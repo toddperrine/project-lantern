@@ -1,4 +1,4 @@
-import type { GenerateStoryRequest, GenerateStoryResponse } from "./types";
+import type { GenerateStoryRequest, GenerateStoryResponse, StoryDiagnostics } from "./types";
 import {
   countWords,
   extractCharacterNames,
@@ -9,7 +9,10 @@ import {
 const TARGET_MIN = 1500;
 const TARGET_MAX = 2000;
 
-export function generateFallbackStory(input: GenerateStoryRequest): GenerateStoryResponse {
+export function generateFallbackStory(
+  input: GenerateStoryRequest,
+  diagnostics: StoryDiagnostics
+): GenerateStoryResponse {
   const characters = extractCharacterNames(input.characterProfiles);
   const rules = extractWorldRules(input.worldBible);
   const settings = extractSettings(input.worldBible);
@@ -44,7 +47,8 @@ export function generateFallbackStory(input: GenerateStoryRequest): GenerateStor
       wordCount: countWords(story),
       charactersUsed: cast.slice(0, 4),
       rulesReferenced: [primaryRule, secondaryRule].filter(Boolean),
-      source: "fallback"
+      source: "fallback",
+      diagnostics
     }
   };
 }
