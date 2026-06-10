@@ -13,15 +13,23 @@ const ACCEPTED_EXTENSIONS = [".md", ".txt"];
 export default function Home() {
   const [worldBible, setWorldBible] = useState<UploadState>({ name: "", content: "" });
   const [characterProfiles, setCharacterProfiles] = useState<UploadState>({ name: "", content: "" });
-  const [storySeed, setStorySeed] = useState("");
+  const [storySeed, setStorySeed] = useState<UploadState>({ name: "", content: "" });
+  const [storyRules, setStoryRules] = useState<UploadState>({ name: "", content: "" });
   const [storyResponse, setStoryResponse] = useState<GenerateStoryResponse | null>(null);
   const [error, setError] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingSample, setIsLoadingSample] = useState(false);
 
   const canGenerate = useMemo(
-    () => Boolean(worldBible.content.trim() && characterProfiles.content.trim() && storySeed.trim() && !isGenerating),
-    [worldBible.content, characterProfiles.content, storySeed, isGenerating]
+    () =>
+      Boolean(
+        worldBible.content.trim() &&
+          characterProfiles.content.trim() &&
+          storySeed.content.trim() &&
+          storyRules.content.trim() &&
+          !isGenerating
+      ),
+    [worldBible.content, characterProfiles.content, storySeed.content, storyRules.content, isGenerating]
   );
 
   async function handleGenerate() {
@@ -38,7 +46,8 @@ export default function Home() {
         body: JSON.stringify({
           worldBible: worldBible.content,
           characterProfiles: characterProfiles.content,
-          storySeed
+          storySeed: storySeed.content,
+          storyRules: storyRules.content
         })
       });
 
@@ -61,22 +70,29 @@ export default function Home() {
     setIsLoadingSample(true);
 
     try {
-      const [world, characters, generationRules, seed] = await Promise.all([
+      const [world, characters, seed, generationRules] = await Promise.all([
         fetchSampleFile("world.md"),
         fetchSampleFile("characters.md"),
-        fetchSampleFile("story_generation_rules.md"),
-        fetchSampleFile("story_seed.md")
+        fetchSampleFile("story_seed.md"),
+        fetchSampleFile("story_generation_rules.md")
       ]);
 
       setWorldBible({
-        name: "Space Cowboy sample world",
-        content: `${world}\n\n${generationRules}`
+        name: "world.md",
+        content: world
       });
       setCharacterProfiles({
-        name: "Space Cowboy sample characters",
+        name: "characters.md",
         content: characters
       });
-      setStorySeed(seed.trim());
+      setStorySeed({
+        name: "story_seed.md",
+        content: seed
+      });
+      setStoryRules({
+        name: "story_generation_rules.md",
+        content: generationRules
+      });
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Unable to load the sample world.");
     } finally {
@@ -92,7 +108,7 @@ export default function Home() {
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-brass">Local creator tool</p>
             <h1 className="mt-2 text-4xl font-semibold tracking-tight text-ink md:text-5xl">Story World Engine</h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-ink/70">
-              Upload canon, add a seed, and generate a literary short story that respects your world and cast.
+              Upload canon, a story request, and narrative rules to generate a literary short story that respects your world and cast.
             </p>
           </div>
           <div className="rounded-md border border-ink/10 bg-white/60 px-4 py-3 text-sm text-ink/70">
@@ -122,16 +138,18 @@ export default function Home() {
               value={characterProfiles}
               onChange={setCharacterProfiles}
             />
-
-            <label className="flex flex-col gap-2 rounded-md border border-ink/10 bg-white/70 p-4 shadow-soft">
-              <span className="text-sm font-semibold text-ink">Story Seed</span>
-              <textarea
-                className="min-h-36 resize-y rounded-md border border-ink/15 bg-white p-3 text-sm leading-6 outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/20"
-                placeholder="Example: A cartographer discovers that a forbidden district has appeared on every map overnight."
-                value={storySeed}
-                onChange={(event) => setStorySeed(event.target.value)}
-              />
-            </label>
+            <UploadPanel
+              title="Story Seed"
+              description="Upload a .md or .txt file with the inciting incident, theme, or conflict to explore."
+              value={storySeed}
+              onChange={setStorySeed}
+            />
+            <UploadPanel
+              title="Story Generation Rules / Narrative Constraints"
+              description="Upload a .md or .txt file with narrative rules, constraints, priorities, and endings guidance."
+              value={storyRules}
+              onChange={setStoryRules}
+            />
 
             {error ? (
               <div className="rounded-md border border-ember/30 bg-ember/10 p-3 text-sm text-ember">{error}</div>
