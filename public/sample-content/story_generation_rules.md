@@ -1,12 +1,18 @@
 # Story Generation Rules
 
-- Write in a literary frontier science-fiction style.
-- Keep the story between 1500 and 2000 words.
-- Preserve the Sable Range world rules exactly.
-- Preserve character motivations, fears, and speech patterns.
-- Do not mention AI, prompts, models, or story generation.
-- Use concrete sensory detail: dust, metal, old leather, static, starlight, engine heat, water, glass.
-- Let technology feel worn, named, repaired, and personal.
-- Moral choices should have consequences.
-- The story should include at least one world rule as a meaningful plot constraint.
-- The ending should resolve the central event but leave emotional residue.
+Every story must obey these rules:
+
+1. The story begins grounded.
+2. No exposition dumps.
+3. No explanation of the simulation.
+4. At least two belief systems must collide.
+5. One belief receives partial confirmation.
+6. Another belief imposes a cost.
+7. The world should feel real but slightly wrong.
+8. Metaphors may become literal.
+9. Nobody is completely right.
+10. Nobody is completely wrong.
+11. Character decisions matter more than plot mechanics.
+12. Endings should create transformation rather than victory.
+13. The simulation should be discovered through behavior, not explanation.
+14. Every story should test the question: Should the world evolve, or should it be reset?
