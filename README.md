@@ -158,6 +158,14 @@ The response shape remains stable for both paths:
     charactersUsed: string[];
     rulesReferenced: string[];
     source: "openai" | "fallback";
+    diagnostics: {
+      openAIEnabled: boolean;
+      apiKeyDetected: boolean;
+      modelUsed: string;
+      openAIRequestAttempted: boolean;
+      openAIRequestSucceeded: boolean;
+      fallbackReason: string | null;
+    };
   };
 }
 ```
