@@ -1,6 +1,7 @@
 const EXPLICIT_NAME_PATTERN = /(?:^|\n)\s*(?:character|name)\s*[:\-]\s*([^\n]+)/gi;
 const HEADING_PATTERN = /(?:^|\n)\s*#{1,3}\s+([^\n]+)/g;
-const RULE_PATTERN = /(?:^|\n)\s*(?:[-*]\s*)?(?:rule|law|canon|principle|truth|constraint)\s*[:\-]\s*(.+)/gi;
+const EXPLICIT_RULE_PATTERN = /(?:^|\n)\s*(?:[-*]\s*)?(?:\d+[.)]\s*)?(?:rule|law|canon|principle|truth|constraint)\s*[:\-]\s*(.+)/gi;
+const LIST_RULE_PATTERN = /(?:^|\n)\s*(?:[-*]|\d+[.)])\s+(.+)/g;
 const SETTING_PATTERN = /(?:^|\n)\s*(?:[-*]\s*)?(?:setting|location|place|region|city|realm)\s*[:\-]\s*(.+)/gi;
 
 export function countWords(text: string): number {
@@ -38,9 +39,16 @@ export function extractCharacterNames(characterProfiles: string): string[] {
 
 export function extractWorldRules(worldBible: string): string[] {
   const rules = new Set<string>();
-  for (const match of worldBible.matchAll(RULE_PATTERN)) {
+  for (const match of worldBible.matchAll(EXPLICIT_RULE_PATTERN)) {
     const rule = cleanSnippet(match[1]);
-    if (rule) {
+    if (isRuleLike(rule)) {
+      rules.add(rule);
+    }
+  }
+
+  for (const match of worldBible.matchAll(LIST_RULE_PATTERN)) {
+    const rule = cleanSnippet(match[1]);
+    if (isRuleLike(rule)) {
       rules.add(rule);
     }
   }
@@ -48,13 +56,13 @@ export function extractWorldRules(worldBible: string): string[] {
   if (rules.size === 0) {
     for (const line of worldBible.split(/\r?\n/)) {
       const trimmed = cleanSnippet(line.replace(/^[-*]\s*/, ""));
-      if (trimmed.length > 28 && /must|never|only|cannot|always|forbidden|requires/i.test(trimmed)) {
+      if (isRuleLike(trimmed)) {
         rules.add(trimmed);
       }
     }
   }
 
-  return [...rules].slice(0, 8);
+  return [...rules].slice(0, 12);
 }
 
 export function extractSettings(worldBible: string): string[] {
@@ -74,8 +82,8 @@ export function inferCharactersUsed(story: string, characterProfiles: string): s
   return names.filter((name) => new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(story));
 }
 
-export function inferRulesReferenced(story: string, worldBible: string): string[] {
-  const rules = extractWorldRules(worldBible);
+export function inferRulesReferenced(story: string, sourceRules: string): string[] {
+  const rules = extractWorldRules(sourceRules);
   return rules.filter((rule) => {
     const keywords = rule
       .toLowerCase()
@@ -90,6 +98,10 @@ export function inferRulesReferenced(story: string, worldBible: string): string[
 
 export function cleanSnippet(value: string | undefined): string {
   return (value ?? "").replace(/\s+/g, " ").replace(/^["']|["']$/g, "").trim().slice(0, 220);
+}
+
+function isRuleLike(value: string): boolean {
+  return value.length > 12 && /must|never|only|cannot|always|forbidden|requires|rule|law|cost|constraint|should|story|ending|character|world|belief|simulation|exposition|metaphor|decision|transformation/i.test(value);
 }
 
 function isCommonHeading(value: string): boolean {
