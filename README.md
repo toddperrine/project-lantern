@@ -26,7 +26,7 @@ story-world-engine/
 |     |- story_generation_rules.md
 |     `- story_seed.md
 |- .env.example                   # Environment variable template
-|- next.config.ts                 # Next.js configuration
+|- next.config.mjs                # Next.js configuration
 |- package.json
 |- tailwind.config.ts
 |- vercel.json                    # Vercel deployment configuration
