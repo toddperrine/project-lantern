@@ -1,4 +1,5 @@
-const NAME_PATTERN = /(?:^|\n)\s*(?:#+\s*)?(?:character\s*:\s*)?([A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+){0,2})\s*(?:[-:]\s*|\n)/g;
+const EXPLICIT_NAME_PATTERN = /(?:^|\n)\s*(?:character|name)\s*[:\-]\s*([^\n]+)/gi;
+const HEADING_PATTERN = /(?:^|\n)\s*#{1,3}\s+([^\n]+)/g;
 const RULE_PATTERN = /(?:^|\n)\s*(?:[-*]\s*)?(?:rule|law|canon|principle|truth|constraint)\s*[:\-]\s*(.+)/gi;
 const SETTING_PATTERN = /(?:^|\n)\s*(?:[-*]\s*)?(?:setting|location|place|region|city|realm)\s*[:\-]\s*(.+)/gi;
 
@@ -8,18 +9,26 @@ export function countWords(text: string): number {
 
 export function extractCharacterNames(characterProfiles: string): string[] {
   const names = new Set<string>();
-  for (const match of characterProfiles.matchAll(NAME_PATTERN)) {
-    const name = match[1]?.trim();
-    if (name && !isCommonHeading(name)) {
+
+  for (const match of characterProfiles.matchAll(EXPLICIT_NAME_PATTERN)) {
+    const name = normalizeCharacterName(match[1]);
+    if (name) {
+      names.add(name);
+    }
+  }
+
+  for (const match of characterProfiles.matchAll(HEADING_PATTERN)) {
+    const name = normalizeCharacterName(match[1]);
+    if (name) {
       names.add(name);
     }
   }
 
   if (names.size === 0) {
-    for (const line of characterProfiles.split(/\r?\n/)) {
-      const trimmed = line.replace(/^#+\s*/, "").trim();
-      if (/^[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+){0,2}$/.test(trimmed)) {
-        names.add(trimmed);
+    for (const rawLine of characterProfiles.split(/\r?\n/)) {
+      const name = normalizeCharacterName(rawLine);
+      if (name) {
+        names.add(name);
       }
     }
   }
@@ -84,7 +93,28 @@ export function cleanSnippet(value: string | undefined): string {
 }
 
 function isCommonHeading(value: string): boolean {
-  return /^(world|characters|profiles|rules|locations|timeline|magic|technology|history)$/i.test(value);
+  return /^(world|characters|character|profiles|rules|locations|timeline|magic|technology|history|source|role|enneagram|core fear|fear|desire|weakness|strength|want|need|wound|secret|notes|consistency notes)$/i.test(value);
+}
+
+function normalizeCharacterName(value: string | undefined): string | null {
+  const cleaned = cleanSnippet(value)
+    .replace(/^[-*#\d.)\s]+/, "")
+    .replace(/\b(character|profile)\b$/i, "")
+    .trim();
+
+  if (!cleaned || isCommonHeading(cleaned) || cleaned.includes(":")) {
+    return null;
+  }
+
+  if (cleaned === cleaned.toUpperCase() && /[A-Z]/.test(cleaned)) {
+    return null;
+  }
+
+  if (!/^[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+){0,2}$/.test(cleaned)) {
+    return null;
+  }
+
+  return cleaned;
 }
 
 function escapeRegExp(value: string): string {
