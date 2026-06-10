@@ -128,6 +128,17 @@ Build Command: npm run build
 Development Command: npm run dev
 ```
 
+After deployment, generate a story and check the metadata panel. It reports:
+
+- OpenAI Enabled
+- OPENAI_API_KEY detected
+- Model requested
+- OpenAI Attempted
+- OpenAI Succeeded
+- Fallback Reason
+
+If `Generator source` is `fallback`, confirm `OPENAI_API_KEY` is configured for the same Vercel environment you deployed, such as Production or Preview.
+
 ## Architecture Notes
 
 The frontend reads uploaded `.md` and `.txt` files in the browser and sends their text content to `/api/generate` with the story seed.
@@ -147,6 +158,14 @@ The response shape remains stable for both paths:
     charactersUsed: string[];
     rulesReferenced: string[];
     source: "openai" | "fallback";
+    diagnostics: {
+      openAIEnabled: boolean;
+      apiKeyDetected: boolean;
+      modelRequested: string;
+      openAIRequestAttempted: boolean;
+      openAIRequestSucceeded: boolean;
+      fallbackReason: string | null;
+    };
   };
 }
 ```
