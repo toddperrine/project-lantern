@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { GenerateStoryRequest, GenerateStoryResponse } from "./types";
+import type { GenerateStoryRequest, GenerateStoryResponse, StoryDiagnostics } from "./types";
 import {
   countWords,
   inferCharactersUsed,
@@ -18,13 +18,31 @@ export function hasOpenAIKey(): boolean {
   return Boolean(process.env.OPENAI_API_KEY?.trim());
 }
 
+export function getOpenAIModel(): string {
+  return process.env.OPENAI_MODEL?.trim() || DEFAULT_MODEL;
+}
+
+export function getOpenAIDiagnostics(overrides: Partial<StoryDiagnostics> = {}): StoryDiagnostics {
+  const apiKeyDetected = hasOpenAIKey();
+
+  return {
+    openAIEnabled: apiKeyDetected,
+    apiKeyDetected,
+    modelRequested: getOpenAIModel(),
+    openAIRequestAttempted: false,
+    openAIRequestSucceeded: false,
+    fallbackReason: null,
+    ...overrides
+  };
+}
+
 export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<GenerateStoryResponse> {
   const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
   });
 
   const response = await client.chat.completions.create({
-    model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
+    model: getOpenAIModel(),
     temperature: 0.8,
     max_tokens: 4500,
     response_format: { type: "json_object" },
@@ -54,7 +72,11 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
       wordCount: countWords(story),
       charactersUsed: normalizeList(payload.charactersUsed, inferCharactersUsed(story, input.characterProfiles)),
       rulesReferenced: normalizeList(payload.rulesReferenced, inferRulesReferenced(story, input.worldBible)),
-      source: "openai"
+      source: "openai",
+      diagnostics: getOpenAIDiagnostics({
+        openAIRequestAttempted: true,
+        openAIRequestSucceeded: true
+      })
     }
   };
 }
