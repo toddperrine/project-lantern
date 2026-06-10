@@ -75,12 +75,17 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
     throw new Error("OpenAI response did not include a story after expansion.");
   }
 
+  const wordCount = countWords(story);
+  if (wordCount < MIN_STORY_WORDS) {
+    throw new Error(`OpenAI story remained under ${MIN_STORY_WORDS} words after expansion (${wordCount} words).`);
+  }
+
   const ruleSources = `${input.worldBible}\n\n${input.storyRules || DEFAULT_NARRATIVE_RULES}`;
 
   return {
     story,
     metadata: {
-      wordCount: countWords(story),
+      wordCount,
       charactersUsed: normalizeList(payload.charactersUsed, inferCharactersUsed(story, input.characterProfiles)),
       rulesReferenced: normalizeList(payload.rulesReferenced, inferRulesReferenced(story, ruleSources)),
       source: "openai",
