@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, useMemo, useState } from "react";
 import type { GenerateStoryResponse } from "@/lib/types";
+import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 
 type UploadState = {
   name: string;
@@ -56,7 +57,7 @@ export default function Home() {
         throw new Error(payload.error ?? "Story generation failed.");
       }
 
-      setStoryResponse(payload as GenerateStoryResponse);
+      setStoryResponse(normalizeGenerateStoryResponse(payload));
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Story generation failed.");
     } finally {
@@ -178,6 +179,28 @@ async function fetchSampleFile(fileName: string): Promise<string> {
   }
 
   return response.text();
+}
+
+function normalizeGenerateStoryResponse(payload: unknown): GenerateStoryResponse {
+  const normalizedPayload = normalizeStoryPayload(payload) as Partial<GenerateStoryResponse>;
+  const story = normalizeStoryText(normalizedPayload.story);
+
+  if (!story || !normalizedPayload.metadata) {
+    throw new Error("Story generation returned an invalid response.");
+  }
+
+  return {
+    ...normalizedPayload,
+    story,
+    metadata: {
+      ...normalizedPayload.metadata,
+      wordCount: countWords(story)
+    }
+  } as GenerateStoryResponse;
+}
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
 function UploadPanel({
