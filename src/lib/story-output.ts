@@ -20,8 +20,15 @@ export function normalizeStoryText(value: unknown): string {
     story = stripMarkdownFence(nested.story).trim();
   }
 
+  const extractedStory = extractStoryField(story);
+  if (extractedStory) {
+    story = extractedStory;
+  }
+
   return story
     .replace(/\r\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\"/g, "\"")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -70,4 +77,14 @@ function parseJsonObject(value: string): StoryPayloadLike | null {
   }
 
   return null;
+}
+
+function extractStoryField(value: string): string | null {
+  const cleaned = stripMarkdownFence(value);
+  if (!cleaned.startsWith("{") || !/"story"\s*:/.test(cleaned)) {
+    return null;
+  }
+
+  const match = cleaned.match(/"story"\s*:\s*"([\s\S]*?)"\s*(?:,\s*"(?:charactersUsed|rulesReferenced|metadata)"|}\s*$)/);
+  return match?.[1]?.trim() ?? null;
 }
