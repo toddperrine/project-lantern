@@ -1,4 +1,5 @@
 import type { GenerateStoryRequest, GenerateStoryResponse, StoryDiagnostics } from "./types";
+import { normalizeStoryText } from "./story-output";
 import {
   countWords,
   extractCharacterNames,
@@ -48,7 +49,7 @@ export function generateFallbackStory(
     story += `\n\n${paragraph}`;
   }
 
-  story = trimToWordLimit(story, TARGET_MAX);
+  story = normalizeStoryText(trimToWordLimit(story, TARGET_MAX));
 
   return {
     story,
@@ -82,7 +83,7 @@ function buildExpansionParagraphs(cast: string[], primaryRule: string, secondary
 function trimToWordLimit(text: string, maxWords: number): string {
   const words = text.trim().split(/\s+/);
   if (words.length <= maxWords) {
-    return text;
+    return text.trim();
   }
 
   return `${words.slice(0, maxWords).join(" ").replace(/[,\s]+$/, "")}.`;
