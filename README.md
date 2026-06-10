@@ -26,6 +26,7 @@ story-world-engine/
 |     |- story_generation_rules.md
 |     `- story_seed.md
 |- .env.example                   # Environment variable template
+|- next.config.ts                 # Next.js configuration
 |- package.json
 |- tailwind.config.ts
 `- tsconfig.json
