@@ -2,6 +2,7 @@ export type GenerateStoryRequest = {
   worldBible: string;
   characterProfiles: string;
   storySeed: string;
+  storyRules: string;
 };
 
 export type StoryMetadata = {
