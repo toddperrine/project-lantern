@@ -25,7 +25,8 @@ export async function POST(request: Request) {
   const input = {
     worldBible: body.worldBible!.trim(),
     characterProfiles: body.characterProfiles!.trim(),
-    storySeed: body.storySeed!.trim()
+    storySeed: body.storySeed!.trim(),
+    storyRules: body.storyRules!.trim()
   };
 
   if (!hasOpenAIKey()) {
@@ -66,10 +67,15 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
   }
 
   if (!body.storySeed?.trim()) {
-    return "Add a story seed before generating a story.";
+    return "Upload a story seed before generating a story.";
   }
 
-  const contextLength = body.worldBible.length + body.characterProfiles.length + body.storySeed.length;
+  if (!body.storyRules?.trim()) {
+    return "Upload story generation rules before generating a story.";
+  }
+
+  const contextLength =
+    body.worldBible.length + body.characterProfiles.length + body.storySeed.length + body.storyRules.length;
   if (contextLength > MAX_CONTEXT_CHARS) {
     return "The uploaded context is too large for this local MVP. Please shorten the files and try again.";
   }
