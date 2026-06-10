@@ -9,9 +9,19 @@ export type StoryMetadata = {
   charactersUsed: string[];
   rulesReferenced: string[];
   source: "openai" | "fallback";
+  diagnostics: StoryDiagnostics;
 };
 
 export type GenerateStoryResponse = {
   story: string;
   metadata: StoryMetadata;
+};
+
+export type StoryDiagnostics = {
+  openAIEnabled: boolean;
+  apiKeyDetected: boolean;
+  modelUsed: string;
+  openAIRequestAttempted: boolean;
+  openAIRequestSucceeded: boolean;
+  fallbackReason: string | null;
 };
