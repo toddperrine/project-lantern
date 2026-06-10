@@ -1,0 +1,1 @@
+During a drought on Mercy Station, Jo Bellweather repairs a dead satellite beacon and receives a complete message from the Choir: Saint Orra's Well exists, Elias Rook has found its route, and Mara Venn is carrying the solar brand of someone who once swore to protect it.

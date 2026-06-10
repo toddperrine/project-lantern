@@ -1,43 +1,54 @@
 # Story World Engine
 
-Story World Engine is a local-development MVP web application for creators who want to upload canon documents and generate original short stories that stay aligned with a fictional world.
+Story World Engine is a local-first MVP for creators who want to upload a world bible, upload character profiles, add a story seed, and generate an original short story that follows the uploaded canon.
+
+The app uses OpenAI when `OPENAI_API_KEY` is configured. If no key is present, it automatically falls back to a deterministic local generator so the MVP still runs without external services.
 
 ## Project Structure
 
 ```text
-.
-├── src
-│   ├── app
-│   │   ├── api/generate/route.ts   # Local generation API route
-│   │   ├── globals.css             # Tailwind and global app styles
-│   │   ├── layout.tsx              # Root layout and metadata
-│   │   └── page.tsx                # Landing page and app shell
-│   ├── components
-│   │   ├── FileDrop.tsx            # Reusable .md/.txt upload control
-│   │   └── StoryWorkspace.tsx      # Creator workflow and story display
-│   ├── lib
-│   │   ├── storyGenerator.ts       # Deterministic MVP story generation pipeline
-│   │   ├── text.ts                 # Text helpers
-│   │   └── worldParser.ts          # World/character parsing helpers
-│   └── types
-│       └── story.ts                # Request/response types
-├── package.json
-├── postcss.config.mjs
-├── eslint.config.mjs
-├── next.config.ts
-└── tsconfig.json
+story-world-engine/
+|- src/
+|  |- app/
+|  |  |- api/generate/route.ts    # Story generation API route
+|  |  |- globals.css              # Tailwind and global styles
+|  |  |- layout.tsx               # App shell and metadata
+|  |  `- page.tsx                 # Upload UI and story output
+|  `- lib/
+|     |- fallback-generator.ts    # Deterministic fallback story generator
+|     |- openai-generator.ts      # Official OpenAI Node SDK integration
+|     |- story-analysis.ts        # Metadata extraction helpers
+|     `- types.ts                 # Shared request/response types
+|- public/
+|  `- sample-content/
+|     |- world.md                 # Space Cowboy world bible
+|     |- characters.md            # Space Cowboy character profiles
+|     |- story_generation_rules.md
+|     `- story_seed.md
+|- .env.example                   # Environment variable template
+|- next.config.ts                 # Next.js configuration
+|- package.json
+|- tailwind.config.ts
+`- tsconfig.json
 ```
 
 ## Features
 
-- Upload a World Bible as `.md` or `.txt`.
-- Upload Character Profiles as `.md` or `.txt`.
-- Enter a free-form Story Seed.
-- Generate and display a 1500–2000 word short story in the browser.
-- Maintain consistency by extracting character names, character notes, world rules, and setting details from the uploaded files.
-- No authentication, payments, database, AWS, or external story-generation service required.
+- Upload a World Bible as `.md` or `.txt`
+- Upload Character Profiles as `.md` or `.txt`
+- Load the included Space Cowboy sample world without manual uploads
+- Enter a Story Seed
+- Generate a 1500-2000 word literary short story
+- Preserve world rules, character consistency, tone, and story seed
+- Display the story in the browser
+- Return metadata:
+  - word count
+  - characters used
+  - rules referenced
+  - generator source
+- No authentication, payments, database, AWS, voice, memory, or subscriptions
 
-## Setup Instructions
+## Setup
 
 Install dependencies:
 
@@ -45,23 +56,73 @@ Install dependencies:
 npm install
 ```
 
-## Run Instructions
+Create a local environment file:
 
-Start the local development server:
+```bash
+cp .env.example .env.local
+```
+
+On Windows PowerShell, use:
+
+```powershell
+Copy-Item .env.example .env.local
+```
+
+Add your OpenAI API key to `.env.local`:
+
+```bash
+OPENAI_API_KEY=your_api_key_here
+```
+
+Optionally choose a different OpenAI model:
+
+```bash
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+If `OPENAI_API_KEY` is missing or empty, the API route uses the deterministic fallback generator.
+
+## Run Locally
+
+Start the development server:
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open the app:
+
+```text
+http://localhost:3000
+```
 
 ## Useful Commands
 
 ```bash
 npm run typecheck
 npm run build
+npm run lint
 ```
 
-## Local Architecture Notes
+## Architecture Notes
 
-The app reads uploaded files in the browser, sends their text plus the story seed to a Next.js API route, and uses a deterministic local generator to build a draft. This keeps the MVP simple and private for local development while leaving a clean seam for replacing `src/lib/storyGenerator.ts` with an LLM-backed implementation later.
+The frontend reads uploaded `.md` and `.txt` files in the browser and sends their text content to `/api/generate` with the story seed.
+
+The API route validates the payload, checks for `OPENAI_API_KEY`, and chooses one of two generation paths:
+
+1. OpenAI-powered generation through the official `openai` Node SDK.
+2. Deterministic local fallback generation when no key is configured or the OpenAI request fails.
+
+The response shape remains stable for both paths:
+
+```ts
+{
+  story: string;
+  metadata: {
+    wordCount: number;
+    charactersUsed: string[];
+    rulesReferenced: string[];
+    source: "openai" | "fallback";
+  };
+}
+```

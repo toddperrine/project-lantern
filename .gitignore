@@ -2,5 +2,8 @@ node_modules
 .next
 out
 .env*.local
-*.tsbuildinfo
-.DS_Store
+!.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

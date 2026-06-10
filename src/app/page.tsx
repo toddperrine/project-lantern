@@ -1,43 +1,280 @@
-import { StoryWorkspace } from '@/components/StoryWorkspace';
+"use client";
 
-const steps = [
-  'Upload a world bible as Markdown or plain text.',
-  'Upload character profiles with motivations, relationships, and boundaries.',
-  'Add a story seed and generate a canon-aware short story in the browser.',
-];
+import { type ChangeEvent, useMemo, useState } from "react";
+import type { GenerateStoryResponse } from "@/lib/types";
+
+type UploadState = {
+  name: string;
+  content: string;
+};
+
+const ACCEPTED_EXTENSIONS = [".md", ".txt"];
 
 export default function Home() {
-  return (
-    <main className="min-h-screen">
-      <section className="mx-auto max-w-7xl px-6 py-14 lg:px-8 lg:py-20">
-        <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
-          <div>
-            <p className="inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-semibold uppercase tracking-[0.28em] text-cyan-200">
-              Story World Engine MVP
-            </p>
-            <h1 className="mt-8 max-w-4xl text-5xl font-black tracking-tight text-white sm:text-6xl lg:text-7xl">
-              Generate canon-aware short stories from your world files.
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-              A focused local-development app for creators: no authentication, no payments, no database, and no cloud storage. Upload your canon, seed a conflict, and produce a structured 1500–2000 word draft.
-            </p>
-          </div>
+  const [worldBible, setWorldBible] = useState<UploadState>({ name: "", content: "" });
+  const [characterProfiles, setCharacterProfiles] = useState<UploadState>({ name: "", content: "" });
+  const [storySeed, setStorySeed] = useState("");
+  const [storyResponse, setStoryResponse] = useState<GenerateStoryResponse | null>(null);
+  const [error, setError] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingSample, setIsLoadingSample] = useState(false);
 
-          <div className="rounded-[2rem] border border-slate-700 bg-slate-900/70 p-6 shadow-2xl shadow-cyan-950/20">
-            <h2 className="text-xl font-bold text-white">MVP Flow</h2>
-            <ol className="mt-5 space-y-4">
-              {steps.map((step, index) => (
-                <li key={step} className="flex gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-cyan-300 font-bold text-slate-950">{index + 1}</span>
-                  <span className="text-sm leading-6 text-slate-300">{step}</span>
-                </li>
-              ))}
-            </ol>
+  const canGenerate = useMemo(
+    () => Boolean(worldBible.content.trim() && characterProfiles.content.trim() && storySeed.trim() && !isGenerating),
+    [worldBible.content, characterProfiles.content, storySeed, isGenerating]
+  );
+
+  async function handleGenerate() {
+    setError("");
+    setStoryResponse(null);
+    setIsGenerating(true);
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          worldBible: worldBible.content,
+          characterProfiles: characterProfiles.content,
+          storySeed
+        })
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Story generation failed.");
+      }
+
+      setStoryResponse(payload as GenerateStoryResponse);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Story generation failed.");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  async function handleLoadSampleWorld() {
+    setError("");
+    setStoryResponse(null);
+    setIsLoadingSample(true);
+
+    try {
+      const [world, characters, generationRules, seed] = await Promise.all([
+        fetchSampleFile("world.md"),
+        fetchSampleFile("characters.md"),
+        fetchSampleFile("story_generation_rules.md"),
+        fetchSampleFile("story_seed.md")
+      ]);
+
+      setWorldBible({
+        name: "Space Cowboy sample world",
+        content: `${world}\n\n${generationRules}`
+      });
+      setCharacterProfiles({
+        name: "Space Cowboy sample characters",
+        content: characters
+      });
+      setStorySeed(seed.trim());
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to load the sample world.");
+    } finally {
+      setIsLoadingSample(false);
+    }
+  }
+
+  return (
+    <main className="min-h-screen px-5 py-6 md:px-8">
+      <section className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <header className="flex flex-col gap-3 border-b border-ink/10 pb-5 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-brass">Local creator tool</p>
+            <h1 className="mt-2 text-4xl font-semibold tracking-tight text-ink md:text-5xl">Story World Engine</h1>
+            <p className="mt-3 max-w-2xl text-base leading-7 text-ink/70">
+              Upload canon, add a seed, and generate a literary short story that respects your world and cast.
+            </p>
           </div>
+          <div className="rounded-md border border-ink/10 bg-white/60 px-4 py-3 text-sm text-ink/70">
+            No authentication, database, payments, AWS, voice, memory, or subscriptions.
+          </div>
+        </header>
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
+          <section className="flex flex-col gap-4">
+            <button
+              className="rounded-md border border-brass/40 bg-white/75 px-5 py-3 text-sm font-semibold text-brass shadow-soft transition hover:border-brass hover:bg-paper disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isLoadingSample || isGenerating}
+              onClick={handleLoadSampleWorld}
+            >
+              {isLoadingSample ? "Loading sample world..." : "Load Sample World"}
+            </button>
+
+            <UploadPanel
+              title="World Bible"
+              description="Upload a .md or .txt file with rules, places, tone, history, and canon."
+              value={worldBible}
+              onChange={setWorldBible}
+            />
+            <UploadPanel
+              title="Character Profiles"
+              description="Upload a .md or .txt file with names, motivations, relationships, and constraints."
+              value={characterProfiles}
+              onChange={setCharacterProfiles}
+            />
+
+            <label className="flex flex-col gap-2 rounded-md border border-ink/10 bg-white/70 p-4 shadow-soft">
+              <span className="text-sm font-semibold text-ink">Story Seed</span>
+              <textarea
+                className="min-h-36 resize-y rounded-md border border-ink/15 bg-white p-3 text-sm leading-6 outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/20"
+                placeholder="Example: A cartographer discovers that a forbidden district has appeared on every map overnight."
+                value={storySeed}
+                onChange={(event) => setStorySeed(event.target.value)}
+              />
+            </label>
+
+            {error ? (
+              <div className="rounded-md border border-ember/30 bg-ember/10 p-3 text-sm text-ember">{error}</div>
+            ) : null}
+
+            <button
+              className="rounded-md bg-ink px-5 py-3 text-sm font-semibold text-paper transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:bg-ink/35"
+              disabled={!canGenerate}
+              onClick={handleGenerate}
+            >
+              {isGenerating ? "Generating story..." : "Generate Story"}
+            </button>
+          </section>
+
+          <StoryOutput response={storyResponse} isGenerating={isGenerating} />
         </div>
       </section>
-
-      <StoryWorkspace />
     </main>
   );
+}
+
+async function fetchSampleFile(fileName: string): Promise<string> {
+  const response = await fetch(`/sample-content/${fileName}`);
+  if (!response.ok) {
+    throw new Error(`Unable to load sample file: ${fileName}`);
+  }
+
+  return response.text();
+}
+
+function UploadPanel({
+  title,
+  description,
+  value,
+  onChange
+}: {
+  title: string;
+  description: string;
+  value: UploadState;
+  onChange: (value: UploadState) => void;
+}) {
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+    if (!ACCEPTED_EXTENSIONS.includes(extension)) {
+      event.target.value = "";
+      onChange({ name: "", content: "" });
+      return;
+    }
+
+    onChange({
+      name: file.name,
+      content: await file.text()
+    });
+  }
+
+  return (
+    <section className="rounded-md border border-ink/10 bg-white/70 p-4 shadow-soft">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-lg font-semibold text-ink">{title}</h2>
+        <p className="text-sm leading-6 text-ink/65">{description}</p>
+      </div>
+      <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-brass/55 bg-paper/70 px-4 py-6 text-center transition hover:border-brass hover:bg-paper">
+        <span className="text-sm font-semibold text-brass">{value.name || "Choose .md or .txt file"}</span>
+        <span className="mt-1 text-xs text-ink/55">
+          {value.content ? `${value.content.length.toLocaleString()} characters loaded` : "Files stay local until generation"}
+        </span>
+        <input className="sr-only" type="file" accept=".md,.txt,text/markdown,text/plain" onChange={handleFileChange} />
+      </label>
+    </section>
+  );
+}
+
+function StoryOutput({
+  response,
+  isGenerating
+}: {
+  response: GenerateStoryResponse | null;
+  isGenerating: boolean;
+}) {
+  if (isGenerating) {
+    return (
+      <section className="min-h-[640px] rounded-md border border-ink/10 bg-white/75 p-6 shadow-soft">
+        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brass">Drafting</p>
+        <div className="mt-6 space-y-3">
+          <div className="h-4 w-11/12 animate-pulse rounded bg-ink/10" />
+          <div className="h-4 w-10/12 animate-pulse rounded bg-ink/10" />
+          <div className="h-4 w-8/12 animate-pulse rounded bg-ink/10" />
+        </div>
+      </section>
+    );
+  }
+
+  if (!response) {
+    return (
+      <section className="flex min-h-[640px] items-center justify-center rounded-md border border-ink/10 bg-white/60 p-6 text-center shadow-soft">
+        <div>
+          <h2 className="text-2xl font-semibold text-ink">Your story will appear here</h2>
+          <p className="mt-3 max-w-md text-sm leading-6 text-ink/65">
+            The API uses OpenAI when `OPENAI_API_KEY` is set, and the local deterministic engine when it is not.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-md border border-ink/10 bg-white/80 p-5 shadow-soft md:p-7">
+      <div className="flex flex-col gap-3 border-b border-ink/10 pb-5 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brass">Generated Story</p>
+          <h2 className="mt-2 text-2xl font-semibold text-ink">
+            {response.metadata.source === "openai" ? "OpenAI-powered draft" : "Fallback local draft"}
+          </h2>
+        </div>
+        <div className="grid gap-2 text-sm text-ink/70 sm:grid-cols-2 md:min-w-80">
+          <MetadataItem label="Word count" value={response.metadata.wordCount.toLocaleString()} />
+          <MetadataItem label="Source" value={response.metadata.source} />
+          <MetadataItem label="Characters" value={formatList(response.metadata.charactersUsed)} />
+          <MetadataItem label="Rules" value={formatList(response.metadata.rulesReferenced)} />
+        </div>
+      </div>
+
+      <article className="mt-6 max-w-none whitespace-pre-wrap text-base leading-8 text-ink">
+        {response.story}
+      </article>
+    </section>
+  );
+}
+
+function MetadataItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-paper/80 px-3 py-2">
+      <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-ink/45">{label}</dt>
+      <dd className="mt-1 line-clamp-2 text-sm text-ink">{value}</dd>
+    </div>
+  );
+}
+
+function formatList(values: string[]): string {
+  return values.length > 0 ? values.join(", ") : "None detected";
 }

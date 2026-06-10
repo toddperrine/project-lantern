@@ -1,36 +1,59 @@
-import { NextResponse } from 'next/server';
-import { generateStory } from '@/lib/storyGenerator';
-import type { StoryGenerationRequest } from '@/types/story';
+import { NextResponse } from "next/server";
+import { generateFallbackStory } from "@/lib/fallback-generator";
+import { generateOpenAIStory, hasOpenAIKey } from "@/lib/openai-generator";
+import type { GenerateStoryRequest } from "@/lib/types";
 
-const MAX_TEXT_LENGTH = 80_000;
-
-function isValidPayload(payload: unknown): payload is StoryGenerationRequest {
-  if (!payload || typeof payload !== 'object') {
-    return false;
-  }
-
-  const candidate = payload as Partial<StoryGenerationRequest>;
-  return (
-    typeof candidate.worldBible === 'string' &&
-    typeof candidate.characterProfiles === 'string' &&
-    typeof candidate.storySeed === 'string'
-  );
-}
+const MAX_CONTEXT_CHARS = 120_000;
 
 export async function POST(request: Request) {
-  const payload = await request.json().catch(() => null);
+  let body: Partial<GenerateStoryRequest>;
 
-  if (!isValidPayload(payload)) {
-    return NextResponse.json({ error: 'World bible, character profiles, and story seed are required.' }, { status: 400 });
+  try {
+    body = (await request.json()) as Partial<GenerateStoryRequest>;
+  } catch {
+    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
   }
 
-  if (!payload.worldBible.trim() || !payload.characterProfiles.trim() || !payload.storySeed.trim()) {
-    return NextResponse.json({ error: 'Please upload both files and enter a story seed before generating.' }, { status: 400 });
+  const validationError = validateRequest(body);
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
-  if (payload.worldBible.length > MAX_TEXT_LENGTH || payload.characterProfiles.length > MAX_TEXT_LENGTH) {
-    return NextResponse.json({ error: 'Uploaded files are too large for the local MVP limit.' }, { status: 413 });
+  const input = {
+    worldBible: body.worldBible!.trim(),
+    characterProfiles: body.characterProfiles!.trim(),
+    storySeed: body.storySeed!.trim()
+  };
+
+  if (!hasOpenAIKey()) {
+    return NextResponse.json(generateFallbackStory(input));
   }
 
-  return NextResponse.json(generateStory(payload));
+  try {
+    return NextResponse.json(await generateOpenAIStory(input));
+  } catch (error) {
+    console.error("OpenAI story generation failed; using deterministic fallback.", error);
+    return NextResponse.json(generateFallbackStory(input));
+  }
+}
+
+function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
+  if (!body.worldBible?.trim()) {
+    return "Upload a world bible before generating a story.";
+  }
+
+  if (!body.characterProfiles?.trim()) {
+    return "Upload character profiles before generating a story.";
+  }
+
+  if (!body.storySeed?.trim()) {
+    return "Add a story seed before generating a story.";
+  }
+
+  const contextLength = body.worldBible.length + body.characterProfiles.length + body.storySeed.length;
+  if (contextLength > MAX_CONTEXT_CHARS) {
+    return "The uploaded context is too large for this local MVP. Please shorten the files and try again.";
+  }
+
+  return null;
 }

@@ -1,31 +1,29 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  color-scheme: dark;
-  background: #020617;
+  color-scheme: light;
 }
 
 * {
   box-sizing: border-box;
 }
 
-html {
-  scroll-behavior: smooth;
-}
-
 body {
   margin: 0;
-  min-height: 100vh;
   background:
-    radial-gradient(circle at 18% 0%, rgba(34, 211, 238, 0.18), transparent 28rem),
-    radial-gradient(circle at 85% 10%, rgba(99, 102, 241, 0.16), transparent 30rem),
-    linear-gradient(135deg, #020617 0%, #0f172a 50%, #111827 100%);
-  color: #e2e8f0;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    radial-gradient(circle at top left, rgba(187, 90, 60, 0.12), transparent 36rem),
+    linear-gradient(135deg, #fffaf2 0%, #f3ebdc 100%);
+  color: #171412;
 }
 
 button,
 input,
 textarea {
   font: inherit;
+}
+
+::selection {
+  background: rgba(155, 107, 47, 0.24);
 }
