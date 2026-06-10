@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { GenerateStoryRequest, GenerateStoryResponse, StoryDiagnostics } from "./types";
+import { normalizeStoryPayload, normalizeStoryText, normalizeStringList } from "./story-output";
 import {
   countWords,
   inferCharactersUsed,
@@ -60,7 +61,7 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
   });
 
   const payload = parseStoryPayload(response.choices[0]?.message.content ?? "");
-  const story = payload.story.trim();
+  const story = normalizeStoryText(payload.story);
 
   if (!story) {
     throw new Error("OpenAI response did not include a story.");
@@ -110,22 +111,14 @@ ${input.storyRules}`;
 }
 
 function parseStoryPayload(rawText: string): OpenAIStoryPayload {
-  const cleaned = rawText.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  const payload = normalizeStoryPayload(rawText);
+  const story = normalizeStoryText(payload.story ?? rawText);
 
-  try {
-    return JSON.parse(cleaned) as OpenAIStoryPayload;
-  } catch {
-    const storyMatch = cleaned.match(/"story"\s*:\s*"([\s\S]*)"\s*,\s*"charactersUsed"/);
-    if (storyMatch?.[1]) {
-      return {
-        story: storyMatch[1].replace(/\\"/g, "\"").replace(/\\n/g, "\n")
-      };
-    }
-
-    return {
-      story: cleaned
-    };
-  }
+  return {
+    story,
+    charactersUsed: normalizeStringList(payload.charactersUsed),
+    rulesReferenced: normalizeStringList(payload.rulesReferenced)
+  };
 }
 
 function normalizeList(values: string[] | undefined, fallback: string[]): string[] {
