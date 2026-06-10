@@ -29,6 +29,7 @@ story-world-engine/
 |- next.config.ts                 # Next.js configuration
 |- package.json
 |- tailwind.config.ts
+|- vercel.json                    # Vercel deployment configuration
 `- tsconfig.json
 ```
 
@@ -102,6 +103,29 @@ http://localhost:3000
 npm run typecheck
 npm run build
 npm run lint
+```
+
+## Deploy To Vercel
+
+Story World Engine is configured for Vercel with `vercel.json`.
+
+1. Import the repository into Vercel.
+2. Choose the Next.js framework preset if Vercel does not detect it automatically.
+3. Set the production environment variables:
+
+```text
+OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+`OPENAI_API_KEY` is required for OpenAI-powered story generation in production. If it is not set, the app still deploys and uses the deterministic fallback generator.
+
+Vercel build settings:
+
+```text
+Install Command: npm install
+Build Command: npm run build
+Development Command: npm run dev
 ```
 
 ## Architecture Notes
