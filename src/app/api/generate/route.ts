@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { generateFallbackStory } from "@/lib/fallback-generator";
-import { generateOpenAIStory, hasOpenAIKey } from "@/lib/openai-generator";
+import { generateOpenAIStory, getOpenAIDiagnostics, hasOpenAIKey } from "@/lib/openai-generator";
 import type { GenerateStoryRequest } from "@/lib/types";
 
 const MAX_CONTEXT_CHARS = 120_000;
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   let body: Partial<GenerateStoryRequest>;
@@ -26,14 +29,30 @@ export async function POST(request: Request) {
   };
 
   if (!hasOpenAIKey()) {
-    return NextResponse.json(generateFallbackStory(input));
+    return NextResponse.json(
+      generateFallbackStory(
+        input,
+        getOpenAIDiagnostics({
+          fallbackReason: "OPENAI_API_KEY is missing or empty in this deployment environment."
+        })
+      )
+    );
   }
 
   try {
     return NextResponse.json(await generateOpenAIStory(input));
   } catch (error) {
-    console.error("OpenAI story generation failed; using deterministic fallback.", error);
-    return NextResponse.json(generateFallbackStory(input));
+    const fallbackReason = `OpenAI request failed: ${summarizeOpenAIError(error)}`;
+    console.error("OpenAI story generation failed; using deterministic fallback.", fallbackReason);
+    return NextResponse.json(
+      generateFallbackStory(
+        input,
+        getOpenAIDiagnostics({
+          openAIRequestAttempted: true,
+          fallbackReason
+        })
+      )
+    );
   }
 }
 
@@ -56,4 +75,16 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
   }
 
   return null;
+}
+
+function summarizeOpenAIError(error: unknown): string {
+  if (error instanceof Error) {
+    return redactSecretLikeText(error.message);
+  }
+
+  return "Unknown error";
+}
+
+function redactSecretLikeText(value: string): string {
+  return value.replace(/sk-[A-Za-z0-9_-]+/g, "sk-...[redacted]");
 }
