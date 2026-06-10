@@ -242,6 +242,8 @@ function StoryOutput({
     );
   }
 
+  const diagnostics = response.metadata.diagnostics;
+
   return (
     <section className="rounded-md border border-ink/10 bg-white/80 p-5 shadow-soft md:p-7">
       <div className="flex flex-col gap-3 border-b border-ink/10 pb-5 md:flex-row md:items-start md:justify-between">
@@ -256,6 +258,12 @@ function StoryOutput({
           <MetadataItem label="Source" value={response.metadata.source} />
           <MetadataItem label="Characters" value={formatList(response.metadata.charactersUsed)} />
           <MetadataItem label="Rules" value={formatList(response.metadata.rulesReferenced)} />
+          <MetadataItem label="OpenAI Enabled" value={formatBoolean(diagnostics.openAIEnabled)} />
+          <MetadataItem label="API Key Detected" value={formatBoolean(diagnostics.apiKeyDetected)} />
+          <MetadataItem label="Model Used" value={diagnostics.modelUsed} />
+          <MetadataItem label="OpenAI Attempted" value={formatBoolean(diagnostics.openAIRequestAttempted)} />
+          <MetadataItem label="OpenAI Succeeded" value={formatBoolean(diagnostics.openAIRequestSucceeded)} />
+          <MetadataItem label="Fallback Reason" value={diagnostics.fallbackReason ?? "None"} />
         </div>
       </div>
 
@@ -270,11 +278,15 @@ function MetadataItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md bg-paper/80 px-3 py-2">
       <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-ink/45">{label}</dt>
-      <dd className="mt-1 line-clamp-2 text-sm text-ink">{value}</dd>
+      <dd className="mt-1 break-words text-sm text-ink">{value}</dd>
     </div>
   );
 }
 
 function formatList(values: string[]): string {
   return values.length > 0 ? values.join(", ") : "None detected";
+}
+
+function formatBoolean(value: boolean): string {
+  return value ? "Yes" : "No";
 }
