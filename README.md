@@ -50,6 +50,9 @@ story-world-engine/
   - Length Target
 - Recommend architecture settings with deterministic local heuristics
 - Show recommendation explanation and confidence before applying
+- Save generated stories locally in the browser
+- Restore or delete saved stories
+- Copy stories, copy social teasers, download `.txt`, download `.md`, and use native browser share when available
 - POV is locked to third-person limited
 - Load the included Space Cowboy sample artifacts without manual uploads:
   - `world.md`
@@ -189,6 +192,10 @@ The frontend reads uploaded `.md` and `.txt` files in the browser and sends thei
 The Recommend Settings button runs deterministic local heuristics in the browser. It analyzes the uploaded world bible, character profiles, story seed, story rules, and current selections. It returns recommended architecture settings, a short explanation, and a 0-1 confidence score. No OpenAI recommendation call, database, authentication, persistent memory, or saved profile is used. The recommendation is never auto-applied; the creator must choose Apply Recommendation and can manually override every control afterward.
 
 A future version could personalize recommendations from explicit likes/dislikes and a saved taste profile. That memory layer is intentionally not implemented in this MVP.
+
+Saved stories are stored in browser `localStorage`. They include only the finished story text and metadata such as title, created date, word count, generator source, characters used, rules referenced, selected architecture settings, length target, and diagnostics notice. Uploaded World Bible, Character Profiles, Story Seed, and Story Rules text are not saved.
+
+Local saved stories may be lost if browser data is cleared, the user switches browsers, or local storage is reset. Phase 1 does not support backend storage, public share URLs, cloud sync, authentication, or database-backed saved stories. Export options stay local: copy story, copy social teaser, download `.txt`, download `.md`, and native browser share when available.
 
 The OpenAI path builds its prompt from private internal sections:
 
