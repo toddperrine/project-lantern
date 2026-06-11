@@ -1,4 +1,5 @@
-import type { GenerateStoryRequest, GenerateStoryResponse, StoryDiagnostics } from "./types";
+import { LENGTH_TARGETS } from "./types";
+import type { GenerateStoryRequest, GenerateStoryResponse, LengthTarget, StoryDiagnostics } from "./types";
 import { normalizeStoryText } from "./story-output";
 import {
   countWords,
@@ -7,14 +8,12 @@ import {
   extractWorldRules
 } from "./story-analysis";
 
-const TARGET_MIN = 1500;
-const TARGET_MAX = 2000;
-
 export function generateFallbackStory(
   input: GenerateStoryRequest,
   diagnostics: StoryDiagnostics
 ): GenerateStoryResponse {
   const characters = extractCharacterNames(input.characterProfiles);
+  const lengthSpec = getLengthTargetSpec(input.lengthTarget);
   const worldRules = extractWorldRules(input.worldBible);
   const narrativeRules = extractWorldRules(input.storyRules);
   const rules = [...worldRules, ...narrativeRules];
@@ -41,24 +40,44 @@ export function generateFallbackStory(
   ];
 
   let story = paragraphs.join("\n\n");
+  let expansionAttempted = false;
+  let expansionSucceeded = false;
+
   for (const paragraph of buildExpansionParagraphs(cast, primaryRule, secondaryRule, narrativeRule)) {
-    if (countWords(story) >= TARGET_MIN) {
+    if (countWords(story) >= lengthSpec.minWords) {
       break;
     }
 
+    expansionAttempted = true;
     story += `\n\n${paragraph}`;
   }
 
-  story = normalizeStoryText(trimToWordLimit(story, TARGET_MAX));
+  story = normalizeStoryText(trimToWordLimit(story, lengthSpec.maxWords));
+  const wordCount = countWords(story);
+  expansionSucceeded = expansionAttempted && wordCount >= lengthSpec.minWords;
+  const underTargetNotice =
+    wordCount < lengthSpec.minWords ? `Final story is below the selected ${formatLengthTarget(input.lengthTarget)} target.` : null;
 
   return {
     story,
     metadata: {
-      wordCount: countWords(story),
+      wordCount,
       charactersUsed: cast.slice(0, 4),
       rulesReferenced: rules.slice(0, 6).filter(Boolean),
       source: "fallback",
-      diagnostics
+      diagnostics: {
+        ...diagnostics,
+        notice: diagnostics.notice ?? underTargetNotice,
+        genrePreset: input.genrePreset,
+        narrativeArchitecture: input.narrativeArchitecture,
+        characterArc: input.characterArc,
+        endingType: input.endingType,
+        lengthTarget: formatLengthTarget(input.lengthTarget),
+        finalWordCount: wordCount,
+        expansionAttempted,
+        expansionSucceeded,
+        underTargetNotice
+      }
     }
   };
 }
@@ -68,6 +87,10 @@ function buildExpansionParagraphs(cast: string[], primaryRule: string, secondary
   const companion = cast[1] ?? cast[0];
 
   return [
+    `The shape of the trouble required more than atmosphere. The first clue, pressure, or rupture had to change what action was possible. ${lead} returned to the earliest sign and understood that it had not been an omen but a demand. From then on, every answer closed one door behind them.`,
+    `The strange event could not remain decorative, and the central question could not resolve as a private feeling. ${lead} tested the world's account of itself against the visible evidence, while ${companion} pressed for a choice that would protect the people most likely to be harmed by delay.`,
+    `Their arc bent under pressure. No one is proven by confession alone, so ${lead} had to act before certainty became comfortable. The decision cost them leverage, reputation, or safety, and the cost made the later revelation more than an idea.`,
+    `Closure could not arrive clean. The central danger had to be faced, named, and altered, but something of its consequence would remain in the streets, in the cast, or in the rule everyone would remember differently afterward.`,
     `The aftermath did not arrive all at once. It settled in gestures: doors left open, names paused over, maps amended in cautious ink. ${lead} watched the world continue according to its laws, and that continuation was both comfort and sentence. Nothing had been cheated. Nothing had been easy. The choice had roots deep enough to trouble sleep and branches wide enough to shelter those who still needed shelter.`,
     `${companion} kept returning to the moment when haste had almost sounded like wisdom. ${secondaryRule}. The lesson was not gentle, but it was durable. It changed the way they listened at thresholds, the way they weighed a stranger's fear, and the way they counted the price of being right too late.`,
     `By the next morning, ordinary life had resumed its stubborn work. Bread cooled on counters. Wheels complained in the lanes. Someone laughed too loudly because silence felt dangerous. ${lead} accepted those small survivals as proof that the world had not forgiven them, exactly, but had allowed them to keep walking inside it.`,
@@ -87,4 +110,13 @@ function trimToWordLimit(text: string, maxWords: number): string {
   }
 
   return `${words.slice(0, maxWords).join(" ").replace(/[,\s]+$/, "")}.`;
+}
+
+function getLengthTargetSpec(lengthTarget: LengthTarget) {
+  return LENGTH_TARGETS.find((target) => target.value === lengthTarget) ?? LENGTH_TARGETS[1];
+}
+
+function formatLengthTarget(lengthTarget: LengthTarget): string {
+  const target = getLengthTargetSpec(lengthTarget);
+  return `${target.value}: ${target.minWords}-${target.maxWords} words`;
 }
