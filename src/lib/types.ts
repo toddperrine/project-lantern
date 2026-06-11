@@ -25,4 +25,5 @@ export type StoryDiagnostics = {
   openAIRequestAttempted: boolean;
   openAIRequestSucceeded: boolean;
   fallbackReason: string | null;
+  notice: string | null;
 };
