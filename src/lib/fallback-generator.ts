@@ -76,7 +76,10 @@ export function generateFallbackStory(
         finalWordCount: wordCount,
         expansionAttempted,
         expansionSucceeded,
-        underTargetNotice
+        underTargetNotice,
+        blueprintGenerated: diagnostics.blueprintGenerated ?? false,
+        blueprintSceneCount: diagnostics.blueprintSceneCount ?? 0,
+        blueprintFailedReason: diagnostics.blueprintFailedReason
       }
     }
   };
