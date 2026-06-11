@@ -50,6 +50,7 @@ const GENRE_KEYWORDS: Record<GenrePreset, string[]> = {
     "impossible",
     "signal",
     "file",
+    "music",
     "song",
     "unknown",
     "hidden",
@@ -58,6 +59,7 @@ const GENRE_KEYWORDS: Record<GenrePreset, string[]> = {
     "should not exist",
     "secret",
     "corruption",
+    "corrupted",
     "evidence"
   ],
   "Literary Science Fiction": [
@@ -128,16 +130,15 @@ const TRANSFORMATION_WITHOUT_VICTORY_KEYWORDS = [
 ];
 
 const LONG_LENGTH_KEYWORDS = [
-  "complex",
-  "multiple",
-  "major characters",
-  "mythic",
+  "complex world rules",
+  "multiple major characters",
+  "mystery plus emotional arc",
+  "high mythic",
   "literary ambition",
-  "history",
+  "mythic ambition",
   "civilization",
   "ecological",
-  "cosmology",
-  "rules"
+  "cosmology"
 ];
 
 const COMPACT_LENGTH_KEYWORDS = ["simple", "single conflict", "one conflict", "small", "brief"];
@@ -265,12 +266,12 @@ function recommendEndingType(genrePreset: GenrePreset, text: string): EndingType
 
 function recommendLengthTarget(genrePreset: GenrePreset, text: string, characterProfiles: string): LengthTarget {
   const characterCount = countLikelyCharacters(characterProfiles);
-  const hasLongSignal =
-    hasAnyKeyword(text, LONG_LENGTH_KEYWORDS) ||
-    characterCount >= 4 ||
-    (genrePreset === "Literary Science Fiction" && hasAnyKeyword(text, ["civilization", "ecological", "network", "archive"]));
+  const longSignalCount = LONG_LENGTH_KEYWORDS.filter((keyword) => countKeywordMatches(text, keyword) > 0).length;
+  const hasDenseLiteraryScienceFictionSignal =
+    genrePreset === "Literary Science Fiction" &&
+    ["civilization", "ecological", "network", "archive"].filter((keyword) => countKeywordMatches(text, keyword) > 0).length >= 2;
 
-  if (hasLongSignal) {
+  if (longSignalCount >= 2 || hasDenseLiteraryScienceFictionSignal || (longSignalCount >= 1 && characterCount >= 5)) {
     return "Long";
   }
 
