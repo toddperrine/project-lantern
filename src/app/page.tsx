@@ -27,10 +27,9 @@ export default function Home() {
         worldBible.content.trim() &&
           characterProfiles.content.trim() &&
           storySeed.content.trim() &&
-          storyRules.content.trim() &&
           !isGenerating
       ),
-    [worldBible.content, characterProfiles.content, storySeed.content, storyRules.content, isGenerating]
+    [worldBible.content, characterProfiles.content, storySeed.content, isGenerating]
   );
 
   async function handleGenerate() {

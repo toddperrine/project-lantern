@@ -4,6 +4,18 @@ import { generateOpenAIStory, getOpenAIDiagnostics, hasOpenAIKey } from "@/lib/o
 import type { GenerateStoryRequest } from "@/lib/types";
 
 const MAX_CONTEXT_CHARS = 120_000;
+const DEFAULT_STORY_RULES = `Every story must obey these rules:
+1. Begin in-scene with concrete action, setting, or dialogue.
+2. Do not summarize the premise.
+3. Do not explain the world or simulation.
+4. Let world rules emerge through consequence, behavior, dialogue, and conflict.
+5. At least two belief systems must collide.
+6. Nobody is completely right and nobody is completely wrong.
+7. Character decisions matter more than plot mechanics.
+8. The central event should resolve.
+9. The emotional or thematic question should remain alive.
+10. End with transformation, not victory.
+11. Avoid generic closing abstractions.`;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +38,7 @@ export async function POST(request: Request) {
     worldBible: body.worldBible!.trim(),
     characterProfiles: body.characterProfiles!.trim(),
     storySeed: body.storySeed!.trim(),
-    storyRules: body.storyRules!.trim()
+    storyRules: body.storyRules?.trim() || DEFAULT_STORY_RULES
   };
 
   if (!hasOpenAIKey()) {
@@ -70,12 +82,8 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
     return "Upload a story seed before generating a story.";
   }
 
-  if (!body.storyRules?.trim()) {
-    return "Upload story generation rules before generating a story.";
-  }
-
   const contextLength =
-    body.worldBible.length + body.characterProfiles.length + body.storySeed.length + body.storyRules.length;
+    body.worldBible.length + body.characterProfiles.length + body.storySeed.length + (body.storyRules?.length ?? 0);
   if (contextLength > MAX_CONTEXT_CHARS) {
     return "The uploaded context is too large for this local MVP. Please shorten the files and try again.";
   }
