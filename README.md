@@ -18,6 +18,7 @@ story-world-engine/
 |     |- fallback-generator.ts    # Deterministic fallback story generator
 |     |- openai-generator.ts      # Official OpenAI Node SDK integration
 |     |- story-analysis.ts        # Metadata extraction helpers
+|     |- story-architecture-recommendations.ts # Local heuristic setting recommendations
 |     |- story-output.ts          # Story response normalization helpers
 |     `- types.ts                 # Shared request/response types and presets
 |- public/
@@ -47,6 +48,8 @@ story-world-engine/
   - Character Arc
   - Ending Type
   - Length Target
+- Recommend architecture settings with deterministic local heuristics
+- Show recommendation explanation and confidence before applying
 - POV is locked to third-person limited
 - Load the included Space Cowboy sample artifacts without manual uploads:
   - `world.md`
@@ -182,6 +185,10 @@ The frontend reads uploaded `.md` and `.txt` files in the browser and sends thei
   lengthTarget: "Compact" | "Standard" | "Long";
 }
 ```
+
+The Recommend Settings button runs deterministic local heuristics in the browser. It analyzes the uploaded world bible, character profiles, story seed, story rules, and current selections. It returns recommended architecture settings, a short explanation, and a 0-1 confidence score. No OpenAI recommendation call, database, authentication, persistent memory, or saved profile is used. The recommendation is never auto-applied; the creator must choose Apply Recommendation and can manually override every control afterward.
+
+A future version could personalize recommendations from explicit likes/dislikes and a saved taste profile. That memory layer is intentionally not implemented in this MVP.
 
 The OpenAI path builds its prompt from private internal sections:
 
