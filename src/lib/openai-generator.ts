@@ -49,6 +49,7 @@ export function getOpenAIDiagnostics(overrides: Partial<StoryDiagnostics> = {}):
     openAIRequestAttempted: false,
     openAIRequestSucceeded: false,
     fallbackReason: null,
+    notice: null,
     ...overrides
   };
 }
@@ -68,18 +69,18 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
 
   if (countWords(story) < MIN_STORY_WORDS) {
     payload = await requestStory(client, buildExpansionPrompt(input, story));
-    story = normalizeStoryText(payload.story);
-  }
+    const expandedStory = normalizeStoryText(payload.story);
+    if (!expandedStory) {
+      throw new Error("OpenAI response did not include a story after expansion.");
+    }
 
-  if (!story) {
-    throw new Error("OpenAI response did not include a story after expansion.");
+    story = expandedStory;
   }
 
   const wordCount = countWords(story);
-  if (wordCount < MIN_STORY_WORDS) {
-    throw new Error(`OpenAI story remained under ${MIN_STORY_WORDS} words after expansion (${wordCount} words).`);
-  }
-
+  const lengthNotice = wordCount < MIN_STORY_WORDS
+    ? `OpenAI story remained under target length after expansion (${wordCount} words).`
+    : null;
   const ruleSources = `${input.worldBible}\n\n${input.storyRules || DEFAULT_NARRATIVE_RULES}`;
 
   return {
@@ -91,7 +92,8 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
       source: "openai",
       diagnostics: getOpenAIDiagnostics({
         openAIRequestAttempted: true,
-        openAIRequestSucceeded: true
+        openAIRequestSucceeded: true,
+        notice: lengthNotice
       })
     }
   };

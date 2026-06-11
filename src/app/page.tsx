@@ -304,6 +304,7 @@ function StoryOutput({
           <MetadataItem label="OpenAI Attempted" value={formatBoolean(diagnostics.openAIRequestAttempted)} />
           <MetadataItem label="OpenAI Succeeded" value={formatBoolean(diagnostics.openAIRequestSucceeded)} />
           <MetadataItem label="Fallback Reason" value={diagnostics.fallbackReason ?? "None"} />
+          <MetadataItem label="Notice" value={diagnostics.notice ?? "None"} />
         </div>
       </div>
 
