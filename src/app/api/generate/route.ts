@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { generateFallbackStory } from "@/lib/fallback-generator";
 import { generateOpenAIStory, getOpenAIDiagnostics, hasOpenAIKey } from "@/lib/openai-generator";
+import {
+  CHARACTER_ARCS,
+  ENDING_TYPES,
+  GENRE_PRESETS,
+  LENGTH_TARGETS,
+  NARRATIVE_ARCHITECTURES
+} from "@/lib/types";
 import type { GenerateStoryRequest } from "@/lib/types";
 
 const MAX_CONTEXT_CHARS = 120_000;
@@ -38,15 +45,25 @@ export async function POST(request: Request) {
     worldBible: body.worldBible!.trim(),
     characterProfiles: body.characterProfiles!.trim(),
     storySeed: body.storySeed!.trim(),
-    storyRules: body.storyRules?.trim() || DEFAULT_STORY_RULES
-  };
+    storyRules: body.storyRules?.trim() || DEFAULT_STORY_RULES,
+    genrePreset: body.genrePreset!,
+    narrativeArchitecture: body.narrativeArchitecture!,
+    characterArc: body.characterArc!,
+    endingType: body.endingType!,
+    lengthTarget: body.lengthTarget!
+  } satisfies GenerateStoryRequest;
 
   if (!hasOpenAIKey()) {
     return NextResponse.json(
       generateFallbackStory(
         input,
         getOpenAIDiagnostics({
-          fallbackReason: "OPENAI_API_KEY is missing or empty in this deployment environment."
+          fallbackReason: "OPENAI_API_KEY is missing or empty in this deployment environment.",
+          genrePreset: input.genrePreset,
+          narrativeArchitecture: input.narrativeArchitecture,
+          characterArc: input.characterArc,
+          endingType: input.endingType,
+          lengthTarget: formatLengthTarget(input.lengthTarget)
         })
       )
     );
@@ -62,7 +79,12 @@ export async function POST(request: Request) {
         input,
         getOpenAIDiagnostics({
           openAIRequestAttempted: true,
-          fallbackReason
+          fallbackReason,
+          genrePreset: input.genrePreset,
+          narrativeArchitecture: input.narrativeArchitecture,
+          characterArc: input.characterArc,
+          endingType: input.endingType,
+          lengthTarget: formatLengthTarget(input.lengthTarget)
         })
       )
     );
@@ -80,6 +102,26 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
 
   if (!body.storySeed?.trim()) {
     return "Upload a story seed before generating a story.";
+  }
+
+  if (!body.genrePreset || !GENRE_PRESETS.includes(body.genrePreset)) {
+    return "Choose a valid genre preset.";
+  }
+
+  if (!body.narrativeArchitecture || !NARRATIVE_ARCHITECTURES.includes(body.narrativeArchitecture)) {
+    return "Choose a valid narrative architecture.";
+  }
+
+  if (!body.characterArc || !CHARACTER_ARCS.includes(body.characterArc)) {
+    return "Choose a valid character arc.";
+  }
+
+  if (!body.endingType || !ENDING_TYPES.includes(body.endingType)) {
+    return "Choose a valid ending type.";
+  }
+
+  if (!body.lengthTarget || !LENGTH_TARGETS.some((target) => target.value === body.lengthTarget)) {
+    return "Choose a valid length target.";
   }
 
   const contextLength =
@@ -101,4 +143,9 @@ function summarizeOpenAIError(error: unknown): string {
 
 function redactSecretLikeText(value: string): string {
   return value.replace(/sk-[A-Za-z0-9_-]+/g, "sk-...[redacted]");
+}
+
+function formatLengthTarget(lengthTarget: GenerateStoryRequest["lengthTarget"]): string {
+  const target = LENGTH_TARGETS.find((candidate) => candidate.value === lengthTarget) ?? LENGTH_TARGETS[1];
+  return `${target.value}: ${target.minWords}-${target.maxWords} words`;
 }
