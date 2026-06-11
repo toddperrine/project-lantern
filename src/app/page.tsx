@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, useMemo, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import { recommendStoryArchitecture } from "@/lib/story-architecture-recommendations";
 import type { StoryArchitectureRecommendation } from "@/lib/story-architecture-recommendations";
 import {
@@ -16,7 +16,8 @@ import type {
   GenerateStoryResponse,
   GenrePreset,
   LengthTarget,
-  NarrativeArchitecture
+  NarrativeArchitecture,
+  StoryDiagnostics
 } from "@/lib/types";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 
@@ -30,7 +31,25 @@ type SelectOption = {
   label: string;
 };
 
+type SavedStory = {
+  id: string;
+  title: string;
+  createdAt: string;
+  story: string;
+  wordCount: number;
+  generatorSource: GenerateStoryResponse["metadata"]["source"];
+  charactersUsed: string[];
+  rulesReferenced: string[];
+  genrePreset: GenrePreset;
+  narrativeArchitecture: NarrativeArchitecture;
+  characterArc: CharacterArc;
+  endingType: EndingType;
+  lengthTarget: string;
+  diagnosticsNotice: string | null;
+};
+
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
+const SAVED_STORIES_STORAGE_KEY = "story-world-engine:saved-stories:v1";
 
 export default function Home() {
   const [worldBible, setWorldBible] = useState<UploadState>({ name: "", content: "" });
@@ -44,9 +63,17 @@ export default function Home() {
   const [lengthTarget, setLengthTarget] = useState<LengthTarget>("Standard");
   const [recommendation, setRecommendation] = useState<StoryArchitectureRecommendation | null>(null);
   const [storyResponse, setStoryResponse] = useState<GenerateStoryResponse | null>(null);
+  const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [canNativeShare, setCanNativeShare] = useState(false);
   const [error, setError] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingSample, setIsLoadingSample] = useState(false);
+
+  useEffect(() => {
+    setSavedStories(readSavedStories());
+    setCanNativeShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
+  }, []);
 
   const canGenerate = useMemo(
     () =>
@@ -62,6 +89,7 @@ export default function Home() {
 
   async function handleGenerate() {
     setError("");
+    setStatusMessage("");
     setStoryResponse(null);
     setIsGenerating(true);
 
@@ -99,6 +127,7 @@ export default function Home() {
 
   async function handleLoadSampleWorld() {
     setError("");
+    setStatusMessage("");
     setRecommendation(null);
     setStoryResponse(null);
     setIsLoadingSample(true);
@@ -162,6 +191,78 @@ export default function Home() {
     setCharacterArc(recommendation.characterArc);
     setEndingType(recommendation.endingType);
     setLengthTarget(recommendation.lengthTarget);
+  }
+
+  function handleSaveStory() {
+    if (!storyResponse) {
+      return;
+    }
+
+    const savedStory = createSavedStory(storyResponse);
+    const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
+    persistSavedStories(nextSavedStories);
+    setSavedStories(nextSavedStories);
+    setStatusMessage("Story saved locally in this browser.");
+  }
+
+  function handleRestoreSavedStory(savedStory: SavedStory) {
+    setStoryResponse(savedStoryToResponse(savedStory));
+    setStatusMessage(`Restored ${savedStory.title}.`);
+  }
+
+  function handleDeleteSavedStory(storyId: string) {
+    const nextSavedStories = savedStories.filter((story) => story.id !== storyId);
+    persistSavedStories(nextSavedStories);
+    setSavedStories(nextSavedStories);
+    setStatusMessage("Saved story deleted.");
+  }
+
+  async function handleCopyStory() {
+    if (!storyResponse) {
+      return;
+    }
+
+    await copyText(storyResponse.story);
+    setStatusMessage("Story copied.");
+  }
+
+  async function handleCopySocialTeaser() {
+    if (!storyResponse) {
+      return;
+    }
+
+    await copyText(buildSocialTeaser(createSavedStory(storyResponse)));
+    setStatusMessage("Social teaser copied.");
+  }
+
+  async function handleShareStory() {
+    if (!storyResponse || !navigator.share) {
+      return;
+    }
+
+    const savedStory = createSavedStory(storyResponse);
+    await navigator.share({
+      title: savedStory.title,
+      text: buildSocialTeaser(savedStory)
+    });
+  }
+
+  function handleDownloadTxt() {
+    if (!storyResponse) {
+      return;
+    }
+
+    const savedStory = createSavedStory(storyResponse);
+    downloadTextFile(`${slugify(savedStory.title)}.txt`, savedStory.story);
+  }
+
+  function handleDownloadMarkdown() {
+    if (!storyResponse) {
+      return;
+    }
+
+    const savedStory = createSavedStory(storyResponse);
+    downloadTextFile(`${slugify(savedStory.title)}.md`, buildMarkdownExport(savedStory));
   }
 
   return (
@@ -296,6 +397,16 @@ export default function Home() {
               </div>
             </section>
 
+            <SavedStoriesPanel
+              savedStories={savedStories}
+              onDelete={handleDeleteSavedStory}
+              onRestore={handleRestoreSavedStory}
+            />
+
+            {statusMessage ? (
+              <div className="rounded-md border border-brass/25 bg-paper/80 p-3 text-sm text-ink/70">{statusMessage}</div>
+            ) : null}
+
             {error ? (
               <div className="rounded-md border border-ember/30 bg-ember/10 p-3 text-sm text-ember">{error}</div>
             ) : null}
@@ -309,7 +420,17 @@ export default function Home() {
             </button>
           </section>
 
-          <StoryOutput response={storyResponse} isGenerating={isGenerating} />
+          <StoryOutput
+            canNativeShare={canNativeShare}
+            isGenerating={isGenerating}
+            onCopySocialTeaser={handleCopySocialTeaser}
+            onCopyStory={handleCopyStory}
+            onDownloadMarkdown={handleDownloadMarkdown}
+            onDownloadTxt={handleDownloadTxt}
+            onSaveStory={handleSaveStory}
+            onShareStory={handleShareStory}
+            response={storyResponse}
+          />
         </div>
       </section>
     </main>
@@ -345,6 +466,159 @@ function normalizeGenerateStoryResponse(payload: unknown): GenerateStoryResponse
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function createSavedStory(response: GenerateStoryResponse): SavedStory {
+  const diagnostics = response.metadata.diagnostics;
+
+  return {
+    id: createStoryId(response.story),
+    title: createStoryTitle(response.story),
+    createdAt: new Date().toISOString(),
+    story: response.story,
+    wordCount: response.metadata.wordCount,
+    generatorSource: response.metadata.source,
+    charactersUsed: response.metadata.charactersUsed,
+    rulesReferenced: response.metadata.rulesReferenced,
+    genrePreset: diagnostics.genrePreset,
+    narrativeArchitecture: diagnostics.narrativeArchitecture,
+    characterArc: diagnostics.characterArc,
+    endingType: diagnostics.endingType,
+    lengthTarget: diagnostics.lengthTarget,
+    diagnosticsNotice: diagnostics.notice ?? diagnostics.underTargetNotice
+  };
+}
+
+function savedStoryToResponse(savedStory: SavedStory): GenerateStoryResponse {
+  const diagnostics: StoryDiagnostics = {
+    openAIEnabled: false,
+    apiKeyDetected: false,
+    modelRequested: "Restored local save",
+    openAIRequestAttempted: false,
+    openAIRequestSucceeded: false,
+    fallbackReason: null,
+    notice: savedStory.diagnosticsNotice,
+    genrePreset: savedStory.genrePreset,
+    narrativeArchitecture: savedStory.narrativeArchitecture,
+    characterArc: savedStory.characterArc,
+    endingType: savedStory.endingType,
+    lengthTarget: savedStory.lengthTarget,
+    finalWordCount: savedStory.wordCount,
+    expansionAttempted: false,
+    expansionSucceeded: false,
+    underTargetNotice: null
+  };
+
+  return {
+    story: savedStory.story,
+    metadata: {
+      wordCount: savedStory.wordCount,
+      charactersUsed: savedStory.charactersUsed,
+      rulesReferenced: savedStory.rulesReferenced,
+      source: savedStory.generatorSource,
+      diagnostics
+    }
+  };
+}
+
+function readSavedStories(): SavedStory[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(SAVED_STORIES_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as SavedStory[];
+    return Array.isArray(parsed) ? parsed.filter(isSavedStory) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistSavedStories(stories: SavedStory[]) {
+  window.localStorage.setItem(SAVED_STORIES_STORAGE_KEY, JSON.stringify(stories));
+}
+
+function isSavedStory(value: unknown): value is SavedStory {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<SavedStory>;
+  return Boolean(candidate.id && candidate.title && candidate.createdAt && candidate.story);
+}
+
+async function copyText(text: string) {
+  await navigator.clipboard.writeText(text);
+}
+
+function buildMarkdownExport(savedStory: SavedStory): string {
+  return `# ${savedStory.title}
+
+Generated date: ${formatDateTime(savedStory.createdAt)}
+Word count: ${savedStory.wordCount.toLocaleString()}
+Genre Preset: ${savedStory.genrePreset}
+Narrative Architecture: ${savedStory.narrativeArchitecture}
+Character Arc: ${savedStory.characterArc}
+Ending Type: ${savedStory.endingType}
+Length Target: ${savedStory.lengthTarget}
+
+${savedStory.story}`;
+}
+
+function buildSocialTeaser(savedStory: SavedStory): string {
+  return `${savedStory.title}
+
+${truncateText(savedStory.story, 280)}
+
+${savedStory.wordCount.toLocaleString()} words
+Generated with Story World Engine`;
+}
+
+function downloadTextFile(fileName: string, contents: string) {
+  const blob = new Blob([contents], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function createStoryId(story: string): string {
+  return `${Date.now()}-${story.length}`;
+}
+
+function createStoryTitle(story: string): string {
+  const firstLine = story.split(/\n+/).find((line) => line.trim())?.trim() ?? "Generated Story";
+  const firstSentence = firstLine.split(/[.!?]/)[0]?.trim() || firstLine;
+  return truncateText(firstSentence.replace(/^#+\s*/, ""), 72) || "Generated Story";
+}
+
+function truncateText(text: string, maxLength: number): string {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (compact.length <= maxLength) {
+    return compact;
+  }
+
+  return `${compact.slice(0, maxLength).replace(/[\s,.;:]+$/, "")}...`;
+}
+
+function slugify(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "story-world-engine-story";
+}
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
 }
 
 function SelectControl({
@@ -437,12 +711,79 @@ function RecommendationItem({ label, value }: { label: string; value: string }) 
   );
 }
 
-function StoryOutput({
-  response,
-  isGenerating
+function SavedStoriesPanel({
+  savedStories,
+  onDelete,
+  onRestore
 }: {
+  savedStories: SavedStory[];
+  onDelete: (storyId: string) => void;
+  onRestore: (story: SavedStory) => void;
+}) {
+  return (
+    <section className="rounded-md border border-ink/10 bg-white/70 p-4 shadow-soft">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-lg font-semibold text-ink">Saved Stories</h2>
+        <p className="text-sm leading-6 text-ink/65">Stored locally in this browser. Uploaded source files are not saved.</p>
+      </div>
+
+      {savedStories.length === 0 ? (
+        <p className="mt-4 rounded-md bg-paper/80 px-3 py-2 text-sm text-ink/60">No saved stories yet.</p>
+      ) : (
+        <div className="mt-4 grid gap-3">
+          {savedStories.map((story) => (
+            <article key={story.id} className="rounded-md border border-ink/10 bg-paper/80 p-3">
+              <h3 className="text-sm font-semibold text-ink">{story.title}</h3>
+              <p className="mt-1 text-xs leading-5 text-ink/60">
+                {formatDateTime(story.createdAt)} · {story.wordCount.toLocaleString()} words
+              </p>
+              <p className="mt-1 text-xs leading-5 text-ink/60">
+                {story.genrePreset} · {story.narrativeArchitecture}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-paper transition hover:bg-ink/90"
+                  onClick={() => onRestore(story)}
+                  type="button"
+                >
+                  Open
+                </button>
+                <button
+                  className="rounded-md border border-ember/30 bg-white/70 px-3 py-2 text-xs font-semibold text-ember transition hover:bg-ember/10"
+                  onClick={() => onDelete(story.id)}
+                  type="button"
+                >
+                  Delete
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StoryOutput({
+  canNativeShare,
+  response,
+  isGenerating,
+  onCopySocialTeaser,
+  onCopyStory,
+  onDownloadMarkdown,
+  onDownloadTxt,
+  onSaveStory,
+  onShareStory
+}: {
+  canNativeShare: boolean;
   response: GenerateStoryResponse | null;
   isGenerating: boolean;
+  onCopySocialTeaser: () => void;
+  onCopyStory: () => void;
+  onDownloadMarkdown: () => void;
+  onDownloadTxt: () => void;
+  onSaveStory: () => void;
+  onShareStory: () => void;
 }) {
   if (isGenerating) {
     return (
@@ -474,14 +815,39 @@ function StoryOutput({
 
   return (
     <section className="rounded-md border border-ink/10 bg-white/80 p-5 shadow-soft md:p-7">
-      <div className="flex flex-col gap-3 border-b border-ink/10 pb-5 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brass">Generated Story</p>
-          <h2 className="mt-2 text-2xl font-semibold text-ink">
-            {response.metadata.source === "openai" ? "OpenAI-powered draft" : "Fallback local draft"}
-          </h2>
+      <div className="flex flex-col gap-4 border-b border-ink/10 pb-5">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brass">Generated Story</p>
+            <h2 className="mt-2 text-2xl font-semibold text-ink">
+              {response.metadata.source === "openai" ? "OpenAI-powered draft" : "Fallback local draft"}
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-paper transition hover:bg-ink/90" onClick={onSaveStory} type="button">
+              Save Story
+            </button>
+            <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onCopyStory} type="button">
+              Copy story
+            </button>
+            <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onDownloadTxt} type="button">
+              Download .txt
+            </button>
+            <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onDownloadMarkdown} type="button">
+              Download .md
+            </button>
+            <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onCopySocialTeaser} type="button">
+              Copy social teaser
+            </button>
+            {canNativeShare ? (
+              <button className="rounded-md border border-brass/40 bg-white/75 px-3 py-2 text-xs font-semibold text-brass transition hover:bg-paper" onClick={onShareStory} type="button">
+                Share
+              </button>
+            ) : null}
+          </div>
         </div>
-        <div className="grid gap-2 text-sm text-ink/70 sm:grid-cols-2 md:min-w-80">
+
+        <div className="grid gap-2 text-sm text-ink/70 sm:grid-cols-2 lg:grid-cols-3">
           <MetadataItem label="Word count" value={response.metadata.wordCount.toLocaleString()} />
           <MetadataItem label="Generator source" value={response.metadata.source} />
           <MetadataItem label="Characters" value={formatList(response.metadata.charactersUsed)} />
