@@ -506,7 +506,10 @@ function savedStoryToResponse(savedStory: SavedStory): GenerateStoryResponse {
     finalWordCount: savedStory.wordCount,
     expansionAttempted: false,
     expansionSucceeded: false,
-    underTargetNotice: null
+    underTargetNotice: null,
+    blueprintGenerated: false,
+    blueprintSceneCount: 0,
+    blueprintFailedReason: null
   };
 
   return {
@@ -861,6 +864,9 @@ function StoryOutput({
           <MetadataItem label="Expansion attempted" value={formatBoolean(diagnostics.expansionAttempted)} />
           <MetadataItem label="Expansion succeeded" value={formatBoolean(diagnostics.expansionSucceeded)} />
           <MetadataItem label="Under target notice" value={diagnostics.underTargetNotice ?? "None"} />
+          <MetadataItem label="Blueprint generated" value={formatBoolean(diagnostics.blueprintGenerated)} />
+          <MetadataItem label="Blueprint scene count" value={diagnostics.blueprintSceneCount.toLocaleString()} />
+          <MetadataItem label="Blueprint failed reason" value={diagnostics.blueprintFailedReason ?? "None"} />
           <MetadataItem label="OpenAI Enabled" value={formatBoolean(diagnostics.openAIEnabled)} />
           <MetadataItem label="OPENAI_API_KEY detected" value={formatBoolean(diagnostics.apiKeyDetected)} />
           <MetadataItem label="Model requested" value={diagnostics.modelRequested} />
