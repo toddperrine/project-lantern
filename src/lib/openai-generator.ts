@@ -1,5 +1,6 @@
 import OpenAI from "openai";
-import type { GenerateStoryRequest, GenerateStoryResponse, StoryDiagnostics } from "./types";
+import { LENGTH_TARGETS } from "./types";
+import type { GenerateStoryRequest, GenerateStoryResponse, LengthTarget, StoryDiagnostics } from "./types";
 import { normalizeStoryPayload, normalizeStoryText, normalizeStringList } from "./story-output";
 import {
   countWords,
@@ -14,10 +15,7 @@ type OpenAIStoryPayload = {
 };
 
 const DEFAULT_MODEL = "gpt-4.1-mini";
-const MIN_STORY_WORDS = 1500;
-const TARGET_STORY_WORDS = 1800;
-const MAX_STORY_WORDS = 2000;
-const OPENAI_MAX_TOKENS = 7000;
+const POV = "Third-person limited";
 const DEFAULT_NARRATIVE_RULES = `Every story must obey these rules:
 1. Begin in-scene with concrete action, setting, or dialogue.
 2. Do not summarize the premise.
@@ -50,6 +48,15 @@ export function getOpenAIDiagnostics(overrides: Partial<StoryDiagnostics> = {}):
     openAIRequestSucceeded: false,
     fallbackReason: null,
     notice: null,
+    genrePreset: "Speculative Mystery",
+    narrativeArchitecture: "Revelation Story",
+    characterArc: "Positive Change Arc",
+    endingType: "Resolution with Residue",
+    lengthTarget: formatLengthTarget("Standard"),
+    finalWordCount: 0,
+    expansionAttempted: false,
+    expansionSucceeded: false,
+    underTargetNotice: null,
     ...overrides
   };
 }
@@ -58,8 +65,9 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
   const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
   });
+  const lengthSpec = getLengthTargetSpec(input.lengthTarget);
 
-  const initialPayload = await requestStory(client, buildPrompt(input));
+  const initialPayload = await requestStory(client, buildPrompt(input), estimateMaxTokens(lengthSpec.maxWords));
   let story = normalizeStoryText(initialPayload.story);
   let payload = initialPayload;
 
@@ -67,20 +75,27 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
     throw new Error("OpenAI response did not include a story.");
   }
 
-  if (countWords(story) < MIN_STORY_WORDS) {
-    payload = await requestStory(client, buildExpansionPrompt(input, story));
+  let wordCount = countWords(story);
+  let expansionAttempted = false;
+  let expansionSucceeded = false;
+
+  if (wordCount < lengthSpec.minWords) {
+    expansionAttempted = true;
+    payload = await requestStory(client, buildExpansionPrompt(input, story), estimateMaxTokens(lengthSpec.maxWords));
     const expandedStory = normalizeStoryText(payload.story);
     if (!expandedStory) {
       throw new Error("OpenAI response did not include a story after expansion.");
     }
 
     story = expandedStory;
+    wordCount = countWords(story);
+    expansionSucceeded = wordCount >= lengthSpec.minWords;
   }
 
-  const wordCount = countWords(story);
-  const lengthNotice = wordCount < MIN_STORY_WORDS
-    ? `OpenAI story remained under target length after expansion (${wordCount} words).`
-    : null;
+  const underTargetNotice =
+    wordCount < lengthSpec.minWords
+      ? `Final story is below the selected ${formatLengthTarget(input.lengthTarget)} target.`
+      : null;
   const ruleSources = `${input.worldBible}\n\n${input.storyRules || DEFAULT_NARRATIVE_RULES}`;
 
   return {
@@ -93,17 +108,26 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
       diagnostics: getOpenAIDiagnostics({
         openAIRequestAttempted: true,
         openAIRequestSucceeded: true,
-        notice: lengthNotice
+        notice: underTargetNotice,
+        genrePreset: input.genrePreset,
+        narrativeArchitecture: input.narrativeArchitecture,
+        characterArc: input.characterArc,
+        endingType: input.endingType,
+        lengthTarget: formatLengthTarget(input.lengthTarget),
+        finalWordCount: wordCount,
+        expansionAttempted,
+        expansionSucceeded,
+        underTargetNotice
       })
     }
   };
 }
 
-async function requestStory(client: OpenAI, prompt: string): Promise<OpenAIStoryPayload> {
+async function requestStory(client: OpenAI, prompt: string, maxTokens: number): Promise<OpenAIStoryPayload> {
   const response = await client.chat.completions.create({
     model: getOpenAIModel(),
     temperature: 0.82,
-    max_tokens: OPENAI_MAX_TOKENS,
+    max_tokens: maxTokens,
     response_format: { type: "json_object" },
     messages: [
       {
@@ -122,74 +146,28 @@ async function requestStory(client: OpenAI, prompt: string): Promise<OpenAIStory
 }
 
 function buildPrompt(input: GenerateStoryRequest): string {
+  const lengthSpec = getLengthTargetSpec(input.lengthTarget);
   const narrativeRules = input.storyRules.trim() || DEFAULT_NARRATIVE_RULES;
 
-  return `Write a complete literary short story of ${TARGET_STORY_WORDS} words.
+  return `Use the following private internal sections to plan and write a structurally complete original short story. The final story must never reproduce these section labels or describe this planning framework.
 
-Length requirements:
-- Minimum: ${MIN_STORY_WORDS} words.
-- Target: ${TARGET_STORY_WORDS} words.
-- Maximum: ${MAX_STORY_WORDS} words.
-- Do not return fewer than ${MIN_STORY_WORDS} words.
+GENRE PRESET
+${input.genrePreset}
 
-Quality requirements:
-- Write as if the story were being published in a literary magazine.
-- Begin in-scene with concrete action, setting, or dialogue.
-- Do not summarize the premise.
-- Do not use synopsis language, outline language, section headings, or scene labels.
-- Do not explain the world.
-- Do not explain the simulation.
-- Do not mention AI, prompts, models, source material, uploaded files, or generation.
-- Do not include prompt labels, file labels, bullet lists, or section headings in the story.
-- Let world rules emerge through consequence, behavior, dialogue, and conflict.
-- Use concrete sensory detail.
-- Make technology feel worn, named, repaired, and personal.
-- Give each major character a distinct voice, worldview, fear, and speech pattern.
-- Reveal beliefs through action, choices, silences, habits, and conflict rather than direct explanation.
-- At least two belief systems should collide.
-- Nobody should be completely right.
-- Nobody should be completely wrong.
-- Resolve the central event.
-- Keep the emotional or thematic question alive.
-- End with transformation, not victory.
-- Avoid generic closing abstractions such as "the world began to breathe anew," "tomorrow yet unwritten," or similar lines.
+NARRATIVE ARCHITECTURE
+${input.narrativeArchitecture}
 
-Source-material requirements:
-- The four internal sections below are private source material only.
-- Never reproduce section labels, prompt text, bullet lists, or file contents verbatim.
-- Use names, rules, constraints, relationships, and conflicts as material for original prose.
-- NARRATIVE RULES take priority over generic literary defaults.
+CHARACTER ARC
+${input.characterArc}
 
-WORLD BIBLE
-${input.worldBible}
+ENDING TYPE
+${input.endingType}
 
-CHARACTERS
-${input.characterProfiles}
+LENGTH TARGET
+${formatLengthTarget(input.lengthTarget)}
 
-STORY REQUEST
-${input.storySeed}
-
-NARRATIVE RULES
-${narrativeRules}`;
-}
-
-function buildExpansionPrompt(input: GenerateStoryRequest, story: string): string {
-  const narrativeRules = input.storyRules.trim() || DEFAULT_NARRATIVE_RULES;
-
-  return `Expand the existing short story below into a complete literary short story of ${TARGET_STORY_WORDS} words.
-
-Hard requirements:
-- Final length must be between ${MIN_STORY_WORDS} and ${MAX_STORY_WORDS} words.
-- Preserve all established facts, characters, tone, causal logic, central event, and ending transformation.
-- Do not pad with filler, blank lines, throat-clearing, exposition dumps, or appended summary paragraphs.
-- Add lived scenes: action, dialogue, sensory detail, consequence, conflict, and character-specific choices.
-- Make character voices more distinct through diction, fear, worldview, and speech rhythm.
-- Reveal beliefs through behavior and conflict rather than direct explanation.
-- Resolve the central event while leaving the emotional or thematic question alive.
-- Avoid generic closing abstractions such as "the world began to breathe anew," "tomorrow yet unwritten," or similar lines.
-- Return only valid JSON in the required shape. The story field must contain only final prose.
-
-Private source material, not to be reproduced verbatim:
+POV
+${POV}
 
 WORLD BIBLE
 ${input.worldBible}
@@ -203,8 +181,35 @@ ${input.storySeed}
 NARRATIVE RULES
 ${narrativeRules}
 
-EXISTING STORY TO EXPAND
-${story}`;
+Global instructions:
+- Genre defines the story contract.
+- Narrative Architecture defines story shape.
+- Character Arc defines protagonist transformation.
+- Ending Type defines closure.
+- Length Target defines the target range of ${lengthSpec.minWords}-${lengthSpec.maxWords} words.
+- World Bible and Character Profiles control canon.
+- Story Seed controls the premise.
+- Story Rules control local constraints.
+- The story must be structurally complete. It should not be a single conversation, mood piece, premise sketch, or philosophical debate.
+- It must move through irreversible turns shaped by the selected narrative architecture.
+- Use third-person limited point of view only.
+- Begin in-scene with concrete action, setting, or dialogue.
+- Preserve world rules, character consistency, tone, and local constraints.
+- Let world rules emerge through consequence, behavior, dialogue, and conflict.
+- Do not mention AI, prompts, models, source material, uploaded files, or generation.
+- Return metadata for characters used and rules referenced.`;
+}
+
+function buildExpansionPrompt(input: GenerateStoryRequest, story: string): string {
+  const lengthSpec = getLengthTargetSpec(input.lengthTarget);
+
+  return `${buildPrompt(input)}
+
+Current story draft:
+${story}
+
+Expansion task:
+Rewrite and expand the full story to reach the selected ${lengthSpec.minWords}-${lengthSpec.maxWords} word target. Focus only on missing scenes, irreversible turns, costs, consequences, revelations, and character decisions. Do not add filler, summaries, exposition dumps, or philosophical debate. Preserve canon, character consistency, third-person limited POV, and the selected architecture. Return only valid JSON in the required shape. The story field must contain only final prose.`;
 }
 
 function parseStoryPayload(rawText: string): OpenAIStoryPayload {
@@ -221,4 +226,17 @@ function parseStoryPayload(rawText: string): OpenAIStoryPayload {
 function normalizeList(values: string[] | undefined, fallback: string[]): string[] {
   const source = values && values.length > 0 ? values : fallback;
   return [...new Set(source.map((value) => value.trim()).filter(Boolean))].slice(0, 10);
+}
+
+function getLengthTargetSpec(lengthTarget: LengthTarget) {
+  return LENGTH_TARGETS.find((target) => target.value === lengthTarget) ?? LENGTH_TARGETS[1];
+}
+
+function formatLengthTarget(lengthTarget: LengthTarget): string {
+  const target = getLengthTargetSpec(lengthTarget);
+  return `${target.value}: ${target.minWords}-${target.maxWords} words`;
+}
+
+function estimateMaxTokens(maxWords: number): number {
+  return Math.min(12_000, Math.ceil(maxWords * 2.2));
 }
