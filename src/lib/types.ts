@@ -63,6 +63,9 @@ export type StoryDiagnostics = {
   openAIEnabled: boolean;
   apiKeyDetected: boolean;
   modelRequested: string;
+  blueprintModelRequested: string;
+  storyModelRequested: string;
+  expansionModelRequested: string;
   openAIRequestAttempted: boolean;
   openAIRequestSucceeded: boolean;
   fallbackReason: string | null;
@@ -75,6 +78,8 @@ export type StoryDiagnostics = {
   finalWordCount: number;
   expansionAttempted: boolean;
   expansionSucceeded: boolean;
+  expansionAttemptsCount: number;
+  repairAttemptsCount: number;
   underTargetNotice: string | null;
   blueprintGenerated: boolean;
   blueprintSceneCount: number;
