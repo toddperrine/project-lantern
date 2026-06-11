@@ -1,12 +1,31 @@
 "use client";
 
 import { type ChangeEvent, useMemo, useState } from "react";
-import type { GenerateStoryResponse } from "@/lib/types";
+import {
+  CHARACTER_ARCS,
+  ENDING_TYPES,
+  GENRE_PRESETS,
+  LENGTH_TARGETS,
+  NARRATIVE_ARCHITECTURES
+} from "@/lib/types";
+import type {
+  CharacterArc,
+  EndingType,
+  GenerateStoryResponse,
+  GenrePreset,
+  LengthTarget,
+  NarrativeArchitecture
+} from "@/lib/types";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 
 type UploadState = {
   name: string;
   content: string;
+};
+
+type SelectOption = {
+  value: string;
+  label: string;
 };
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
@@ -16,6 +35,11 @@ export default function Home() {
   const [characterProfiles, setCharacterProfiles] = useState<UploadState>({ name: "", content: "" });
   const [storySeed, setStorySeed] = useState<UploadState>({ name: "", content: "" });
   const [storyRules, setStoryRules] = useState<UploadState>({ name: "", content: "" });
+  const [genrePreset, setGenrePreset] = useState<GenrePreset>("Speculative Mystery");
+  const [narrativeArchitecture, setNarrativeArchitecture] = useState<NarrativeArchitecture>("Revelation Story");
+  const [characterArc, setCharacterArc] = useState<CharacterArc>("Positive Change Arc");
+  const [endingType, setEndingType] = useState<EndingType>("Resolution with Residue");
+  const [lengthTarget, setLengthTarget] = useState<LengthTarget>("Standard");
   const [storyResponse, setStoryResponse] = useState<GenerateStoryResponse | null>(null);
   const [error, setError] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -27,9 +51,10 @@ export default function Home() {
         worldBible.content.trim() &&
           characterProfiles.content.trim() &&
           storySeed.content.trim() &&
+          storyRules.content.trim() &&
           !isGenerating
       ),
-    [worldBible.content, characterProfiles.content, storySeed.content, isGenerating]
+    [worldBible.content, characterProfiles.content, storySeed.content, storyRules.content, isGenerating]
   );
 
   async function handleGenerate() {
@@ -47,7 +72,12 @@ export default function Home() {
           worldBible: worldBible.content,
           characterProfiles: characterProfiles.content,
           storySeed: storySeed.content,
-          storyRules: storyRules.content
+          storyRules: storyRules.content,
+          genrePreset,
+          narrativeArchitecture,
+          characterArc,
+          endingType,
+          lengthTarget
         })
       });
 
@@ -151,6 +181,48 @@ export default function Home() {
               onChange={setStoryRules}
             />
 
+            <section className="rounded-md border border-ink/10 bg-white/70 p-4 shadow-soft">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-lg font-semibold text-ink">Story Architecture</h2>
+                <p className="text-sm leading-6 text-ink/65">Compact controls for genre, shape, arc, ending, and length.</p>
+              </div>
+              <div className="mt-4 grid gap-3">
+                <SelectControl
+                  label="Genre Preset"
+                  value={genrePreset}
+                  options={GENRE_PRESETS}
+                  onChange={(value) => setGenrePreset(value as GenrePreset)}
+                />
+                <SelectControl
+                  label="Narrative Architecture"
+                  value={narrativeArchitecture}
+                  options={NARRATIVE_ARCHITECTURES}
+                  onChange={(value) => setNarrativeArchitecture(value as NarrativeArchitecture)}
+                />
+                <SelectControl
+                  label="Character Arc"
+                  value={characterArc}
+                  options={CHARACTER_ARCS}
+                  onChange={(value) => setCharacterArc(value as CharacterArc)}
+                />
+                <SelectControl
+                  label="Ending Type"
+                  value={endingType}
+                  options={ENDING_TYPES}
+                  onChange={(value) => setEndingType(value as EndingType)}
+                />
+                <SelectControl
+                  label="Length Target"
+                  value={lengthTarget}
+                  options={LENGTH_TARGETS.map((target) => ({ value: target.value, label: target.label }))}
+                  onChange={(value) => setLengthTarget(value as LengthTarget)}
+                />
+                <div className="rounded-md bg-paper/80 px-3 py-2 text-sm text-ink/70">
+                  POV is locked to third-person limited.
+                </div>
+              </div>
+            </section>
+
             {error ? (
               <div className="rounded-md border border-ember/30 bg-ember/10 p-3 text-sm text-ember">{error}</div>
             ) : null}
@@ -200,6 +272,40 @@ function normalizeGenerateStoryResponse(payload: unknown): GenerateStoryResponse
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function SelectControl({
+  label,
+  value,
+  options,
+  onChange
+}: {
+  label: string;
+  value: string;
+  options: readonly string[] | readonly SelectOption[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-2">
+      <span className="text-sm font-semibold text-ink">{label}</span>
+      <select
+        className="rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/20"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {options.map((option) => {
+          const optionValue = typeof option === "string" ? option : option.value;
+          const optionLabel = typeof option === "string" ? option : option.label;
+
+          return (
+            <option key={optionValue} value={optionValue}>
+              {optionLabel}
+            </option>
+          );
+        })}
+      </select>
+    </label>
+  );
 }
 
 function UploadPanel({
@@ -298,6 +404,15 @@ function StoryOutput({
           <MetadataItem label="Generator source" value={response.metadata.source} />
           <MetadataItem label="Characters" value={formatList(response.metadata.charactersUsed)} />
           <MetadataItem label="Rules" value={formatList(response.metadata.rulesReferenced)} />
+          <MetadataItem label="Genre preset" value={diagnostics.genrePreset} />
+          <MetadataItem label="Narrative architecture" value={diagnostics.narrativeArchitecture} />
+          <MetadataItem label="Character arc" value={diagnostics.characterArc} />
+          <MetadataItem label="Ending type" value={diagnostics.endingType} />
+          <MetadataItem label="Length target" value={diagnostics.lengthTarget} />
+          <MetadataItem label="Final word count" value={diagnostics.finalWordCount.toLocaleString()} />
+          <MetadataItem label="Expansion attempted" value={formatBoolean(diagnostics.expansionAttempted)} />
+          <MetadataItem label="Expansion succeeded" value={formatBoolean(diagnostics.expansionSucceeded)} />
+          <MetadataItem label="Under target notice" value={diagnostics.underTargetNotice ?? "None"} />
           <MetadataItem label="OpenAI Enabled" value={formatBoolean(diagnostics.openAIEnabled)} />
           <MetadataItem label="OPENAI_API_KEY detected" value={formatBoolean(diagnostics.apiKeyDetected)} />
           <MetadataItem label="Model requested" value={diagnostics.modelRequested} />
