@@ -24,6 +24,19 @@ import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 type UploadState = {
   name: string;
   content: string;
+  libraryArtifactId?: string;
+};
+
+type InputArtifactType = "worldBible" | "characterProfiles" | "storySeed" | "storyRules";
+
+type InputArtifact = {
+  id: string;
+  type: InputArtifactType;
+  name: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  characterCount: number;
 };
 
 type SelectOption = {
@@ -49,13 +62,21 @@ type SavedStory = {
 };
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
+const INPUT_ARTIFACTS_STORAGE_KEY = "story-world-engine:input-artifacts:v1";
 const SAVED_STORIES_STORAGE_KEY = "story-world-engine:saved-stories:v1";
+const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
+const INPUT_LABELS: Record<InputArtifactType, string> = {
+  worldBible: "World Bible",
+  characterProfiles: "Character Profiles",
+  storySeed: "Story Seed",
+  storyRules: "Story Rules"
+};
 
 export default function Home() {
-  const [worldBible, setWorldBible] = useState<UploadState>({ name: "", content: "" });
-  const [characterProfiles, setCharacterProfiles] = useState<UploadState>({ name: "", content: "" });
-  const [storySeed, setStorySeed] = useState<UploadState>({ name: "", content: "" });
-  const [storyRules, setStoryRules] = useState<UploadState>({ name: "", content: "" });
+  const [worldBible, setWorldBible] = useState<UploadState>(EMPTY_UPLOAD);
+  const [characterProfiles, setCharacterProfiles] = useState<UploadState>(EMPTY_UPLOAD);
+  const [storySeed, setStorySeed] = useState<UploadState>(EMPTY_UPLOAD);
+  const [storyRules, setStoryRules] = useState<UploadState>(EMPTY_UPLOAD);
   const [genrePreset, setGenrePreset] = useState<GenrePreset>("Speculative Mystery");
   const [narrativeArchitecture, setNarrativeArchitecture] = useState<NarrativeArchitecture>("Revelation Story");
   const [characterArc, setCharacterArc] = useState<CharacterArc>("Positive Change Arc");
@@ -63,6 +84,7 @@ export default function Home() {
   const [lengthTarget, setLengthTarget] = useState<LengthTarget>("Standard");
   const [recommendation, setRecommendation] = useState<StoryArchitectureRecommendation | null>(null);
   const [storyResponse, setStoryResponse] = useState<GenerateStoryResponse | null>(null);
+  const [inputArtifacts, setInputArtifacts] = useState<InputArtifact[]>([]);
   const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
   const [statusMessage, setStatusMessage] = useState("");
   const [canNativeShare, setCanNativeShare] = useState(false);
@@ -71,6 +93,7 @@ export default function Home() {
   const [isLoadingSample, setIsLoadingSample] = useState(false);
 
   useEffect(() => {
+    setInputArtifacts(readInputArtifacts());
     setSavedStories(readSavedStories());
     setCanNativeShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
   }, []);
@@ -96,9 +119,7 @@ export default function Home() {
     try {
       const response = await fetch("/api/generate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           worldBible: worldBible.content,
           characterProfiles: characterProfiles.content,
@@ -111,12 +132,10 @@ export default function Home() {
           lengthTarget
         })
       });
-
       const payload = await response.json();
       if (!response.ok) {
         throw new Error(payload.error ?? "Story generation failed.");
       }
-
       setStoryResponse(normalizeGenerateStoryResponse(payload));
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Story generation failed.");
@@ -139,23 +158,10 @@ export default function Home() {
         fetchSampleFile("story_seed.md"),
         fetchSampleFile("story_generation_rules.md")
       ]);
-
-      setWorldBible({
-        name: "world.md",
-        content: world
-      });
-      setCharacterProfiles({
-        name: "characters.md",
-        content: characters
-      });
-      setStorySeed({
-        name: "story_seed.md",
-        content: seed
-      });
-      setStoryRules({
-        name: "story_generation_rules.md",
-        content: generationRules
-      });
+      setWorldBible({ name: "world.md", content: world });
+      setCharacterProfiles({ name: "characters.md", content: characters });
+      setStorySeed({ name: "story_seed.md", content: seed });
+      setStoryRules({ name: "story_generation_rules.md", content: generationRules });
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Unable to load the sample world.");
     } finally {
@@ -170,13 +176,7 @@ export default function Home() {
         characterProfiles: characterProfiles.content,
         storySeed: storySeed.content,
         storyRules: storyRules.content,
-        currentSelections: {
-          genrePreset,
-          narrativeArchitecture,
-          characterArc,
-          endingType,
-          lengthTarget
-        }
+        currentSelections: { genrePreset, narrativeArchitecture, characterArc, endingType, lengthTarget }
       })
     );
   }
@@ -185,7 +185,6 @@ export default function Home() {
     if (!recommendation) {
       return;
     }
-
     setGenrePreset(recommendation.genrePreset);
     setNarrativeArchitecture(recommendation.narrativeArchitecture);
     setCharacterArc(recommendation.characterArc);
@@ -193,11 +192,88 @@ export default function Home() {
     setLengthTarget(recommendation.lengthTarget);
   }
 
+  function handleClearCurrentInputs() {
+    setWorldBible({ ...EMPTY_UPLOAD });
+    setCharacterProfiles({ ...EMPTY_UPLOAD });
+    setStorySeed({ ...EMPTY_UPLOAD });
+    setStoryRules({ ...EMPTY_UPLOAD });
+    setRecommendation(null);
+    setStoryResponse(null);
+    setStatusMessage("Current inputs cleared. Saved library items were not changed.");
+  }
+
+  function handleSelectInputArtifact(type: InputArtifactType, artifactId: string) {
+    if (!artifactId) {
+      setUploadForType(type, { ...EMPTY_UPLOAD });
+      return;
+    }
+    const artifact = inputArtifacts.find((item) => item.id === artifactId && item.type === type);
+    if (!artifact) {
+      return;
+    }
+    setUploadForType(type, { name: artifact.name, content: artifact.content, libraryArtifactId: artifact.id });
+    setRecommendation(null);
+    setStoryResponse(null);
+    setStatusMessage(`Loaded ${artifact.name} from the local library.`);
+  }
+
+  function handleSaveInputArtifact(type: InputArtifactType, value: UploadState) {
+    if (!value.content.trim()) {
+      setError(`Add ${INPUT_LABELS[type]} content before saving it to the library.`);
+      return;
+    }
+
+    setError("");
+    const now = new Date().toISOString();
+    const baseName = value.name.trim() || `${INPUT_LABELS[type]} ${formatLibraryVersion(now)}`;
+    const duplicate = inputArtifacts.some((artifact) => artifact.type === type && artifact.name === baseName);
+    let name = baseName;
+
+    if (duplicate) {
+      const saveVersion = window.confirm(
+        `${baseName} already exists in ${INPUT_LABELS[type]}. Save a new timestamped version instead?`
+      );
+      if (!saveVersion) {
+        return;
+      }
+      name = `${baseName} (${formatLibraryVersion(now)})`;
+    }
+
+    const artifact: InputArtifact = {
+      id: createInputArtifactId(type, name, now),
+      type,
+      name,
+      content: value.content,
+      createdAt: now,
+      updatedAt: now,
+      characterCount: value.content.length
+    };
+    const nextArtifacts = [artifact, ...inputArtifacts];
+    persistInputArtifacts(nextArtifacts);
+    setInputArtifacts(nextArtifacts);
+    setUploadForType(type, { name: artifact.name, content: artifact.content, libraryArtifactId: artifact.id });
+    setStatusMessage(`${artifact.name} saved to the local library.`);
+  }
+
+  function handleRemoveInputArtifact(type: InputArtifactType, artifactId?: string) {
+    if (!artifactId) {
+      return;
+    }
+    const artifact = inputArtifacts.find((item) => item.id === artifactId && item.type === type);
+    if (!artifact) {
+      return;
+    }
+    const nextArtifacts = inputArtifacts.filter((item) => item.id !== artifactId);
+    persistInputArtifacts(nextArtifacts);
+    setInputArtifacts(nextArtifacts);
+    clearSelectedArtifactId(type, artifactId);
+    setStatusMessage(`${artifact.name} removed from the local library.`);
+  }
+
   function handleSaveStory() {
     if (!storyResponse) {
       return;
     }
-
     const savedStory = createSavedStory(storyResponse);
     const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
     persistSavedStories(nextSavedStories);
@@ -221,7 +297,6 @@ export default function Home() {
     if (!storyResponse) {
       return;
     }
-
     await copyText(storyResponse.story);
     setStatusMessage("Story copied.");
   }
@@ -230,7 +305,6 @@ export default function Home() {
     if (!storyResponse) {
       return;
     }
-
     await copyText(buildSocialTeaser(createSavedStory(storyResponse)));
     setStatusMessage("Social teaser copied.");
   }
@@ -239,19 +313,14 @@ export default function Home() {
     if (!storyResponse || !navigator.share) {
       return;
     }
-
     const savedStory = createSavedStory(storyResponse);
-    await navigator.share({
-      title: savedStory.title,
-      text: buildSocialTeaser(savedStory)
-    });
+    await navigator.share({ title: savedStory.title, text: buildSocialTeaser(savedStory) });
   }
 
   function handleDownloadTxt() {
     if (!storyResponse) {
       return;
     }
-
     const savedStory = createSavedStory(storyResponse);
     downloadTextFile(`${slugify(savedStory.title)}.txt`, savedStory.story);
   }
@@ -260,9 +329,35 @@ export default function Home() {
     if (!storyResponse) {
       return;
     }
-
     const savedStory = createSavedStory(storyResponse);
     downloadTextFile(`${slugify(savedStory.title)}.md`, buildMarkdownExport(savedStory));
+  }
+
+  function setUploadForType(type: InputArtifactType, value: UploadState) {
+    if (type === "worldBible") {
+      setWorldBible(value);
+    } else if (type === "characterProfiles") {
+      setCharacterProfiles(value);
+    } else if (type === "storySeed") {
+      setStorySeed(value);
+    } else {
+      setStoryRules(value);
+    }
+  }
+
+  function clearSelectedArtifactId(type: InputArtifactType, artifactId: string) {
+    const clearIfSelected = (value: UploadState): UploadState =>
+      value.libraryArtifactId === artifactId ? { name: value.name, content: value.content } : value;
+
+    if (type === "worldBible") {
+      setWorldBible(clearIfSelected);
+    } else if (type === "characterProfiles") {
+      setCharacterProfiles(clearIfSelected);
+    } else if (type === "storySeed") {
+      setStorySeed(clearIfSelected);
+    } else {
+      setStoryRules(clearIfSelected);
+    }
   }
 
   return (
@@ -287,34 +382,64 @@ export default function Home() {
               className="rounded-md border border-brass/40 bg-white/75 px-5 py-3 text-sm font-semibold text-brass shadow-soft transition hover:border-brass hover:bg-paper disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isLoadingSample || isGenerating}
               onClick={handleLoadSampleWorld}
+              type="button"
             >
               {isLoadingSample ? "Loading sample world..." : "Load Sample World"}
             </button>
 
             <UploadPanel
-              title="World Bible"
+              artifactType="worldBible"
               description="Upload a .md or .txt file with rules, places, tone, history, and canon."
-              value={worldBible}
+              libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "worldBible")}
               onChange={setWorldBible}
+              onRemoveFromLibrary={handleRemoveInputArtifact}
+              onSaveToLibrary={handleSaveInputArtifact}
+              onSelectFromLibrary={handleSelectInputArtifact}
+              title="World Bible"
+              value={worldBible}
             />
             <UploadPanel
-              title="Character Profiles"
+              artifactType="characterProfiles"
               description="Upload a .md or .txt file with names, motivations, relationships, and constraints."
-              value={characterProfiles}
+              libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "characterProfiles")}
               onChange={setCharacterProfiles}
+              onRemoveFromLibrary={handleRemoveInputArtifact}
+              onSaveToLibrary={handleSaveInputArtifact}
+              onSelectFromLibrary={handleSelectInputArtifact}
+              title="Character Profiles"
+              value={characterProfiles}
             />
             <UploadPanel
-              title="Story Seed"
+              artifactType="storySeed"
               description="Upload a .md or .txt file with the inciting incident, theme, or conflict to explore."
-              value={storySeed}
+              libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "storySeed")}
               onChange={setStorySeed}
+              onRemoveFromLibrary={handleRemoveInputArtifact}
+              onSaveToLibrary={handleSaveInputArtifact}
+              onSelectFromLibrary={handleSelectInputArtifact}
+              title="Story Seed"
+              value={storySeed}
             />
             <UploadPanel
-              title="Story Generation Rules / Narrative Constraints"
+              artifactType="storyRules"
               description="Upload a .md or .txt file with narrative rules, constraints, priorities, and endings guidance."
-              value={storyRules}
+              libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "storyRules")}
               onChange={setStoryRules}
+              onRemoveFromLibrary={handleRemoveInputArtifact}
+              onSaveToLibrary={handleSaveInputArtifact}
+              onSelectFromLibrary={handleSelectInputArtifact}
+              title="Story Generation Rules / Narrative Constraints"
+              value={storyRules}
             />
+
+            <button
+              className="rounded-md border border-ink/15 bg-white/75 px-5 py-3 text-sm font-semibold text-ink transition hover:bg-paper disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isGenerating}
+              onClick={handleClearCurrentInputs}
+              type="button"
+            >
+              Clear current inputs
+            </button>
 
             <section className="rounded-md border border-ink/10 bg-white/70 p-4 shadow-soft">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -361,60 +486,34 @@ export default function Home() {
               ) : null}
 
               <div className="mt-4 grid gap-3">
-                <SelectControl
-                  label="Genre Preset"
-                  value={genrePreset}
-                  options={GENRE_PRESETS}
-                  onChange={(value) => setGenrePreset(value as GenrePreset)}
-                />
+                <SelectControl label="Genre Preset" onChange={(value) => setGenrePreset(value as GenrePreset)} options={GENRE_PRESETS} value={genrePreset} />
                 <SelectControl
                   label="Narrative Architecture"
-                  value={narrativeArchitecture}
-                  options={NARRATIVE_ARCHITECTURES}
                   onChange={(value) => setNarrativeArchitecture(value as NarrativeArchitecture)}
+                  options={NARRATIVE_ARCHITECTURES}
+                  value={narrativeArchitecture}
                 />
-                <SelectControl
-                  label="Character Arc"
-                  value={characterArc}
-                  options={CHARACTER_ARCS}
-                  onChange={(value) => setCharacterArc(value as CharacterArc)}
-                />
-                <SelectControl
-                  label="Ending Type"
-                  value={endingType}
-                  options={ENDING_TYPES}
-                  onChange={(value) => setEndingType(value as EndingType)}
-                />
+                <SelectControl label="Character Arc" onChange={(value) => setCharacterArc(value as CharacterArc)} options={CHARACTER_ARCS} value={characterArc} />
+                <SelectControl label="Ending Type" onChange={(value) => setEndingType(value as EndingType)} options={ENDING_TYPES} value={endingType} />
                 <SelectControl
                   label="Length Target"
-                  value={lengthTarget}
-                  options={LENGTH_TARGETS.map((target) => ({ value: target.value, label: target.label }))}
                   onChange={(value) => setLengthTarget(value as LengthTarget)}
+                  options={LENGTH_TARGETS.map((target) => ({ value: target.value, label: target.label }))}
+                  value={lengthTarget}
                 />
-                <div className="rounded-md bg-paper/80 px-3 py-2 text-sm text-ink/70">
-                  POV is locked to third-person limited.
-                </div>
+                <div className="rounded-md bg-paper/80 px-3 py-2 text-sm text-ink/70">POV is locked to third-person limited.</div>
               </div>
             </section>
 
-            <SavedStoriesPanel
-              savedStories={savedStories}
-              onDelete={handleDeleteSavedStory}
-              onRestore={handleRestoreSavedStory}
-            />
-
-            {statusMessage ? (
-              <div className="rounded-md border border-brass/25 bg-paper/80 p-3 text-sm text-ink/70">{statusMessage}</div>
-            ) : null}
-
-            {error ? (
-              <div className="rounded-md border border-ember/30 bg-ember/10 p-3 text-sm text-ember">{error}</div>
-            ) : null}
+            <SavedStoriesPanel savedStories={savedStories} onDelete={handleDeleteSavedStory} onRestore={handleRestoreSavedStory} />
+            {statusMessage ? <div className="rounded-md border border-brass/25 bg-paper/80 p-3 text-sm text-ink/70">{statusMessage}</div> : null}
+            {error ? <div className="rounded-md border border-ember/30 bg-ember/10 p-3 text-sm text-ember">{error}</div> : null}
 
             <button
               className="rounded-md bg-ink px-5 py-3 text-sm font-semibold text-paper transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:bg-ink/35"
               disabled={!canGenerate}
               onClick={handleGenerate}
+              type="button"
             >
               {isGenerating ? "Generating story..." : "Generate Story"}
             </button>
@@ -442,186 +541,99 @@ async function fetchSampleFile(fileName: string): Promise<string> {
   if (!response.ok) {
     throw new Error(`Unable to load sample file: ${fileName}`);
   }
-
   return response.text();
 }
 
-function normalizeGenerateStoryResponse(payload: unknown): GenerateStoryResponse {
-  const normalizedPayload = normalizeStoryPayload(payload) as Partial<GenerateStoryResponse>;
-  const story = normalizeStoryText(normalizedPayload.story);
-
-  if (!story || !normalizedPayload.metadata) {
-    throw new Error("Story generation returned an invalid response.");
-  }
-
-  return {
-    ...normalizedPayload,
-    story,
-    metadata: {
-      ...normalizedPayload.metadata,
-      wordCount: countWords(story)
+function UploadPanel({
+  artifactType,
+  description,
+  libraryArtifacts,
+  onChange,
+  onRemoveFromLibrary,
+  onSaveToLibrary,
+  onSelectFromLibrary,
+  title,
+  value
+}: {
+  artifactType: InputArtifactType;
+  description: string;
+  libraryArtifacts: InputArtifact[];
+  onChange: (value: UploadState) => void;
+  onRemoveFromLibrary: (type: InputArtifactType, artifactId?: string) => void;
+  onSaveToLibrary: (type: InputArtifactType, value: UploadState) => void;
+  onSelectFromLibrary: (type: InputArtifactType, artifactId: string) => void;
+  title: string;
+  value: UploadState;
+}) {
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
     }
-  } as GenerateStoryResponse;
-}
-
-function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
-function createSavedStory(response: GenerateStoryResponse): SavedStory {
-  const diagnostics = response.metadata.diagnostics;
-
-  return {
-    id: createStoryId(response.story),
-    title: createStoryTitle(response.story),
-    createdAt: new Date().toISOString(),
-    story: response.story,
-    wordCount: response.metadata.wordCount,
-    generatorSource: response.metadata.source,
-    charactersUsed: response.metadata.charactersUsed,
-    rulesReferenced: response.metadata.rulesReferenced,
-    genrePreset: diagnostics.genrePreset,
-    narrativeArchitecture: diagnostics.narrativeArchitecture,
-    characterArc: diagnostics.characterArc,
-    endingType: diagnostics.endingType,
-    lengthTarget: diagnostics.lengthTarget,
-    diagnosticsNotice: diagnostics.notice ?? diagnostics.underTargetNotice
-  };
-}
-
-function savedStoryToResponse(savedStory: SavedStory): GenerateStoryResponse {
-  const diagnostics: StoryDiagnostics = {
-    openAIEnabled: false,
-    apiKeyDetected: false,
-    modelRequested: "Restored local save",
-    openAIRequestAttempted: false,
-    openAIRequestSucceeded: false,
-    fallbackReason: null,
-    notice: savedStory.diagnosticsNotice,
-    genrePreset: savedStory.genrePreset,
-    narrativeArchitecture: savedStory.narrativeArchitecture,
-    characterArc: savedStory.characterArc,
-    endingType: savedStory.endingType,
-    lengthTarget: savedStory.lengthTarget,
-    finalWordCount: savedStory.wordCount,
-    expansionAttempted: false,
-    expansionSucceeded: false,
-    underTargetNotice: null,
-    blueprintGenerated: false,
-    blueprintSceneCount: 0,
-    blueprintFailedReason: null
-  };
-
-  return {
-    story: savedStory.story,
-    metadata: {
-      wordCount: savedStory.wordCount,
-      charactersUsed: savedStory.charactersUsed,
-      rulesReferenced: savedStory.rulesReferenced,
-      source: savedStory.generatorSource,
-      diagnostics
+    const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+    if (!ACCEPTED_EXTENSIONS.includes(extension)) {
+      event.target.value = "";
+      onChange({ ...EMPTY_UPLOAD });
+      return;
     }
-  };
-}
-
-function readSavedStories(): SavedStory[] {
-  if (typeof window === "undefined") {
-    return [];
+    onChange({ name: file.name, content: await file.text() });
   }
 
-  try {
-    const raw = window.localStorage.getItem(SAVED_STORIES_STORAGE_KEY);
-    if (!raw) {
-      return [];
-    }
+  const selectedArtifact = libraryArtifacts.find((artifact) => artifact.id === value.libraryArtifactId);
 
-    const parsed = JSON.parse(raw) as SavedStory[];
-    return Array.isArray(parsed) ? parsed.filter(isSavedStory) : [];
-  } catch {
-    return [];
-  }
-}
-
-function persistSavedStories(stories: SavedStory[]) {
-  window.localStorage.setItem(SAVED_STORIES_STORAGE_KEY, JSON.stringify(stories));
-}
-
-function isSavedStory(value: unknown): value is SavedStory {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const candidate = value as Partial<SavedStory>;
-  return Boolean(candidate.id && candidate.title && candidate.createdAt && candidate.story);
-}
-
-async function copyText(text: string) {
-  await navigator.clipboard.writeText(text);
-}
-
-function buildMarkdownExport(savedStory: SavedStory): string {
-  return `# ${savedStory.title}
-
-Generated date: ${formatDateTime(savedStory.createdAt)}
-Word count: ${savedStory.wordCount.toLocaleString()}
-Genre Preset: ${savedStory.genrePreset}
-Narrative Architecture: ${savedStory.narrativeArchitecture}
-Character Arc: ${savedStory.characterArc}
-Ending Type: ${savedStory.endingType}
-Length Target: ${savedStory.lengthTarget}
-
-${savedStory.story}`;
-}
-
-function buildSocialTeaser(savedStory: SavedStory): string {
-  return `${savedStory.title}
-
-${truncateText(savedStory.story, 280)}
-
-${savedStory.wordCount.toLocaleString()} words
-Generated with Story World Engine`;
-}
-
-function downloadTextFile(fileName: string, contents: string) {
-  const blob = new Blob([contents], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
-function createStoryId(story: string): string {
-  return `${Date.now()}-${story.length}`;
-}
-
-function createStoryTitle(story: string): string {
-  const firstLine = story.split(/\n+/).find((line) => line.trim())?.trim() ?? "Generated Story";
-  const firstSentence = firstLine.split(/[.!?]/)[0]?.trim() || firstLine;
-  return truncateText(firstSentence.replace(/^#+\s*/, ""), 72) || "Generated Story";
-}
-
-function truncateText(text: string, maxLength: number): string {
-  const compact = text.replace(/\s+/g, " ").trim();
-  if (compact.length <= maxLength) {
-    return compact;
-  }
-
-  return `${compact.slice(0, maxLength).replace(/[\s,.;:]+$/, "")}...`;
-}
-
-function slugify(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "story-world-engine-story";
-}
-
-function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short"
-  }).format(new Date(value));
+  return (
+    <section className="rounded-md border border-ink/10 bg-white/70 p-4 shadow-soft">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-lg font-semibold text-ink">{title}</h2>
+        <p className="text-sm leading-6 text-ink/65">{description}</p>
+      </div>
+      <label className="mt-4 flex flex-col gap-2">
+        <span className="text-sm font-semibold text-ink">Choose from library</span>
+        <select
+          className="rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/20"
+          onChange={(event) => onSelectFromLibrary(artifactType, event.target.value)}
+          value={value.libraryArtifactId ?? ""}
+        >
+          <option value="">Upload new or choose saved</option>
+          {libraryArtifacts.map((artifact) => (
+            <option key={artifact.id} value={artifact.id}>
+              {artifact.name} ({artifact.characterCount.toLocaleString()} chars)
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-brass/55 bg-paper/70 px-4 py-6 text-center transition hover:border-brass hover:bg-paper">
+        <span className="text-sm font-semibold text-brass">{value.name || "Choose .md or .txt file"}</span>
+        <span className="mt-1 text-xs text-ink/55">
+          {value.content ? `${value.content.length.toLocaleString()} characters loaded` : "Files stay local until generation"}
+        </span>
+        <input className="sr-only" type="file" accept=".md,.txt,text/markdown,text/plain" onChange={handleFileChange} />
+      </label>
+      {selectedArtifact ? (
+        <p className="mt-3 rounded-md bg-paper/80 px-3 py-2 text-xs leading-5 text-ink/60">
+          Loaded from library: {selectedArtifact.name} | {selectedArtifact.characterCount.toLocaleString()} characters
+        </p>
+      ) : null}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-paper transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!value.content.trim()}
+          onClick={() => onSaveToLibrary(artifactType, value)}
+          type="button"
+        >
+          Save to Library
+        </button>
+        <button
+          className="rounded-md border border-ember/30 bg-white/70 px-3 py-2 text-xs font-semibold text-ember transition hover:bg-ember/10 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!value.libraryArtifactId}
+          onClick={() => onRemoveFromLibrary(artifactType, value.libraryArtifactId)}
+          type="button"
+        >
+          Remove from Library
+        </button>
+      </div>
+    </section>
+  );
 }
 
 function SelectControl({
@@ -646,7 +658,6 @@ function SelectControl({
         {options.map((option) => {
           const optionValue = typeof option === "string" ? option : option.value;
           const optionLabel = typeof option === "string" ? option : option.label;
-
           return (
             <option key={optionValue} value={optionValue}>
               {optionLabel}
@@ -655,53 +666,6 @@ function SelectControl({
         })}
       </select>
     </label>
-  );
-}
-
-function UploadPanel({
-  title,
-  description,
-  value,
-  onChange
-}: {
-  title: string;
-  description: string;
-  value: UploadState;
-  onChange: (value: UploadState) => void;
-}) {
-  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
-    if (!ACCEPTED_EXTENSIONS.includes(extension)) {
-      event.target.value = "";
-      onChange({ name: "", content: "" });
-      return;
-    }
-
-    onChange({
-      name: file.name,
-      content: await file.text()
-    });
-  }
-
-  return (
-    <section className="rounded-md border border-ink/10 bg-white/70 p-4 shadow-soft">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-ink">{title}</h2>
-        <p className="text-sm leading-6 text-ink/65">{description}</p>
-      </div>
-      <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-brass/55 bg-paper/70 px-4 py-6 text-center transition hover:border-brass hover:bg-paper">
-        <span className="text-sm font-semibold text-brass">{value.name || "Choose .md or .txt file"}</span>
-        <span className="mt-1 text-xs text-ink/55">
-          {value.content ? `${value.content.length.toLocaleString()} characters loaded` : "Files stay local until generation"}
-        </span>
-        <input className="sr-only" type="file" accept=".md,.txt,text/markdown,text/plain" onChange={handleFileChange} />
-      </label>
-    </section>
   );
 }
 
@@ -727,9 +691,8 @@ function SavedStoriesPanel({
     <section className="rounded-md border border-ink/10 bg-white/70 p-4 shadow-soft">
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold text-ink">Saved Stories</h2>
-        <p className="text-sm leading-6 text-ink/65">Stored locally in this browser. Uploaded source files are not saved.</p>
+        <p className="text-sm leading-6 text-ink/65">Stored locally in this browser.</p>
       </div>
-
       {savedStories.length === 0 ? (
         <p className="mt-4 rounded-md bg-paper/80 px-3 py-2 text-sm text-ink/60">No saved stories yet.</p>
       ) : (
@@ -738,17 +701,13 @@ function SavedStoriesPanel({
             <article key={story.id} className="rounded-md border border-ink/10 bg-paper/80 p-3">
               <h3 className="text-sm font-semibold text-ink">{story.title}</h3>
               <p className="mt-1 text-xs leading-5 text-ink/60">
-                {formatDateTime(story.createdAt)} · {story.wordCount.toLocaleString()} words
+                {formatDateTime(story.createdAt)} | {story.wordCount.toLocaleString()} words
               </p>
               <p className="mt-1 text-xs leading-5 text-ink/60">
-                {story.genrePreset} · {story.narrativeArchitecture}
+                {story.genrePreset} | {story.narrativeArchitecture}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-paper transition hover:bg-ink/90"
-                  onClick={() => onRestore(story)}
-                  type="button"
-                >
+                <button className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-paper transition hover:bg-ink/90" onClick={() => onRestore(story)} type="button">
                   Open
                 </button>
                 <button
@@ -827,29 +786,14 @@ function StoryOutput({
             </h2>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-paper transition hover:bg-ink/90" onClick={onSaveStory} type="button">
-              Save Story
-            </button>
-            <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onCopyStory} type="button">
-              Copy story
-            </button>
-            <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onDownloadTxt} type="button">
-              Download .txt
-            </button>
-            <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onDownloadMarkdown} type="button">
-              Download .md
-            </button>
-            <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onCopySocialTeaser} type="button">
-              Copy social teaser
-            </button>
-            {canNativeShare ? (
-              <button className="rounded-md border border-brass/40 bg-white/75 px-3 py-2 text-xs font-semibold text-brass transition hover:bg-paper" onClick={onShareStory} type="button">
-                Share
-              </button>
-            ) : null}
+            <OutputButton onClick={onSaveStory}>Save Story</OutputButton>
+            <OutputButton onClick={onCopyStory}>Copy story</OutputButton>
+            <OutputButton onClick={onDownloadTxt}>Download .txt</OutputButton>
+            <OutputButton onClick={onDownloadMarkdown}>Download .md</OutputButton>
+            <OutputButton onClick={onCopySocialTeaser}>Copy social teaser</OutputButton>
+            {canNativeShare ? <OutputButton onClick={onShareStory}>Share</OutputButton> : null}
           </div>
         </div>
-
         <div className="grid gap-2 text-sm text-ink/70 sm:grid-cols-2 lg:grid-cols-3">
           <MetadataItem label="Word count" value={response.metadata.wordCount.toLocaleString()} />
           <MetadataItem label="Generator source" value={response.metadata.source} />
@@ -876,11 +820,16 @@ function StoryOutput({
           <MetadataItem label="Notice" value={diagnostics.notice ?? "None"} />
         </div>
       </div>
-
-      <article className="mt-6 max-w-none whitespace-pre-wrap text-base leading-8 text-ink">
-        {response.story}
-      </article>
+      <article className="mt-6 max-w-none whitespace-pre-wrap text-base leading-8 text-ink">{response.story}</article>
     </section>
+  );
+}
+
+function OutputButton({ children, onClick }: { children: string; onClick: () => void }) {
+  return (
+    <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onClick} type="button">
+      {children}
+    </button>
   );
 }
 
@@ -891,6 +840,209 @@ function MetadataItem({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 break-words text-sm text-ink">{value}</dd>
     </div>
   );
+}
+
+function normalizeGenerateStoryResponse(payload: unknown): GenerateStoryResponse {
+  const normalizedPayload = normalizeStoryPayload(payload) as Partial<GenerateStoryResponse>;
+  const story = normalizeStoryText(normalizedPayload.story);
+  if (!story || !normalizedPayload.metadata) {
+    throw new Error("Story generation returned an invalid response.");
+  }
+  return {
+    ...normalizedPayload,
+    story,
+    metadata: {
+      ...normalizedPayload.metadata,
+      wordCount: countWords(story)
+    }
+  } as GenerateStoryResponse;
+}
+
+function createSavedStory(response: GenerateStoryResponse): SavedStory {
+  const diagnostics = response.metadata.diagnostics;
+  return {
+    id: createStoryId(response.story),
+    title: createStoryTitle(response.story),
+    createdAt: new Date().toISOString(),
+    story: response.story,
+    wordCount: response.metadata.wordCount,
+    generatorSource: response.metadata.source,
+    charactersUsed: response.metadata.charactersUsed,
+    rulesReferenced: response.metadata.rulesReferenced,
+    genrePreset: diagnostics.genrePreset,
+    narrativeArchitecture: diagnostics.narrativeArchitecture,
+    characterArc: diagnostics.characterArc,
+    endingType: diagnostics.endingType,
+    lengthTarget: diagnostics.lengthTarget,
+    diagnosticsNotice: diagnostics.notice ?? diagnostics.underTargetNotice
+  };
+}
+
+function savedStoryToResponse(savedStory: SavedStory): GenerateStoryResponse {
+  const diagnostics: StoryDiagnostics = {
+    openAIEnabled: false,
+    apiKeyDetected: false,
+    modelRequested: "Restored local save",
+    openAIRequestAttempted: false,
+    openAIRequestSucceeded: false,
+    fallbackReason: null,
+    notice: savedStory.diagnosticsNotice,
+    genrePreset: savedStory.genrePreset,
+    narrativeArchitecture: savedStory.narrativeArchitecture,
+    characterArc: savedStory.characterArc,
+    endingType: savedStory.endingType,
+    lengthTarget: savedStory.lengthTarget,
+    finalWordCount: savedStory.wordCount,
+    expansionAttempted: false,
+    expansionSucceeded: false,
+    underTargetNotice: null,
+    blueprintGenerated: false,
+    blueprintSceneCount: 0,
+    blueprintFailedReason: null
+  };
+  return {
+    story: savedStory.story,
+    metadata: {
+      wordCount: savedStory.wordCount,
+      charactersUsed: savedStory.charactersUsed,
+      rulesReferenced: savedStory.rulesReferenced,
+      source: savedStory.generatorSource,
+      diagnostics
+    }
+  };
+}
+
+function readInputArtifacts(): InputArtifact[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(INPUT_ARTIFACTS_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as InputArtifact[];
+    return Array.isArray(parsed) ? parsed.filter(isInputArtifact) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistInputArtifacts(artifacts: InputArtifact[]) {
+  window.localStorage.setItem(INPUT_ARTIFACTS_STORAGE_KEY, JSON.stringify(artifacts));
+}
+
+function isInputArtifact(value: unknown): value is InputArtifact {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<InputArtifact>;
+  return Boolean(
+    candidate.id &&
+      isInputArtifactType(candidate.type) &&
+      candidate.name &&
+      typeof candidate.content === "string" &&
+      candidate.createdAt &&
+      candidate.updatedAt &&
+      typeof candidate.characterCount === "number"
+  );
+}
+
+function isInputArtifactType(value: unknown): value is InputArtifactType {
+  return value === "worldBible" || value === "characterProfiles" || value === "storySeed" || value === "storyRules";
+}
+
+function readSavedStories(): SavedStory[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(SAVED_STORIES_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as SavedStory[];
+    return Array.isArray(parsed) ? parsed.filter(isSavedStory) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistSavedStories(stories: SavedStory[]) {
+  window.localStorage.setItem(SAVED_STORIES_STORAGE_KEY, JSON.stringify(stories));
+}
+
+function isSavedStory(value: unknown): value is SavedStory {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<SavedStory>;
+  return Boolean(candidate.id && candidate.title && candidate.createdAt && candidate.story);
+}
+
+async function copyText(text: string) {
+  await navigator.clipboard.writeText(text);
+}
+
+function buildMarkdownExport(savedStory: SavedStory): string {
+  return `# ${savedStory.title}\n\nGenerated date: ${formatDateTime(savedStory.createdAt)}\nWord count: ${savedStory.wordCount.toLocaleString()}\nGenre Preset: ${savedStory.genrePreset}\nNarrative Architecture: ${savedStory.narrativeArchitecture}\nCharacter Arc: ${savedStory.characterArc}\nEnding Type: ${savedStory.endingType}\nLength Target: ${savedStory.lengthTarget}\n\n${savedStory.story}`;
+}
+
+function buildSocialTeaser(savedStory: SavedStory): string {
+  return `${savedStory.title}\n\n${truncateText(savedStory.story, 280)}\n\n${savedStory.wordCount.toLocaleString()} words\nGenerated with Story World Engine`;
+}
+
+function downloadTextFile(fileName: string, contents: string) {
+  const blob = new Blob([contents], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function createStoryId(story: string): string {
+  return `${Date.now()}-${story.length}`;
+}
+
+function createInputArtifactId(type: InputArtifactType, name: string, createdAt: string): string {
+  return `${type}-${createdAt}-${name.length}`.replace(/[^a-zA-Z0-9_-]/g, "-");
+}
+
+function createStoryTitle(story: string): string {
+  const firstLine = story.split(/\n+/).find((line) => line.trim())?.trim() ?? "Generated Story";
+  const firstSentence = firstLine.split(/[.!?]/)[0]?.trim() || firstLine;
+  return truncateText(firstSentence.replace(/^#+\s*/, ""), 72) || "Generated Story";
+}
+
+function truncateText(text: string, maxLength: number): string {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (compact.length <= maxLength) {
+    return compact;
+  }
+  return `${compact.slice(0, maxLength).replace(/[\s,.;:]+$/, "")}...`;
+}
+
+function slugify(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "story-world-engine-story";
+}
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function formatLibraryVersion(value: string): string {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" })
+    .format(new Date(value))
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/-+$/g, "");
 }
 
 function formatList(values: string[]): string {
