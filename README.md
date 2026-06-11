@@ -1,6 +1,6 @@
 # Story World Engine
 
-Story World Engine is a local-first MVP for creators who want to upload a world bible, character profiles, a story seed, and narrative generation rules, then generate an original short story that follows the uploaded canon.
+Story World Engine is a local-first MVP for creators who want to upload a world bible, character profiles, a story seed, and narrative generation rules, then generate an original short story that follows the uploaded canon and selected narrative architecture.
 
 The app uses OpenAI when `OPENAI_API_KEY` is configured. If no key is present, it automatically falls back to a deterministic local generator so the MVP still runs without external services.
 
@@ -18,7 +18,8 @@ story-world-engine/
 |     |- fallback-generator.ts    # Deterministic fallback story generator
 |     |- openai-generator.ts      # Official OpenAI Node SDK integration
 |     |- story-analysis.ts        # Metadata extraction helpers
-|     `- types.ts                 # Shared request/response types
+|     |- story-output.ts          # Story response normalization helpers
+|     `- types.ts                 # Shared request/response types and presets
 |- public/
 |  `- sample-content/
 |     |- world.md                 # Space Cowboy world bible
@@ -40,12 +41,19 @@ story-world-engine/
 - Upload a Story Seed as `.md` or `.txt`
 - Upload Story Generation Rules / Narrative Constraints as `.md` or `.txt`
 - Display uploaded filenames and character counts for all four artifacts
+- Choose compact story architecture controls:
+  - Genre Preset
+  - Narrative Architecture
+  - Character Arc
+  - Ending Type
+  - Length Target
+- POV is locked to third-person limited
 - Load the included Space Cowboy sample artifacts without manual uploads:
   - `world.md`
   - `characters.md`
   - `story_seed.md`
   - `story_generation_rules.md`
-- Generate a 1500-2000 word literary short story
+- Generate a structurally complete literary short story against the selected length target
 - Preserve world rules, character consistency, story request, and narrative constraints
 - Display the story in the browser
 - Return metadata:
@@ -53,6 +61,8 @@ story-world-engine/
   - characters used
   - rules referenced
   - generator source
+  - selected architecture controls
+  - expansion attempt and under-target diagnostics
 - No authentication, payments, database, AWS, voice, memory, or subscriptions
 
 ## Setup
@@ -136,18 +146,28 @@ Development Command: npm run dev
 
 After deployment, generate a story and check the metadata panel. It reports:
 
+- Genre preset
+- Narrative architecture
+- Character arc
+- Ending type
+- Length target
+- Final word count
+- Expansion attempted
+- Expansion succeeded
+- Under target notice
 - OpenAI Enabled
 - OPENAI_API_KEY detected
 - Model requested
 - OpenAI Attempted
 - OpenAI Succeeded
 - Fallback Reason
+- Notice
 
 If `Generator source` is `fallback`, confirm `OPENAI_API_KEY` is configured for the same Vercel environment you deployed, such as Production or Preview.
 
 ## Architecture Notes
 
-The frontend reads uploaded `.md` and `.txt` files in the browser and sends their text content to `/api/generate` as four fields:
+The frontend reads uploaded `.md` and `.txt` files in the browser and sends their text content to `/api/generate` with compact architecture controls:
 
 ```ts
 {
@@ -155,17 +175,32 @@ The frontend reads uploaded `.md` and `.txt` files in the browser and sends thei
   characterProfiles: string;
   storySeed: string;
   storyRules: string;
+  genrePreset: "Speculative Mystery" | "Literary Science Fiction" | "Contemporary Fantastical / Magical Realist";
+  narrativeArchitecture: "Revelation Story" | "Event Story" | "Character Transformation Story";
+  characterArc: "Positive Change Arc" | "Flat / Testing Arc" | "Disillusionment Arc";
+  endingType: "Resolution with Residue" | "Revelation with Cost" | "Transformation without Victory";
+  lengthTarget: "Compact" | "Standard" | "Long";
 }
 ```
 
-The OpenAI path builds its prompt from four clearly separated internal sections:
+The OpenAI path builds its prompt from private internal sections:
 
+- `GENRE PRESET`
+- `NARRATIVE ARCHITECTURE`
+- `CHARACTER ARC`
+- `ENDING TYPE`
+- `LENGTH TARGET`
+- `POV`
 - `WORLD BIBLE`
 - `CHARACTERS`
 - `STORY REQUEST`
 - `NARRATIVE RULES`
 
-Those sections are source material only. The model is instructed not to reproduce section labels, prompt text, bullet lists, or file contents verbatim. Narrative rules guide generation and take priority over generic literary defaults.
+Those sections are source material only. The model is instructed not to reproduce section labels, prompt text, bullet lists, or file contents verbatim. Genre defines the story contract, narrative architecture defines story shape, character arc defines protagonist transformation, ending type defines closure, and length target defines the target range.
+
+The story must be structurally complete. It should not be a single conversation, mood piece, premise sketch, or philosophical debate. It must move through irreversible turns shaped by the selected narrative architecture.
+
+If the first OpenAI story is below the selected target range, the app makes one expansion call focused on missing scenes, turns, costs, and consequences. It does not add filler and does not fall back solely because the story is under target. Fallback mode is reserved for technical failure: missing API key, API error, invalid response, or empty story.
 
 The API route validates the payload, checks for `OPENAI_API_KEY`, and chooses one of two generation paths:
 
@@ -189,6 +224,16 @@ The response shape remains stable for both paths:
       openAIRequestAttempted: boolean;
       openAIRequestSucceeded: boolean;
       fallbackReason: string | null;
+      notice: string | null;
+      genrePreset: string;
+      narrativeArchitecture: string;
+      characterArc: string;
+      endingType: string;
+      lengthTarget: string;
+      finalWordCount: number;
+      expansionAttempted: boolean;
+      expansionSucceeded: boolean;
+      underTargetNotice: string | null;
     };
   };
 }
