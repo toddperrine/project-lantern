@@ -42,6 +42,9 @@ story-world-engine/
 - Upload a Story Seed as `.md` or `.txt`
 - Upload Story Generation Rules / Narrative Constraints as `.md` or `.txt`
 - Display uploaded filenames and character counts for all four artifacts
+- Save reusable input artifacts in a browser-local library
+- Reuse saved World Bible, Character Profiles, Story Seed, and Story Rules artifacts from dropdowns
+- Clear current inputs without deleting saved local library items
 - Choose compact story architecture controls:
   - Genre Preset
   - Narrative Architecture
@@ -178,7 +181,7 @@ If `Generator source` is `fallback`, confirm `OPENAI_API_KEY` is configured for 
 
 ## Architecture Notes
 
-The frontend reads uploaded `.md` and `.txt` files in the browser and sends their text content to `/api/generate` with compact architecture controls:
+The frontend reads uploaded `.md` and `.txt` files in the browser. Creators can save reusable input artifacts locally in the browser and later choose them from each upload panel. Saved input artifacts include id, type, name, content, created date, updated date, and character count. They are local-only and are not sent anywhere unless the creator explicitly generates a story, which sends the selected current inputs to `/api/generate` with compact architecture controls:
 
 ```ts
 {
@@ -198,9 +201,9 @@ The Recommend Settings button runs deterministic local heuristics in the browser
 
 A future version could personalize recommendations from explicit likes/dislikes and a saved taste profile. That memory layer is intentionally not implemented in this MVP.
 
-Saved stories are stored in browser `localStorage`. They include only the finished story text and metadata such as title, created date, word count, generator source, characters used, rules referenced, selected architecture settings, length target, and diagnostics notice. Uploaded World Bible, Character Profiles, Story Seed, and Story Rules text are not saved.
+Saved input artifacts and saved stories are stored in browser `localStorage`. Saved stories include the finished story text and metadata such as title, created date, word count, generator source, characters used, rules referenced, selected architecture settings, length target, and diagnostics notice.
 
-Local saved stories may be lost if browser data is cleared, the user switches browsers, or local storage is reset. Phase 1 does not support backend storage, public share URLs, cloud sync, authentication, or database-backed saved stories. Export options stay local: copy story, copy social teaser, download `.txt`, download `.md`, and native browser share when available.
+Local library items and saved stories may be lost if browser data is cleared, the user switches browsers, or local storage is reset. Library items are local-only. Phase 1 does not support backend storage, public share URLs, cloud sync, authentication, accounts, or database-backed libraries. Future versions may add authenticated cloud libraries and project folders, but that is intentionally not implemented in this MVP. Export options stay local: copy story, copy social teaser, download `.txt`, download `.md`, and native browser share when available.
 
 The OpenAI path first creates a hidden private JSON blueprint, then writes the final story from that blueprint. The blueprint includes the protagonist, point-of-view character, central anomaly, rule under pressure, desire, fear, blind spot, architecture, arc, ending, concrete revelation, concrete cost, final decision, changed world state, and 5-9 scene beats. Each scene beat carries location, active characters, concrete action, new information, conflict or obstacle, irreversible turn, and consequence.
 
