@@ -76,4 +76,7 @@ export type StoryDiagnostics = {
   expansionAttempted: boolean;
   expansionSucceeded: boolean;
   underTargetNotice: string | null;
+  blueprintGenerated: boolean;
+  blueprintSceneCount: number;
+  blueprintFailedReason: string | null;
 };

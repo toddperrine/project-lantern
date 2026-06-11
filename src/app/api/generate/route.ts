@@ -72,7 +72,8 @@ export async function POST(request: Request) {
   try {
     return NextResponse.json(await generateOpenAIStory(input));
   } catch (error) {
-    const fallbackReason = `OpenAI request failed: ${summarizeOpenAIError(error)}`;
+    const errorSummary = summarizeOpenAIError(error);
+    const fallbackReason = `OpenAI request failed: ${errorSummary}`;
     console.error("OpenAI story generation failed; using deterministic fallback.", fallbackReason);
     return NextResponse.json(
       generateFallbackStory(
@@ -84,7 +85,10 @@ export async function POST(request: Request) {
           narrativeArchitecture: input.narrativeArchitecture,
           characterArc: input.characterArc,
           endingType: input.endingType,
-          lengthTarget: formatLengthTarget(input.lengthTarget)
+          lengthTarget: formatLengthTarget(input.lengthTarget),
+          blueprintGenerated: false,
+          blueprintSceneCount: 0,
+          blueprintFailedReason: errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null
         })
       )
     );

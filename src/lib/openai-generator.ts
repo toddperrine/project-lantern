@@ -14,6 +14,34 @@ type OpenAIStoryPayload = {
   rulesReferenced?: string[];
 };
 
+type StoryBlueprint = {
+  protagonist: string;
+  pointOfViewCharacter: string;
+  centralAnomaly: string;
+  speculativeRuleUnderPressure: string;
+  characterDesire: string;
+  characterFear: string;
+  characterBlindSpot: string;
+  narrativeArchitecture: string;
+  characterArc: string;
+  endingType: string;
+  concreteRevelation: string;
+  concreteCost: string;
+  finalDecision: string;
+  changedWorldState: string;
+  sceneBeats: BlueprintSceneBeat[];
+};
+
+type BlueprintSceneBeat = {
+  location: string;
+  activeCharacters: string[];
+  concreteAction: string;
+  newInformation: string;
+  conflictOrObstacle: string;
+  irreversibleTurn: string;
+  consequence: string;
+};
+
 const DEFAULT_MODEL = "gpt-4.1-mini";
 const POV = "Third-person limited";
 const DEFAULT_NARRATIVE_RULES = `Every story must obey these rules:
@@ -28,6 +56,19 @@ const DEFAULT_NARRATIVE_RULES = `Every story must obey these rules:
 9. The emotional or thematic question should remain alive.
 10. End with transformation, not victory.
 11. Avoid generic closing abstractions.`;
+const TECHNICAL_FORBIDDEN_TERMS = ["AI", "prompt", "model", "dataset", "simulation", "generated", "source material", "uploaded file"];
+const STORY_WORLD_TRANSLATIONS = [
+  "corrupted sound",
+  "memory gaps",
+  "impossible repetition",
+  "changed lyrics",
+  "physical glitches",
+  "missing names",
+  "wrong shadows",
+  "broken instruments",
+  "altered records",
+  "contradictory memories"
+];
 
 export function hasOpenAIKey(): boolean {
   return Boolean(process.env.OPENAI_API_KEY?.trim());
@@ -57,6 +98,9 @@ export function getOpenAIDiagnostics(overrides: Partial<StoryDiagnostics> = {}):
     expansionAttempted: false,
     expansionSucceeded: false,
     underTargetNotice: null,
+    blueprintGenerated: false,
+    blueprintSceneCount: 0,
+    blueprintFailedReason: null,
     ...overrides
   };
 }
@@ -66,8 +110,19 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
     apiKey: process.env.OPENAI_API_KEY
   });
   const lengthSpec = getLengthTargetSpec(input.lengthTarget);
+  let blueprint: StoryBlueprint;
 
-  const initialPayload = await requestStory(client, buildPrompt(input), estimateMaxTokens(lengthSpec.maxWords));
+  try {
+    blueprint = await requestBlueprint(client, input);
+  } catch (error) {
+    throw new Error(`Blueprint generation failed: ${summarizeError(error)}`);
+  }
+
+  const initialPayload = await requestStory(
+    client,
+    buildStoryPrompt(input, blueprint),
+    estimateStoryMaxTokens(lengthSpec.maxWords)
+  );
   let story = normalizeStoryText(initialPayload.story);
   let payload = initialPayload;
 
@@ -81,7 +136,11 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
 
   if (wordCount < lengthSpec.minWords) {
     expansionAttempted = true;
-    payload = await requestStory(client, buildExpansionPrompt(input, story), estimateMaxTokens(lengthSpec.maxWords));
+    payload = await requestStory(
+      client,
+      buildExpansionPrompt(input, blueprint, story),
+      estimateStoryMaxTokens(lengthSpec.maxWords)
+    );
     const expandedStory = normalizeStoryText(payload.story);
     if (!expandedStory) {
       throw new Error("OpenAI response did not include a story after expansion.");
@@ -117,23 +176,48 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
         finalWordCount: wordCount,
         expansionAttempted,
         expansionSucceeded,
-        underTargetNotice
+        underTargetNotice,
+        blueprintGenerated: true,
+        blueprintSceneCount: blueprint.sceneBeats.length,
+        blueprintFailedReason: null
       })
     }
   };
 }
 
+async function requestBlueprint(client: OpenAI, input: GenerateStoryRequest): Promise<StoryBlueprint> {
+  const response = await client.chat.completions.create({
+    model: getOpenAIModel(),
+    temperature: 0.45,
+    max_tokens: 3500,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          "Create private planning JSON for original short fiction. Return only valid JSON. Do not write prose, notes, markdown, or commentary."
+      },
+      {
+        role: "user",
+        content: buildBlueprintPrompt(input)
+      }
+    ]
+  });
+
+  return parseBlueprint(response.choices[0]?.message.content ?? "");
+}
+
 async function requestStory(client: OpenAI, prompt: string, maxTokens: number): Promise<OpenAIStoryPayload> {
   const response = await client.chat.completions.create({
     model: getOpenAIModel(),
-    temperature: 0.82,
+    temperature: 0.78,
     max_tokens: maxTokens,
     response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
         content:
-          "You are a literary short story engine for creators. Write original fiction as if for a literary magazine. Return only valid JSON matching this shape: {\"story\":\"...\",\"charactersUsed\":[\"...\"],\"rulesReferenced\":[\"...\"]}. The story value must contain only finished prose, never JSON text, prompt labels, source labels, headings, bullets, notes, outlines, or commentary."
+          "You are a literary short story engine for creators. Write original fiction as if for a literary magazine. Return only valid JSON matching this shape: {\"story\":\"...\",\"charactersUsed\":[\"...\"],\"rulesReferenced\":[\"...\"]}. The story value must contain only finished prose, never JSON text, labels, headings, bullets, notes, outlines, or commentary."
       },
       {
         role: "user",
@@ -145,11 +229,44 @@ async function requestStory(client: OpenAI, prompt: string, maxTokens: number): 
   return parseStoryPayload(response.choices[0]?.message.content ?? "");
 }
 
-function buildPrompt(input: GenerateStoryRequest): string {
-  const lengthSpec = getLengthTargetSpec(input.lengthTarget);
+function buildBlueprintPrompt(input: GenerateStoryRequest): string {
   const narrativeRules = input.storyRules.trim() || DEFAULT_NARRATIVE_RULES;
 
-  return `Use the following private internal sections to plan and write a structurally complete original short story. The final story must never reproduce these section labels or describe this planning framework.
+  return `Build a private story blueprint as JSON. The blueprint is for planning only and must never be displayed to the reader.
+
+Return exactly one JSON object with these keys:
+- protagonist
+- pointOfViewCharacter
+- centralAnomaly
+- speculativeRuleUnderPressure
+- characterDesire
+- characterFear
+- characterBlindSpot
+- narrativeArchitecture
+- characterArc
+- endingType
+- concreteRevelation
+- concreteCost
+- finalDecision
+- changedWorldState
+- sceneBeats
+
+sceneBeats must contain 5-9 beats. Each beat must include:
+- location
+- activeCharacters
+- concreteAction
+- newInformation
+- conflictOrObstacle
+- irreversibleTurn
+- consequence
+
+Planning requirements:
+- Use the selected narrative architecture, character arc, and ending type.
+- Make each beat a scene-level action, not a discussion topic.
+- Each beat must introduce new information, a conflict or obstacle, an irreversible turn, and a consequence.
+- The blueprint must force a concrete cost, a final decision, and a changed world state.
+- Use third-person limited point of view through the pointOfViewCharacter.
+- If the materials mention technical meta concepts, translate them into story-world phenomena such as ${STORY_WORLD_TRANSLATIONS.join(", ")}.
 
 GENRE PRESET
 ${input.genrePreset}
@@ -179,37 +296,135 @@ STORY REQUEST
 ${input.storySeed}
 
 NARRATIVE RULES
-${narrativeRules}
-
-Global instructions:
-- Genre defines the story contract.
-- Narrative Architecture defines story shape.
-- Character Arc defines protagonist transformation.
-- Ending Type defines closure.
-- Length Target defines the target range of ${lengthSpec.minWords}-${lengthSpec.maxWords} words.
-- World Bible and Character Profiles control canon.
-- Story Seed controls the premise.
-- Story Rules control local constraints.
-- The story must be structurally complete. It should not be a single conversation, mood piece, premise sketch, or philosophical debate.
-- It must move through irreversible turns shaped by the selected narrative architecture.
-- Use third-person limited point of view only.
-- Begin in-scene with concrete action, setting, or dialogue.
-- Preserve world rules, character consistency, tone, and local constraints.
-- Let world rules emerge through consequence, behavior, dialogue, and conflict.
-- Do not mention AI, prompts, models, source material, uploaded files, or generation.
-- Return metadata for characters used and rules referenced.`;
+${narrativeRules}`;
 }
 
-function buildExpansionPrompt(input: GenerateStoryRequest, story: string): string {
+function buildStoryPrompt(input: GenerateStoryRequest, blueprint: StoryBlueprint): string {
   const lengthSpec = getLengthTargetSpec(input.lengthTarget);
+  const narrativeRules = input.storyRules.trim() || DEFAULT_NARRATIVE_RULES;
+  const forbiddenRule = buildForbiddenLanguageRule(input.storyRules);
 
-  return `${buildPrompt(input)}
+  return `Write the final story from this private blueprint. The blueprint is a hidden planning object. Do not summarize it, quote it, display it, or mention it.
 
-Current story draft:
-${story}
+Length requirements:
+- Minimum: ${lengthSpec.minWords} words.
+- Maximum: ${lengthSpec.maxWords} words.
+- Selected target: ${formatLengthTarget(input.lengthTarget)}.
 
-Expansion task:
-Rewrite and expand the full story to reach the selected ${lengthSpec.minWords}-${lengthSpec.maxWords} word target. Focus only on missing scenes, irreversible turns, costs, consequences, revelations, and character decisions. Do not add filler, summaries, exposition dumps, or philosophical debate. Preserve canon, character consistency, third-person limited POV, and the selected architecture. Return only valid JSON in the required shape. The story field must contain only final prose.`;
+Final story requirements:
+- Follow the blueprint scene beats in order, turning each beat into lived scene action.
+- Do not use section labels, outline language, bullet-like transitions, or synopsis language.
+- Do not make philosophical debate the main action.
+- Reveal the mystery through action, clues, behavior, and consequence.
+- Include a concrete cost.
+- Include a final decision.
+- Show a changed world state.
+- Use third-person limited point of view through ${blueprint.pointOfViewCharacter}.
+- Preserve character consistency, world rules, and local narrative rules.
+${forbiddenRule}
+- If source concepts resemble forbidden language, translate them into story-world phenomena: ${STORY_WORLD_TRANSLATIONS.join(", ")}.
+
+PRIVATE BLUEPRINT JSON
+${JSON.stringify(blueprint, null, 2)}
+
+WORLD BIBLE
+${input.worldBible}
+
+CHARACTERS
+${input.characterProfiles}
+
+STORY REQUEST
+${input.storySeed}
+
+NARRATIVE RULES
+${narrativeRules}`;
+}
+
+function buildExpansionPrompt(input: GenerateStoryRequest, blueprint: StoryBlueprint, story: string): string {
+  const lengthSpec = getLengthTargetSpec(input.lengthTarget);
+  const forbiddenRule = buildForbiddenLanguageRule(input.storyRules);
+
+  return `Rewrite and expand the draft into a complete story that satisfies the selected ${lengthSpec.minWords}-${lengthSpec.maxWords} word target.
+
+Compare the draft against the private blueprint. Add missing scenes, irreversible turns, costs, consequences, revelations, and the changed world state. Do not merely add more dialogue, atmosphere, reflection, or debate.
+
+Hard requirements:
+- Follow the blueprint scene beats.
+- Do not summarize the blueprint.
+- Do not use section labels or outline language.
+- Do not make philosophical debate the main action.
+- Reveal mystery through action, clues, behavior, and consequence.
+- Include a concrete cost, final decision, and changed world state.
+${forbiddenRule}
+
+PRIVATE BLUEPRINT JSON
+${JSON.stringify(blueprint, null, 2)}
+
+DRAFT STORY
+${story}`;
+}
+
+function buildForbiddenLanguageRule(storyRules: string): string {
+  const lowerRules = storyRules.toLowerCase();
+  const explicitlyAllowed = TECHNICAL_FORBIDDEN_TERMS.some((term) => lowerRules.includes(`allow ${term.toLowerCase()}`));
+
+  if (explicitlyAllowed) {
+    return "- Uploaded narrative rules explicitly allow some technical meta language; use it only if it belongs inside the story world.";
+  }
+
+  return `- Hard forbidden language: do not use these terms in the final story: ${TECHNICAL_FORBIDDEN_TERMS.join(", ")}.`;
+}
+
+function parseBlueprint(rawText: string): StoryBlueprint {
+  const payload = normalizeStoryPayload(rawText) as Partial<StoryBlueprint>;
+  const sceneBeats = Array.isArray(payload.sceneBeats) ? payload.sceneBeats.filter(isBlueprintSceneBeat).slice(0, 9) : [];
+
+  if (sceneBeats.length < 5) {
+    throw new Error("Blueprint did not include 5-9 complete scene beats.");
+  }
+
+  return {
+    protagonist: requireString(payload.protagonist, "protagonist"),
+    pointOfViewCharacter: requireString(payload.pointOfViewCharacter, "pointOfViewCharacter"),
+    centralAnomaly: requireString(payload.centralAnomaly, "centralAnomaly"),
+    speculativeRuleUnderPressure: requireString(payload.speculativeRuleUnderPressure, "speculativeRuleUnderPressure"),
+    characterDesire: requireString(payload.characterDesire, "characterDesire"),
+    characterFear: requireString(payload.characterFear, "characterFear"),
+    characterBlindSpot: requireString(payload.characterBlindSpot, "characterBlindSpot"),
+    narrativeArchitecture: requireString(payload.narrativeArchitecture, "narrativeArchitecture"),
+    characterArc: requireString(payload.characterArc, "characterArc"),
+    endingType: requireString(payload.endingType, "endingType"),
+    concreteRevelation: requireString(payload.concreteRevelation, "concreteRevelation"),
+    concreteCost: requireString(payload.concreteCost, "concreteCost"),
+    finalDecision: requireString(payload.finalDecision, "finalDecision"),
+    changedWorldState: requireString(payload.changedWorldState, "changedWorldState"),
+    sceneBeats
+  };
+}
+
+function isBlueprintSceneBeat(value: unknown): value is BlueprintSceneBeat {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const beat = value as Partial<BlueprintSceneBeat>;
+  return Boolean(
+    beat.location &&
+      Array.isArray(beat.activeCharacters) &&
+      beat.concreteAction &&
+      beat.newInformation &&
+      beat.conflictOrObstacle &&
+      beat.irreversibleTurn &&
+      beat.consequence
+  );
+}
+
+function requireString(value: unknown, label: string): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`Blueprint missing ${label}.`);
+  }
+
+  return value.trim();
 }
 
 function parseStoryPayload(rawText: string): OpenAIStoryPayload {
@@ -237,6 +452,14 @@ function formatLengthTarget(lengthTarget: LengthTarget): string {
   return `${target.value}: ${target.minWords}-${target.maxWords} words`;
 }
 
-function estimateMaxTokens(maxWords: number): number {
-  return Math.min(12_000, Math.ceil(maxWords * 2.2));
+function estimateStoryMaxTokens(maxWords: number): number {
+  return Math.min(16_000, Math.ceil(maxWords * 2.6));
+}
+
+function summarizeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Unknown error";
 }

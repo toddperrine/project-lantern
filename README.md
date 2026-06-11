@@ -60,6 +60,7 @@ story-world-engine/
   - `story_seed.md`
   - `story_generation_rules.md`
 - Generate a structurally complete literary short story against the selected length target
+- Use a hidden blueprint pass before final OpenAI story drafting
 - Preserve world rules, character consistency, story request, and narrative constraints
 - Display the story in the browser
 - Return metadata:
@@ -69,6 +70,7 @@ story-world-engine/
   - generator source
   - selected architecture controls
   - expansion attempt and under-target diagnostics
+  - blueprint generated, blueprint scene count, and blueprint failure reason
 - No authentication, payments, database, AWS, voice, memory, or subscriptions
 
 ## Setup
@@ -161,6 +163,9 @@ After deployment, generate a story and check the metadata panel. It reports:
 - Expansion attempted
 - Expansion succeeded
 - Under target notice
+- Blueprint generated
+- Blueprint scene count
+- Blueprint failed reason
 - OpenAI Enabled
 - OPENAI_API_KEY detected
 - Model requested
@@ -197,24 +202,15 @@ Saved stories are stored in browser `localStorage`. They include only the finish
 
 Local saved stories may be lost if browser data is cleared, the user switches browsers, or local storage is reset. Phase 1 does not support backend storage, public share URLs, cloud sync, authentication, or database-backed saved stories. Export options stay local: copy story, copy social teaser, download `.txt`, download `.md`, and native browser share when available.
 
-The OpenAI path builds its prompt from private internal sections:
+The OpenAI path first creates a hidden private JSON blueprint, then writes the final story from that blueprint. The blueprint includes the protagonist, point-of-view character, central anomaly, rule under pressure, desire, fear, blind spot, architecture, arc, ending, concrete revelation, concrete cost, final decision, changed world state, and 5-9 scene beats. Each scene beat carries location, active characters, concrete action, new information, conflict or obstacle, irreversible turn, and consequence.
 
-- `GENRE PRESET`
-- `NARRATIVE ARCHITECTURE`
-- `CHARACTER ARC`
-- `ENDING TYPE`
-- `LENGTH TARGET`
-- `POV`
-- `WORLD BIBLE`
-- `CHARACTERS`
-- `STORY REQUEST`
-- `NARRATIVE RULES`
+The blueprint is never displayed in the UI. It is used to force scene-level action before prose drafting. The final story prompt tells the model to follow the scene beats, avoid outline language, avoid making philosophical debate the main action, reveal mystery through action and consequence, include a concrete cost, include a final decision, and show a changed world state.
 
-Those sections are source material only. The model is instructed not to reproduce section labels, prompt text, bullet lists, or file contents verbatim. Genre defines the story contract, narrative architecture defines story shape, character arc defines protagonist transformation, ending type defines closure, and length target defines the target range.
+The OpenAI path also applies a hard forbidden-language rule unless the uploaded Story Rules explicitly allow those terms. Technical meta concepts are translated into story-world phenomena such as corrupted sound, memory gaps, impossible repetition, changed lyrics, physical glitches, missing names, wrong shadows, broken instruments, altered records, and contradictory memories.
 
 The story must be structurally complete. It should not be a single conversation, mood piece, premise sketch, or philosophical debate. It must move through irreversible turns shaped by the selected narrative architecture.
 
-If the first OpenAI story is below the selected target range, the app makes one expansion call focused on missing scenes, turns, costs, and consequences. It does not add filler and does not fall back solely because the story is under target. Fallback mode is reserved for technical failure: missing API key, API error, invalid response, or empty story.
+If the first OpenAI story is below the selected target range, the app makes one expansion call focused on comparing the draft against the private blueprint and adding missing scenes, turns, costs, and consequences. It does not add filler and does not fall back solely because the story is under target. Fallback mode is reserved for technical failure: missing API key, API error, invalid response, empty story, or blueprint generation failure.
 
 The API route validates the payload, checks for `OPENAI_API_KEY`, and chooses one of two generation paths:
 
@@ -248,6 +244,9 @@ The response shape remains stable for both paths:
       expansionAttempted: boolean;
       expansionSucceeded: boolean;
       underTargetNotice: string | null;
+      blueprintGenerated: boolean;
+      blueprintSceneCount: number;
+      blueprintFailedReason: string | null;
     };
   };
 }
