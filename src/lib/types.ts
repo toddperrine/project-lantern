@@ -51,6 +51,10 @@ export type StoryMetadata = {
   charactersUsed: string[];
   rulesReferenced: string[];
   source: "openai" | "fallback";
+  generationStartedAt?: string;
+  generationFinishedAt?: string;
+  generationDurationSeconds?: number;
+  serverGenerationDurationSeconds?: number;
   diagnostics: StoryDiagnostics;
 };
 
@@ -80,6 +84,10 @@ export type StoryDiagnostics = {
   expansionSucceeded: boolean;
   expansionAttemptsCount?: number;
   repairAttemptsCount?: number;
+  serverGenerationDurationSeconds?: number;
+  timedOutEarly?: boolean;
+  stoppedReason?: "complete" | "time-budget" | "max-expansion-attempts" | "openai-error";
+  remainingForbiddenTerms?: string[];
   underTargetNotice: string | null;
   blueprintGenerated: boolean;
   blueprintSceneCount: number;
