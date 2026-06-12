@@ -53,11 +53,15 @@ type ForbiddenRepairResult = {
   story: string;
   payload: OpenAIStoryPayload;
   repairAttemptsCount: number;
+  remainingForbiddenTerms: string[];
+  stoppedReason: StoryDiagnostics["stoppedReason"];
 };
 
 const DEFAULT_BLUEPRINT_MODEL = "gpt-4.1-mini";
 const DEFAULT_STORY_MODEL = "gpt-4.1";
 const DEFAULT_EXPANSION_MODEL = "gpt-4.1";
+const OPTIONAL_CALL_TIME_BUDGET_MS = 240_000;
+const MAX_FORBIDDEN_REPAIR_ATTEMPTS = 1;
 const POV = "Third-person limited";
 const DEFAULT_NARRATIVE_RULES = `Every story must obey these rules:
 1. Begin in-scene with concrete action, setting, or dialogue.
@@ -143,6 +147,9 @@ export function getOpenAIDiagnostics(overrides: Partial<StoryDiagnostics> = {}):
     expansionSucceeded: false,
     expansionAttemptsCount: 0,
     repairAttemptsCount: 0,
+    timedOutEarly: false,
+    stoppedReason: "complete",
+    remainingForbiddenTerms: [],
     underTargetNotice: null,
     blueprintGenerated: false,
     blueprintSceneCount: 0,
@@ -152,12 +159,16 @@ export function getOpenAIDiagnostics(overrides: Partial<StoryDiagnostics> = {}):
 }
 
 export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<GenerateStoryResponse> {
+  const generationStartedAt = Date.now();
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const lengthSpec = getLengthTargetSpec(input.lengthTarget);
+  const maxExpansionAttempts = getMaxExpansionAttempts(input.lengthTarget);
   const blueprintRange = getBlueprintBeatRange(input.lengthTarget);
   const disallowedTerms = getDisallowedForbiddenTerms(input.storyRules);
   let repairAttemptsCount = 0;
   let blueprint: StoryBlueprint;
+  let stoppedReason: StoryDiagnostics["stoppedReason"] = "complete";
+  let remainingForbiddenTerms: string[] = [];
 
   try {
     const blueprintResult = await requestBlueprint(client, input, blueprintRange);
@@ -179,36 +190,79 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
     throw new Error("OpenAI response did not include a story.");
   }
 
-  let forbiddenRepair = await repairForbiddenTermsIfNeeded(client, input, blueprint, story, payload, disallowedTerms);
+  let forbiddenRepair = await repairForbiddenTermsIfNeeded(
+    client,
+    input,
+    blueprint,
+    story,
+    payload,
+    disallowedTerms,
+    generationStartedAt,
+    MAX_FORBIDDEN_REPAIR_ATTEMPTS - repairAttemptsCount
+  );
   story = forbiddenRepair.story;
   payload = forbiddenRepair.payload;
   repairAttemptsCount += forbiddenRepair.repairAttemptsCount;
+  remainingForbiddenTerms = forbiddenRepair.remainingForbiddenTerms;
+  if (forbiddenRepair.stoppedReason) {
+    stoppedReason = forbiddenRepair.stoppedReason;
+  }
 
   let wordCount = countWords(story);
   let expansionAttemptsCount = 0;
   let expansionSucceeded = wordCount >= lengthSpec.minWords;
 
-  while (wordCount < lengthSpec.minWords && expansionAttemptsCount < 3) {
+  while (wordCount < lengthSpec.minWords && expansionAttemptsCount < maxExpansionAttempts && stoppedReason !== "time-budget") {
+    if (!hasOptionalCallBudget(generationStartedAt)) {
+      stoppedReason = "time-budget";
+      break;
+    }
+
     expansionAttemptsCount += 1;
-    payload = await requestStory(
-      client,
-      getExpansionModel(),
-      buildExpansionPrompt(input, blueprint, story, expansionAttemptsCount, disallowedTerms),
-      estimateStoryMaxTokens(lengthSpec.maxWords)
-    );
+    try {
+      payload = await requestStory(
+        client,
+        getExpansionModel(),
+        buildExpansionPrompt(input, blueprint, story, expansionAttemptsCount, maxExpansionAttempts, disallowedTerms),
+        estimateStoryMaxTokens(lengthSpec.maxWords)
+      );
+    } catch {
+      stoppedReason = "openai-error";
+      break;
+    }
     const expandedStory = normalizeStoryText(payload.story);
     if (!expandedStory) {
-      throw new Error(`OpenAI response did not include a story after expansion attempt ${expansionAttemptsCount}.`);
+      stoppedReason = "openai-error";
+      break;
     }
 
     story = expandedStory;
-    forbiddenRepair = await repairForbiddenTermsIfNeeded(client, input, blueprint, story, payload, disallowedTerms);
+    forbiddenRepair = await repairForbiddenTermsIfNeeded(
+      client,
+      input,
+      blueprint,
+      story,
+      payload,
+      disallowedTerms,
+      generationStartedAt,
+      MAX_FORBIDDEN_REPAIR_ATTEMPTS - repairAttemptsCount
+    );
     story = forbiddenRepair.story;
     payload = forbiddenRepair.payload;
     repairAttemptsCount += forbiddenRepair.repairAttemptsCount;
+    remainingForbiddenTerms = forbiddenRepair.remainingForbiddenTerms;
+    if (forbiddenRepair.stoppedReason) {
+      stoppedReason = forbiddenRepair.stoppedReason;
+    }
     wordCount = countWords(story);
     expansionSucceeded = wordCount >= lengthSpec.minWords;
   }
+
+  if (stoppedReason === "complete" && wordCount < lengthSpec.minWords && expansionAttemptsCount >= maxExpansionAttempts) {
+    stoppedReason = "max-expansion-attempts";
+  }
+
+  remainingForbiddenTerms = findForbiddenTerms(story, disallowedTerms);
 
   const underTargetNotice =
     wordCount < lengthSpec.minWords
@@ -237,6 +291,9 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
         expansionSucceeded,
         expansionAttemptsCount,
         repairAttemptsCount,
+        timedOutEarly: stoppedReason === "time-budget",
+        stoppedReason,
+        remainingForbiddenTerms,
         underTargetNotice,
         blueprintGenerated: true,
         blueprintSceneCount: blueprint.sceneBeats.length,
@@ -315,33 +372,46 @@ async function repairForbiddenTermsIfNeeded(
   blueprint: StoryBlueprint,
   story: string,
   payload: OpenAIStoryPayload,
-  disallowedTerms: string[]
+  disallowedTerms: string[],
+  generationStartedAt: number,
+  remainingRepairAttempts: number
 ): Promise<ForbiddenRepairResult> {
   let nextStory = story;
   let nextPayload = payload;
   let repairAttemptsCount = 0;
+  let remainingForbiddenTerms = findForbiddenTerms(nextStory, disallowedTerms);
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const foundTerms = findForbiddenTerms(nextStory, disallowedTerms);
-    if (foundTerms.length === 0) {
-      break;
-    }
+  if (remainingForbiddenTerms.length === 0) {
+    return { story: nextStory, payload: nextPayload, repairAttemptsCount, remainingForbiddenTerms, stoppedReason: "complete" };
+  }
 
+  if (remainingRepairAttempts <= 0) {
+    return { story: nextStory, payload: nextPayload, repairAttemptsCount, remainingForbiddenTerms, stoppedReason: "complete" };
+  }
+
+  if (!hasOptionalCallBudget(generationStartedAt)) {
+    return { story: nextStory, payload: nextPayload, repairAttemptsCount, remainingForbiddenTerms, stoppedReason: "time-budget" };
+  }
+
+  try {
     repairAttemptsCount += 1;
     nextPayload = await requestStory(
       client,
       getExpansionModel(),
-      buildForbiddenRepairPrompt(input, blueprint, nextStory, foundTerms),
+      buildForbiddenRepairPrompt(input, blueprint, nextStory, remainingForbiddenTerms),
       estimateStoryMaxTokens(getLengthTargetSpec(input.lengthTarget).maxWords)
     );
     const repairedStory = normalizeStoryText(nextPayload.story);
     if (!repairedStory) {
-      throw new Error("OpenAI response did not include a story after forbidden-term repair.");
+      return { story: nextStory, payload: nextPayload, repairAttemptsCount, remainingForbiddenTerms, stoppedReason: "openai-error" };
     }
     nextStory = repairedStory;
+    remainingForbiddenTerms = findForbiddenTerms(nextStory, disallowedTerms);
+  } catch {
+    return { story: nextStory, payload: nextPayload, repairAttemptsCount, remainingForbiddenTerms, stoppedReason: "openai-error" };
   }
 
-  return { story: nextStory, payload: nextPayload, repairAttemptsCount };
+  return { story: nextStory, payload: nextPayload, repairAttemptsCount, remainingForbiddenTerms, stoppedReason: "complete" };
 }
 
 function buildBlueprintPrompt(
@@ -479,12 +549,13 @@ function buildExpansionPrompt(
   blueprint: StoryBlueprint,
   story: string,
   attempt: number,
+  maxAttempts: number,
   disallowedTerms: string[]
 ): string {
   const lengthSpec = getLengthTargetSpec(input.lengthTarget);
   const forbiddenRule = buildForbiddenLanguageRule(disallowedTerms);
 
-  return `Rewrite and expand the draft into a complete story that satisfies the selected ${lengthSpec.minWords}-${lengthSpec.maxWords} word target. This is expansion attempt ${attempt} of 3.
+  return `Rewrite and expand the draft into a complete story that satisfies the selected ${lengthSpec.minWords}-${lengthSpec.maxWords} word target. This is expansion attempt ${attempt} of ${maxAttempts}.
 
 Compare the draft against the private blueprint. Expand missing or compressed scenes, consequences, costs, revelations, character pressure, sensory anchors, and the changed world state. Do not merely add more dialogue, atmosphere, reflection, or debate.
 
@@ -616,6 +687,18 @@ function getBlueprintBeatRange(lengthTarget: LengthTarget): { min: number; max: 
     return { min: 9, max: 12 };
   }
   return { min: 7, max: 9 };
+}
+
+function getMaxExpansionAttempts(lengthTarget: LengthTarget): number {
+  if (lengthTarget === "Long") {
+    return 2;
+  }
+
+  return 1;
+}
+
+function hasOptionalCallBudget(generationStartedAt: number): boolean {
+  return Date.now() - generationStartedAt < OPTIONAL_CALL_TIME_BUDGET_MS;
 }
 
 function formatLengthTarget(lengthTarget: LengthTarget): string {
