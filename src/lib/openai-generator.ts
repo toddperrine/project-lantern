@@ -27,7 +27,11 @@ type StoryBlueprint = {
   endingType: string;
   concreteRevelation: string;
   concreteCost: string;
+  protagonistPersonalStake: string;
+  antagonistOrOpposingForceStake: string;
+  concreteIrreversibleCost: string;
   finalDecision: string;
+  finalImageOrAction: string;
   changedWorldState: string;
   sceneBeats: BlueprintSceneBeat[];
 };
@@ -42,6 +46,8 @@ type BlueprintSceneBeat = {
   consequence: string;
   sensoryAnchor: string;
   characterPressure: string;
+  characterStake: string;
+  materialConsequence: string;
 };
 
 type BlueprintRequestResult = {
@@ -102,6 +108,48 @@ const STORY_WORLD_TRANSLATIONS = [
   "altered records",
   "contradictory memories"
 ];
+const META_RULE_TRANSLATIONS: Record<string, string> = {
+  AI: "unseen intelligence",
+  prompt: "summoning phrase",
+  model: "pattern",
+  dataset: "archive of patterns",
+  simulation: "world's repeated order",
+  generated: "newly formed",
+  "source material": "old records",
+  "uploaded file": "found document",
+  code: "hidden order",
+  system: "hidden order",
+  reboot: "forced return",
+  reset: "forced return",
+  parameters: "boundaries"
+};
+const WEAK_COST_TERMS = ["risk", "uncertainty", "instability", "future is unknown", "unknown future"];
+const CONCRETE_COST_SIGNALS = [
+  "memory",
+  "remember",
+  "relationship",
+  "friend",
+  "family",
+  "place",
+  "room",
+  "street",
+  "object",
+  "transformed",
+  "changed",
+  "altered",
+  "rule",
+  "road",
+  "path",
+  "door",
+  "record",
+  "archive",
+  "setlist",
+  "instrument",
+  "amp",
+  "lyric",
+  "sign"
+];
+const DISCUSSION_ONLY_BEAT_TERMS = ["discussion", "debate", "realization", "philosophical exchange", "conversation about"];
 
 export function hasOpenAIKey(): boolean {
   return Boolean(process.env.OPENAI_API_KEY?.trim());
@@ -269,13 +317,17 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
       ? `Final story is below the selected ${formatLengthTarget(input.lengthTarget)} target after ${expansionAttemptsCount} expansion attempts.`
       : null;
   const ruleSources = `${input.worldBible}\n\n${input.storyRules || DEFAULT_NARRATIVE_RULES}`;
+  const rulesReferenced = cleanRulesReferenced(
+    normalizeList(payload.rulesReferenced, inferRulesReferenced(story, ruleSources)),
+    disallowedTerms
+  );
 
   return {
     story,
     metadata: {
       wordCount,
       charactersUsed: normalizeList(payload.charactersUsed, inferCharactersUsed(story, input.characterProfiles)),
-      rulesReferenced: normalizeList(payload.rulesReferenced, inferRulesReferenced(story, ruleSources)),
+      rulesReferenced,
       source: "openai",
       diagnostics: getOpenAIDiagnostics({
         openAIRequestAttempted: true,
@@ -441,7 +493,11 @@ Return exactly one JSON object with these keys:
 - endingType
 - concreteRevelation
 - concreteCost
+- protagonistPersonalStake
+- antagonistOrOpposingForceStake
+- concreteIrreversibleCost
 - finalDecision
+- finalImageOrAction
 - changedWorldState
 - sceneBeats
 
@@ -455,13 +511,20 @@ sceneBeats must contain ${beatRange.min}-${beatRange.max} beats for the selected
 - consequence
 - sensoryAnchor
 - characterPressure
+- characterStake
+- materialConsequence
 
 Planning requirements:
 - Use the selected narrative architecture, character arc, and ending type.
-- Make each beat a scene-level action, not a discussion topic.
+- Make each beat a scene-level action, not a discussion, realization, or philosophical exchange.
 - Each beat must introduce new information, a conflict or obstacle, an irreversible turn, and a consequence.
-- Each beat must include a sensory anchor and specific character pressure.
-- The blueprint must force a concrete cost, a final decision, and a changed world state.
+- Each beat must include a sensory anchor, specific character pressure, a personal characterStake, and a materialConsequence visible in the world.
+- The blueprint must force a concrete irreversible cost, a final decision, a final concrete image or action, and a changed world state.
+- The concrete irreversible cost must be one of: a memory lost or changed, a relationship damaged, a place altered, an object permanently transformed, a rule of the world visibly changed, a road/path/door becoming unavailable, or a record/archive/setlist/instrument altered.
+- The concrete irreversible cost must not be only risk, uncertainty, instability, or the future being unknown.
+- Major characters must have personal stakes dramatized through behavior: Space Cowboy loses something personal if he stays or runs; Rhiannon risks a truth or relationship; The Architect loses control, authorship, or a beloved pattern.
+- Characters may disagree, but they must not speak only as philosophical positions.
+- The finalImageOrAction must be visible and concrete, such as a sign changing, a lyric appearing on a physical surface, an unplugged amp humming, a setlist rewriting itself, a door opening to the wrong street, a character leaving or keeping a specific object, or a repeated gesture changing meaning.
 - Use third-person limited point of view through the pointOfViewCharacter.
 - If the materials mention technical meta concepts, translate them into story-world phenomena such as ${STORY_WORLD_TRANSLATIONS.join(", ")}.
 
@@ -517,11 +580,13 @@ Length requirements:
 Final story requirements:
 - Follow every blueprint scene beat in order, turning each beat into lived scene action.
 - Do not compress beats into summary.
-- Do not skip any beat, cost, consequence, revelation, final decision, or changed world state.
+- Do not skip any beat, personal stake, material consequence, cost, consequence, revelation, final decision, final image/action, or changed world state.
 - Do not use section labels, headings, outline language, bullet-like transitions, synopsis language, ---, or "Earlier that evening" as a retelling device.
-- Do not make philosophical debate the main action.
+- Do not make philosophical debate the main action. Characters should want concrete things and reveal beliefs through behavior, choices, omissions, and pressure.
 - Reveal the mystery through action, clues, behavior, sensory detail, and consequence.
-- Include the concrete cost, final decision, and changed world state from the blueprint.
+- Include the protagonistPersonalStake, antagonistOrOpposingForceStake, concreteIrreversibleCost, final decision, finalImageOrAction, and changed world state from the blueprint.
+- The concrete irreversible cost must be visible on the page and must not be only risk, uncertainty, instability, or an unknown future.
+- The final paragraph must end through the blueprint's finalImageOrAction, not abstract theme. Avoid final abstractions such as "the world was alive", "freedom meant choosing", "the future was uncertain", "hope remained", or "everything had changed".
 - Use third-person limited point of view through ${blueprint.pointOfViewCharacter}.
 - Preserve character consistency, world rules, and local narrative rules.
 - For this length target, a valid blueprint has ${beatRange.min}-${beatRange.max} beats; treat all ${blueprint.sceneBeats.length} provided beats as mandatory.
@@ -563,9 +628,10 @@ Hard requirements:
 - Dramatize every blueprint scene beat in order.
 - Do not summarize the blueprint.
 - Do not use section labels, headings, outline language, ---, or "Earlier that evening" as a retelling device.
-- Do not make philosophical debate the main action.
+- Do not make philosophical debate the main action; convert abstract claims into behavior, objects, damage, movement, and choices.
 - Reveal mystery through action, clues, behavior, sensory detail, and consequence.
-- Include a concrete cost, final decision, and changed world state.
+- Include the protagonistPersonalStake, antagonistOrOpposingForceStake, concreteIrreversibleCost, final decision, finalImageOrAction, and changed world state.
+- The final paragraph must end on a concrete visible image or action from finalImageOrAction, not a summary of theme, hope, freedom, change, or uncertainty.
 - Preserve the plot, characters, scene structure, and selected length target.
 ${forbiddenRule}
 
@@ -627,7 +693,11 @@ function parseBlueprint(rawText: string, beatRange: { min: number; max: number }
     endingType: requireString(payload.endingType, "endingType"),
     concreteRevelation: requireString(payload.concreteRevelation, "concreteRevelation"),
     concreteCost: requireString(payload.concreteCost, "concreteCost"),
+    protagonistPersonalStake: requireString(payload.protagonistPersonalStake, "protagonistPersonalStake"),
+    antagonistOrOpposingForceStake: requireString(payload.antagonistOrOpposingForceStake, "antagonistOrOpposingForceStake"),
+    concreteIrreversibleCost: requireConcreteCost(payload.concreteIrreversibleCost ?? payload.concreteCost),
     finalDecision: requireString(payload.finalDecision, "finalDecision"),
+    finalImageOrAction: requireString(payload.finalImageOrAction, "finalImageOrAction"),
     changedWorldState: requireString(payload.changedWorldState, "changedWorldState"),
     sceneBeats
   };
@@ -648,7 +718,10 @@ function isBlueprintSceneBeat(value: unknown): value is BlueprintSceneBeat {
       beat.irreversibleTurn &&
       beat.consequence &&
       beat.sensoryAnchor &&
-      beat.characterPressure
+      beat.characterPressure &&
+      beat.characterStake &&
+      beat.materialConsequence &&
+      !isDiscussionOnlyBeat(beat)
   );
 }
 
@@ -675,6 +748,20 @@ function normalizeList(values: string[] | undefined, fallback: string[]): string
   return [...new Set(source.map((value) => value.trim()).filter(Boolean))].slice(0, 10);
 }
 
+function cleanRulesReferenced(values: string[], disallowedTerms: string[]): string[] {
+  return normalizeList(
+    values.map((value) => translateMetaTerms(value, disallowedTerms)),
+    []
+  );
+}
+
+function translateMetaTerms(value: string, disallowedTerms: string[]): string {
+  return disallowedTerms.reduce((current, term) => {
+    const replacement = META_RULE_TRANSLATIONS[term] ?? "story-world pattern";
+    return current.replace(buildForbiddenTermRegex(term), (_match, prefix: string, suffix: string) => `${prefix}${replacement}${suffix}`);
+  }, value);
+}
+
 function getLengthTargetSpec(lengthTarget: LengthTarget) {
   return LENGTH_TARGETS.find((target) => target.value === lengthTarget) ?? LENGTH_TARGETS[1];
 }
@@ -690,11 +777,29 @@ function getBlueprintBeatRange(lengthTarget: LengthTarget): { min: number; max: 
 }
 
 function getMaxExpansionAttempts(lengthTarget: LengthTarget): number {
-  if (lengthTarget === "Long") {
+  if (lengthTarget === "Standard" || lengthTarget === "Long") {
     return 2;
   }
 
   return 1;
+}
+
+function requireConcreteCost(value: unknown): string {
+  const cost = requireString(value, "concreteIrreversibleCost");
+  const lowerCost = cost.toLowerCase();
+  const hasWeakOnlyCost = WEAK_COST_TERMS.some((term) => lowerCost.includes(term));
+  const hasConcreteSignal = CONCRETE_COST_SIGNALS.some((term) => lowerCost.includes(term));
+
+  if (!hasConcreteSignal || (hasWeakOnlyCost && lowerCost.length < 80)) {
+    throw new Error("Blueprint concreteIrreversibleCost must be a visible, material, irreversible cost.");
+  }
+
+  return cost;
+}
+
+function isDiscussionOnlyBeat(beat: Partial<BlueprintSceneBeat>): boolean {
+  const actionText = `${beat.concreteAction ?? ""} ${beat.materialConsequence ?? ""}`.toLowerCase();
+  return DISCUSSION_ONLY_BEAT_TERMS.some((term) => actionText.includes(term));
 }
 
 function hasOptionalCallBudget(generationStartedAt: number): boolean {
