@@ -8,7 +8,7 @@ import {
   LENGTH_TARGETS,
   NARRATIVE_ARCHITECTURES
 } from "@/lib/types";
-import type { GenerateStoryRequest } from "@/lib/types";
+import type { GenerateStoryRequest, GenerateStoryResponse } from "@/lib/types";
 
 const MAX_CONTEXT_CHARS = 120_000;
 const DEFAULT_STORY_RULES = `Every story must obey these rules:
@@ -28,6 +28,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const generationStartedAt = new Date();
   let body: Partial<GenerateStoryRequest>;
 
   try {
@@ -55,44 +56,74 @@ export async function POST(request: Request) {
 
   if (!hasOpenAIKey()) {
     return NextResponse.json(
-      generateFallbackStory(
-        input,
-        getOpenAIDiagnostics({
-          fallbackReason: "OPENAI_API_KEY is missing or empty in this deployment environment.",
-          genrePreset: input.genrePreset,
-          narrativeArchitecture: input.narrativeArchitecture,
-          characterArc: input.characterArc,
-          endingType: input.endingType,
-          lengthTarget: formatLengthTarget(input.lengthTarget)
-        })
+      withServerGenerationDuration(
+        generateFallbackStory(
+          input,
+          getOpenAIDiagnostics({
+            fallbackReason: "OPENAI_API_KEY is missing or empty in this deployment environment.",
+            genrePreset: input.genrePreset,
+            narrativeArchitecture: input.narrativeArchitecture,
+            characterArc: input.characterArc,
+            endingType: input.endingType,
+            lengthTarget: formatLengthTarget(input.lengthTarget)
+          })
+        ),
+        generationStartedAt
       )
     );
   }
 
   try {
-    return NextResponse.json(await generateOpenAIStory(input));
+    return NextResponse.json(withServerGenerationDuration(await generateOpenAIStory(input), generationStartedAt));
   } catch (error) {
     const errorSummary = summarizeOpenAIError(error);
     const fallbackReason = `OpenAI request failed: ${errorSummary}`;
     console.error("OpenAI story generation failed; using deterministic fallback.", fallbackReason);
     return NextResponse.json(
-      generateFallbackStory(
-        input,
-        getOpenAIDiagnostics({
-          openAIRequestAttempted: true,
-          fallbackReason,
-          genrePreset: input.genrePreset,
-          narrativeArchitecture: input.narrativeArchitecture,
-          characterArc: input.characterArc,
-          endingType: input.endingType,
-          lengthTarget: formatLengthTarget(input.lengthTarget),
-          blueprintGenerated: false,
-          blueprintSceneCount: 0,
-          blueprintFailedReason: errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null
-        })
+      withServerGenerationDuration(
+        generateFallbackStory(
+          input,
+          getOpenAIDiagnostics({
+            openAIRequestAttempted: true,
+            fallbackReason,
+            genrePreset: input.genrePreset,
+            narrativeArchitecture: input.narrativeArchitecture,
+            characterArc: input.characterArc,
+            endingType: input.endingType,
+            lengthTarget: formatLengthTarget(input.lengthTarget),
+            timedOutEarly: false,
+            stoppedReason: "openai-error",
+            blueprintGenerated: false,
+            blueprintSceneCount: 0,
+            blueprintFailedReason: errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null
+          })
+        ),
+        generationStartedAt
       )
     );
   }
+}
+
+function withServerGenerationDuration(
+  response: GenerateStoryResponse,
+  generationStartedAt: Date
+): GenerateStoryResponse {
+  const generationFinishedAt = new Date();
+  const serverGenerationDurationSeconds = Math.max(
+    0,
+    Math.round((generationFinishedAt.getTime() - generationStartedAt.getTime()) / 1000)
+  );
+  return {
+    ...response,
+    metadata: {
+      ...response.metadata,
+      serverGenerationDurationSeconds,
+      diagnostics: {
+        ...response.metadata.diagnostics,
+        serverGenerationDurationSeconds
+      }
+    }
+  };
 }
 
 function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
