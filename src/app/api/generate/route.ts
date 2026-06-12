@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getBuildInfo } from "@/lib/build-info";
 import { generateFallbackStory } from "@/lib/fallback-generator";
 import { generateOpenAIStory, getOpenAIDiagnostics, hasOpenAIKey } from "@/lib/openai-generator";
 import {
@@ -113,14 +114,26 @@ function withServerGenerationDuration(
     0,
     Math.round((generationFinishedAt.getTime() - generationStartedAt.getTime()) / 1000)
   );
+  const buildInfo = getBuildInfo();
+
   return {
     ...response,
     metadata: {
       ...response.metadata,
       serverGenerationDurationSeconds,
+      appVersion: buildInfo.appVersion,
+      buildEnvironment: buildInfo.buildEnvironment,
+      gitBranch: buildInfo.gitBranch,
+      commitSha: buildInfo.commitSha,
+      buildTimestamp: buildInfo.buildTimestamp,
       diagnostics: {
         ...response.metadata.diagnostics,
-        serverGenerationDurationSeconds
+        serverGenerationDurationSeconds,
+        appVersion: buildInfo.appVersion,
+        buildEnvironment: buildInfo.buildEnvironment,
+        gitBranch: buildInfo.gitBranch,
+        commitSha: buildInfo.commitSha,
+        buildTimestamp: buildInfo.buildTimestamp
       }
     }
   };
