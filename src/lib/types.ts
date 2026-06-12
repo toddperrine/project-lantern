@@ -25,7 +25,7 @@ export const ENDING_TYPES = [
 export const LENGTH_TARGETS = [
   { value: "Compact", label: "Compact: 1500-2500 words", minWords: 1500, maxWords: 2500 },
   { value: "Standard", label: "Standard: 2500-3500 words", minWords: 2500, maxWords: 3500 },
-  { value: "Long", label: "Long: 3500-5000 words", minWords: 3500, maxWords: 5000 }
+  { value: "Long", label: "Long: 3500-5000 words - Experimental / may take longer", minWords: 3500, maxWords: 5000 }
 ] as const;
 
 export type GenrePreset = (typeof GENRE_PRESETS)[number];
@@ -55,6 +55,11 @@ export type StoryMetadata = {
   generationFinishedAt?: string;
   generationDurationSeconds?: number;
   serverGenerationDurationSeconds?: number;
+  appVersion?: string;
+  buildEnvironment?: string;
+  gitBranch?: string;
+  commitSha?: string;
+  buildTimestamp?: string;
   diagnostics: StoryDiagnostics;
 };
 
@@ -85,6 +90,11 @@ export type StoryDiagnostics = {
   expansionAttemptsCount?: number;
   repairAttemptsCount?: number;
   serverGenerationDurationSeconds?: number;
+  appVersion?: string;
+  buildEnvironment?: string;
+  gitBranch?: string;
+  commitSha?: string;
+  buildTimestamp?: string;
   timedOutEarly?: boolean;
   stoppedReason?: "complete" | "time-budget" | "max-expansion-attempts" | "openai-error";
   remainingForbiddenTerms?: string[];

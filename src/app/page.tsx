@@ -61,10 +61,29 @@ type SavedStory = {
   diagnosticsNotice: string | null;
 };
 
+type BuildInfo = {
+  appVersion: string;
+  buildEnvironment: string;
+  gitBranch: string;
+  commitSha: string;
+  shortCommitSha: string;
+  buildTimestamp: string;
+  vercelUrl: string;
+};
+
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
 const INPUT_ARTIFACTS_STORAGE_KEY = "story-world-engine:input-artifacts:v1";
 const SAVED_STORIES_STORAGE_KEY = "story-world-engine:saved-stories:v1";
 const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
+const DEFAULT_BUILD_INFO: BuildInfo = {
+  appVersion: "0.5.0",
+  buildEnvironment: "development",
+  gitBranch: "local",
+  commitSha: "unknown",
+  shortCommitSha: "unknown",
+  buildTimestamp: "unknown",
+  vercelUrl: "local"
+};
 const INPUT_LABELS: Record<InputArtifactType, string> = {
   worldBible: "World Bible",
   characterProfiles: "Character Profiles",
@@ -86,17 +105,55 @@ export default function Home() {
   const [storyResponse, setStoryResponse] = useState<GenerateStoryResponse | null>(null);
   const [inputArtifacts, setInputArtifacts] = useState<InputArtifact[]>([]);
   const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
+  const [buildInfo, setBuildInfo] = useState<BuildInfo>(DEFAULT_BUILD_INFO);
   const [statusMessage, setStatusMessage] = useState("");
   const [canNativeShare, setCanNativeShare] = useState(false);
   const [error, setError] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingSample, setIsLoadingSample] = useState(false);
+  const [generationStartedAt, setGenerationStartedAt] = useState<string | null>(null);
+  const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
 
   useEffect(() => {
     setInputArtifacts(readInputArtifacts());
     setSavedStories(readSavedStories());
     setCanNativeShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch("/api/build-info")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: BuildInfo | null) => {
+        if (isMounted && payload) {
+          setBuildInfo({ ...DEFAULT_BUILD_INFO, ...payload });
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setBuildInfo(DEFAULT_BUILD_INFO);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isGenerating || !generationStartedAt) {
+      return;
+    }
+
+    const startedAtMs = new Date(generationStartedAt).getTime();
+    const updateElapsedSeconds = () => {
+      setGenerationElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)));
+    };
+
+    updateElapsedSeconds();
+    const intervalId = window.setInterval(updateElapsedSeconds, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [generationStartedAt, isGenerating]);
 
   const canGenerate = useMemo(
     () =>
@@ -111,9 +168,12 @@ export default function Home() {
   );
 
   async function handleGenerate() {
+    const startedAt = new Date();
     setError("");
     setStatusMessage("");
     setStoryResponse(null);
+    setGenerationStartedAt(startedAt.toISOString());
+    setGenerationElapsedSeconds(0);
     setIsGenerating(true);
 
     try {
@@ -136,9 +196,26 @@ export default function Home() {
       if (!response.ok) {
         throw new Error(payload.error ?? "Story generation failed.");
       }
-      setStoryResponse(normalizeGenerateStoryResponse(payload));
+
+      const finishedAt = new Date();
+      const generationDurationSeconds = Math.max(0, Math.round((finishedAt.getTime() - startedAt.getTime()) / 1000));
+      const normalizedResponse = normalizeGenerateStoryResponse(payload);
+      setStoryResponse({
+        ...normalizedResponse,
+        metadata: {
+          ...normalizedResponse.metadata,
+          generationStartedAt: startedAt.toISOString(),
+          generationFinishedAt: finishedAt.toISOString(),
+          generationDurationSeconds
+        }
+      });
+      setGenerationElapsedSeconds(generationDurationSeconds);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Story generation failed.");
+      const failedAt = new Date();
+      const failureDurationSeconds = Math.max(0, Math.round((failedAt.getTime() - startedAt.getTime()) / 1000));
+      const errorMessage = caughtError instanceof Error ? caughtError.message : "Story generation failed.";
+      setGenerationElapsedSeconds(failureDurationSeconds);
+      setError(`Story generation failed after ${formatDuration(failureDurationSeconds)}. ${errorMessage}`);
     } finally {
       setIsGenerating(false);
     }
@@ -371,8 +448,11 @@ export default function Home() {
               Upload canon, a story request, and narrative rules to generate a literary short story that respects your world and cast.
             </p>
           </div>
-          <div className="rounded-md border border-ink/10 bg-white/60 px-4 py-3 text-sm text-ink/70">
-            No authentication, database, payments, AWS, voice, memory, or subscriptions.
+          <div className="flex flex-col gap-2 md:items-end">
+            <BuildBadge buildInfo={buildInfo} />
+            <div className="rounded-md border border-ink/10 bg-white/60 px-4 py-3 text-sm text-ink/70">
+              No authentication, database, payments, AWS, voice, memory, or subscriptions.
+            </div>
           </div>
         </header>
 
@@ -387,57 +467,12 @@ export default function Home() {
               {isLoadingSample ? "Loading sample world..." : "Load Sample World"}
             </button>
 
-            <UploadPanel
-              artifactType="worldBible"
-              description="Upload a .md or .txt file with rules, places, tone, history, and canon."
-              libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "worldBible")}
-              onChange={setWorldBible}
-              onRemoveFromLibrary={handleRemoveInputArtifact}
-              onSaveToLibrary={handleSaveInputArtifact}
-              onSelectFromLibrary={handleSelectInputArtifact}
-              title="World Bible"
-              value={worldBible}
-            />
-            <UploadPanel
-              artifactType="characterProfiles"
-              description="Upload a .md or .txt file with names, motivations, relationships, and constraints."
-              libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "characterProfiles")}
-              onChange={setCharacterProfiles}
-              onRemoveFromLibrary={handleRemoveInputArtifact}
-              onSaveToLibrary={handleSaveInputArtifact}
-              onSelectFromLibrary={handleSelectInputArtifact}
-              title="Character Profiles"
-              value={characterProfiles}
-            />
-            <UploadPanel
-              artifactType="storySeed"
-              description="Upload a .md or .txt file with the inciting incident, theme, or conflict to explore."
-              libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "storySeed")}
-              onChange={setStorySeed}
-              onRemoveFromLibrary={handleRemoveInputArtifact}
-              onSaveToLibrary={handleSaveInputArtifact}
-              onSelectFromLibrary={handleSelectInputArtifact}
-              title="Story Seed"
-              value={storySeed}
-            />
-            <UploadPanel
-              artifactType="storyRules"
-              description="Upload a .md or .txt file with narrative rules, constraints, priorities, and endings guidance."
-              libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "storyRules")}
-              onChange={setStoryRules}
-              onRemoveFromLibrary={handleRemoveInputArtifact}
-              onSaveToLibrary={handleSaveInputArtifact}
-              onSelectFromLibrary={handleSelectInputArtifact}
-              title="Story Generation Rules / Narrative Constraints"
-              value={storyRules}
-            />
+            <UploadPanel artifactType="worldBible" description="Upload a .md or .txt file with rules, places, tone, history, and canon." libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "worldBible")} onChange={setWorldBible} onRemoveFromLibrary={handleRemoveInputArtifact} onSaveToLibrary={handleSaveInputArtifact} onSelectFromLibrary={handleSelectInputArtifact} title="World Bible" value={worldBible} />
+            <UploadPanel artifactType="characterProfiles" description="Upload a .md or .txt file with names, motivations, relationships, and constraints." libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "characterProfiles")} onChange={setCharacterProfiles} onRemoveFromLibrary={handleRemoveInputArtifact} onSaveToLibrary={handleSaveInputArtifact} onSelectFromLibrary={handleSelectInputArtifact} title="Character Profiles" value={characterProfiles} />
+            <UploadPanel artifactType="storySeed" description="Upload a .md or .txt file with the inciting incident, theme, or conflict to explore." libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "storySeed")} onChange={setStorySeed} onRemoveFromLibrary={handleRemoveInputArtifact} onSaveToLibrary={handleSaveInputArtifact} onSelectFromLibrary={handleSelectInputArtifact} title="Story Seed" value={storySeed} />
+            <UploadPanel artifactType="storyRules" description="Upload a .md or .txt file with narrative rules, constraints, priorities, and endings guidance." libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "storyRules")} onChange={setStoryRules} onRemoveFromLibrary={handleRemoveInputArtifact} onSaveToLibrary={handleSaveInputArtifact} onSelectFromLibrary={handleSelectInputArtifact} title="Story Generation Rules / Narrative Constraints" value={storyRules} />
 
-            <button
-              className="rounded-md border border-ink/15 bg-white/75 px-5 py-3 text-sm font-semibold text-ink transition hover:bg-paper disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isGenerating}
-              onClick={handleClearCurrentInputs}
-              type="button"
-            >
+            <button className="rounded-md border border-ink/15 bg-white/75 px-5 py-3 text-sm font-semibold text-ink transition hover:bg-paper disabled:cursor-not-allowed disabled:opacity-60" disabled={isGenerating} onClick={handleClearCurrentInputs} type="button">
               Clear current inputs
             </button>
 
@@ -447,12 +482,7 @@ export default function Home() {
                   <h2 className="text-lg font-semibold text-ink">Story Architecture</h2>
                   <p className="text-sm leading-6 text-ink/65">Compact controls for genre, shape, arc, ending, and length.</p>
                 </div>
-                <button
-                  className="rounded-md border border-brass/40 bg-white/75 px-3 py-2 text-sm font-semibold text-brass transition hover:border-brass hover:bg-paper disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={isGenerating}
-                  onClick={handleRecommendSettings}
-                  type="button"
-                >
+                <button className="rounded-md border border-brass/40 bg-white/75 px-3 py-2 text-sm font-semibold text-brass transition hover:border-brass hover:bg-paper disabled:cursor-not-allowed disabled:opacity-60" disabled={isGenerating} onClick={handleRecommendSettings} type="button">
                   Recommend Settings
                 </button>
               </div>
@@ -462,15 +492,9 @@ export default function Home() {
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="font-semibold text-ink">Recommended settings</p>
-                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-ink/45">
-                        Confidence {Math.round(recommendation.confidence * 100)}%
-                      </p>
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-ink/45">Confidence {Math.round(recommendation.confidence * 100)}%</p>
                     </div>
-                    <button
-                      className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-paper transition hover:bg-ink/90"
-                      onClick={handleApplyRecommendation}
-                      type="button"
-                    >
+                    <button className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-paper transition hover:bg-ink/90" onClick={handleApplyRecommendation} type="button">
                       Apply Recommendation
                     </button>
                   </div>
@@ -487,20 +511,10 @@ export default function Home() {
 
               <div className="mt-4 grid gap-3">
                 <SelectControl label="Genre Preset" onChange={(value) => setGenrePreset(value as GenrePreset)} options={GENRE_PRESETS} value={genrePreset} />
-                <SelectControl
-                  label="Narrative Architecture"
-                  onChange={(value) => setNarrativeArchitecture(value as NarrativeArchitecture)}
-                  options={NARRATIVE_ARCHITECTURES}
-                  value={narrativeArchitecture}
-                />
+                <SelectControl label="Narrative Architecture" onChange={(value) => setNarrativeArchitecture(value as NarrativeArchitecture)} options={NARRATIVE_ARCHITECTURES} value={narrativeArchitecture} />
                 <SelectControl label="Character Arc" onChange={(value) => setCharacterArc(value as CharacterArc)} options={CHARACTER_ARCS} value={characterArc} />
                 <SelectControl label="Ending Type" onChange={(value) => setEndingType(value as EndingType)} options={ENDING_TYPES} value={endingType} />
-                <SelectControl
-                  label="Length Target"
-                  onChange={(value) => setLengthTarget(value as LengthTarget)}
-                  options={LENGTH_TARGETS.map((target) => ({ value: target.value, label: target.label }))}
-                  value={lengthTarget}
-                />
+                <SelectControl label="Length Target" onChange={(value) => setLengthTarget(value as LengthTarget)} options={LENGTH_TARGETS.map((target) => ({ value: target.value, label: target.label }))} value={lengthTarget} />
                 <div className="rounded-md bg-paper/80 px-3 py-2 text-sm text-ink/70">POV is locked to third-person limited.</div>
               </div>
             </section>
@@ -509,27 +523,12 @@ export default function Home() {
             {statusMessage ? <div className="rounded-md border border-brass/25 bg-paper/80 p-3 text-sm text-ink/70">{statusMessage}</div> : null}
             {error ? <div className="rounded-md border border-ember/30 bg-ember/10 p-3 text-sm text-ember">{error}</div> : null}
 
-            <button
-              className="rounded-md bg-ink px-5 py-3 text-sm font-semibold text-paper transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:bg-ink/35"
-              disabled={!canGenerate}
-              onClick={handleGenerate}
-              type="button"
-            >
+            <button className="rounded-md bg-ink px-5 py-3 text-sm font-semibold text-paper transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:bg-ink/35" disabled={!canGenerate} onClick={handleGenerate} type="button">
               {isGenerating ? "Generating story..." : "Generate Story"}
             </button>
           </section>
 
-          <StoryOutput
-            canNativeShare={canNativeShare}
-            isGenerating={isGenerating}
-            onCopySocialTeaser={handleCopySocialTeaser}
-            onCopyStory={handleCopyStory}
-            onDownloadMarkdown={handleDownloadMarkdown}
-            onDownloadTxt={handleDownloadTxt}
-            onSaveStory={handleSaveStory}
-            onShareStory={handleShareStory}
-            response={storyResponse}
-          />
+          <StoryOutput canNativeShare={canNativeShare} generationElapsedSeconds={generationElapsedSeconds} isGenerating={isGenerating} onCopySocialTeaser={handleCopySocialTeaser} onCopyStory={handleCopyStory} onDownloadMarkdown={handleDownloadMarkdown} onDownloadTxt={handleDownloadTxt} onSaveStory={handleSaveStory} onShareStory={handleShareStory} response={storyResponse} />
         </div>
       </section>
     </main>
@@ -544,27 +543,7 @@ async function fetchSampleFile(fileName: string): Promise<string> {
   return response.text();
 }
 
-function UploadPanel({
-  artifactType,
-  description,
-  libraryArtifacts,
-  onChange,
-  onRemoveFromLibrary,
-  onSaveToLibrary,
-  onSelectFromLibrary,
-  title,
-  value
-}: {
-  artifactType: InputArtifactType;
-  description: string;
-  libraryArtifacts: InputArtifact[];
-  onChange: (value: UploadState) => void;
-  onRemoveFromLibrary: (type: InputArtifactType, artifactId?: string) => void;
-  onSaveToLibrary: (type: InputArtifactType, value: UploadState) => void;
-  onSelectFromLibrary: (type: InputArtifactType, artifactId: string) => void;
-  title: string;
-  value: UploadState;
-}) {
+function UploadPanel({ artifactType, description, libraryArtifacts, onChange, onRemoveFromLibrary, onSaveToLibrary, onSelectFromLibrary, title, value }: { artifactType: InputArtifactType; description: string; libraryArtifacts: InputArtifact[]; onChange: (value: UploadState) => void; onRemoveFromLibrary: (type: InputArtifactType, artifactId?: string) => void; onSaveToLibrary: (type: InputArtifactType, value: UploadState) => void; onSelectFromLibrary: (type: InputArtifactType, artifactId: string) => void; title: string; value: UploadState; }) {
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
@@ -589,80 +568,36 @@ function UploadPanel({
       </div>
       <label className="mt-4 flex flex-col gap-2">
         <span className="text-sm font-semibold text-ink">Choose from library</span>
-        <select
-          className="rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/20"
-          onChange={(event) => onSelectFromLibrary(artifactType, event.target.value)}
-          value={value.libraryArtifactId ?? ""}
-        >
+        <select className="rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/20" onChange={(event) => onSelectFromLibrary(artifactType, event.target.value)} value={value.libraryArtifactId ?? ""}>
           <option value="">Upload new or choose saved</option>
           {libraryArtifacts.map((artifact) => (
-            <option key={artifact.id} value={artifact.id}>
-              {artifact.name} ({artifact.characterCount.toLocaleString()} chars)
-            </option>
+            <option key={artifact.id} value={artifact.id}>{artifact.name} ({artifact.characterCount.toLocaleString()} chars)</option>
           ))}
         </select>
       </label>
       <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-brass/55 bg-paper/70 px-4 py-6 text-center transition hover:border-brass hover:bg-paper">
         <span className="text-sm font-semibold text-brass">{value.name || "Choose .md or .txt file"}</span>
-        <span className="mt-1 text-xs text-ink/55">
-          {value.content ? `${value.content.length.toLocaleString()} characters loaded` : "Files stay local until generation"}
-        </span>
+        <span className="mt-1 text-xs text-ink/55">{value.content ? `${value.content.length.toLocaleString()} characters loaded` : "Files stay local until generation"}</span>
         <input className="sr-only" type="file" accept=".md,.txt,text/markdown,text/plain" onChange={handleFileChange} />
       </label>
-      {selectedArtifact ? (
-        <p className="mt-3 rounded-md bg-paper/80 px-3 py-2 text-xs leading-5 text-ink/60">
-          Loaded from library: {selectedArtifact.name} | {selectedArtifact.characterCount.toLocaleString()} characters
-        </p>
-      ) : null}
+      {selectedArtifact ? <p className="mt-3 rounded-md bg-paper/80 px-3 py-2 text-xs leading-5 text-ink/60">Loaded from library: {selectedArtifact.name} | {selectedArtifact.characterCount.toLocaleString()} characters</p> : null}
       <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-paper transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!value.content.trim()}
-          onClick={() => onSaveToLibrary(artifactType, value)}
-          type="button"
-        >
-          Save to Library
-        </button>
-        <button
-          className="rounded-md border border-ember/30 bg-white/70 px-3 py-2 text-xs font-semibold text-ember transition hover:bg-ember/10 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!value.libraryArtifactId}
-          onClick={() => onRemoveFromLibrary(artifactType, value.libraryArtifactId)}
-          type="button"
-        >
-          Remove from Library
-        </button>
+        <button className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-paper transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-50" disabled={!value.content.trim()} onClick={() => onSaveToLibrary(artifactType, value)} type="button">Save to Library</button>
+        <button className="rounded-md border border-ember/30 bg-white/70 px-3 py-2 text-xs font-semibold text-ember transition hover:bg-ember/10 disabled:cursor-not-allowed disabled:opacity-50" disabled={!value.libraryArtifactId} onClick={() => onRemoveFromLibrary(artifactType, value.libraryArtifactId)} type="button">Remove from Library</button>
       </div>
     </section>
   );
 }
 
-function SelectControl({
-  label,
-  value,
-  options,
-  onChange
-}: {
-  label: string;
-  value: string;
-  options: readonly string[] | readonly SelectOption[];
-  onChange: (value: string) => void;
-}) {
+function SelectControl({ label, value, options, onChange }: { label: string; value: string; options: readonly string[] | readonly SelectOption[]; onChange: (value: string) => void; }) {
   return (
     <label className="flex flex-col gap-2">
       <span className="text-sm font-semibold text-ink">{label}</span>
-      <select
-        className="rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/20"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
+      <select className="rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/20" value={value} onChange={(event) => onChange(event.target.value)}>
         {options.map((option) => {
           const optionValue = typeof option === "string" ? option : option.value;
           const optionLabel = typeof option === "string" ? option : option.label;
-          return (
-            <option key={optionValue} value={optionValue}>
-              {optionLabel}
-            </option>
-          );
+          return <option key={optionValue} value={optionValue}>{optionLabel}</option>;
         })}
       </select>
     </label>
@@ -678,45 +613,23 @@ function RecommendationItem({ label, value }: { label: string; value: string }) 
   );
 }
 
-function SavedStoriesPanel({
-  savedStories,
-  onDelete,
-  onRestore
-}: {
-  savedStories: SavedStory[];
-  onDelete: (storyId: string) => void;
-  onRestore: (story: SavedStory) => void;
-}) {
+function SavedStoriesPanel({ savedStories, onDelete, onRestore }: { savedStories: SavedStory[]; onDelete: (storyId: string) => void; onRestore: (story: SavedStory) => void; }) {
   return (
     <section className="rounded-md border border-ink/10 bg-white/70 p-4 shadow-soft">
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold text-ink">Saved Stories</h2>
         <p className="text-sm leading-6 text-ink/65">Stored locally in this browser.</p>
       </div>
-      {savedStories.length === 0 ? (
-        <p className="mt-4 rounded-md bg-paper/80 px-3 py-2 text-sm text-ink/60">No saved stories yet.</p>
-      ) : (
+      {savedStories.length === 0 ? <p className="mt-4 rounded-md bg-paper/80 px-3 py-2 text-sm text-ink/60">No saved stories yet.</p> : (
         <div className="mt-4 grid gap-3">
           {savedStories.map((story) => (
             <article key={story.id} className="rounded-md border border-ink/10 bg-paper/80 p-3">
               <h3 className="text-sm font-semibold text-ink">{story.title}</h3>
-              <p className="mt-1 text-xs leading-5 text-ink/60">
-                {formatDateTime(story.createdAt)} | {story.wordCount.toLocaleString()} words
-              </p>
-              <p className="mt-1 text-xs leading-5 text-ink/60">
-                {story.genrePreset} | {story.narrativeArchitecture}
-              </p>
+              <p className="mt-1 text-xs leading-5 text-ink/60">{formatDateTime(story.createdAt)} | {story.wordCount.toLocaleString()} words</p>
+              <p className="mt-1 text-xs leading-5 text-ink/60">{story.genrePreset} | {story.narrativeArchitecture}</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-paper transition hover:bg-ink/90" onClick={() => onRestore(story)} type="button">
-                  Open
-                </button>
-                <button
-                  className="rounded-md border border-ember/30 bg-white/70 px-3 py-2 text-xs font-semibold text-ember transition hover:bg-ember/10"
-                  onClick={() => onDelete(story.id)}
-                  type="button"
-                >
-                  Delete
-                </button>
+                <button className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-paper transition hover:bg-ink/90" onClick={() => onRestore(story)} type="button">Open</button>
+                <button className="rounded-md border border-ember/30 bg-white/70 px-3 py-2 text-xs font-semibold text-ember transition hover:bg-ember/10" onClick={() => onDelete(story.id)} type="button">Delete</button>
               </div>
             </article>
           ))}
@@ -726,31 +639,33 @@ function SavedStoriesPanel({
   );
 }
 
-function StoryOutput({
-  canNativeShare,
-  response,
-  isGenerating,
-  onCopySocialTeaser,
-  onCopyStory,
-  onDownloadMarkdown,
-  onDownloadTxt,
-  onSaveStory,
-  onShareStory
-}: {
-  canNativeShare: boolean;
-  response: GenerateStoryResponse | null;
-  isGenerating: boolean;
-  onCopySocialTeaser: () => void;
-  onCopyStory: () => void;
-  onDownloadMarkdown: () => void;
-  onDownloadTxt: () => void;
-  onSaveStory: () => void;
-  onShareStory: () => void;
-}) {
+function BuildBadge({ buildInfo }: { buildInfo: BuildInfo }) {
+  return (
+    <div className="rounded-md border border-brass/25 bg-white/75 px-3 py-2 text-xs font-semibold text-ink/65 shadow-soft">
+      Version {buildInfo.appVersion} | {buildInfo.buildEnvironment} | {buildInfo.gitBranch} | {buildInfo.shortCommitSha}
+      {buildInfo.buildTimestamp !== "unknown" ? ` | ${formatBuildTimestamp(buildInfo.buildTimestamp)}` : ""}
+    </div>
+  );
+}
+
+function StoryOutput({ canNativeShare, generationElapsedSeconds, response, isGenerating, onCopySocialTeaser, onCopyStory, onDownloadMarkdown, onDownloadTxt, onSaveStory, onShareStory }: { canNativeShare: boolean; generationElapsedSeconds: number; response: GenerateStoryResponse | null; isGenerating: boolean; onCopySocialTeaser: () => void; onCopyStory: () => void; onDownloadMarkdown: () => void; onDownloadTxt: () => void; onSaveStory: () => void; onShareStory: () => void; }) {
   if (isGenerating) {
+    const progressPercent = getGenerationProgressPercent(generationElapsedSeconds);
     return (
       <section className="min-h-[640px] rounded-md border border-ink/10 bg-white/75 p-6 shadow-soft">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brass">Drafting</p>
+        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brass">Generating story...</p>
+        <div className="mt-6 rounded-md border border-brass/25 bg-paper/80 p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold text-ink">{formatDuration(generationElapsedSeconds)}</h2>
+              <p className="mt-2 text-sm leading-6 text-ink/70">{getGenerationStatusMessage(generationElapsedSeconds)}</p>
+            </div>
+            <div className="size-12 animate-spin rounded-full border-4 border-brass/20 border-t-brass" aria-hidden="true" />
+          </div>
+          <div className="mt-5 h-3 overflow-hidden rounded-full bg-ink/10"><div className="h-full rounded-full bg-brass transition-all duration-500" style={{ width: `${progressPercent}%` }} /></div>
+          <p className="mt-3 text-xs leading-5 text-ink/55">The request is still running. Blueprint, repair, and expansion passes can take longer for Standard and Long stories.</p>
+          {generationElapsedSeconds > 180 ? <p className="mt-4 rounded-md border border-ember/30 bg-ember/10 p-3 text-sm leading-6 text-ember">This is taking longer than expected. The request may still finish, but if it does not, check Vercel logs or retry with Compact or Standard length.</p> : null}
+        </div>
         <div className="mt-6 space-y-3">
           <div className="h-4 w-11/12 animate-pulse rounded bg-ink/10" />
           <div className="h-4 w-10/12 animate-pulse rounded bg-ink/10" />
@@ -765,25 +680,20 @@ function StoryOutput({
       <section className="flex min-h-[640px] items-center justify-center rounded-md border border-ink/10 bg-white/60 p-6 text-center shadow-soft">
         <div>
           <h2 className="text-2xl font-semibold text-ink">Your story will appear here</h2>
-          <p className="mt-3 max-w-md text-sm leading-6 text-ink/65">
-            The API uses OpenAI when `OPENAI_API_KEY` is set, and the local deterministic engine when it is not.
-          </p>
+          <p className="mt-3 max-w-md text-sm leading-6 text-ink/65">The API uses OpenAI when `OPENAI_API_KEY` is set, and the local deterministic engine when it is not.</p>
         </div>
       </section>
     );
   }
 
   const diagnostics = response.metadata.diagnostics;
-
   return (
     <section className="rounded-md border border-ink/10 bg-white/80 p-5 shadow-soft md:p-7">
       <div className="flex flex-col gap-4 border-b border-ink/10 pb-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brass">Generated Story</p>
-            <h2 className="mt-2 text-2xl font-semibold text-ink">
-              {response.metadata.source === "openai" ? "OpenAI-powered draft" : "Fallback local draft"}
-            </h2>
+            <h2 className="mt-2 text-2xl font-semibold text-ink">{response.metadata.source === "openai" ? "OpenAI-powered draft" : "Fallback local draft"}</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             <OutputButton onClick={onSaveStory}>Save Story</OutputButton>
@@ -797,8 +707,15 @@ function StoryOutput({
         <div className="grid gap-2 text-sm text-ink/70 sm:grid-cols-2 lg:grid-cols-3">
           <MetadataItem label="Word count" value={response.metadata.wordCount.toLocaleString()} />
           <MetadataItem label="Generator source" value={response.metadata.source} />
+          {response.metadata.generationDurationSeconds !== undefined ? <MetadataItem label="Generation duration" value={formatDuration(response.metadata.generationDurationSeconds)} /> : null}
+          {response.metadata.serverGenerationDurationSeconds !== undefined ? <MetadataItem label="Server duration" value={formatDuration(response.metadata.serverGenerationDurationSeconds)} /> : null}
           <MetadataItem label="Characters" value={formatList(response.metadata.charactersUsed)} />
           <MetadataItem label="Rules" value={formatList(response.metadata.rulesReferenced)} />
+          <MetadataItem label="App version" value={response.metadata.appVersion ?? diagnostics.appVersion ?? "unknown"} />
+          <MetadataItem label="Build environment" value={response.metadata.buildEnvironment ?? diagnostics.buildEnvironment ?? "development"} />
+          <MetadataItem label="Git branch" value={response.metadata.gitBranch ?? diagnostics.gitBranch ?? "local"} />
+          <MetadataItem label="Commit SHA" value={shortenCommitSha(response.metadata.commitSha ?? diagnostics.commitSha ?? "unknown")} />
+          <MetadataItem label="Build timestamp" value={formatBuildTimestamp(response.metadata.buildTimestamp ?? diagnostics.buildTimestamp ?? "unknown")} />
           <MetadataItem label="Genre preset" value={diagnostics.genrePreset} />
           <MetadataItem label="Narrative architecture" value={diagnostics.narrativeArchitecture} />
           <MetadataItem label="Character arc" value={diagnostics.characterArc} />
@@ -807,6 +724,9 @@ function StoryOutput({
           <MetadataItem label="Final word count" value={diagnostics.finalWordCount.toLocaleString()} />
           <MetadataItem label="Expansion attempted" value={formatBoolean(diagnostics.expansionAttempted)} />
           <MetadataItem label="Expansion succeeded" value={formatBoolean(diagnostics.expansionSucceeded)} />
+          <MetadataItem label="Timed out early" value={formatBoolean(Boolean(diagnostics.timedOutEarly))} />
+          <MetadataItem label="Stopped reason" value={diagnostics.stoppedReason ?? "complete"} />
+          <MetadataItem label="Remaining forbidden terms" value={formatList(diagnostics.remainingForbiddenTerms ?? [])} />
           <MetadataItem label="Under target notice" value={diagnostics.underTargetNotice ?? "None"} />
           <MetadataItem label="Blueprint generated" value={formatBoolean(diagnostics.blueprintGenerated)} />
           <MetadataItem label="Blueprint scene count" value={diagnostics.blueprintSceneCount.toLocaleString()} />
@@ -826,11 +746,7 @@ function StoryOutput({
 }
 
 function OutputButton({ children, onClick }: { children: string; onClick: () => void }) {
-  return (
-    <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onClick} type="button">
-      {children}
-    </button>
-  );
+  return <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onClick} type="button">{children}</button>;
 }
 
 function MetadataItem({ label, value }: { label: string; value: string }) {
@@ -937,15 +853,7 @@ function isInputArtifact(value: unknown): value is InputArtifact {
     return false;
   }
   const candidate = value as Partial<InputArtifact>;
-  return Boolean(
-    candidate.id &&
-      isInputArtifactType(candidate.type) &&
-      candidate.name &&
-      typeof candidate.content === "string" &&
-      candidate.createdAt &&
-      candidate.updatedAt &&
-      typeof candidate.characterCount === "number"
-  );
+  return Boolean(candidate.id && isInputArtifactType(candidate.type) && candidate.name && typeof candidate.content === "string" && candidate.createdAt && candidate.updatedAt && typeof candidate.characterCount === "number");
 }
 
 function isInputArtifactType(value: unknown): value is InputArtifactType {
@@ -1039,14 +947,53 @@ function formatDateTime(value: string): string {
 }
 
 function formatLibraryVersion(value: string): string {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" })
-    .format(new Date(value))
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/-+$/g, "");
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)).replace(/[^a-zA-Z0-9]+/g, "-").replace(/-+$/g, "");
 }
 
 function formatList(values: string[]): string {
   return values.length > 0 ? values.join(", ") : "None detected";
+}
+
+function formatDuration(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function getGenerationStatusMessage(elapsedSeconds: number): string {
+  if (elapsedSeconds >= 120) {
+    return "Still working. Longer stories and repair passes may take several minutes.";
+  }
+  if (elapsedSeconds >= 60) {
+    return "Expanding and checking constraints...";
+  }
+  if (elapsedSeconds >= 30) {
+    return "Drafting story...";
+  }
+  if (elapsedSeconds >= 10) {
+    return "Building story blueprint...";
+  }
+  return "Preparing story materials...";
+}
+
+function getGenerationProgressPercent(elapsedSeconds: number): number {
+  return Math.min(96, Math.max(8, Math.round((elapsedSeconds / 180) * 100)));
+}
+
+function shortenCommitSha(commitSha: string): string {
+  return commitSha === "unknown" ? commitSha : commitSha.slice(0, 7);
+}
+
+function formatBuildTimestamp(value: string): string {
+  if (value === "unknown") {
+    return value;
+  }
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) {
+    return value;
+  }
+  return formatDateTime(timestamp.toISOString());
 }
 
 function formatBoolean(value: boolean): string {
