@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.7.0";
+export const APP_VERSION = "0.6.0";
 
 export type BuildInfo = {
   appVersion: string;
@@ -11,19 +11,34 @@ export type BuildInfo = {
 };
 
 export function getBuildInfo(): BuildInfo {
-  const commitSha = valueOrFallback(process.env.VERCEL_GIT_COMMIT_SHA, "unknown");
+  const buildEnvironment = firstEnvValue(["VERCEL_ENV", "NEXT_PUBLIC_VERCEL_ENV", "NEXT_PUBLIC_BUILD_ENV"], getDefaultBuildEnvironment());
+  const gitBranch = firstEnvValue(["VERCEL_GIT_COMMIT_REF", "NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF", "NEXT_PUBLIC_GIT_BRANCH"], buildEnvironment === "production" ? "main" : "local");
+  const commitSha = firstEnvValue(["VERCEL_GIT_COMMIT_SHA", "NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA", "NEXT_PUBLIC_COMMIT_SHA"], "unknown");
 
   return {
     appVersion: APP_VERSION,
-    buildEnvironment: valueOrFallback(process.env.VERCEL_ENV, "development"),
-    gitBranch: valueOrFallback(process.env.VERCEL_GIT_COMMIT_REF, "local"),
+    buildEnvironment,
+    gitBranch,
     commitSha,
     shortCommitSha: commitSha === "unknown" ? "unknown" : commitSha.slice(0, 7),
-    buildTimestamp: valueOrFallback(process.env.NEXT_PUBLIC_BUILD_TIMESTAMP, "unknown"),
-    vercelUrl: valueOrFallback(process.env.VERCEL_URL, "local")
+    buildTimestamp: firstEnvValue(["NEXT_PUBLIC_BUILD_TIMESTAMP", "VERCEL_GIT_COMMIT_CREATED_AT"], "unknown"),
+    vercelUrl: firstEnvValue(["VERCEL_PROJECT_PRODUCTION_URL", "VERCEL_BRANCH_URL", "VERCEL_URL", "NEXT_PUBLIC_VERCEL_URL"], "local")
   };
 }
 
-function valueOrFallback(value: string | undefined, fallback: string): string {
-  return value?.trim() || fallback;
+function firstEnvValue(names: string[], fallback: string): string {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
+  }
+
+  return fallback;
+}
+
+function getDefaultBuildEnvironment(): string {
+  if (process.env.VERCEL_URL || process.env.NEXT_PUBLIC_VERCEL_URL) {
+    return process.env.NODE_ENV === "production" ? "production" : "preview";
+  }
+
+  return process.env.NODE_ENV === "production" ? "production" : "development";
 }
