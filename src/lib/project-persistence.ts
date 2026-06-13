@@ -3,6 +3,7 @@ import type {
   EndingType,
   GenerateStoryResponse,
   GenrePreset,
+  LengthTarget,
   NarrativeArchitecture,
   StoryDiagnostics
 } from "@/lib/types";
@@ -34,9 +35,30 @@ export type SavedStory = {
   lengthTarget: string;
   diagnosticsNotice: string | null;
 };
+export type SavedProject = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  inputs: {
+    worldBible: UploadState;
+    characterProfiles: UploadState;
+    storySeed: UploadState;
+    storyRules: UploadState;
+  };
+  selections: {
+    genrePreset: GenrePreset;
+    narrativeArchitecture: NarrativeArchitecture;
+    characterArc: CharacterArc;
+    endingType: EndingType;
+    lengthTarget: LengthTarget;
+  };
+  latestStory: GenerateStoryResponse | null;
+};
 
 export const INPUT_ARTIFACTS_STORAGE_KEY = "story-world-engine:input-artifacts:v1";
 export const SAVED_STORIES_STORAGE_KEY = "story-world-engine:saved-stories:v1";
+export const SAVED_PROJECTS_STORAGE_KEY = "story-world-engine:saved-projects:v1";
 
 export function readInputArtifacts(): InputArtifact[] {
   return readLocalStorageArray(INPUT_ARTIFACTS_STORAGE_KEY).filter(isInputArtifact);
@@ -52,6 +74,14 @@ export function readSavedStories(): SavedStory[] {
 
 export function persistSavedStories(stories: SavedStory[]) {
   writeLocalStorageArray(SAVED_STORIES_STORAGE_KEY, stories);
+}
+
+export function readSavedProjects(): SavedProject[] {
+  return readLocalStorageArray(SAVED_PROJECTS_STORAGE_KEY).filter(isSavedProject);
+}
+
+export function persistSavedProjects(projects: SavedProject[]) {
+  writeLocalStorageArray(SAVED_PROJECTS_STORAGE_KEY, projects);
 }
 
 export function readLocalStorageArray(key: string): unknown[] {
@@ -93,6 +123,20 @@ export function isInputArtifactType(value: unknown): value is InputArtifactType 
 export function isSavedStory(value: unknown): value is SavedStory {
   const candidate = value as Partial<SavedStory>;
   return Boolean(candidate && typeof candidate === "object" && candidate.id && candidate.title && candidate.createdAt && candidate.story);
+}
+
+export function isSavedProject(value: unknown): value is SavedProject {
+  const candidate = value as Partial<SavedProject>;
+  return Boolean(
+    candidate &&
+      typeof candidate === "object" &&
+      candidate.id &&
+      candidate.name &&
+      candidate.createdAt &&
+      candidate.updatedAt &&
+      candidate.inputs &&
+      candidate.selections
+  );
 }
 
 export function createSavedStory(response: GenerateStoryResponse): SavedStory {
@@ -152,6 +196,10 @@ export function savedStoryToResponse(savedStory: SavedStory): GenerateStoryRespo
 
 export function createInputArtifactId(type: InputArtifactType, name: string, createdAt: string): string {
   return `${type}-${createdAt}-${name.length}`.replace(/[^a-zA-Z0-9_-]/g, "-");
+}
+
+export function createSavedProjectId(name: string, createdAt: string): string {
+  return `project-${createdAt}-${name.length}`.replace(/[^a-zA-Z0-9_-]/g, "-");
 }
 
 function createStoryId(story: string): string {
