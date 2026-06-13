@@ -141,15 +141,15 @@ function withServerGenerationDuration(
 
 function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
   if (!body.worldBible?.trim()) {
-    return "Upload a world bible before generating a story.";
+    return "Add a Storyworld before generating a story.";
   }
 
   if (!body.characterProfiles?.trim()) {
-    return "Upload character profiles before generating a story.";
+    return "Add a Cast before generating a story.";
   }
 
   if (!body.storySeed?.trim()) {
-    return "Upload a story seed before generating a story.";
+    return "Add a Story Spark before generating a story.";
   }
 
   if (!body.genrePreset || !GENRE_PRESETS.includes(body.genrePreset)) {
