@@ -9,6 +9,7 @@ type ApplyMode = "add" | "replace";
 
 const ORIGINAL_SECTION_TITLE = "Character Archetypes";
 const CAST_SECTION_TITLE = "Cast";
+const LEGACY_CAST_SECTION_TITLE = "Character Profiles";
 
 export function CharacterArchetypeCompactor() {
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
@@ -41,7 +42,7 @@ export function CharacterArchetypeCompactor() {
         section.setAttribute("aria-hidden", "true");
       }
 
-      const castSection = findSectionByTitle(CAST_SECTION_TITLE);
+      const castSection = findSectionByTitle(CAST_SECTION_TITLE) ?? findSectionByTitle(LEGACY_CAST_SECTION_TITLE);
       let target = document.getElementById("compact-character-archetype-library");
       if (!target) {
         target = document.createElement("div");
