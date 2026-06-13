@@ -7,22 +7,18 @@ import { recommendStoryArchitecture } from "@/lib/story-architecture-recommendat
 import type { StoryArchitectureRecommendation } from "@/lib/story-architecture-recommendations";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
-import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture, StoryDiagnostics } from "@/lib/types";
+import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture } from "@/lib/types";
+import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
+import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
 import { WORLD_TEMPLATES } from "@/lib/world-templates";
 import type { WorldTemplate } from "@/lib/world-templates";
 
-type UploadState = { name: string; content: string; libraryArtifactId?: string };
-type InputArtifactType = "worldBible" | "characterProfiles" | "storySeed" | "storyRules";
-type InputArtifact = { id: string; type: InputArtifactType; name: string; content: string; createdAt: string; updatedAt: string; characterCount: number };
 type SelectOption = { value: string; label: string };
 type BuildInfo = { appVersion: string; buildEnvironment: string; gitBranch: string; commitSha: string; shortCommitSha: string; buildTimestamp: string; vercelUrl: string };
-type SavedStory = { id: string; title: string; createdAt: string; story: string; wordCount: number; generatorSource: GenerateStoryResponse["metadata"]["source"]; charactersUsed: string[]; rulesReferenced: string[]; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: string; diagnosticsNotice: string | null };
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
-const INPUT_ARTIFACTS_STORAGE_KEY = "story-world-engine:input-artifacts:v1";
-const SAVED_STORIES_STORAGE_KEY = "story-world-engine:saved-stories:v1";
 const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
-const DEFAULT_BUILD_INFO: BuildInfo = { appVersion: "0.7.1", buildEnvironment: "metadata unavailable", gitBranch: "metadata unavailable", commitSha: "metadata unavailable", shortCommitSha: "metadata unavailable", buildTimestamp: "unknown", vercelUrl: "metadata unavailable" };
+const DEFAULT_BUILD_INFO: BuildInfo = { appVersion: "0.7.2", buildEnvironment: "metadata unavailable", gitBranch: "metadata unavailable", commitSha: "metadata unavailable", shortCommitSha: "metadata unavailable", buildTimestamp: "unknown", vercelUrl: "metadata unavailable" };
 const INPUT_LABELS: Record<InputArtifactType, string> = { worldBible: "Storyworld", characterProfiles: "Cast", storySeed: "Story Spark", storyRules: "Craft Rules" };
 const DEFAULT_STORY_RULES_NOTICE = "Default craft rules are used automatically when this is empty.";
 
@@ -40,6 +36,9 @@ export default function Home() {
   const [storyResponse, setStoryResponse] = useState<GenerateStoryResponse | null>(null);
   const [inputArtifacts, setInputArtifacts] = useState<InputArtifact[]>([]);
   const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [projectName, setProjectName] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState("");
   const [buildInfo, setBuildInfo] = useState<BuildInfo>(DEFAULT_BUILD_INFO);
   const [statusMessage, setStatusMessage] = useState("");
   const [canNativeShare, setCanNativeShare] = useState(false);
@@ -52,6 +51,7 @@ export default function Home() {
   useEffect(() => {
     setInputArtifacts(readInputArtifacts());
     setSavedStories(readSavedStories());
+    setSavedProjects(readSavedProjects());
     setCanNativeShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
   }, []);
 
@@ -168,6 +168,60 @@ export default function Home() {
     setStatusMessage("Current inputs cleared. Saved library items were not changed.");
   }
 
+  function handleSaveProject() {
+    const trimmedName = projectName.trim();
+    if (!trimmedName) return setError("Add a project name before saving this workspace.");
+    setError("");
+    const now = new Date().toISOString();
+    const existingProject = savedProjects.find((project) => project.id === selectedProjectId || project.name.toLowerCase() === trimmedName.toLowerCase());
+    const savedProject: SavedProject = {
+      id: existingProject?.id ?? createSavedProjectId(trimmedName, now),
+      name: trimmedName,
+      createdAt: existingProject?.createdAt ?? now,
+      updatedAt: now,
+      inputs: { worldBible, characterProfiles, storySeed, storyRules },
+      selections: { genrePreset, narrativeArchitecture, characterArc, endingType, lengthTarget },
+      latestStory: storyResponse
+    };
+    const nextProjects = [savedProject, ...savedProjects.filter((project) => project.id !== savedProject.id)];
+    persistSavedProjects(nextProjects);
+    setSavedProjects(nextProjects);
+    setSelectedProjectId(savedProject.id);
+    setStatusMessage(`${savedProject.name} saved locally in this browser.`);
+  }
+
+  function handleLoadProject(projectId: string) {
+    setSelectedProjectId(projectId);
+    if (!projectId) return;
+    const project = savedProjects.find((item) => item.id === projectId);
+    if (!project) return;
+    setProjectName(project.name);
+    setWorldBible(project.inputs.worldBible);
+    setCharacterProfiles(project.inputs.characterProfiles);
+    setStorySeed(project.inputs.storySeed);
+    setStoryRules(project.inputs.storyRules);
+    setGenrePreset(project.selections.genrePreset);
+    setNarrativeArchitecture(project.selections.narrativeArchitecture);
+    setCharacterArc(project.selections.characterArc);
+    setEndingType(project.selections.endingType);
+    setLengthTarget(project.selections.lengthTarget);
+    setRecommendation(null);
+    setStoryResponse(project.latestStory);
+    setStatusMessage(`${project.name} loaded from this browser.`);
+  }
+
+  function handleDeleteProject() {
+    if (!selectedProjectId) return setError("Choose a saved project before deleting.");
+    const project = savedProjects.find((item) => item.id === selectedProjectId);
+    if (!project) return;
+    const nextProjects = savedProjects.filter((item) => item.id !== selectedProjectId);
+    persistSavedProjects(nextProjects);
+    setSavedProjects(nextProjects);
+    setSelectedProjectId("");
+    setProjectName("");
+    setStatusMessage(`${project.name} deleted from this browser.`);
+  }
+
   function handleSelectInputArtifact(type: InputArtifactType, artifactId: string) {
     if (!artifactId) return setUploadForType(type, { ...EMPTY_UPLOAD });
     const artifact = inputArtifacts.find((item) => item.id === artifactId && item.type === type);
@@ -245,6 +299,7 @@ export default function Home() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
           <section className="flex flex-col gap-4">
             <button className="rounded-md border border-brass/40 bg-white/75 px-5 py-3 text-sm font-semibold text-brass shadow-soft transition hover:border-brass hover:bg-paper disabled:cursor-not-allowed disabled:opacity-60" disabled={isLoadingSample || isGenerating} onClick={handleLoadSampleWorld} type="button">{isLoadingSample ? "Loading sample world..." : "Load Sample World"}</button>
+            <ProjectPanel onDelete={handleDeleteProject} onLoad={handleLoadProject} onNameChange={setProjectName} onSave={handleSaveProject} projectName={projectName} savedProjects={savedProjects} selectedProjectId={selectedProjectId} />
             <StoryworldSection disabled={isGenerating} libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "worldBible")} onApplyTemplate={handleApplyWorldTemplate} onChange={setWorldBible} onRemoveFromLibrary={handleRemoveInputArtifact} onSaveToLibrary={handleSaveInputArtifact} onSelectFromLibrary={handleSelectInputArtifact} value={worldBible} />
             <CastSection disabled={isGenerating} libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "characterProfiles")} onApplyArchetype={handleApplyCharacterArchetype} onChange={setCharacterProfiles} onRemoveFromLibrary={handleRemoveInputArtifact} onSaveToLibrary={handleSaveInputArtifact} onSelectFromLibrary={handleSelectInputArtifact} value={characterProfiles} />
             <StorySparkSection libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "storySeed")} onChange={setStorySeed} onRemoveFromLibrary={handleRemoveInputArtifact} onSaveToLibrary={handleSaveInputArtifact} onSelectFromLibrary={handleSelectInputArtifact} value={storySeed} />
@@ -262,6 +317,10 @@ export default function Home() {
       </section>
     </main>
   );
+}
+
+function ProjectPanel({ onDelete, onLoad, onNameChange, onSave, projectName, savedProjects, selectedProjectId }: { onDelete: () => void; onLoad: (projectId: string) => void; onNameChange: (name: string) => void; onSave: () => void; projectName: string; savedProjects: SavedProject[]; selectedProjectId: string }) {
+  return <section className="rounded-md border border-brass/20 bg-white/75 p-4 shadow-soft"><SectionHeader title="Project" subtitle="Save or restore this memoir workspace in this browser." /><label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-ink">Project Name</span><input className="rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-brass focus:ring-2 focus:ring-brass/20" onChange={(event) => onNameChange(event.target.value)} placeholder="My memoir project" type="text" value={projectName} /></label><div className="mt-3 flex flex-wrap gap-2"><ActionButton onClick={onSave}>Save Project</ActionButton><SecondaryButton disabled={!selectedProjectId} onClick={onDelete}>Delete Project</SecondaryButton></div><label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-ink">Load Project</span><select className="rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/20" onChange={(event) => onLoad(event.target.value)} value={selectedProjectId}><option value="">Choose a saved project</option>{savedProjects.map((project) => <option key={project.id} value={project.id}>{project.name} - {formatDateTime(project.updatedAt)}</option>)}</select></label><p className="mt-3 text-xs leading-5 text-ink/55">Projects are saved locally in this browser and include the current inputs, selections, and latest generated story.</p></section>;
 }
 
 function StoryworldSection(props: { disabled: boolean; libraryArtifacts: InputArtifact[]; onApplyTemplate: (template: WorldTemplate, mode: "add" | "replace") => void; onChange: (value: UploadState) => void; onRemoveFromLibrary: (type: InputArtifactType, artifactId?: string) => void; onSaveToLibrary: (type: InputArtifactType, value: UploadState) => void; onSelectFromLibrary: (type: InputArtifactType, artifactId: string) => void; value: UploadState }) {
@@ -358,28 +417,15 @@ function MetadataItem({ label, value }: { label: string; value: string }) { retu
 
 async function fetchSampleFile(fileName: string): Promise<string> { const response = await fetch(`/sample-content/${fileName}`); if (!response.ok) throw new Error(`Unable to load sample file: ${fileName}`); return response.text(); }
 function normalizeGenerateStoryResponse(payload: unknown): GenerateStoryResponse { const normalizedPayload = normalizeStoryPayload(payload) as Partial<GenerateStoryResponse>; const story = normalizeStoryText(normalizedPayload.story); if (!story || !normalizedPayload.metadata) throw new Error("Story generation returned an invalid response."); return { ...normalizedPayload, story, metadata: { ...normalizedPayload.metadata, wordCount: countWords(story) } } as GenerateStoryResponse; }
-function createSavedStory(response: GenerateStoryResponse): SavedStory { const diagnostics = response.metadata.diagnostics; return { id: createStoryId(response.story), title: createStoryTitle(response.story), createdAt: new Date().toISOString(), story: response.story, wordCount: response.metadata.wordCount, generatorSource: response.metadata.source, charactersUsed: response.metadata.charactersUsed, rulesReferenced: response.metadata.rulesReferenced, genrePreset: diagnostics.genrePreset, narrativeArchitecture: diagnostics.narrativeArchitecture, characterArc: diagnostics.characterArc, endingType: diagnostics.endingType, lengthTarget: diagnostics.lengthTarget, diagnosticsNotice: diagnostics.notice ?? diagnostics.underTargetNotice }; }
-function savedStoryToResponse(savedStory: SavedStory): GenerateStoryResponse { const diagnostics: StoryDiagnostics = { openAIEnabled: false, apiKeyDetected: false, modelRequested: "Restored local save", openAIRequestAttempted: false, openAIRequestSucceeded: false, fallbackReason: null, notice: savedStory.diagnosticsNotice, genrePreset: savedStory.genrePreset, narrativeArchitecture: savedStory.narrativeArchitecture, characterArc: savedStory.characterArc, endingType: savedStory.endingType, lengthTarget: savedStory.lengthTarget, finalWordCount: savedStory.wordCount, expansionAttempted: false, expansionSucceeded: false, underTargetNotice: null, blueprintGenerated: false, blueprintSceneCount: 0, blueprintFailedReason: null }; return { story: savedStory.story, metadata: { wordCount: savedStory.wordCount, charactersUsed: savedStory.charactersUsed, rulesReferenced: savedStory.rulesReferenced, source: savedStory.generatorSource, diagnostics } }; }
-function readInputArtifacts(): InputArtifact[] { return readLocalStorageArray(INPUT_ARTIFACTS_STORAGE_KEY).filter(isInputArtifact); }
-function persistInputArtifacts(artifacts: InputArtifact[]) { window.localStorage.setItem(INPUT_ARTIFACTS_STORAGE_KEY, JSON.stringify(artifacts)); }
-function readSavedStories(): SavedStory[] { return readLocalStorageArray(SAVED_STORIES_STORAGE_KEY).filter(isSavedStory); }
-function persistSavedStories(stories: SavedStory[]) { window.localStorage.setItem(SAVED_STORIES_STORAGE_KEY, JSON.stringify(stories)); }
-function readLocalStorageArray(key: string): unknown[] { if (typeof window === "undefined") return []; try { const raw = window.localStorage.getItem(key); const parsed = raw ? JSON.parse(raw) : []; return Array.isArray(parsed) ? parsed : []; } catch { return []; } }
-function isInputArtifact(value: unknown): value is InputArtifact { const candidate = value as Partial<InputArtifact>; return Boolean(candidate && typeof candidate === "object" && candidate.id && isInputArtifactType(candidate.type) && candidate.name && typeof candidate.content === "string" && candidate.createdAt && candidate.updatedAt && typeof candidate.characterCount === "number"); }
-function isInputArtifactType(value: unknown): value is InputArtifactType { return value === "worldBible" || value === "characterProfiles" || value === "storySeed" || value === "storyRules"; }
-function isSavedStory(value: unknown): value is SavedStory { const candidate = value as Partial<SavedStory>; return Boolean(candidate && typeof candidate === "object" && candidate.id && candidate.title && candidate.createdAt && candidate.story); }
 async function copyText(text: string) { await navigator.clipboard.writeText(text); }
 function buildMarkdownExport(savedStory: SavedStory): string { return `# ${savedStory.title}\n\nGenerated date: ${formatDateTime(savedStory.createdAt)}\nWord count: ${savedStory.wordCount.toLocaleString()}\nGenre Preset: ${savedStory.genrePreset}\nNarrative Architecture: ${savedStory.narrativeArchitecture}\nCharacter Arc: ${savedStory.characterArc}\nEnding Type: ${savedStory.endingType}\nLength Target: ${savedStory.lengthTarget}\n\n${savedStory.story}`; }
 function buildSocialTeaser(savedStory: SavedStory): string { return `${savedStory.title}\n\n${truncateText(savedStory.story, 280)}\n\n${savedStory.wordCount.toLocaleString()} words\nGenerated with Story World Engine`; }
 function downloadTextFile(fileName: string, contents: string) { const blob = new Blob([contents], { type: "text/plain;charset=utf-8" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = fileName; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url); }
 function countWords(text: string): number { return text.trim().split(/\s+/).filter(Boolean).length; }
-function createStoryId(story: string): string { return `${Date.now()}-${story.length}`; }
-function createInputArtifactId(type: InputArtifactType, name: string, createdAt: string): string { return `${type}-${createdAt}-${name.length}`.replace(/[^a-zA-Z0-9_-]/g, "-"); }
 function formatWorldTemplateBible(template: WorldTemplate): string { return `# ${template.title}\n\nShort Description: ${template.shortDescription}\n\nCore Rule: ${template.coreRule}\n\nStoryworld:\n${template.fullWorldBibleText}\n\nBest Characters: ${template.bestCharacters}\n\nStory Pressure: ${template.storyPressure}\n\nSensory Palette: ${template.sensoryPalette}`; }
 function formatCharacterArchetypeCard(preset: CharacterArchetypePreset): string { return `## ${preset.name} — ${preset.archetype}\n\nEnneagram: ${preset.enneagram}\nFunction: ${preset.function}\nCore Desire: ${preset.coreDesire}\nCore Fear: ${preset.coreFear}\nBackstory: ${preset.backstory}\nConflict Engine: ${preset.conflictEngine}`; }
 function getCurrentCastEntries(content: string): { name: string; archetype: string }[] { return CHARACTER_ARCHETYPE_PRESETS.filter((preset) => content.includes(`${preset.name} — ${preset.archetype}`)).map((preset) => ({ name: preset.name, archetype: preset.archetype })); }
 function formatArchetypeOption(preset: CharacterArchetypePreset): string { return `${preset.name} — ${preset.archetype.replace(/^The\s+/i, "")}`; }
-function createStoryTitle(story: string): string { const firstLine = story.split(/\n+/).find((line) => line.trim())?.trim() ?? "Generated Story"; const firstSentence = firstLine.split(/[.!?]/)[0]?.trim() || firstLine; return truncateText(firstSentence.replace(/^#+\s*/, ""), 72) || "Generated Story"; }
 function truncateText(text: string, maxLength: number): string { const compact = text.replace(/\s+/g, " ").trim(); return compact.length <= maxLength ? compact : `${compact.slice(0, maxLength).replace(/[\s,.;:]+$/, "")}...`; }
 function slugify(value: string): string { return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "story-world-engine-story"; }
 function formatDateTime(value: string): string { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
