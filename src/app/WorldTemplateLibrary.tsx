@@ -7,6 +7,7 @@ import type { WorldTemplate } from "@/lib/world-templates";
 
 const INPUT_ARTIFACTS_STORAGE_KEY = "story-world-engine:input-artifacts:v1";
 const STORYWORLD_SECTION_TITLE = "Storyworld";
+const LEGACY_WORLD_SECTION_TITLE = "World Bible";
 
 type ApplyMode = "add" | "replace";
 
@@ -30,7 +31,10 @@ export function WorldTemplateLibrary() {
   useEffect(() => {
     const findStoryworldSection = () => {
       const headings = Array.from(document.querySelectorAll("h2"));
-      const heading = headings.find((item) => item.textContent?.trim() === STORYWORLD_SECTION_TITLE);
+      const heading = headings.find((item) => {
+        const text = item.textContent?.trim();
+        return text === STORYWORLD_SECTION_TITLE || text === LEGACY_WORLD_SECTION_TITLE;
+      });
       const section = heading?.closest("section") as HTMLElement | null;
       if (!section) {
         return;
