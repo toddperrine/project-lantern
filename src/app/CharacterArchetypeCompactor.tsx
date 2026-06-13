@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CHARACTER_ARCHETYPE_PRESETS } from "@/lib/character-archetypes";
 import type { CharacterArchetypePreset } from "@/lib/character-archetypes";
@@ -15,19 +15,21 @@ export function CharacterArchetypeCompactor() {
   const [selectedName, setSelectedName] = useState("");
   const [showDetails, setShowDetails] = useState(false);
   const [actionsDisabled, setActionsDisabled] = useState(false);
+  const originalSectionRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const syncActionDisabled = (section: HTMLElement) => {
       const firstAction = section.querySelector("button") as HTMLButtonElement | null;
-      setActionsDisabled(Boolean(firstAction?.disabled));
+      const nextDisabled = Boolean(firstAction?.disabled);
+      setActionsDisabled((current) => (current === nextDisabled ? current : nextDisabled));
     };
 
-    const findOriginalSection = () => {
+    const findOriginalSection = (): HTMLElement | null => {
       const headings = Array.from(document.querySelectorAll("h2"));
       const heading = headings.find((item) => item.textContent?.trim() === ORIGINAL_SECTION_TITLE);
       const section = heading?.closest("section") as HTMLElement | null;
       if (!section || section.dataset.compactedCharacterArchetypes === "true") {
-        return;
+        return null;
       }
 
       section.dataset.originalCharacterArchetypes = "true";
@@ -45,25 +47,42 @@ export function CharacterArchetypeCompactor() {
         section.insertAdjacentElement("afterend", target);
       }
 
-      setOriginalSection(section);
-      setPortalTarget(target);
+      if (originalSectionRef.current !== section) {
+        originalSectionRef.current = section;
+        setOriginalSection(section);
+      }
+      setPortalTarget((current) => (current === target ? current : target));
       syncActionDisabled(section);
+      return section;
     };
 
-    findOriginalSection();
-    const observer = new MutationObserver(() => {
-      findOriginalSection();
-      const section = originalSection ?? (document.querySelector("[data-original-character-archetypes='true']") as HTMLElement | null);
-      if (section?.querySelector("h2")?.textContent?.trim() === ORIGINAL_SECTION_TITLE) {
-        section.style.display = "none";
-        section.setAttribute("aria-hidden", "true");
-        syncActionDisabled(section);
+    let sectionObserver: MutationObserver | null = null;
+    const observeSection = (section: HTMLElement) => {
+      sectionObserver?.disconnect();
+      sectionObserver = new MutationObserver(() => syncActionDisabled(section));
+      sectionObserver.observe(section, { attributes: true, attributeFilter: ["disabled"], subtree: true });
+    };
+
+    const initialSection = findOriginalSection();
+    if (initialSection) {
+      observeSection(initialSection);
+      return () => sectionObserver?.disconnect();
+    }
+
+    const bodyObserver = new MutationObserver(() => {
+      const section = findOriginalSection();
+      if (section) {
+        observeSection(section);
+        bodyObserver.disconnect();
       }
     });
 
-    observer.observe(document.body, { attributes: true, childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [originalSection]);
+    bodyObserver.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      bodyObserver.disconnect();
+      sectionObserver?.disconnect();
+    };
+  }, []);
 
   const selectedPreset = useMemo(
     () => CHARACTER_ARCHETYPE_PRESETS.find((preset) => preset.name === selectedName) ?? null,
