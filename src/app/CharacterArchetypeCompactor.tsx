@@ -219,24 +219,22 @@ function findSectionByTitle(title: string): HTMLElement | null {
 
 function PencilPortrait({ name }: { name: string }) {
   const index = Math.max(0, CHARACTER_ARCHETYPE_PRESETS.findIndex((preset) => preset.name === name));
-  const styles = PORTRAIT_STYLES[index % PORTRAIT_STYLES.length];
+  const portrait = PORTRAIT_STYLES[index % PORTRAIT_STYLES.length];
 
   return (
     <svg
       aria-label={`${name} portrait`}
-      className="h-24 w-20 rounded-md border border-ink/10 bg-white/65"
+      className="h-24 w-20 rounded-md border border-ink/10 bg-white/60"
       role="img"
       viewBox="0 0 80 96"
     >
-      <rect fill="#f6f0e4" height="96" width="80" />
-      <path d={styles.shoulders} fill="none" stroke="#3a3936" strokeLinecap="round" strokeWidth="2" />
-      <path d={styles.neck} fill="none" stroke="#57534d" strokeLinecap="round" strokeWidth="1.6" />
-      <ellipse cx="40" cy="38" fill="#f7f3eb" rx="15" ry="19" stroke="#33312e" strokeWidth="1.8" />
-      <path d={styles.hair} fill="none" stroke="#2f2e2b" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
-      <path d={styles.feature} fill="none" stroke="#5f5b55" strokeLinecap="round" strokeWidth="1.4" />
-      <path d="M32 39 Q35 37 38 39 M43 39 Q46 37 49 39" fill="none" stroke="#33312e" strokeLinecap="round" strokeWidth="1.2" />
-      <path d="M37 49 Q40 51 44 49" fill="none" stroke="#33312e" strokeLinecap="round" strokeWidth="1.2" />
-      <path d={styles.mark} fill="none" stroke="#77716a" strokeLinecap="round" strokeWidth="1" />
+      <g fill="none" stroke="#111111" strokeLinecap="round" strokeLinejoin="round">
+        <path d={portrait.contour} strokeWidth="2" />
+        <path d={portrait.hair} strokeWidth="1.9" />
+        <path d={portrait.face} strokeWidth="1.45" />
+        <path d={portrait.shoulders} strokeWidth="1.8" />
+        <path d={portrait.detail} strokeWidth="1.15" />
+      </g>
     </svg>
   );
 }
@@ -258,14 +256,74 @@ function formatArchetypeOption(preset: CharacterArchetypePreset): string {
 }
 
 const PORTRAIT_STYLES = [
-  { hair: "M26 34 Q29 16 43 18 Q58 21 55 42 M27 32 Q36 25 53 28", feature: "M30 55 Q24 58 21 65 M51 55 Q57 58 60 65", mark: "M24 18 Q28 14 33 15", neck: "M35 56 L34 66 M45 56 L46 66", shoulders: "M18 88 Q26 68 40 68 Q54 68 62 88" },
-  { hair: "M25 36 Q31 18 43 19 Q53 21 57 35 M29 25 Q39 16 54 28", feature: "M25 62 Q40 58 56 62", mark: "M58 18 Q62 20 64 24", neck: "M34 57 L32 67 M46 57 L48 67", shoulders: "M17 88 Q25 70 40 69 Q55 70 63 88" },
-  { hair: "M24 39 Q26 20 39 18 Q56 17 58 39 M24 39 Q41 30 58 39", feature: "M22 58 Q29 52 35 57 M46 57 Q53 52 59 58", mark: "M37 13 L42 9 L47 13", neck: "M35 57 L35 68 M45 57 L45 68", shoulders: "M16 88 Q28 71 40 70 Q52 71 64 88" },
-  { hair: "M25 35 Q30 22 41 21 Q53 22 56 35 M28 28 Q40 34 54 28", feature: "M21 64 Q31 60 39 64 M41 64 Q50 60 59 64", mark: "M18 31 Q22 28 25 31", neck: "M34 56 L33 68 M46 56 L47 68", shoulders: "M15 88 Q24 72 40 70 Q56 72 65 88" },
-  { hair: "M24 36 Q27 19 40 19 Q55 20 57 36 M29 22 Q35 27 31 34 M51 23 Q46 29 51 35", feature: "M23 61 L57 61 M31 56 Q40 59 49 56", mark: "M15 45 Q20 42 24 45", neck: "M35 57 L34 68 M45 57 L46 68", shoulders: "M18 88 Q26 70 40 70 Q54 70 62 88" },
-  { hair: "M26 34 Q31 19 42 20 Q55 22 56 38 M27 34 Q38 20 56 31", feature: "M27 58 Q40 54 53 58 M35 64 Q40 66 46 64", mark: "M60 45 Q65 48 62 53", neck: "M35 56 L35 67 M45 56 L45 67", shoulders: "M17 88 Q27 71 40 70 Q53 71 63 88" },
-  { hair: "M23 37 Q26 18 40 17 Q56 18 59 37 M25 28 Q40 35 57 28", feature: "M20 52 Q30 48 37 53 M43 53 Q50 48 60 52", mark: "M31 16 Q40 9 49 16", neck: "M35 57 L33 68 M45 57 L47 68", shoulders: "M15 88 Q25 69 40 69 Q55 69 65 88" },
-  { hair: "M25 39 Q27 20 39 18 Q54 18 57 39 M25 39 Q32 46 39 38 M57 39 Q50 46 43 38", feature: "M21 60 Q31 55 39 59 M41 59 Q50 55 59 60", mark: "M17 72 Q25 68 32 72", neck: "M35 57 L34 69 M45 57 L46 69", shoulders: "M16 88 Q26 70 40 69 Q54 70 64 88" },
-  { hair: "M24 35 Q29 17 41 17 Q56 20 58 37 M26 34 Q36 28 52 33", feature: "M23 64 Q31 58 38 62 M42 62 Q50 58 57 64", mark: "M20 21 Q24 17 29 19", neck: "M34 56 L32 68 M46 56 L48 68", shoulders: "M16 88 Q25 71 40 70 Q55 71 64 88" },
-  { hair: "M26 34 Q32 20 42 20 Q53 21 56 34 M30 24 L27 37 M50 24 L56 37", feature: "M24 57 Q39 62 56 57 M35 51 Q40 53 45 51", mark: "M58 66 Q63 70 65 76", neck: "M35 56 L35 68 M45 56 L45 68", shoulders: "M15 88 Q25 70 40 69 Q55 70 65 88" }
+  {
+    contour: "M38 19 Q27 21 25 34 Q24 48 32 56 Q39 63 49 58 Q58 52 57 37 Q56 24 45 20 Q41 18 38 19",
+    hair: "M26 34 Q33 20 45 22 Q55 25 56 39 M27 31 Q39 27 53 32",
+    face: "M32 39 Q34 37 36 39 M44 39 Q47 37 49 39 M41 40 Q39 45 40 48 M36 53 Q41 56 47 52",
+    shoulders: "M22 87 Q28 70 40 68 Q52 70 60 87",
+    detail: "M26 58 Q21 65 18 73 M54 58 Q60 65 63 73"
+  },
+  {
+    contour: "M41 18 Q29 19 26 31 Q23 45 29 55 Q35 65 47 61 Q58 57 59 42 Q60 27 50 21 Q46 18 41 18",
+    hair: "M27 33 Q31 22 43 20 Q53 21 58 33 M30 25 Q40 16 54 27",
+    face: "M33 38 Q36 36 38 38 M45 38 Q48 36 50 38 M42 40 Q43 45 40 49 M35 54 Q42 52 50 55",
+    shoulders: "M19 88 Q27 72 40 70 Q54 71 63 88",
+    detail: "M31 60 Q27 65 25 72 M51 60 Q55 66 56 73"
+  },
+  {
+    contour: "M39 17 Q28 19 25 35 Q23 51 34 59 Q44 66 54 56 Q61 49 58 34 Q55 19 43 17 Q41 16 39 17",
+    hair: "M24 38 Q26 22 39 18 Q53 17 58 38 M25 39 Q41 29 58 38",
+    face: "M32 40 Q35 38 37 40 M45 40 Q48 38 50 40 M41 41 Q39 46 42 49 M35 54 Q43 58 50 53",
+    shoulders: "M17 87 Q29 72 40 70 Q52 72 64 87",
+    detail: "M39 13 L42 9 L46 14 M56 55 Q60 60 61 67"
+  },
+  {
+    contour: "M40 20 Q30 20 27 33 Q24 47 30 55 Q37 64 49 60 Q59 56 58 41 Q57 27 48 22 Q44 20 40 20",
+    hair: "M27 34 Q31 23 42 22 Q52 22 57 34 M29 29 Q40 35 54 29",
+    face: "M33 40 Q35 39 37 40 M44 40 Q47 39 49 40 M40 42 Q42 46 39 50 M35 55 Q41 53 47 55",
+    shoulders: "M16 88 Q25 72 40 70 Q55 72 65 88",
+    detail: "M20 34 Q24 31 27 34 M51 58 Q56 62 59 68"
+  },
+  {
+    contour: "M40 18 Q29 20 25 35 Q23 47 30 57 Q37 66 49 61 Q59 57 59 42 Q58 27 48 20 Q44 18 40 18",
+    hair: "M25 36 Q27 20 40 19 Q55 20 58 36 M31 22 Q35 29 31 35 M51 23 Q47 30 52 36",
+    face: "M32 39 Q35 38 37 39 M44 39 Q48 38 50 39 M41 41 Q38 46 40 49 M34 55 L50 55",
+    shoulders: "M19 88 Q27 71 40 70 Q54 71 61 88",
+    detail: "M18 46 Q22 43 25 46 M56 46 Q60 43 63 47"
+  },
+  {
+    contour: "M41 19 Q30 20 27 33 Q25 49 33 57 Q41 64 52 58 Q60 52 57 36 Q54 22 45 20 Q43 19 41 19",
+    hair: "M27 34 Q32 20 43 21 Q55 23 56 38 M28 34 Q39 21 56 31",
+    face: "M33 39 Q36 38 38 39 M45 39 Q48 38 50 39 M42 41 Q41 46 43 49 M36 55 Q42 58 49 54",
+    shoulders: "M18 87 Q28 71 40 70 Q53 71 62 87",
+    detail: "M61 45 Q66 49 62 54 M30 60 Q26 66 24 73"
+  },
+  {
+    contour: "M39 17 Q27 18 24 33 Q22 48 31 57 Q39 65 51 59 Q60 54 59 39 Q57 22 44 18 Q42 17 39 17",
+    hair: "M23 37 Q26 19 40 17 Q56 18 59 37 M25 28 Q41 36 58 28",
+    face: "M31 39 Q34 37 37 39 M45 39 Q49 37 52 39 M41 40 Q40 46 43 49 M35 54 Q42 52 49 54",
+    shoulders: "M15 88 Q25 69 40 69 Q55 69 65 88",
+    detail: "M31 15 Q40 9 50 16 M21 53 Q27 49 35 53"
+  },
+  {
+    contour: "M40 18 Q29 19 25 34 Q22 49 32 58 Q41 66 51 58 Q60 50 57 35 Q54 20 43 18 Q41 17 40 18",
+    hair: "M25 39 Q27 20 39 18 Q54 18 57 39 M25 39 Q32 46 39 38 M57 39 Q50 46 43 38",
+    face: "M32 41 Q35 39 37 41 M44 41 Q47 39 50 41 M41 43 Q39 48 42 51 M36 56 Q42 59 48 55",
+    shoulders: "M16 88 Q26 70 40 69 Q54 70 64 88",
+    detail: "M18 72 Q25 68 32 72 M52 59 Q57 65 58 72"
+  },
+  {
+    contour: "M40 17 Q29 18 25 33 Q22 48 31 58 Q40 67 52 59 Q61 52 58 36 Q55 20 43 18 Q41 17 40 17",
+    hair: "M24 35 Q29 17 41 17 Q56 20 58 37 M26 34 Q36 28 52 33",
+    face: "M32 39 Q35 37 37 39 M45 39 Q48 37 50 39 M41 40 Q38 46 41 50 M34 56 Q42 52 50 57",
+    shoulders: "M16 88 Q25 71 40 70 Q55 71 64 88",
+    detail: "M20 21 Q24 17 29 19 M24 60 Q21 66 20 73"
+  },
+  {
+    contour: "M41 19 Q30 20 27 34 Q25 48 32 57 Q39 65 51 60 Q60 56 58 40 Q56 25 47 21 Q44 19 41 19",
+    hair: "M26 34 Q32 20 42 20 Q53 21 56 34 M30 24 L27 37 M50 24 L56 37",
+    face: "M33 39 Q36 38 38 39 M45 39 Q48 38 50 39 M42 41 Q44 46 41 50 M34 54 Q42 60 51 54",
+    shoulders: "M15 88 Q25 70 40 69 Q55 70 65 88",
+    detail: "M58 66 Q63 70 65 76 M30 58 Q26 63 24 70"
+  }
 ] as const;
