@@ -6,7 +6,7 @@ import { WORLD_TEMPLATES } from "@/lib/world-templates";
 import type { WorldTemplate } from "@/lib/world-templates";
 
 const INPUT_ARTIFACTS_STORAGE_KEY = "story-world-engine:input-artifacts:v1";
-const WORLD_BIBLE_SECTION_TITLE = "World Bible";
+const STORYWORLD_SECTION_TITLE = "Storyworld";
 
 type ApplyMode = "add" | "replace";
 
@@ -18,7 +18,7 @@ type InputArtifact = {
 
 export function WorldTemplateLibrary() {
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-  const [worldBibleSection, setWorldBibleSection] = useState<HTMLElement | null>(null);
+  const [storyworldSection, setStoryworldSection] = useState<HTMLElement | null>(null);
   const [selectedId, setSelectedId] = useState("");
   const [showDetails, setShowDetails] = useState(false);
   const [actionsDisabled, setActionsDisabled] = useState(false);
@@ -28,45 +28,47 @@ export function WorldTemplateLibrary() {
   );
 
   useEffect(() => {
-    const findWorldBibleSection = () => {
+    const findStoryworldSection = () => {
       const headings = Array.from(document.querySelectorAll("h2"));
-      const heading = headings.find((item) => item.textContent?.trim() === WORLD_BIBLE_SECTION_TITLE);
+      const heading = headings.find((item) => item.textContent?.trim() === STORYWORLD_SECTION_TITLE);
       const section = heading?.closest("section") as HTMLElement | null;
       if (!section) {
         return;
       }
 
-      let target = document.getElementById("world-template-library");
+      let target = document.getElementById("storyworld-template-library");
       if (!target) {
-        target = document.createElement("section");
-        target.id = "world-template-library";
-        section.insertAdjacentElement("afterend", target);
+        target = document.createElement("div");
+        target.id = "storyworld-template-library";
+        section.firstElementChild?.insertAdjacentElement("afterend", target);
       }
 
-      setWorldBibleSection(section);
+      setStoryworldSection(section);
       setPortalTarget(target);
       setActionsDisabled(Boolean(section.querySelector("input[type='file']")?.hasAttribute("disabled")));
     };
 
-    findWorldBibleSection();
-    const observer = new MutationObserver(findWorldBibleSection);
-    observer.observe(document.body, { attributes: true, childList: true, subtree: true });
+    findStoryworldSection();
+    if (document.getElementById("storyworld-template-library")) {
+      return;
+    }
+
+    const observer = new MutationObserver(() => {
+      findStoryworldSection();
+      if (document.getElementById("storyworld-template-library")) {
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, []);
 
-  if (!portalTarget || !worldBibleSection) {
+  if (!portalTarget || !storyworldSection) {
     return null;
   }
 
   return createPortal(
-    <section className="rounded-md border border-ink/10 bg-white/70 p-4 shadow-soft">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-ink">World Templates</h2>
-        <p className="text-sm leading-6 text-ink/65">
-          Choose one static world bible template. Only applied templates become generation input.
-        </p>
-      </div>
-
+    <div className="mt-4 rounded-md border border-ink/10 bg-paper/80 p-3">
       <label className="mt-4 flex flex-col gap-2">
         <span className="text-sm font-semibold text-ink">Choose a world template</span>
         <select
@@ -89,7 +91,7 @@ export function WorldTemplateLibrary() {
       {selectedTemplate ? (
         <SelectedWorldPanel
           actionsDisabled={actionsDisabled}
-          onApply={(mode) => applyWorldTemplate(worldBibleSection, selectedTemplate, mode)}
+          onApply={(mode) => applyWorldTemplate(storyworldSection, selectedTemplate, mode)}
           onToggleDetails={() => setShowDetails((value) => !value)}
           showDetails={showDetails}
           template={selectedTemplate}
@@ -99,7 +101,7 @@ export function WorldTemplateLibrary() {
           Select a world to preview its core rule.
         </p>
       )}
-    </section>,
+    </div>,
     portalTarget
   );
 }
@@ -133,7 +135,7 @@ function SelectedWorldPanel({
           onClick={() => onApply("add")}
           type="button"
         >
-          Add to World Bible
+          Add to Storyworld
         </button>
         <button
           className="rounded-md border border-brass/40 bg-white/75 px-3 py-2 text-xs font-semibold text-brass transition hover:border-brass hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50"
@@ -141,7 +143,7 @@ function SelectedWorldPanel({
           onClick={() => onApply("replace")}
           type="button"
         >
-          Replace World Bible
+          Use this Storyworld
         </button>
         <button
           className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper"
@@ -175,7 +177,7 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 
 async function applyWorldTemplate(section: HTMLElement, template: WorldTemplate, mode: ApplyMode) {
   const templateText = formatWorldTemplateBible(template);
-  const existingText = mode === "replace" ? "" : await readCurrentWorldBible(section);
+  const existingText = mode === "replace" ? "" : await readCurrentWorldBible(section, template.id);
   const nextText = existingText.trim() ? `${existingText.trim()}\n\n${templateText}` : templateText;
   const fileName = mode === "replace" ? `${template.id}.md` : `world-bible-with-${template.id}.md`;
   const input = section.querySelector("input[type='file']") as HTMLInputElement | null;
@@ -191,8 +193,10 @@ async function applyWorldTemplate(section: HTMLElement, template: WorldTemplate,
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-async function readCurrentWorldBible(section: HTMLElement): Promise<string> {
-  const selectedLibraryId = (section.querySelector("select") as HTMLSelectElement | null)?.value;
+async function readCurrentWorldBible(section: HTMLElement, selectedTemplateId: string): Promise<string> {
+  const selectedLibraryId = Array.from(section.querySelectorAll("select")).find(
+    (select) => select.value && select.value !== selectedTemplateId
+  )?.value;
   const libraryContent = selectedLibraryId ? readSavedWorldBible(selectedLibraryId) : "";
   if (libraryContent) {
     return libraryContent;
@@ -203,7 +207,8 @@ async function readCurrentWorldBible(section: HTMLElement): Promise<string> {
     return file.text();
   }
 
-  const fileLabel = section.querySelector("label span")?.textContent?.trim();
+  const fileInput = section.querySelector("input[type='file']") as HTMLInputElement | null;
+  const fileLabel = fileInput?.closest("label")?.querySelector("span")?.textContent?.trim();
   if (fileLabel === "world.md") {
     try {
       const response = await fetch("/sample-content/world.md");
@@ -236,7 +241,7 @@ Short Description: ${template.shortDescription}
 
 Core Rule: ${template.coreRule}
 
-World Bible:
+Storyworld:
 ${template.fullWorldBibleText}
 
 Best Characters: ${template.bestCharacters}
