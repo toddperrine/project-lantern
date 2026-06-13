@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   webpack(config) {
     config.module.rules.push({
-      test: /src[\\/]app[\\/]page\.tsx$/,
+      test: /src[\\/]app[\\/](page|CharacterArchetypeCompactor)\.tsx$/,
       enforce: "pre",
       use: [path.join(__dirname, "src/build/page-copy-replacements.cjs")]
     });
