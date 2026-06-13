@@ -8,6 +8,7 @@ import type { CharacterArchetypePreset } from "@/lib/character-archetypes";
 type ApplyMode = "add" | "replace";
 
 const ORIGINAL_SECTION_TITLE = "Character Archetypes";
+const CAST_SECTION_TITLE = "Cast";
 
 export function CharacterArchetypeCompactor() {
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
@@ -40,11 +41,13 @@ export function CharacterArchetypeCompactor() {
         section.setAttribute("aria-hidden", "true");
       }
 
+      const castSection = findSectionByTitle(CAST_SECTION_TITLE);
       let target = document.getElementById("compact-character-archetype-library");
       if (!target) {
-        target = document.createElement("section");
+        target = document.createElement("div");
         target.id = "compact-character-archetype-library";
-        section.insertAdjacentElement("afterend", target);
+        const targetParent = castSection ?? section;
+        targetParent.firstElementChild?.insertAdjacentElement("afterend", target);
       }
 
       if (originalSectionRef.current !== section) {
@@ -94,17 +97,10 @@ export function CharacterArchetypeCompactor() {
   }
 
   return createPortal(
-    <section
-      className="rounded-md border border-ink/10 bg-white/70 p-4 shadow-soft"
+    <div
+      className="mt-4 rounded-md border border-ink/10 bg-paper/80 p-3"
       data-compacted-character-archetypes="true"
     >
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-ink">Character Archetypes</h2>
-        <p className="text-sm leading-6 text-ink/65">
-          Choose one static preset. Only applied archetypes become Character Profiles input.
-        </p>
-      </div>
-
       <label className="mt-4 flex flex-col gap-2">
         <span className="text-sm font-semibold text-ink">Choose a character archetype</span>
         <select
@@ -137,7 +133,7 @@ export function CharacterArchetypeCompactor() {
           Select a character to preview the compact card.
         </p>
       )}
-    </section>,
+    </div>,
     portalTarget
   );
 }
@@ -173,7 +169,7 @@ function SelectedCharacterPanel({
           onClick={() => onApply("add")}
           type="button"
         >
-          Add to Character Profiles
+          Add to Cast
         </button>
         <button
           className="rounded-md border border-brass/40 bg-white/75 px-3 py-2 text-xs font-semibold text-brass transition hover:border-brass hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50"
@@ -181,7 +177,7 @@ function SelectedCharacterPanel({
           onClick={() => onApply("replace")}
           type="button"
         >
-          Replace Character Profiles
+          Replace Cast
         </button>
         <button
           className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper"
@@ -212,6 +208,12 @@ function DetailItem({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 leading-6 text-ink/75">{value}</dd>
     </div>
   );
+}
+
+function findSectionByTitle(title: string): HTMLElement | null {
+  const headings = Array.from(document.querySelectorAll("h2"));
+  const heading = headings.find((item) => item.textContent?.trim() === title);
+  return heading?.closest("section") as HTMLElement | null;
 }
 
 function PencilPortrait({ name }: { name: string }) {
