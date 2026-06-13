@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { CharacterArchetypeCompactor } from "./CharacterArchetypeCompactor";
+import { WorldTemplateLibrary } from "./WorldTemplateLibrary";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,6 +18,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         {children}
+        <WorldTemplateLibrary />
         <CharacterArchetypeCompactor />
       </body>
     </html>
