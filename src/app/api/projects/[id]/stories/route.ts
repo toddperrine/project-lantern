@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   CloudSavedStoryPersistenceError,
   getCloudSavedStoryConfigError,
+  isCloudSavedStoryCanonStatus,
   isCloudSavedStoryRole,
   listCloudSavedStories,
   saveCloudSavedStory,
@@ -62,7 +63,13 @@ function parseCloudSavedStoryInput(body: unknown): CloudSavedStoryInput | null {
   if (value.sequenceNumber !== undefined && (typeof value.sequenceNumber !== "number" || !Number.isFinite(value.sequenceNumber) || value.sequenceNumber <= 0)) return null;
   if (value.sequenceLabel !== undefined && (typeof value.sequenceLabel !== "string" || !value.sequenceLabel.trim())) return null;
   if (value.storyRole !== undefined && !isCloudSavedStoryRole(value.storyRole)) return null;
+  if (value.canonStatus !== undefined && !isCloudSavedStoryCanonStatus(value.canonStatus)) return null;
+  if (value.isFavorite !== undefined && typeof value.isFavorite !== "boolean") return null;
+  if (value.favoriteAt !== undefined && value.favoriteAt !== null && (typeof value.favoriteAt !== "string" || !value.favoriteAt.trim())) return null;
   if (value.continuationOfStoryId !== undefined && (typeof value.continuationOfStoryId !== "string" || !value.continuationOfStoryId.trim())) return null;
+  if (value.branchOfStoryId !== undefined && (typeof value.branchOfStoryId !== "string" || !value.branchOfStoryId.trim())) return null;
+  if (value.lockedSettingsSnapshot !== undefined && value.lockedSettingsSnapshot !== null && (!value.lockedSettingsSnapshot || typeof value.lockedSettingsSnapshot !== "object" || Array.isArray(value.lockedSettingsSnapshot))) return null;
+  if (value.continuationPrompt !== undefined && value.continuationPrompt !== null && (typeof value.continuationPrompt !== "string" || !value.continuationPrompt.trim())) return null;
   if (value.metadata !== undefined && (!value.metadata || typeof value.metadata !== "object" || Array.isArray(value.metadata))) return null;
 
   return {
@@ -73,7 +80,13 @@ function parseCloudSavedStoryInput(body: unknown): CloudSavedStoryInput | null {
     sequenceNumber: value.sequenceNumber,
     sequenceLabel: value.sequenceLabel,
     storyRole: value.storyRole,
-    continuationOfStoryId: value.continuationOfStoryId
+    canonStatus: value.canonStatus,
+    isFavorite: value.isFavorite,
+    favoriteAt: value.favoriteAt,
+    continuationOfStoryId: value.continuationOfStoryId,
+    branchOfStoryId: value.branchOfStoryId,
+    lockedSettingsSnapshot: value.lockedSettingsSnapshot as Record<string, unknown> | null | undefined,
+    continuationPrompt: value.continuationPrompt
   };
 }
 
