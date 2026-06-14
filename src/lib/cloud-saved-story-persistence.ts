@@ -4,6 +4,7 @@ import { createHash, createHmac, randomUUID } from "node:crypto";
 import { getCloudProject } from "./cloud-project-persistence";
 
 export type CloudSavedStoryRole = "origin" | "continuation" | "branch" | "revision" | "memoir-chapter";
+export type CloudSavedStoryCanonStatus = "draft" | "canon" | "alternate" | "archived";
 
 export type CloudSavedStoryRecord = {
   ownerId: string;
@@ -17,7 +18,13 @@ export type CloudSavedStoryRecord = {
   sequenceNumber: number;
   sequenceLabel: string;
   storyRole: CloudSavedStoryRole;
+  canonStatus: CloudSavedStoryCanonStatus;
+  isFavorite: boolean;
+  favoriteAt: string | null;
   continuationOfStoryId?: string;
+  branchOfStoryId?: string;
+  lockedSettingsSnapshot: Record<string, unknown> | null;
+  continuationPrompt: string | null;
 };
 
 export type CloudSavedStoryInput = {
@@ -28,8 +35,50 @@ export type CloudSavedStoryInput = {
   sequenceNumber?: number;
   sequenceLabel?: string;
   storyRole?: CloudSavedStoryRole;
+  canonStatus?: CloudSavedStoryCanonStatus;
+  isFavorite?: boolean;
+  favoriteAt?: string | null;
   continuationOfStoryId?: string;
+  branchOfStoryId?: string;
+  lockedSettingsSnapshot?: Record<string, unknown> | null;
+  continuationPrompt?: string | null;
 };
+
+export type CloudSavedStoryPatchInput = {
+  title?: string;
+  sequenceNumber?: number;
+  sequenceLabel?: string;
+  storyRole?: CloudSavedStoryRole;
+  canonStatus?: CloudSavedStoryCanonStatus;
+  isFavorite?: boolean;
+  favoriteAt?: string | null;
+  continuationOfStoryId?: string | null;
+  branchOfStoryId?: string | null;
+  lockedSettingsSnapshot?: Record<string, unknown> | null;
+  continuationPrompt?: string | null;
+};
+
+type CloudSavedStoryMutableField = keyof CloudSavedStoryPatchInput;
+
+const CLOUD_SAVED_STORY_MUTABLE_FIELDS: CloudSavedStoryMutableField[] = [
+  "title",
+  "sequenceNumber",
+  "sequenceLabel",
+  "storyRole",
+  "canonStatus",
+  "isFavorite",
+  "favoriteAt",
+  "continuationOfStoryId",
+  "branchOfStoryId",
+  "lockedSettingsSnapshot",
+  "continuationPrompt"
+];
+
+const STORY_LINK_FIELDS = ["continuationOfStoryId", "branchOfStoryId"] as const;
+type StoryLinkField = (typeof STORY_LINK_FIELDS)[number];
+
+const DEFAULT_CANON_STATUS: CloudSavedStoryCanonStatus = "draft";
+const DEFAULT_IS_FAVORITE = false;
 
 export type CloudSavedStoryErrorDetails = {
   operation: string;
@@ -90,6 +139,10 @@ export function isCloudSavedStoryRole(value: unknown): value is CloudSavedStoryR
   return value === "origin" || value === "continuation" || value === "branch" || value === "revision" || value === "memoir-chapter";
 }
 
+export function isCloudSavedStoryCanonStatus(value: unknown): value is CloudSavedStoryCanonStatus {
+  return value === "draft" || value === "canon" || value === "alternate" || value === "archived";
+}
+
 export async function listCloudSavedStories(projectId: string): Promise<CloudSavedStoryRecord[] | null> {
   const projectExists = await getCloudProject(projectId);
   if (!projectExists) return null;
@@ -141,7 +194,13 @@ export async function saveCloudSavedStory(projectId: string, input: CloudSavedSt
     sequenceNumber,
     sequenceLabel: input.sequenceLabel?.trim() || `Part ${sequenceNumber}`,
     storyRole: input.storyRole ?? (input.continuationOfStoryId ? "continuation" : "origin"),
-    ...(input.continuationOfStoryId?.trim() ? { continuationOfStoryId: input.continuationOfStoryId.trim() } : {})
+    canonStatus: input.canonStatus ?? DEFAULT_CANON_STATUS,
+    isFavorite: input.isFavorite ?? DEFAULT_IS_FAVORITE,
+    favoriteAt: input.favoriteAt ?? null,
+    lockedSettingsSnapshot: input.lockedSettingsSnapshot ?? null,
+    continuationPrompt: input.continuationPrompt ?? null,
+    ...(input.continuationOfStoryId?.trim() ? { continuationOfStoryId: input.continuationOfStoryId.trim() } : {}),
+    ...(input.branchOfStoryId?.trim() ? { branchOfStoryId: input.branchOfStoryId.trim() } : {})
   };
 
   await dynamoDbRequest(config, "PutItem", {
@@ -150,6 +209,21 @@ export async function saveCloudSavedStory(projectId: string, input: CloudSavedSt
   });
 
   return record;
+}
+
+export async function updateCloudSavedStory(projectId: string, storyId: string, input: CloudSavedStoryPatchInput): Promise<CloudSavedStoryRecord | null> {
+  const existingStory = await getCloudSavedStory(projectId, storyId);
+  if (!existingStory) return null;
+
+  const config = getDynamoDbConfig();
+  const updatedStory = applyStoryPatch(existingStory, input);
+
+  await dynamoDbRequest(config, "PutItem", {
+    TableName: config.tableName,
+    Item: toDynamoDbItem(toCloudSavedStoryItem(updatedStory))
+  });
+
+  return updatedStory;
 }
 
 export async function deleteCloudSavedStory(projectId: string, storyId: string): Promise<void> {
@@ -271,8 +345,54 @@ function itemToCloudSavedStoryRecord(item: DynamoDbItem): CloudSavedStoryRecord 
     sequenceNumber: value.sequenceNumber,
     sequenceLabel: value.sequenceLabel,
     storyRole: value.storyRole,
-    ...(typeof value.continuationOfStoryId === "string" && value.continuationOfStoryId ? { continuationOfStoryId: value.continuationOfStoryId } : {})
+    canonStatus: isCloudSavedStoryCanonStatus(value.canonStatus) ? value.canonStatus : DEFAULT_CANON_STATUS,
+    isFavorite: typeof value.isFavorite === "boolean" ? value.isFavorite : DEFAULT_IS_FAVORITE,
+    favoriteAt: typeof value.favoriteAt === "string" ? value.favoriteAt : null,
+    lockedSettingsSnapshot: isRecord(value.lockedSettingsSnapshot) ? value.lockedSettingsSnapshot : null,
+    continuationPrompt: typeof value.continuationPrompt === "string" ? value.continuationPrompt : null,
+    ...(typeof value.continuationOfStoryId === "string" && value.continuationOfStoryId ? { continuationOfStoryId: value.continuationOfStoryId } : {}),
+    ...(typeof value.branchOfStoryId === "string" && value.branchOfStoryId ? { branchOfStoryId: value.branchOfStoryId } : {})
   };
+}
+
+function applyStoryPatch(story: CloudSavedStoryRecord, input: CloudSavedStoryPatchInput): CloudSavedStoryRecord {
+  const updatedStory: CloudSavedStoryRecord = {
+    ...story,
+    updatedAt: new Date().toISOString()
+  };
+
+  for (const field of CLOUD_SAVED_STORY_MUTABLE_FIELDS) {
+    if (!hasOwn(input, field)) continue;
+    const value = input[field];
+    if (field === "title" && typeof value === "string") updatedStory.title = value.trim();
+    else if (field === "sequenceNumber" && typeof value === "number") updatedStory.sequenceNumber = Math.floor(value);
+    else if (field === "sequenceLabel" && typeof value === "string") updatedStory.sequenceLabel = value.trim();
+    else if (field === "storyRole" && isCloudSavedStoryRole(value)) updatedStory.storyRole = value;
+    else if (field === "canonStatus" && isCloudSavedStoryCanonStatus(value)) updatedStory.canonStatus = value;
+    else if (field === "isFavorite" && typeof value === "boolean") updatedStory.isFavorite = value;
+    else if (field === "favoriteAt" && (typeof value === "string" || value === null)) updatedStory.favoriteAt = value;
+    else if (field === "lockedSettingsSnapshot" && (isRecord(value) || value === null)) updatedStory.lockedSettingsSnapshot = value;
+    else if (field === "continuationPrompt" && (typeof value === "string" || value === null)) updatedStory.continuationPrompt = typeof value === "string" ? value.trim() : null;
+    else if (isStoryLinkField(field)) updateOptionalStoryLink(updatedStory, field, value);
+  }
+
+  return updatedStory;
+}
+
+function updateOptionalStoryLink(story: CloudSavedStoryRecord, field: StoryLinkField, value: unknown) {
+  if (typeof value === "string" && value.trim()) {
+    story[field] = value.trim();
+  } else if (value === null) {
+    delete story[field];
+  }
+}
+
+function isStoryLinkField(value: string): value is StoryLinkField {
+  return STORY_LINK_FIELDS.includes(value as StoryLinkField);
+}
+
+function hasOwn<T extends object>(value: T, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 function compareStorySequence(a: CloudSavedStoryRecord, b: CloudSavedStoryRecord): number {
