@@ -16,6 +16,7 @@ import type { WorldTemplate } from "@/lib/world-templates";
 type SelectOption = { value: string; label: string };
 type BuildInfo = { appVersion: string; buildEnvironment: string; gitBranch: string; commitSha: string; shortCommitSha: string; buildTimestamp: string; vercelUrl: string };
 type CloudProjectSummary = Pick<SavedProject, "id" | "name" | "createdAt" | "updatedAt">;
+type CloudSavedStorySummary = { sequenceNumber?: number };
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
 const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
@@ -351,13 +352,26 @@ export default function Home() {
     setStatusMessage(`${artifact.name} removed from the local library.`);
   }
 
-  function handleSaveStory() {
+  async function handleSaveStory() {
     if (!storyResponse) return;
     const savedStory = createSavedStory(storyResponse);
     const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
     persistSavedStories(nextSavedStories);
     setSavedStories(nextSavedStories);
-    setStatusMessage("Story saved locally in this browser.");
+    if (!selectedCloudProjectId) {
+      setStatusMessage("Story saved locally in this browser.");
+      return;
+    }
+
+    setStatusMessage("Story saved locally in this browser. Saving to cloud stories...");
+    try {
+      await saveStoryToCloudProject(selectedCloudProjectId, savedStory, storyResponse);
+      setStatusMessage("Story saved locally and to cloud stories.");
+      setCloudProjectMessage("Story saved to the active cloud project.");
+    } catch (caughtError) {
+      setStatusMessage("Story saved locally in this browser. Cloud story save failed.");
+      setCloudProjectMessage(`Cloud story save failed: ${formatCaughtError(caughtError)} Local story save still works.`);
+    }
   }
 
   function setUploadForType(type: InputArtifactType, value: UploadState) {
@@ -507,6 +521,9 @@ function MetadataItem({ label, value }: { label: string; value: string }) { retu
 
 async function fetchSampleFile(fileName: string): Promise<string> { const response = await fetch(`/sample-content/${fileName}`); if (!response.ok) throw new Error(`Unable to load sample file: ${fileName}`); return response.text(); }
 async function fetchCloudJson<T>(input: string, init?: RequestInit): Promise<T> { const response = await fetch(input, { ...init, cache: "no-store" }); const payload = await response.json().catch(() => ({})); if (!response.ok) { const message = typeof payload?.error === "string" ? payload.error : "Cloud project request failed."; throw new Error(message); } return payload as T; }
+async function saveStoryToCloudProject(projectId: string, savedStory: SavedStory, response: GenerateStoryResponse): Promise<void> { const sequenceNumber = await getNextCloudStorySequenceNumber(projectId); await fetchCloudJson(`/api/projects/${encodeURIComponent(projectId)}/stories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ story: { storyId: savedStory.id, title: savedStory.title, story: savedStory.story, metadata: buildCloudStoryMetadata(savedStory, response), sequenceNumber, sequenceLabel: `Part ${sequenceNumber}`, storyRole: "origin", canonStatus: "draft", isFavorite: false, favoriteAt: null } }) }); }
+async function getNextCloudStorySequenceNumber(projectId: string): Promise<number> { const payload = await fetchCloudJson<{ stories?: CloudSavedStorySummary[] }>(`/api/projects/${encodeURIComponent(projectId)}/stories`); const stories = Array.isArray(payload.stories) ? payload.stories : []; return stories.reduce((highest, story) => Math.max(highest, typeof story.sequenceNumber === "number" ? story.sequenceNumber : 0), 0) + 1; }
+function buildCloudStoryMetadata(savedStory: SavedStory, response: GenerateStoryResponse): Record<string, unknown> { return { localStoryId: savedStory.id, localCreatedAt: savedStory.createdAt, wordCount: savedStory.wordCount, generatorSource: savedStory.generatorSource, charactersUsed: savedStory.charactersUsed, rulesReferenced: savedStory.rulesReferenced, genrePreset: savedStory.genrePreset, narrativeArchitecture: savedStory.narrativeArchitecture, characterArc: savedStory.characterArc, endingType: savedStory.endingType, lengthTarget: savedStory.lengthTarget, diagnosticsNotice: savedStory.diagnosticsNotice, generationMetadata: response.metadata }; }
 function normalizeGenerateStoryResponse(payload: unknown): GenerateStoryResponse { const normalizedPayload = normalizeStoryPayload(payload) as Partial<GenerateStoryResponse>; const story = normalizeStoryText(normalizedPayload.story); if (!story || !normalizedPayload.metadata) throw new Error("Story generation returned an invalid response."); return { ...normalizedPayload, story, metadata: { ...normalizedPayload.metadata, wordCount: countWords(story) } } as GenerateStoryResponse; }
 async function copyText(text: string) { await navigator.clipboard.writeText(text); }
 function buildMarkdownExport(savedStory: SavedStory): string { return `# ${savedStory.title}\n\nGenerated date: ${formatDateTime(savedStory.createdAt)}\nWord count: ${savedStory.wordCount.toLocaleString()}\nGenre Preset: ${savedStory.genrePreset}\nNarrative Architecture: ${savedStory.narrativeArchitecture}\nCharacter Arc: ${savedStory.characterArc}\nEnding Type: ${savedStory.endingType}\nLength Target: ${savedStory.lengthTarget}\n\n${savedStory.story}`; }
