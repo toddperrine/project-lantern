@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, createHmac } from "node:crypto";
-import type { SavedProject } from "@/lib/project-persistence";
+import type { SavedProject } from "./project-persistence";
 
 export type CloudProjectSummary = Pick<SavedProject, "id" | "name" | "createdAt" | "updatedAt">;
 

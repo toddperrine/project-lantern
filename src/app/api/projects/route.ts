@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCloudProjectConfigError, listCloudProjects, saveCloudProject } from "@/lib/cloud-project-persistence";
-import { isSavedProject } from "@/lib/project-persistence";
+import { isSavedProject } from "../../../lib/project-persistence";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
