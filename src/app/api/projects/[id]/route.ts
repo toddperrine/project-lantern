@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { deleteCloudProject, getCloudProject, getCloudProjectConfigError } from "@/lib/cloud-project-persistence";
+import { CloudProjectPersistenceError, deleteCloudProject, getCloudProject, getCloudProjectConfigError } from "@/lib/cloud-project-persistence";
 
 type RouteContext = { params: { id: string } };
 
@@ -43,5 +43,8 @@ function cloudConfigErrorResponse(missingVariables: string[]) {
 
 function cloudPersistenceErrorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Cloud project persistence request failed.";
+  if (error instanceof CloudProjectPersistenceError) {
+    return NextResponse.json({ error: message, ...error.details }, { status: 502 });
+  }
   return NextResponse.json({ error: message }, { status: 502 });
 }

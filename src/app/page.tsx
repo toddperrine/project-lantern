@@ -15,10 +15,11 @@ import type { WorldTemplate } from "@/lib/world-templates";
 
 type SelectOption = { value: string; label: string };
 type BuildInfo = { appVersion: string; buildEnvironment: string; gitBranch: string; commitSha: string; shortCommitSha: string; buildTimestamp: string; vercelUrl: string };
+type CloudProjectSummary = Pick<SavedProject, "id" | "name" | "createdAt" | "updatedAt">;
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
 const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
-const DEFAULT_BUILD_INFO: BuildInfo = { appVersion: "0.7.2", buildEnvironment: "metadata unavailable", gitBranch: "metadata unavailable", commitSha: "metadata unavailable", shortCommitSha: "metadata unavailable", buildTimestamp: "unknown", vercelUrl: "metadata unavailable" };
+const DEFAULT_BUILD_INFO: BuildInfo = { appVersion: "0.7.3", buildEnvironment: "metadata unavailable", gitBranch: "metadata unavailable", commitSha: "metadata unavailable", shortCommitSha: "metadata unavailable", buildTimestamp: "unknown", vercelUrl: "metadata unavailable" };
 const INPUT_LABELS: Record<InputArtifactType, string> = { worldBible: "Storyworld", characterProfiles: "Cast", storySeed: "Story Spark", storyRules: "Craft Rules" };
 const DEFAULT_STORY_RULES_NOTICE = "Default craft rules are used automatically when this is empty.";
 
@@ -37,12 +38,16 @@ export default function Home() {
   const [inputArtifacts, setInputArtifacts] = useState<InputArtifact[]>([]);
   const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [cloudProjects, setCloudProjects] = useState<CloudProjectSummary[]>([]);
   const [projectName, setProjectName] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedCloudProjectId, setSelectedCloudProjectId] = useState("");
+  const [cloudProjectMessage, setCloudProjectMessage] = useState("");
   const [buildInfo, setBuildInfo] = useState<BuildInfo>(DEFAULT_BUILD_INFO);
   const [statusMessage, setStatusMessage] = useState("");
   const [canNativeShare, setCanNativeShare] = useState(false);
   const [error, setError] = useState("");
+  const [isCloudProjectsLoading, setIsCloudProjectsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingSample, setIsLoadingSample] = useState(false);
   const [generationStartedAt, setGenerationStartedAt] = useState<string | null>(null);
@@ -53,6 +58,7 @@ export default function Home() {
     setSavedStories(readSavedStories());
     setSavedProjects(readSavedProjects());
     setCanNativeShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
+    void handleRefreshCloudProjects();
   }, []);
 
   useEffect(() => {
@@ -169,20 +175,8 @@ export default function Home() {
   }
 
   function handleSaveProject() {
-    const trimmedName = projectName.trim();
-    if (!trimmedName) return setError("Add a project name before saving this workspace.");
-    setError("");
-    const now = new Date().toISOString();
-    const existingProject = savedProjects.find((project) => project.id === selectedProjectId || project.name.toLowerCase() === trimmedName.toLowerCase());
-    const savedProject: SavedProject = {
-      id: existingProject?.id ?? createSavedProjectId(trimmedName, now),
-      name: trimmedName,
-      createdAt: existingProject?.createdAt ?? now,
-      updatedAt: now,
-      inputs: { worldBible, characterProfiles, storySeed, storyRules },
-      selections: { genrePreset, narrativeArchitecture, characterArc, endingType, lengthTarget },
-      latestStory: storyResponse
-    };
+    const savedProject = createCurrentProjectSnapshot();
+    if (!savedProject) return;
     const nextProjects = [savedProject, ...savedProjects.filter((project) => project.id !== savedProject.id)];
     persistSavedProjects(nextProjects);
     setSavedProjects(nextProjects);
@@ -190,11 +184,67 @@ export default function Home() {
     setStatusMessage(`${savedProject.name} saved locally in this browser.`);
   }
 
+  async function handleRefreshCloudProjects() {
+    setIsCloudProjectsLoading(true);
+    try {
+      const payload = await fetchCloudJson<{ projects?: CloudProjectSummary[] }>("/api/projects");
+      setCloudProjects(Array.isArray(payload.projects) ? payload.projects : []);
+      setCloudProjectMessage("");
+    } catch (caughtError) {
+      setCloudProjects([]);
+      setCloudProjectMessage(`Cloud projects unavailable: ${formatCaughtError(caughtError)}`);
+    } finally {
+      setIsCloudProjectsLoading(false);
+    }
+  }
+
+  async function handleSaveCloudProject() {
+    const savedProject = createCurrentProjectSnapshot(cloudProjects.find((project) => project.id === selectedCloudProjectId));
+    if (!savedProject) return;
+    setIsCloudProjectsLoading(true);
+    try {
+      const payload = await fetchCloudJson<{ project?: SavedProject }>("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: savedProject })
+      });
+      const cloudProject = payload.project ?? savedProject;
+      setSelectedCloudProjectId(cloudProject.id);
+      setCloudProjects((currentProjects) => [cloudProject, ...currentProjects.filter((project) => project.id !== cloudProject.id)]);
+      setCloudProjectMessage(`${cloudProject.name} saved to cloud projects.`);
+    } catch (caughtError) {
+      setCloudProjectMessage(`Cloud save failed: ${formatCaughtError(caughtError)} Local project save/load still works.`);
+    } finally {
+      setIsCloudProjectsLoading(false);
+    }
+  }
+
   function handleLoadProject(projectId: string) {
     setSelectedProjectId(projectId);
     if (!projectId) return;
     const project = savedProjects.find((item) => item.id === projectId);
     if (!project) return;
+    applyProjectSnapshot(project);
+    setStatusMessage(`${project.name} loaded from this browser.`);
+  }
+
+  async function handleLoadCloudProject(projectId: string) {
+    setSelectedCloudProjectId(projectId);
+    if (!projectId) return;
+    setIsCloudProjectsLoading(true);
+    try {
+      const payload = await fetchCloudJson<{ project?: SavedProject }>(`/api/projects/${encodeURIComponent(projectId)}`);
+      if (!payload.project) throw new Error("Cloud project response was missing a project.");
+      applyProjectSnapshot(payload.project);
+      setCloudProjectMessage(`${payload.project.name} loaded from cloud projects.`);
+    } catch (caughtError) {
+      setCloudProjectMessage(`Cloud load failed: ${formatCaughtError(caughtError)} Local project save/load still works.`);
+    } finally {
+      setIsCloudProjectsLoading(false);
+    }
+  }
+
+  function applyProjectSnapshot(project: SavedProject) {
     setProjectName(project.name);
     setWorldBible(project.inputs.worldBible);
     setCharacterProfiles(project.inputs.characterProfiles);
@@ -207,7 +257,6 @@ export default function Home() {
     setLengthTarget(project.selections.lengthTarget);
     setRecommendation(null);
     setStoryResponse(project.latestStory);
-    setStatusMessage(`${project.name} loaded from this browser.`);
   }
 
   function handleDeleteProject() {
@@ -220,6 +269,47 @@ export default function Home() {
     setSelectedProjectId("");
     setProjectName("");
     setStatusMessage(`${project.name} deleted from this browser.`);
+  }
+
+  async function handleDeleteCloudProject() {
+    if (!selectedCloudProjectId) {
+      setCloudProjectMessage("Choose a cloud project before deleting.");
+      return;
+    }
+    const project = cloudProjects.find((item) => item.id === selectedCloudProjectId);
+    setIsCloudProjectsLoading(true);
+    try {
+      await fetchCloudJson(`/api/projects/${encodeURIComponent(selectedCloudProjectId)}`, { method: "DELETE" });
+      setCloudProjects((currentProjects) => currentProjects.filter((item) => item.id !== selectedCloudProjectId));
+      setSelectedCloudProjectId("");
+      setCloudProjectMessage(`${project?.name ?? "Cloud project"} deleted from cloud projects.`);
+    } catch (caughtError) {
+      setCloudProjectMessage(`Cloud delete failed: ${formatCaughtError(caughtError)} Local project save/load still works.`);
+    } finally {
+      setIsCloudProjectsLoading(false);
+    }
+  }
+
+  function createCurrentProjectSnapshot(existingProject?: Pick<SavedProject, "id" | "name" | "createdAt">): SavedProject | null {
+    const trimmedName = projectName.trim();
+    if (!trimmedName) {
+      setError("Add a project name before saving this workspace.");
+      return null;
+    }
+    setError("");
+    const now = new Date().toISOString();
+    const matchingLocalProject = savedProjects.find((project) => project.id === selectedProjectId || project.name.toLowerCase() === trimmedName.toLowerCase());
+    const matchingCloudProject = cloudProjects.find((project) => project.id === selectedCloudProjectId || project.name.toLowerCase() === trimmedName.toLowerCase());
+    const matchedProject = existingProject ?? matchingLocalProject ?? matchingCloudProject;
+    return {
+      id: matchedProject?.id ?? createSavedProjectId(trimmedName, now),
+      name: trimmedName,
+      createdAt: matchedProject?.createdAt ?? now,
+      updatedAt: now,
+      inputs: { worldBible, characterProfiles, storySeed, storyRules },
+      selections: { genrePreset, narrativeArchitecture, characterArc, endingType, lengthTarget },
+      latestStory: storyResponse
+    };
   }
 
   function handleSelectInputArtifact(type: InputArtifactType, artifactId: string) {
@@ -294,12 +384,12 @@ export default function Home() {
             <h1 className="mt-2 text-4xl font-semibold tracking-tight text-ink md:text-5xl">Story World Engine</h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-ink/70">Choose a Storyworld, gather a Cast, add a Story Spark, and generate a literary short story that respects your world and characters.</p>
           </div>
-          <div className="flex flex-col gap-2 md:items-end"><BuildBadge buildInfo={buildInfo} /><div className="rounded-md border border-ink/10 bg-white/60 px-4 py-3 text-sm text-ink/70">No authentication, database, payments, AWS, voice, memory, or subscriptions.</div></div>
+          <div className="flex flex-col gap-2 md:items-end"><BuildBadge buildInfo={buildInfo} /><div className="rounded-md border border-ink/10 bg-white/60 px-4 py-3 text-sm text-ink/70">No authentication, payments, voice, memory, or subscriptions.</div></div>
         </header>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
           <section className="flex flex-col gap-4">
             <button className="rounded-md border border-brass/40 bg-white/75 px-5 py-3 text-sm font-semibold text-brass shadow-soft transition hover:border-brass hover:bg-paper disabled:cursor-not-allowed disabled:opacity-60" disabled={isLoadingSample || isGenerating} onClick={handleLoadSampleWorld} type="button">{isLoadingSample ? "Loading sample world..." : "Load Sample World"}</button>
-            <ProjectPanel onDelete={handleDeleteProject} onLoad={handleLoadProject} onNameChange={setProjectName} onSave={handleSaveProject} projectName={projectName} savedProjects={savedProjects} selectedProjectId={selectedProjectId} />
+            <ProjectPanel cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} isCloudLoading={isCloudProjectsLoading} onDelete={handleDeleteProject} onDeleteCloud={handleDeleteCloudProject} onLoad={handleLoadProject} onLoadCloud={handleLoadCloudProject} onNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onSave={handleSaveProject} onSaveCloud={handleSaveCloudProject} projectName={projectName} savedProjects={savedProjects} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} />
             <StoryworldSection disabled={isGenerating} libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "worldBible")} onApplyTemplate={handleApplyWorldTemplate} onChange={setWorldBible} onRemoveFromLibrary={handleRemoveInputArtifact} onSaveToLibrary={handleSaveInputArtifact} onSelectFromLibrary={handleSelectInputArtifact} value={worldBible} />
             <CastSection disabled={isGenerating} libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "characterProfiles")} onApplyArchetype={handleApplyCharacterArchetype} onChange={setCharacterProfiles} onRemoveFromLibrary={handleRemoveInputArtifact} onSaveToLibrary={handleSaveInputArtifact} onSelectFromLibrary={handleSelectInputArtifact} value={characterProfiles} />
             <StorySparkSection libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "storySeed")} onChange={setStorySeed} onRemoveFromLibrary={handleRemoveInputArtifact} onSaveToLibrary={handleSaveInputArtifact} onSelectFromLibrary={handleSelectInputArtifact} value={storySeed} />
@@ -319,8 +409,8 @@ export default function Home() {
   );
 }
 
-function ProjectPanel({ onDelete, onLoad, onNameChange, onSave, projectName, savedProjects, selectedProjectId }: { onDelete: () => void; onLoad: (projectId: string) => void; onNameChange: (name: string) => void; onSave: () => void; projectName: string; savedProjects: SavedProject[]; selectedProjectId: string }) {
-  return <section className="rounded-md border border-brass/20 bg-white/75 p-4 shadow-soft"><SectionHeader title="Project" subtitle="Save or restore this memoir workspace in this browser." /><label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-ink">Project Name</span><input className="rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-brass focus:ring-2 focus:ring-brass/20" onChange={(event) => onNameChange(event.target.value)} placeholder="My memoir project" type="text" value={projectName} /></label><div className="mt-3 flex flex-wrap gap-2"><ActionButton onClick={onSave}>Save Project</ActionButton><SecondaryButton disabled={!selectedProjectId} onClick={onDelete}>Delete Project</SecondaryButton></div><label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-ink">Load Project</span><select className="rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/20" onChange={(event) => onLoad(event.target.value)} value={selectedProjectId}><option value="">Choose a saved project</option>{savedProjects.map((project) => <option key={project.id} value={project.id}>{project.name} - {formatDateTime(project.updatedAt)}</option>)}</select></label><p className="mt-3 text-xs leading-5 text-ink/55">Projects are saved locally in this browser and include the current inputs, selections, and latest generated story.</p></section>;
+function ProjectPanel({ cloudMessage, cloudProjects, isCloudLoading, onDelete, onDeleteCloud, onLoad, onLoadCloud, onNameChange, onRefreshCloud, onSave, onSaveCloud, projectName, savedProjects, selectedCloudProjectId, selectedProjectId }: { cloudMessage: string; cloudProjects: CloudProjectSummary[]; isCloudLoading: boolean; onDelete: () => void; onDeleteCloud: () => void; onLoad: (projectId: string) => void; onLoadCloud: (projectId: string) => void; onNameChange: (name: string) => void; onRefreshCloud: () => void; onSave: () => void; onSaveCloud: () => void; projectName: string; savedProjects: SavedProject[]; selectedCloudProjectId: string; selectedProjectId: string }) {
+  return <section className="rounded-md border border-brass/20 bg-white/75 p-4 shadow-soft"><SectionHeader title="Project" subtitle="Save or restore this memoir workspace." /><label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-ink">Project Name</span><input className="rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-brass focus:ring-2 focus:ring-brass/20" onChange={(event) => onNameChange(event.target.value)} placeholder="My memoir project" type="text" value={projectName} /></label><div className="mt-3 flex flex-wrap gap-2"><ActionButton onClick={onSave}>Save Project</ActionButton><SecondaryButton disabled={!selectedProjectId} onClick={onDelete}>Delete Project</SecondaryButton></div><label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-ink">Load Project</span><select className="rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/20" onChange={(event) => onLoad(event.target.value)} value={selectedProjectId}><option value="">Choose a saved project</option>{savedProjects.map((project) => <option key={project.id} value={project.id}>{project.name} - {formatDateTime(project.updatedAt)}</option>)}</select></label><p className="mt-3 text-xs leading-5 text-ink/55">Local projects stay in this browser and include the current inputs, selections, and latest generated story.</p><div className="mt-4 border-t border-ink/10 pt-4"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><h3 className="text-sm font-semibold text-ink">Cloud Projects</h3><TertiaryButton disabled={isCloudLoading} onClick={onRefreshCloud}>{isCloudLoading ? "Syncing..." : "Refresh"}</TertiaryButton></div><div className="mt-3 flex flex-wrap gap-2"><ActionButton disabled={isCloudLoading} onClick={onSaveCloud}>Save to Cloud</ActionButton><SecondaryButton disabled={isCloudLoading || !selectedCloudProjectId} onClick={onDeleteCloud}>Delete Cloud Project</SecondaryButton></div><label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-ink">Load Cloud Project</span><select className="rounded-md border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brass focus:ring-2 focus:ring-brass/20" disabled={isCloudLoading} onChange={(event) => onLoadCloud(event.target.value)} value={selectedCloudProjectId}><option value="">Choose a cloud project</option>{cloudProjects.map((project) => <option key={project.id} value={project.id}>{project.name} - {formatDateTime(project.updatedAt)}</option>)}</select></label>{cloudMessage ? <p className="mt-3 rounded-md border border-brass/25 bg-paper/80 px-3 py-2 text-xs leading-5 text-ink/65">{cloudMessage}</p> : null}<p className="mt-3 text-xs leading-5 text-ink/55">Cloud uses the server project API. If it is unavailable, local project save/load still works.</p></div></section>;
 }
 
 function StoryworldSection(props: { disabled: boolean; libraryArtifacts: InputArtifact[]; onApplyTemplate: (template: WorldTemplate, mode: "add" | "replace") => void; onChange: (value: UploadState) => void; onRemoveFromLibrary: (type: InputArtifactType, artifactId?: string) => void; onSaveToLibrary: (type: InputArtifactType, value: UploadState) => void; onSelectFromLibrary: (type: InputArtifactType, artifactId: string) => void; value: UploadState }) {
@@ -378,7 +468,7 @@ function UploadControls({ artifactType, libraryArtifacts, onChange, onRemoveFrom
 function SectionHeader({ subtitle, title }: { subtitle: string; title: string }) { return <div className="flex flex-col gap-1"><h2 className="text-lg font-semibold text-ink">{title}</h2><p className="text-sm leading-6 text-ink/65">{subtitle}</p></div>; }
 function ActionButton({ children, disabled, onClick }: { children: string; disabled?: boolean; onClick: () => void }) { return <button className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-paper transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} onClick={onClick} type="button">{children}</button>; }
 function SecondaryButton({ children, disabled, onClick }: { children: string; disabled?: boolean; onClick: () => void }) { return <button className="rounded-md border border-brass/40 bg-white/75 px-3 py-2 text-xs font-semibold text-brass transition hover:border-brass hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} onClick={onClick} type="button">{children}</button>; }
-function TertiaryButton({ children, onClick }: { children: string; onClick: () => void }) { return <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onClick} type="button">{children}</button>; }
+function TertiaryButton({ children, disabled, onClick }: { children: string; disabled?: boolean; onClick: () => void }) { return <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} onClick={onClick} type="button">{children}</button>; }
 function DetailItem({ label, value }: { label: string; value: string }) { return <div className="rounded-md bg-white/65 px-3 py-2"><dt className="text-xs font-semibold uppercase tracking-[0.14em] text-ink/45">{label}</dt><dd className="mt-1 leading-6 text-ink/75">{value}</dd></div>; }
 
 function PencilPortrait({ name }: { name: string }) {
@@ -416,6 +506,7 @@ function OutputButton({ children, onClick }: { children: string; onClick: () => 
 function MetadataItem({ label, value }: { label: string; value: string }) { return <div className="rounded-md bg-paper/80 px-3 py-2"><dt className="text-xs font-semibold uppercase tracking-[0.14em] text-ink/45">{label}</dt><dd className="mt-1 break-words text-sm text-ink">{value}</dd></div>; }
 
 async function fetchSampleFile(fileName: string): Promise<string> { const response = await fetch(`/sample-content/${fileName}`); if (!response.ok) throw new Error(`Unable to load sample file: ${fileName}`); return response.text(); }
+async function fetchCloudJson<T>(input: string, init?: RequestInit): Promise<T> { const response = await fetch(input, { ...init, cache: "no-store" }); const payload = await response.json().catch(() => ({})); if (!response.ok) { const message = typeof payload?.error === "string" ? payload.error : "Cloud project request failed."; throw new Error(message); } return payload as T; }
 function normalizeGenerateStoryResponse(payload: unknown): GenerateStoryResponse { const normalizedPayload = normalizeStoryPayload(payload) as Partial<GenerateStoryResponse>; const story = normalizeStoryText(normalizedPayload.story); if (!story || !normalizedPayload.metadata) throw new Error("Story generation returned an invalid response."); return { ...normalizedPayload, story, metadata: { ...normalizedPayload.metadata, wordCount: countWords(story) } } as GenerateStoryResponse; }
 async function copyText(text: string) { await navigator.clipboard.writeText(text); }
 function buildMarkdownExport(savedStory: SavedStory): string { return `# ${savedStory.title}\n\nGenerated date: ${formatDateTime(savedStory.createdAt)}\nWord count: ${savedStory.wordCount.toLocaleString()}\nGenre Preset: ${savedStory.genrePreset}\nNarrative Architecture: ${savedStory.narrativeArchitecture}\nCharacter Arc: ${savedStory.characterArc}\nEnding Type: ${savedStory.endingType}\nLength Target: ${savedStory.lengthTarget}\n\n${savedStory.story}`; }
@@ -431,6 +522,7 @@ function slugify(value: string): string { return value.toLowerCase().replace(/[^
 function formatDateTime(value: string): string { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
 function formatLibraryVersion(value: string): string { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)).replace(/[^a-zA-Z0-9]+/g, "-").replace(/-+$/g, ""); }
 function formatList(values: string[]): string { return values.length > 0 ? values.join(", ") : "None detected"; }
+function formatCaughtError(caughtError: unknown): string { return caughtError instanceof Error ? caughtError.message : "Cloud project request failed."; }
 function formatDuration(totalSeconds: number): string { const safeSeconds = Math.max(0, Math.floor(totalSeconds)); const minutes = Math.floor(safeSeconds / 60); const seconds = safeSeconds % 60; return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`; }
 function getGenerationStatusMessage(elapsedSeconds: number): string { if (elapsedSeconds >= 120) return "Still working. Longer stories and repair passes may take several minutes."; if (elapsedSeconds >= 60) return "Expanding and checking constraints..."; if (elapsedSeconds >= 30) return "Drafting story..."; if (elapsedSeconds >= 10) return "Building story blueprint..."; return "Preparing story materials..."; }
 function getGenerationProgressPercent(elapsedSeconds: number): number { return Math.min(96, Math.max(8, Math.round((elapsedSeconds / 180) * 100))); }
