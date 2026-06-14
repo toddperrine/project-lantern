@@ -34,6 +34,25 @@ export type SavedStory = {
   endingType: EndingType;
   lengthTarget: string;
   diagnosticsNotice: string | null;
+  feedback?: StoryFeedback[];
+};
+export type StoryFeedbackScore = 1 | 2 | 3 | 4 | 5;
+export type StoryFeedback = {
+  storyId: string;
+  score: StoryFeedbackScore;
+  selectedOptions: string[];
+  comment?: string;
+  createdAt: string;
+  storyMetadata?: {
+    title?: string;
+    wordCount?: number;
+    generatorSource?: GenerateStoryResponse["metadata"]["source"];
+    genrePreset?: GenrePreset;
+    narrativeArchitecture?: NarrativeArchitecture;
+    characterArc?: CharacterArc;
+    endingType?: EndingType;
+    lengthTarget?: string;
+  };
 };
 export type SavedProject = {
   id: string;
@@ -54,11 +73,13 @@ export type SavedProject = {
     lengthTarget: LengthTarget;
   };
   latestStory: GenerateStoryResponse | null;
+  latestStoryFeedback?: StoryFeedback | null;
 };
 
 export const INPUT_ARTIFACTS_STORAGE_KEY = "story-world-engine:input-artifacts:v1";
 export const SAVED_STORIES_STORAGE_KEY = "story-world-engine:saved-stories:v1";
 export const SAVED_PROJECTS_STORAGE_KEY = "story-world-engine:saved-projects:v1";
+export const STORY_FEEDBACK_STORAGE_KEY = "story-world-engine:story-feedback:v1";
 
 export function readInputArtifacts(): InputArtifact[] {
   return readLocalStorageArray(INPUT_ARTIFACTS_STORAGE_KEY).filter(isInputArtifact);
@@ -82,6 +103,14 @@ export function readSavedProjects(): SavedProject[] {
 
 export function persistSavedProjects(projects: SavedProject[]) {
   writeLocalStorageArray(SAVED_PROJECTS_STORAGE_KEY, projects);
+}
+
+export function readStoryFeedback(): StoryFeedback[] {
+  return readLocalStorageArray(STORY_FEEDBACK_STORAGE_KEY).filter(isStoryFeedback);
+}
+
+export function persistStoryFeedback(feedback: StoryFeedback[]) {
+  writeLocalStorageArray(STORY_FEEDBACK_STORAGE_KEY, feedback);
 }
 
 export function readLocalStorageArray(key: string): unknown[] {
@@ -139,10 +168,27 @@ export function isSavedProject(value: unknown): value is SavedProject {
   );
 }
 
-export function createSavedStory(response: GenerateStoryResponse): SavedStory {
+export function isStoryFeedback(value: unknown): value is StoryFeedback {
+  const candidate = value as Partial<StoryFeedback>;
+  return Boolean(
+    candidate &&
+      typeof candidate === "object" &&
+      typeof candidate.storyId === "string" &&
+      isStoryFeedbackScore(candidate.score) &&
+      Array.isArray(candidate.selectedOptions) &&
+      candidate.selectedOptions.every((option) => typeof option === "string") &&
+      typeof candidate.createdAt === "string"
+  );
+}
+
+export function isStoryFeedbackScore(value: unknown): value is StoryFeedbackScore {
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5;
+}
+
+export function createSavedStory(response: GenerateStoryResponse, storyId = createStoryId(response.story), feedback: StoryFeedback[] = []): SavedStory {
   const diagnostics = response.metadata.diagnostics;
   return {
-    id: createStoryId(response.story),
+    id: storyId,
     title: createStoryTitle(response.story),
     createdAt: new Date().toISOString(),
     story: response.story,
@@ -155,7 +201,8 @@ export function createSavedStory(response: GenerateStoryResponse): SavedStory {
     characterArc: diagnostics.characterArc,
     endingType: diagnostics.endingType,
     lengthTarget: diagnostics.lengthTarget,
-    diagnosticsNotice: diagnostics.notice ?? diagnostics.underTargetNotice
+    diagnosticsNotice: diagnostics.notice ?? diagnostics.underTargetNotice,
+    feedback
   };
 }
 
