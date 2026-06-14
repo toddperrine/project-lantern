@@ -4,6 +4,12 @@ import { createHash, createHmac } from "node:crypto";
 import type { SavedProject } from "./project-persistence";
 
 export type CloudProjectSummary = Pick<SavedProject, "id" | "name" | "createdAt" | "updatedAt">;
+export type CloudProjectErrorDetails = {
+  operation: string;
+  awsErrorName: string | null;
+  awsErrorMessage: string;
+  httpStatusCode: number | null;
+};
 
 type DynamoDbItem = Record<string, DynamoDbAttributeValue>;
 type DynamoDbAttributeValue =
@@ -38,6 +44,16 @@ export class CloudProjectConfigError extends Error {
     super(`Missing required AWS project persistence environment variables: ${missingVariables.join(", ")}`);
     this.name = "CloudProjectConfigError";
     this.missingVariables = missingVariables;
+  }
+}
+
+export class CloudProjectPersistenceError extends Error {
+  details: CloudProjectErrorDetails;
+
+  constructor(details: CloudProjectErrorDetails) {
+    super(details.awsErrorMessage || `DynamoDB ${details.operation} request failed.`);
+    this.name = "CloudProjectPersistenceError";
+    this.details = details;
   }
 }
 
@@ -166,11 +182,15 @@ async function dynamoDbRequest<T = unknown>(config: DynamoDbConfig, action: stri
   });
 
   const responseText = await response.text();
-  const parsed = responseText ? JSON.parse(responseText) : {};
+  const parsed = parseJsonResponse(responseText);
 
   if (!response.ok) {
-    const message = typeof parsed?.message === "string" ? parsed.message : `DynamoDB ${action} request failed.`;
-    throw new Error(message);
+    throw new CloudProjectPersistenceError({
+      operation: action,
+      awsErrorName: getAwsErrorName(parsed, response.headers.get("x-amzn-errortype")),
+      awsErrorMessage: getAwsErrorMessage(parsed) ?? `DynamoDB ${action} request failed.`,
+      httpStatusCode: response.status || null
+    });
   }
 
   return parsed as T;
@@ -216,6 +236,32 @@ function fromDynamoDbAttribute(attribute: DynamoDbAttributeValue): unknown {
   if ("NULL" in attribute) return null;
   if ("L" in attribute) return attribute.L.map(fromDynamoDbAttribute);
   return Object.fromEntries(Object.entries(attribute.M).map(([key, value]) => [key, fromDynamoDbAttribute(value)]));
+}
+
+function parseJsonResponse(responseText: string): unknown {
+  if (!responseText) return {};
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    return {};
+  }
+}
+
+function getAwsErrorName(payload: unknown, headerErrorType: string | null): string | null {
+  const payloadErrorType = getStringProperty(payload, "__type") ?? getStringProperty(payload, "code");
+  const rawErrorName = payloadErrorType ?? headerErrorType;
+  if (!rawErrorName) return null;
+  return rawErrorName.split("#").pop()?.split(":")[0] ?? rawErrorName;
+}
+
+function getAwsErrorMessage(payload: unknown): string | null {
+  return getStringProperty(payload, "message") ?? getStringProperty(payload, "Message");
+}
+
+function getStringProperty(payload: unknown, key: string): string | null {
+  if (!payload || typeof payload !== "object" || !(key in payload)) return null;
+  const value = (payload as Record<string, unknown>)[key];
+  return typeof value === "string" && value.trim() ? value : null;
 }
 
 function toAmzDate(date: Date): string {

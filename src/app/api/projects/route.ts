@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCloudProjectConfigError, listCloudProjects, saveCloudProject } from "@/lib/cloud-project-persistence";
+import { CloudProjectPersistenceError, getCloudProjectConfigError, listCloudProjects, saveCloudProject } from "@/lib/cloud-project-persistence";
 import { isSavedProject } from "../../../lib/project-persistence";
 
 export const runtime = "nodejs";
@@ -52,5 +52,8 @@ function cloudConfigErrorResponse(missingVariables: string[]) {
 
 function cloudPersistenceErrorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Cloud project persistence request failed.";
+  if (error instanceof CloudProjectPersistenceError) {
+    return NextResponse.json({ error: message, ...error.details }, { status: 502 });
+  }
   return NextResponse.json({ error: message }, { status: 502 });
 }
