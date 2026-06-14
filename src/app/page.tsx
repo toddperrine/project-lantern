@@ -8,8 +8,8 @@ import type { StoryArchitectureRecommendation } from "@/lib/story-architecture-r
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
 import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture } from "@/lib/types";
-import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
-import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
+import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, persistStoryFeedback, readInputArtifacts, readSavedProjects, readSavedStories, readStoryFeedback, savedStoryToResponse } from "@/lib/project-persistence";
+import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, StoryFeedback, StoryFeedbackScore, UploadState } from "@/lib/project-persistence";
 import { WORLD_TEMPLATES } from "@/lib/world-templates";
 import type { WorldTemplate } from "@/lib/world-templates";
 
@@ -17,12 +17,22 @@ type SelectOption = { value: string; label: string };
 type BuildInfo = { appVersion: string; buildEnvironment: string; gitBranch: string; commitSha: string; shortCommitSha: string; buildTimestamp: string; vercelUrl: string };
 type CloudProjectSummary = Pick<SavedProject, "id" | "name" | "createdAt" | "updatedAt">;
 type CloudSavedStorySummary = { sequenceNumber?: number };
+type FeedbackChoice = { score: StoryFeedbackScore; label: string };
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
 const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
-const DEFAULT_BUILD_INFO: BuildInfo = { appVersion: "0.7.3", buildEnvironment: "metadata unavailable", gitBranch: "metadata unavailable", commitSha: "metadata unavailable", shortCommitSha: "metadata unavailable", buildTimestamp: "unknown", vercelUrl: "metadata unavailable" };
+const DEFAULT_BUILD_INFO: BuildInfo = { appVersion: "0.7.4", buildEnvironment: "metadata unavailable", gitBranch: "metadata unavailable", commitSha: "metadata unavailable", shortCommitSha: "metadata unavailable", buildTimestamp: "unknown", vercelUrl: "metadata unavailable" };
 const INPUT_LABELS: Record<InputArtifactType, string> = { worldBible: "Storyworld", characterProfiles: "Cast", storySeed: "Story Spark", storyRules: "Craft Rules" };
 const DEFAULT_STORY_RULES_NOTICE = "Default craft rules are used automatically when this is empty.";
+const FEEDBACK_CHOICES: FeedbackChoice[] = [
+  { score: 1, label: "Missed" },
+  { score: 2, label: "Not quite" },
+  { score: 3, label: "Good" },
+  { score: 4, label: "Great" },
+  { score: 5, label: "Favorite" }
+];
+const POSITIVE_FEEDBACK_OPTIONS = ["Character", "World / setting", "Plot", "Ending", "Voice / style", "Emotion", "Wonder / surprise", "Pacing", "Age fit", "Length", "Other"];
+const IMPROVEMENT_FEEDBACK_OPTIONS = ["Stronger character", "More interesting world", "Clearer plot", "Better ending", "More emotion", "More wonder / surprise", "Better pacing", "Less confusing", "Better age fit", "Shorter", "Longer", "Different style", "Other"];
 
 export default function Home() {
   const [worldBible, setWorldBible] = useState<UploadState>(EMPTY_UPLOAD);
@@ -36,6 +46,9 @@ export default function Home() {
   const [lengthTarget, setLengthTarget] = useState<LengthTarget>("Standard");
   const [recommendation, setRecommendation] = useState<StoryArchitectureRecommendation | null>(null);
   const [storyResponse, setStoryResponse] = useState<GenerateStoryResponse | null>(null);
+  const [currentStoryId, setCurrentStoryId] = useState("");
+  const [storyFeedback, setStoryFeedback] = useState<StoryFeedback[]>([]);
+  const [isFeedbackDismissed, setIsFeedbackDismissed] = useState(false);
   const [inputArtifacts, setInputArtifacts] = useState<InputArtifact[]>([]);
   const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
@@ -58,6 +71,7 @@ export default function Home() {
     setInputArtifacts(readInputArtifacts());
     setSavedStories(readSavedStories());
     setSavedProjects(readSavedProjects());
+    setStoryFeedback(readStoryFeedback());
     setCanNativeShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
     void handleRefreshCloudProjects();
   }, []);
@@ -89,6 +103,8 @@ export default function Home() {
     setError("");
     setStatusMessage("");
     setStoryResponse(null);
+    setCurrentStoryId("");
+    setIsFeedbackDismissed(false);
     setGenerationStartedAt(startedAt.toISOString());
     setGenerationElapsedSeconds(0);
     setIsGenerating(true);
@@ -105,6 +121,7 @@ export default function Home() {
       const generationDurationSeconds = Math.max(0, Math.round((finishedAt.getTime() - startedAt.getTime()) / 1000));
       const normalizedResponse = normalizeGenerateStoryResponse(payload);
       setStoryResponse({ ...normalizedResponse, metadata: { ...normalizedResponse.metadata, generationStartedAt: startedAt.toISOString(), generationFinishedAt: finishedAt.toISOString(), generationDurationSeconds } });
+      setCurrentStoryId(createStoryId(normalizedResponse.story, finishedAt.toISOString()));
       setGenerationElapsedSeconds(generationDurationSeconds);
     } catch (caughtError) {
       const seconds = Math.max(0, Math.round((Date.now() - startedAt.getTime()) / 1000));
@@ -120,6 +137,8 @@ export default function Home() {
     setStatusMessage("");
     setRecommendation(null);
     setStoryResponse(null);
+    setCurrentStoryId("");
+    setIsFeedbackDismissed(false);
     setIsLoadingSample(true);
     try {
       const [world, characters, seed, generationRules] = await Promise.all([fetchSampleFile("world.md"), fetchSampleFile("characters.md"), fetchSampleFile("story_seed.md"), fetchSampleFile("story_generation_rules.md")]);
@@ -153,6 +172,8 @@ export default function Home() {
     setWorldBible({ name: worldBible.name || "storyworld.md", content: mode === "replace" || !currentWorld ? text : `${currentWorld}\n\n${text}` });
     setRecommendation(null);
     setStoryResponse(null);
+    setCurrentStoryId("");
+    setIsFeedbackDismissed(false);
     setStatusMessage(mode === "replace" ? `${template.title} is now the Storyworld.` : `${template.title} added to Storyworld.`);
   }
 
@@ -162,6 +183,8 @@ export default function Home() {
     setCharacterProfiles({ name: characterProfiles.name || "cast.md", content: mode === "replace" || !currentProfiles ? card : `${currentProfiles}\n\n${card}` });
     setRecommendation(null);
     setStoryResponse(null);
+    setCurrentStoryId("");
+    setIsFeedbackDismissed(false);
     setStatusMessage(mode === "replace" ? `${preset.name} replaced the current Cast.` : `${preset.name} added to Cast.`);
   }
 
@@ -172,6 +195,8 @@ export default function Home() {
     setStoryRules({ ...EMPTY_UPLOAD });
     setRecommendation(null);
     setStoryResponse(null);
+    setCurrentStoryId("");
+    setIsFeedbackDismissed(false);
     setStatusMessage("Current inputs cleared. Saved library items were not changed.");
   }
 
@@ -258,6 +283,8 @@ export default function Home() {
     setLengthTarget(project.selections.lengthTarget);
     setRecommendation(null);
     setStoryResponse(project.latestStory);
+    setCurrentStoryId(project.latestStoryFeedback?.storyId ?? (project.latestStory ? createStoryId(project.latestStory.story, project.updatedAt) : ""));
+    setIsFeedbackDismissed(false);
   }
 
   function handleDeleteProject() {
@@ -309,7 +336,8 @@ export default function Home() {
       updatedAt: now,
       inputs: { worldBible, characterProfiles, storySeed, storyRules },
       selections: { genrePreset, narrativeArchitecture, characterArc, endingType, lengthTarget },
-      latestStory: storyResponse
+      latestStory: storyResponse,
+      latestStoryFeedback: getCurrentFeedback()
     };
   }
 
@@ -320,6 +348,8 @@ export default function Home() {
     setUploadForType(type, { name: artifact.name, content: artifact.content, libraryArtifactId: artifact.id });
     setRecommendation(null);
     setStoryResponse(null);
+    setCurrentStoryId("");
+    setIsFeedbackDismissed(false);
     setStatusMessage(`Loaded ${artifact.name} from the local library.`);
   }
 
@@ -354,7 +384,7 @@ export default function Home() {
 
   async function handleSaveStory() {
     if (!storyResponse) return;
-    const savedStory = createSavedStory(storyResponse);
+    const savedStory = createSavedStory(storyResponse, currentStoryId || createStoryId(storyResponse.story), storyFeedback.filter((feedback) => feedback.storyId === currentStoryId));
     const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
     persistSavedStories(nextSavedStories);
     setSavedStories(nextSavedStories);
@@ -372,6 +402,19 @@ export default function Home() {
       setStatusMessage("Story saved locally in this browser. Cloud story save failed.");
       setCloudProjectMessage(`Cloud story save failed: ${formatCaughtError(caughtError)} Local story save still works.`);
     }
+  }
+
+  function handleSubmitStoryFeedback(feedback: StoryFeedback) {
+    const nextFeedback = [feedback, ...storyFeedback.filter((item) => item.storyId !== feedback.storyId)];
+    persistStoryFeedback(nextFeedback);
+    setStoryFeedback(nextFeedback);
+    setIsFeedbackDismissed(false);
+    setStatusMessage("Story feedback saved locally.");
+  }
+
+  function getCurrentFeedback(): StoryFeedback | null {
+    if (!currentStoryId) return null;
+    return storyFeedback.find((feedback) => feedback.storyId === currentStoryId) ?? null;
   }
 
   function setUploadForType(type: InputArtifactType, value: UploadState) {
@@ -410,13 +453,13 @@ export default function Home() {
             <CraftRulesSection libraryArtifacts={inputArtifacts.filter((artifact) => artifact.type === "storyRules")} onChange={setStoryRules} onRemoveFromLibrary={handleRemoveInputArtifact} onSaveToLibrary={handleSaveInputArtifact} onSelectFromLibrary={handleSelectInputArtifact} value={storyRules} />
             <button className="rounded-md border border-ink/15 bg-white/75 px-5 py-3 text-sm font-semibold text-ink transition hover:bg-paper disabled:cursor-not-allowed disabled:opacity-60" disabled={isGenerating} onClick={handleClearCurrentInputs} type="button">Clear current inputs</button>
             <StoryArchitecturePanel characterArc={characterArc} endingType={endingType} genrePreset={genrePreset} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onApplyRecommendation={handleApplyRecommendation} onRecommend={handleRecommendSettings} recommendation={recommendation} setCharacterArc={setCharacterArc} setEndingType={setEndingType} setGenrePreset={setGenrePreset} setLengthTarget={setLengthTarget} setNarrativeArchitecture={setNarrativeArchitecture} />
-            <SavedStoriesPanel savedStories={savedStories} onDelete={(storyId) => { const next = savedStories.filter((story) => story.id !== storyId); persistSavedStories(next); setSavedStories(next); setStatusMessage("Saved story deleted."); }} onRestore={(story) => { setStoryResponse(savedStoryToResponse(story)); setStatusMessage(`Restored ${story.title}.`); }} />
+            <SavedStoriesPanel savedStories={savedStories} onDelete={(storyId) => { const next = savedStories.filter((story) => story.id !== storyId); persistSavedStories(next); setSavedStories(next); setStatusMessage("Saved story deleted."); }} onRestore={(story) => { setStoryResponse(savedStoryToResponse(story)); setCurrentStoryId(story.id); setIsFeedbackDismissed(false); setStatusMessage(`Restored ${story.title}.`); }} />
             {statusMessage ? <div className="rounded-md border border-brass/25 bg-paper/80 p-3 text-sm text-ink/70">{statusMessage}</div> : null}
             {error ? <div className="rounded-md border border-ember/30 bg-ember/10 p-3 text-sm text-ember">{error}</div> : null}
             <button className="rounded-md bg-ink px-5 py-3 text-sm font-semibold text-paper transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:bg-ink/35" disabled={!canGenerate} onClick={handleGenerate} type="button">{isGenerating ? "Generating story..." : "Generate Story"}</button>
             {!storyRules.content.trim() ? <p className="rounded-md bg-paper/80 px-3 py-2 text-xs leading-5 text-ink/55">{DEFAULT_STORY_RULES_NOTICE}</p> : null}
           </section>
-          <StoryOutput canNativeShare={canNativeShare} generationElapsedSeconds={generationElapsedSeconds} isGenerating={isGenerating} onCopySocialTeaser={() => storyResponse && copyText(buildSocialTeaser(createSavedStory(storyResponse))).then(() => setStatusMessage("Social teaser copied."))} onCopyStory={() => storyResponse && copyText(storyResponse.story).then(() => setStatusMessage("Story copied."))} onDownloadMarkdown={() => storyResponse && downloadTextFile(`${slugify(createSavedStory(storyResponse).title)}.md`, buildMarkdownExport(createSavedStory(storyResponse)))} onDownloadTxt={() => storyResponse && downloadTextFile(`${slugify(createSavedStory(storyResponse).title)}.txt`, storyResponse.story)} onSaveStory={handleSaveStory} onShareStory={() => storyResponse && navigator.share?.({ title: createSavedStory(storyResponse).title, text: buildSocialTeaser(createSavedStory(storyResponse)) })} response={storyResponse} />
+          <StoryOutput canNativeShare={canNativeShare} feedback={getCurrentFeedback()} generationElapsedSeconds={generationElapsedSeconds} isFeedbackDismissed={isFeedbackDismissed} isGenerating={isGenerating} onCopySocialTeaser={() => storyResponse && copyText(buildSocialTeaser(createSavedStory(storyResponse))).then(() => setStatusMessage("Social teaser copied."))} onCopyStory={() => storyResponse && copyText(storyResponse.story).then(() => setStatusMessage("Story copied."))} onDismissFeedback={() => setIsFeedbackDismissed(true)} onDownloadMarkdown={() => storyResponse && downloadTextFile(`${slugify(createSavedStory(storyResponse).title)}.md`, buildMarkdownExport(createSavedStory(storyResponse)))} onDownloadTxt={() => storyResponse && downloadTextFile(`${slugify(createSavedStory(storyResponse).title)}.txt`, storyResponse.story)} onSaveStory={handleSaveStory} onShareStory={() => storyResponse && navigator.share?.({ title: createSavedStory(storyResponse).title, text: buildSocialTeaser(createSavedStory(storyResponse)) })} onSubmitFeedback={handleSubmitStoryFeedback} response={storyResponse} storyId={currentStoryId} />
         </div>
       </section>
     </main>
@@ -508,28 +551,81 @@ function BuildBadge({ buildInfo }: { buildInfo: BuildInfo }) {
   return <div className="rounded-md border border-brass/25 bg-white/75 px-3 py-2 text-xs font-semibold text-ink/65 shadow-soft">Version {buildInfo.appVersion} | {buildInfo.buildEnvironment} | {buildInfo.gitBranch} | {buildInfo.shortCommitSha}{buildInfo.buildTimestamp !== "unknown" ? ` | ${formatBuildTimestamp(buildInfo.buildTimestamp)}` : ""}</div>;
 }
 
-function StoryOutput({ canNativeShare, generationElapsedSeconds, response, isGenerating, onCopySocialTeaser, onCopyStory, onDownloadMarkdown, onDownloadTxt, onSaveStory, onShareStory }: { canNativeShare: boolean; generationElapsedSeconds: number; response: GenerateStoryResponse | null; isGenerating: boolean; onCopySocialTeaser: () => void; onCopyStory: () => void; onDownloadMarkdown: () => void; onDownloadTxt: () => void; onSaveStory: () => void; onShareStory: () => void }) {
+function StoryOutput({ canNativeShare, feedback, generationElapsedSeconds, response, isFeedbackDismissed, isGenerating, onCopySocialTeaser, onCopyStory, onDismissFeedback, onDownloadMarkdown, onDownloadTxt, onSaveStory, onShareStory, onSubmitFeedback, storyId }: { canNativeShare: boolean; feedback: StoryFeedback | null; generationElapsedSeconds: number; response: GenerateStoryResponse | null; isFeedbackDismissed: boolean; isGenerating: boolean; onCopySocialTeaser: () => void; onCopyStory: () => void; onDismissFeedback: () => void; onDownloadMarkdown: () => void; onDownloadTxt: () => void; onSaveStory: () => void; onShareStory: () => void; onSubmitFeedback: (feedback: StoryFeedback) => void; storyId: string }) {
   if (isGenerating) return <section className="min-h-[640px] rounded-md border border-ink/10 bg-white/75 p-6 shadow-soft"><p className="text-sm font-semibold uppercase tracking-[0.2em] text-brass">Generating story...</p><div className="mt-6 rounded-md border border-brass/25 bg-paper/80 p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-2xl font-semibold text-ink">{formatDuration(generationElapsedSeconds)}</h2><p className="mt-2 text-sm leading-6 text-ink/70">{getGenerationStatusMessage(generationElapsedSeconds)}</p></div><div className="size-12 animate-spin rounded-full border-4 border-brass/20 border-t-brass" aria-hidden="true" /></div><div className="mt-5 h-3 overflow-hidden rounded-full bg-ink/10"><div className="h-full rounded-full bg-brass transition-all duration-500" style={{ width: `${getGenerationProgressPercent(generationElapsedSeconds)}%` }} /></div><p className="mt-3 text-xs leading-5 text-ink/55">The request is still running. Blueprint, repair, and expansion passes can take longer for Standard and Long stories.</p>{generationElapsedSeconds > 180 ? <p className="mt-4 rounded-md border border-ember/30 bg-ember/10 p-3 text-sm leading-6 text-ember">This is taking longer than expected. The request may still finish, but if it does not, check Vercel logs or retry with Compact or Standard length.</p> : null}</div></section>;
   if (!response) return <section className="flex min-h-[640px] items-center justify-center rounded-md border border-ink/10 bg-white/60 p-6 text-center shadow-soft"><div><h2 className="text-2xl font-semibold text-ink">Your story will appear here</h2><p className="mt-3 max-w-md text-sm leading-6 text-ink/65">The API uses OpenAI when OPENAI_API_KEY is set, and the local deterministic engine when it is not.</p></div></section>;
   const diagnostics = response.metadata.diagnostics;
-  const metadata = [["Word count", response.metadata.wordCount.toLocaleString()], ["Generator source", response.metadata.source], ["Generation duration", response.metadata.generationDurationSeconds !== undefined ? formatDuration(response.metadata.generationDurationSeconds) : "None"], ["Server duration", response.metadata.serverGenerationDurationSeconds !== undefined ? formatDuration(response.metadata.serverGenerationDurationSeconds) : "None"], ["Characters", formatList(response.metadata.charactersUsed)], ["Rules", formatList(response.metadata.rulesReferenced)], ["App version", response.metadata.appVersion ?? diagnostics.appVersion ?? "unknown"], ["Build environment", response.metadata.buildEnvironment ?? diagnostics.buildEnvironment ?? "development"], ["Git branch", response.metadata.gitBranch ?? diagnostics.gitBranch ?? "local"], ["Commit SHA", shortenCommitSha(response.metadata.commitSha ?? diagnostics.commitSha ?? "unknown")], ["Build timestamp", formatBuildTimestamp(response.metadata.buildTimestamp ?? diagnostics.buildTimestamp ?? "unknown")], ["Genre preset", diagnostics.genrePreset], ["Narrative architecture", diagnostics.narrativeArchitecture], ["Character arc", diagnostics.characterArc], ["Ending type", diagnostics.endingType], ["Length target", diagnostics.lengthTarget], ["Final word count", diagnostics.finalWordCount.toLocaleString()], ["Expansion attempted", formatBoolean(diagnostics.expansionAttempted)], ["Expansion succeeded", formatBoolean(diagnostics.expansionSucceeded)], ["Timed out early", formatBoolean(Boolean(diagnostics.timedOutEarly))], ["Stopped reason", diagnostics.stoppedReason ?? "complete"], ["Remaining forbidden terms", formatList(diagnostics.remainingForbiddenTerms ?? [])], ["Under target notice", diagnostics.underTargetNotice ?? "None"], ["Blueprint generated", formatBoolean(diagnostics.blueprintGenerated)], ["Blueprint scene count", diagnostics.blueprintSceneCount.toLocaleString()], ["Blueprint failed reason", diagnostics.blueprintFailedReason ?? "None"], ["OpenAI Enabled", formatBoolean(diagnostics.openAIEnabled)], ["OPENAI_API_KEY detected", formatBoolean(diagnostics.apiKeyDetected)], ["Model requested", diagnostics.modelRequested], ["OpenAI Attempted", formatBoolean(diagnostics.openAIRequestAttempted)], ["OpenAI Succeeded", formatBoolean(diagnostics.openAIRequestSucceeded)], ["Fallback Reason", diagnostics.fallbackReason ?? "None"], ["Notice", diagnostics.notice ?? "None"]] as const;
-  return <section className="rounded-md border border-ink/10 bg-white/80 p-5 shadow-soft md:p-7"><div className="flex flex-col gap-4 border-b border-ink/10 pb-5"><div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"><div><p className="text-sm font-semibold uppercase tracking-[0.2em] text-brass">Generated Story</p><h2 className="mt-2 text-2xl font-semibold text-ink">{response.metadata.source === "openai" ? "OpenAI-powered draft" : "Fallback local draft"}</h2></div><div className="flex flex-wrap gap-2"><OutputButton onClick={onSaveStory}>Save Story</OutputButton><OutputButton onClick={onCopyStory}>Copy story</OutputButton><OutputButton onClick={onDownloadTxt}>Download .txt</OutputButton><OutputButton onClick={onDownloadMarkdown}>Download .md</OutputButton><OutputButton onClick={onCopySocialTeaser}>Copy social teaser</OutputButton>{canNativeShare ? <OutputButton onClick={onShareStory}>Share</OutputButton> : null}</div></div><dl className="grid gap-2 text-sm text-ink/70 sm:grid-cols-2 lg:grid-cols-3">{metadata.map(([label, value]) => <MetadataItem key={label} label={label} value={value} />)}</dl></div><article className="mt-6 max-w-none whitespace-pre-wrap text-base leading-8 text-ink">{response.story}</article></section>;
+  const metadata = [["Word count", response.metadata.wordCount.toLocaleString()], ["Generator source", response.metadata.source], ["Generation duration", response.metadata.generationDurationSeconds !== undefined ? formatDuration(response.metadata.generationDurationSeconds) : "None"], ["Server duration", response.metadata.serverGenerationDurationSeconds !== undefined ? formatDuration(response.metadata.serverGenerationDurationSeconds) : "None"], ["Feedback saved", feedback ? `${feedback.score} / 5` : "Not yet"], ["Characters", formatList(response.metadata.charactersUsed)], ["Rules", formatList(response.metadata.rulesReferenced)], ["App version", response.metadata.appVersion ?? diagnostics.appVersion ?? "unknown"], ["Build environment", response.metadata.buildEnvironment ?? diagnostics.buildEnvironment ?? "development"], ["Git branch", response.metadata.gitBranch ?? diagnostics.gitBranch ?? "local"], ["Commit SHA", shortenCommitSha(response.metadata.commitSha ?? diagnostics.commitSha ?? "unknown")], ["Build timestamp", formatBuildTimestamp(response.metadata.buildTimestamp ?? diagnostics.buildTimestamp ?? "unknown")], ["Genre preset", diagnostics.genrePreset], ["Narrative architecture", diagnostics.narrativeArchitecture], ["Character arc", diagnostics.characterArc], ["Ending type", diagnostics.endingType], ["Length target", diagnostics.lengthTarget], ["Final word count", diagnostics.finalWordCount.toLocaleString()], ["Expansion attempted", formatBoolean(diagnostics.expansionAttempted)], ["Expansion succeeded", formatBoolean(diagnostics.expansionSucceeded)], ["Timed out early", formatBoolean(Boolean(diagnostics.timedOutEarly))], ["Stopped reason", diagnostics.stoppedReason ?? "complete"], ["Remaining forbidden terms", formatList(diagnostics.remainingForbiddenTerms ?? [])], ["Under target notice", diagnostics.underTargetNotice ?? "None"], ["Blueprint generated", formatBoolean(diagnostics.blueprintGenerated)], ["Blueprint scene count", diagnostics.blueprintSceneCount.toLocaleString()], ["Blueprint failed reason", diagnostics.blueprintFailedReason ?? "None"], ["OpenAI Enabled", formatBoolean(diagnostics.openAIEnabled)], ["OPENAI_API_KEY detected", formatBoolean(diagnostics.apiKeyDetected)], ["Model requested", diagnostics.modelRequested], ["OpenAI Attempted", formatBoolean(diagnostics.openAIRequestAttempted)], ["OpenAI Succeeded", formatBoolean(diagnostics.openAIRequestSucceeded)], ["Fallback Reason", diagnostics.fallbackReason ?? "None"], ["Notice", diagnostics.notice ?? "None"]] as const;
+  return <section className="rounded-md border border-ink/10 bg-white/80 p-5 shadow-soft md:p-7"><div className="flex flex-col gap-4 border-b border-ink/10 pb-5"><div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"><div><p className="text-sm font-semibold uppercase tracking-[0.2em] text-brass">Generated Story</p><h2 className="mt-2 text-2xl font-semibold text-ink">{response.metadata.source === "openai" ? "OpenAI-powered draft" : "Fallback local draft"}</h2></div><div className="flex flex-wrap gap-2"><OutputButton onClick={onSaveStory}>Save Story</OutputButton><OutputButton onClick={onCopyStory}>Copy story</OutputButton><OutputButton onClick={onDownloadTxt}>Download .txt</OutputButton><OutputButton onClick={onDownloadMarkdown}>Download .md</OutputButton><OutputButton onClick={onCopySocialTeaser}>Copy social teaser</OutputButton>{canNativeShare ? <OutputButton onClick={onShareStory}>Share</OutputButton> : null}</div></div><dl className="grid gap-2 text-sm text-ink/70 sm:grid-cols-2 lg:grid-cols-3">{metadata.map(([label, value]) => <MetadataItem key={label} label={label} value={value} />)}</dl></div><article className="mt-6 max-w-none whitespace-pre-wrap text-base leading-8 text-ink">{response.story}</article>{!isFeedbackDismissed ? <StoryFeedbackCard feedback={feedback} response={response} storyId={storyId || createStoryId(response.story)} onDismiss={onDismissFeedback} onSubmit={onSubmitFeedback} /> : null}</section>;
 }
 
 function OutputButton({ children, onClick }: { children: string; onClick: () => void }) { return <button className="rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onClick} type="button">{children}</button>; }
 function MetadataItem({ label, value }: { label: string; value: string }) { return <div className="rounded-md bg-paper/80 px-3 py-2"><dt className="text-xs font-semibold uppercase tracking-[0.14em] text-ink/45">{label}</dt><dd className="mt-1 break-words text-sm text-ink">{value}</dd></div>; }
 
+function StoryFeedbackCard({ feedback, response, storyId, onDismiss, onSubmit }: { feedback: StoryFeedback | null; response: GenerateStoryResponse; storyId: string; onDismiss: () => void; onSubmit: (feedback: StoryFeedback) => void }) {
+  const [score, setScore] = useState<StoryFeedbackScore | null>(feedback?.score ?? null);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>(feedback?.selectedOptions ?? []);
+  const [comment, setComment] = useState(feedback?.comment ?? "");
+  const options = score && score >= 4 ? POSITIVE_FEEDBACK_OPTIONS : IMPROVEMENT_FEEDBACK_OPTIONS;
+  const prompt = score && score >= 4 ? "What worked best? Pick up to 2." : "What could the story have done better? Pick up to 2.";
+
+  useEffect(() => {
+    setScore(feedback?.score ?? null);
+    setSelectedOptions(feedback?.selectedOptions ?? []);
+    setComment(feedback?.comment ?? "");
+  }, [feedback, storyId]);
+
+  function handleScoreChange(nextScore: StoryFeedbackScore) {
+    setScore(nextScore);
+    setSelectedOptions([]);
+  }
+
+  function handleOptionToggle(option: string) {
+    setSelectedOptions((currentOptions) => {
+      if (currentOptions.includes(option)) return currentOptions.filter((item) => item !== option);
+      if (currentOptions.length >= 2) return currentOptions;
+      return [...currentOptions, option];
+    });
+  }
+
+  function handleSubmit() {
+    if (!score) return;
+    const diagnostics = response.metadata.diagnostics;
+    onSubmit({
+      storyId,
+      score,
+      selectedOptions,
+      ...(comment.trim() ? { comment: comment.trim() } : {}),
+      createdAt: new Date().toISOString(),
+      storyMetadata: {
+        title: createStoryTitle(response.story),
+        wordCount: response.metadata.wordCount,
+        generatorSource: response.metadata.source,
+        genrePreset: diagnostics.genrePreset,
+        narrativeArchitecture: diagnostics.narrativeArchitecture,
+        characterArc: diagnostics.characterArc,
+        endingType: diagnostics.endingType,
+        lengthTarget: diagnostics.lengthTarget
+      }
+    });
+  }
+
+  return <section className="mt-6 rounded-md border border-brass/25 bg-paper/85 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-lg font-semibold text-ink">Did this story land?</h3><p className="mt-1 text-sm leading-6 text-ink/65">Optional feedback, saved locally with this story.</p></div><button className="self-start rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper" onClick={onDismiss} type="button">Dismiss</button></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">{FEEDBACK_CHOICES.map((choice) => <button className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${score === choice.score ? "border-brass bg-brass text-white" : "border-ink/15 bg-white/75 text-ink hover:bg-white"}`} key={choice.score} onClick={() => handleScoreChange(choice.score)} type="button"><span className="block text-xs opacity-75">{choice.score}</span>{choice.label}</button>)}</div>{score ? <div className="mt-4"><p className="text-sm font-semibold text-ink">{prompt}</p><div className="mt-3 flex flex-wrap gap-2">{options.map((option) => <button className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${selectedOptions.includes(option) ? "border-brass bg-white text-brass" : "border-ink/15 bg-white/65 text-ink hover:bg-white"} disabled:cursor-not-allowed disabled:opacity-45`} disabled={!selectedOptions.includes(option) && selectedOptions.length >= 2} key={option} onClick={() => handleOptionToggle(option)} type="button">{option}</button>)}</div><label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-ink">Anything else?</span><textarea className="min-h-24 rounded-md border border-ink/15 bg-white px-3 py-2 text-sm leading-6 text-ink outline-none transition placeholder:text-ink/35 focus:border-brass focus:ring-2 focus:ring-brass/20" onChange={(event) => setComment(event.target.value)} placeholder="Optional note" value={comment} /></label><button className="mt-4 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-paper transition hover:bg-ink/90" onClick={handleSubmit} type="button">{feedback ? "Update Feedback" : "Save Feedback"}</button>{feedback ? <p className="mt-3 text-xs leading-5 text-ink/55">Saved {formatDateTime(feedback.createdAt)}</p> : null}</div> : null}</section>;
+}
+
 async function fetchSampleFile(fileName: string): Promise<string> { const response = await fetch(`/sample-content/${fileName}`); if (!response.ok) throw new Error(`Unable to load sample file: ${fileName}`); return response.text(); }
 async function fetchCloudJson<T>(input: string, init?: RequestInit): Promise<T> { const response = await fetch(input, { ...init, cache: "no-store" }); const payload = await response.json().catch(() => ({})); if (!response.ok) { const message = typeof payload?.error === "string" ? payload.error : "Cloud project request failed."; throw new Error(message); } return payload as T; }
 async function saveStoryToCloudProject(projectId: string, savedStory: SavedStory, response: GenerateStoryResponse): Promise<void> { const sequenceNumber = await getNextCloudStorySequenceNumber(projectId); await fetchCloudJson(`/api/projects/${encodeURIComponent(projectId)}/stories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ story: { storyId: savedStory.id, title: savedStory.title, story: savedStory.story, metadata: buildCloudStoryMetadata(savedStory, response), sequenceNumber, sequenceLabel: `Part ${sequenceNumber}`, storyRole: "origin", canonStatus: "draft", isFavorite: false, favoriteAt: null } }) }); }
 async function getNextCloudStorySequenceNumber(projectId: string): Promise<number> { const payload = await fetchCloudJson<{ stories?: CloudSavedStorySummary[] }>(`/api/projects/${encodeURIComponent(projectId)}/stories`); const stories = Array.isArray(payload.stories) ? payload.stories : []; return stories.reduce((highest, story) => Math.max(highest, typeof story.sequenceNumber === "number" ? story.sequenceNumber : 0), 0) + 1; }
-function buildCloudStoryMetadata(savedStory: SavedStory, response: GenerateStoryResponse): Record<string, unknown> { return { localStoryId: savedStory.id, localCreatedAt: savedStory.createdAt, wordCount: savedStory.wordCount, generatorSource: savedStory.generatorSource, charactersUsed: savedStory.charactersUsed, rulesReferenced: savedStory.rulesReferenced, genrePreset: savedStory.genrePreset, narrativeArchitecture: savedStory.narrativeArchitecture, characterArc: savedStory.characterArc, endingType: savedStory.endingType, lengthTarget: savedStory.lengthTarget, diagnosticsNotice: savedStory.diagnosticsNotice, generationMetadata: response.metadata }; }
+function buildCloudStoryMetadata(savedStory: SavedStory, response: GenerateStoryResponse): Record<string, unknown> { return { localStoryId: savedStory.id, localCreatedAt: savedStory.createdAt, wordCount: savedStory.wordCount, generatorSource: savedStory.generatorSource, charactersUsed: savedStory.charactersUsed, rulesReferenced: savedStory.rulesReferenced, genrePreset: savedStory.genrePreset, narrativeArchitecture: savedStory.narrativeArchitecture, characterArc: savedStory.characterArc, endingType: savedStory.endingType, lengthTarget: savedStory.lengthTarget, diagnosticsNotice: savedStory.diagnosticsNotice, feedback: savedStory.feedback ?? [], generationMetadata: response.metadata }; }
 function normalizeGenerateStoryResponse(payload: unknown): GenerateStoryResponse { const normalizedPayload = normalizeStoryPayload(payload) as Partial<GenerateStoryResponse>; const story = normalizeStoryText(normalizedPayload.story); if (!story || !normalizedPayload.metadata) throw new Error("Story generation returned an invalid response."); return { ...normalizedPayload, story, metadata: { ...normalizedPayload.metadata, wordCount: countWords(story) } } as GenerateStoryResponse; }
 async function copyText(text: string) { await navigator.clipboard.writeText(text); }
 function buildMarkdownExport(savedStory: SavedStory): string { return `# ${savedStory.title}\n\nGenerated date: ${formatDateTime(savedStory.createdAt)}\nWord count: ${savedStory.wordCount.toLocaleString()}\nGenre Preset: ${savedStory.genrePreset}\nNarrative Architecture: ${savedStory.narrativeArchitecture}\nCharacter Arc: ${savedStory.characterArc}\nEnding Type: ${savedStory.endingType}\nLength Target: ${savedStory.lengthTarget}\n\n${savedStory.story}`; }
 function buildSocialTeaser(savedStory: SavedStory): string { return `${savedStory.title}\n\n${truncateText(savedStory.story, 280)}\n\n${savedStory.wordCount.toLocaleString()} words\nGenerated with Story World Engine`; }
 function downloadTextFile(fileName: string, contents: string) { const blob = new Blob([contents], { type: "text/plain;charset=utf-8" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = fileName; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url); }
 function countWords(text: string): number { return text.trim().split(/\s+/).filter(Boolean).length; }
+function createStoryId(story: string, createdAt = new Date().toISOString()): string { return `${createdAt}-${story.length}`.replace(/[^a-zA-Z0-9_-]/g, "-"); }
+function createStoryTitle(story: string): string { const firstLine = story.split(/\n+/).find((line) => line.trim())?.trim() ?? "Generated Story"; const firstSentence = firstLine.split(/[.!?]/)[0]?.trim() || firstLine; return truncateText(firstSentence.replace(/^#+\s*/, ""), 72) || "Generated Story"; }
 function formatWorldTemplateBible(template: WorldTemplate): string { return `# ${template.title}\n\nShort Description: ${template.shortDescription}\n\nCore Rule: ${template.coreRule}\n\nStoryworld:\n${template.fullWorldBibleText}\n\nBest Characters: ${template.bestCharacters}\n\nStory Pressure: ${template.storyPressure}\n\nSensory Palette: ${template.sensoryPalette}`; }
 function formatCharacterArchetypeCard(preset: CharacterArchetypePreset): string { return `## ${preset.name} — ${preset.archetype}\n\nEnneagram: ${preset.enneagram}\nFunction: ${preset.function}\nCore Desire: ${preset.coreDesire}\nCore Fear: ${preset.coreFear}\nBackstory: ${preset.backstory}\nConflict Engine: ${preset.conflictEngine}`; }
 function getCurrentCastEntries(content: string): { name: string; archetype: string }[] { return CHARACTER_ARCHETYPE_PRESETS.filter((preset) => content.includes(`${preset.name} — ${preset.archetype}`)).map((preset) => ({ name: preset.name, archetype: preset.archetype })); }
