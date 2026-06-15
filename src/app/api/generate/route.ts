@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getBuildInfo } from "@/lib/build-info";
 import { generateFallbackStory } from "@/lib/fallback-generator";
 import { generateOpenAIStory, getOpenAIDiagnostics, hasOpenAIKey } from "@/lib/openai-generator";
+import { formatStoryCraftGuidance } from "@/lib/story-craft";
 import {
   CHARACTER_ARCS,
   ENDING_TYPES,
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
     worldBible: body.worldBible!.trim(),
     characterProfiles: body.characterProfiles!.trim(),
     storySeed: body.storySeed!.trim(),
-    storyRules: body.storyRules?.trim() || DEFAULT_STORY_RULES,
+    storyRules: buildStoryRules(body.storyRules),
     genrePreset: body.genrePreset!,
     narrativeArchitecture: body.narrativeArchitecture!,
     characterArc: body.characterArc!,
@@ -173,12 +174,17 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
   }
 
   const contextLength =
-    body.worldBible.length + body.characterProfiles.length + body.storySeed.length + (body.storyRules?.length ?? 0);
+    body.worldBible.length + body.characterProfiles.length + body.storySeed.length + (body.storyRules?.length ?? 0) + formatStoryCraftGuidance().length;
   if (contextLength > MAX_CONTEXT_CHARS) {
     return "The uploaded context is too large for this local MVP. Please shorten the files and try again.";
   }
 
   return null;
+}
+
+function buildStoryRules(storyRules: string | undefined): string {
+  const baseRules = storyRules?.trim() || DEFAULT_STORY_RULES;
+  return `${baseRules}\n\n${formatStoryCraftGuidance()}`;
 }
 
 function summarizeOpenAIError(error: unknown): string {
