@@ -68,4 +68,4 @@ The UI should feel like a streaming app, not a writing tool.
 
 One GitHub Issue = one Codex task = one focused draft PR.
 
-Each PR should have a narrow purpose, clear validation notes, and avoid unrelated cleanup.
+Each PR should have a narrow purpose, clear validation notes, and avoid unrelated cleanup. Use GitHub/Vercel Preview checks as the validation path, and do not include local sandbox warnings unless there is a real repo, GitHub, or Vercel blocker.
