@@ -79,27 +79,30 @@ export async function POST(request: Request) {
     return NextResponse.json(withServerGenerationDuration(await generateOpenAIStory(input), generationStartedAt));
   } catch (error) {
     const errorSummary = summarizeOpenAIError(error);
-    const fallbackReason = `OpenAI request failed: ${errorSummary}`;
-    console.error("OpenAI story generation failed; using deterministic fallback.", fallbackReason);
+
+    if (isBlueprintGenerationFailure(errorSummary)) {
+      try {
+        const repairedResponse = await generateOpenAIStory(buildBlueprintRepairRetryInput(input, errorSummary));
+        return NextResponse.json(
+          withServerGenerationDuration(
+            withBlueprintRepairSuccessDiagnostics(repairedResponse, errorSummary),
+            generationStartedAt
+          )
+        );
+      } catch (repairError) {
+        const repairSummary = summarizeOpenAIError(repairError);
+        return NextResponse.json(
+          withServerGenerationDuration(
+            buildOpenAIFallbackResponse(input, `OpenAI request failed: ${errorSummary}. Blueprint repair retry failed: ${repairSummary}`, `${errorSummary}; repair retry: ${repairSummary}`),
+            generationStartedAt
+          )
+        );
+      }
+    }
+
     return NextResponse.json(
       withServerGenerationDuration(
-        generateFallbackStory(
-          input,
-          getOpenAIDiagnostics({
-            openAIRequestAttempted: true,
-            fallbackReason,
-            genrePreset: input.genrePreset,
-            narrativeArchitecture: input.narrativeArchitecture,
-            characterArc: input.characterArc,
-            endingType: input.endingType,
-            lengthTarget: formatLengthTarget(input.lengthTarget),
-            timedOutEarly: false,
-            stoppedReason: "openai-error",
-            blueprintGenerated: false,
-            blueprintSceneCount: 0,
-            blueprintFailedReason: errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null
-          })
-        ),
+        buildOpenAIFallbackResponse(input, `OpenAI request failed: ${errorSummary}`, errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null),
         generationStartedAt
       )
     );
@@ -138,6 +141,53 @@ function withServerGenerationDuration(
       }
     }
   };
+}
+
+function buildOpenAIFallbackResponse(input: GenerateStoryRequest, fallbackReason: string, blueprintFailedReason: string | null): GenerateStoryResponse {
+  console.error("OpenAI story generation failed; using deterministic fallback.", fallbackReason);
+  return generateFallbackStory(
+    input,
+    getOpenAIDiagnostics({
+      openAIRequestAttempted: true,
+      fallbackReason,
+      genrePreset: input.genrePreset,
+      narrativeArchitecture: input.narrativeArchitecture,
+      characterArc: input.characterArc,
+      endingType: input.endingType,
+      lengthTarget: formatLengthTarget(input.lengthTarget),
+      timedOutEarly: false,
+      stoppedReason: "openai-error",
+      blueprintGenerated: false,
+      blueprintSceneCount: 0,
+      blueprintFailedReason
+    })
+  );
+}
+
+function withBlueprintRepairSuccessDiagnostics(response: GenerateStoryResponse, originalBlueprintFailure: string): GenerateStoryResponse {
+  const notice = `Blueprint repair retry succeeded after initial blueprint failure: ${originalBlueprintFailure}`;
+  return {
+    ...response,
+    metadata: {
+      ...response.metadata,
+      diagnostics: {
+        ...response.metadata.diagnostics,
+        notice,
+        blueprintFailedReason: originalBlueprintFailure
+      }
+    }
+  };
+}
+
+function buildBlueprintRepairRetryInput(input: GenerateStoryRequest, previousError: string): GenerateStoryRequest {
+  return {
+    ...input,
+    storyRules: `${input.storyRules}\n\nBlueprint repair retry instructions:\nThe previous OpenAI blueprint failed validation: ${previousError}\nReturn a corrected blueprint before drafting the story. Preserve the original Story Spark, world, cast, genre, narrative architecture, character arc, ending type, length target, and premise requirements. For ${formatLengthTarget(input.lengthTarget)}, the blueprint must include the required number of complete sceneBeats. Every sceneBeat must include location, activeCharacters, concreteAction, newInformation, conflictOrObstacle, irreversibleTurn, consequence, sensoryAnchor, characterPressure, characterStake, and materialConsequence. Do not reduce, summarize, or omit required beats.`
+  };
+}
+
+function isBlueprintGenerationFailure(errorSummary: string): boolean {
+  return errorSummary.startsWith("Blueprint generation failed");
 }
 
 function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
