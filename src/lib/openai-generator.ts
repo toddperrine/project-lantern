@@ -174,6 +174,7 @@ export function getExpansionModel(): string {
 
 export function getOpenAIDiagnostics(overrides: Partial<StoryDiagnostics> = {}): StoryDiagnostics {
   const apiKeyDetected = hasOpenAIKey();
+  const defaultLengthSpec = getLengthTargetSpec("Standard");
 
   return {
     openAIEnabled: apiKeyDetected,
@@ -191,6 +192,8 @@ export function getOpenAIDiagnostics(overrides: Partial<StoryDiagnostics> = {}):
     characterArc: "Positive Change Arc",
     endingType: "Resolution with Residue",
     lengthTarget: formatLengthTarget("Standard"),
+    targetMinimumWordCount: defaultLengthSpec.minWords,
+    targetMaximumWordCount: defaultLengthSpec.maxWords,
     finalWordCount: 0,
     expansionAttempted: false,
     expansionSucceeded: false,
@@ -315,7 +318,7 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
 
   const underTargetNotice =
     wordCount < lengthSpec.minWords
-      ? `Final story is below the selected ${formatLengthTarget(input.lengthTarget)} target after ${expansionAttemptsCount} expansion attempts.`
+      ? `Final story is below the selected ${formatLengthTarget(input.lengthTarget)} target. Target minimum: ${lengthSpec.minWords} words. Final word count: ${wordCount}. Expansion attempts: ${expansionAttemptsCount}. Stopped reason: ${stoppedReason}.`
       : null;
   const ruleSources = `${input.worldBible}\n\n${input.storyRules || DEFAULT_NARRATIVE_RULES}`;
   const rulesReferenced = cleanRulesReferenced(
@@ -339,6 +342,8 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
         characterArc: input.characterArc,
         endingType: input.endingType,
         lengthTarget: formatLengthTarget(input.lengthTarget),
+        targetMinimumWordCount: lengthSpec.minWords,
+        targetMaximumWordCount: lengthSpec.maxWords,
         finalWordCount: wordCount,
         expansionAttempted: expansionAttemptsCount > 0,
         expansionSucceeded,
@@ -533,6 +538,7 @@ Planning requirements:
 - Characters may disagree, but they must not speak only as philosophical positions.
 - The finalImageOrAction must be visible and concrete, such as a sign changing, a lyric appearing on a physical surface, an unplugged amp humming, a setlist rewriting itself, a door opening to the wrong street, a character leaving or keeping a specific object, or a repeated gesture changing meaning.
 - Use third-person limited point of view through the pointOfViewCharacter.
+- Avoid abstract engine-like story terms such as "protocol" unless the story defines them in-world through concrete action, objects, and consequences.
 - If the materials mention technical meta concepts, translate them into story-world phenomena such as ${STORY_WORLD_TRANSLATIONS.join(", ")}.
 
 GENRE PRESET
@@ -575,6 +581,7 @@ function buildStoryPrompt(
   const lengthSpec = getLengthTargetSpec(input.lengthTarget);
   const narrativeRules = input.storyRules.trim() || DEFAULT_NARRATIVE_RULES;
   const forbiddenRule = buildForbiddenLanguageRule(disallowedTerms);
+  const beatWordBudgetInstruction = buildBeatWordBudgetInstruction(input, blueprint, lengthSpec);
 
   return `Write the final story from this private blueprint. The blueprint is a hidden planning object. Do not summarize it, quote it, display it, or mention it.
 
@@ -583,6 +590,7 @@ Length requirements:
 - Maximum: ${lengthSpec.maxWords} words.
 - Selected target: ${formatLengthTarget(input.lengthTarget)}.
 - The blueprint has ${blueprint.sceneBeats.length} beats; dramatize every beat as a distinct lived scene or scene movement.
+${beatWordBudgetInstruction}
 
 Final story requirements:
 - Treat PREMISE REQUIREMENTS as non-negotiable story obligations. Fulfill every one on the page through concrete scene action.
@@ -600,6 +608,7 @@ Final story requirements:
 - Use third-person limited point of view through ${blueprint.pointOfViewCharacter}.
 - Preserve character consistency, world rules, and local narrative rules.
 - For this length target, a valid blueprint has ${beatRange.min}-${beatRange.max} beats; treat all ${blueprint.sceneBeats.length} provided beats as mandatory.
+- Avoid abstract engine-like story terms such as "protocol" unless the story defines them in-world through concrete action, objects, and consequences.
 ${forbiddenRule}
 - If source concepts resemble forbidden language, translate them into story-world phenomena: ${STORY_WORLD_TRANSLATIONS.join(", ")}.
 
@@ -632,21 +641,28 @@ function buildExpansionPrompt(
 ): string {
   const lengthSpec = getLengthTargetSpec(input.lengthTarget);
   const forbiddenRule = buildForbiddenLanguageRule(disallowedTerms);
+  const currentWordCount = countWords(story);
+  const beatWordBudgetInstruction = buildBeatWordBudgetInstruction(input, blueprint, lengthSpec);
 
   return `Rewrite and expand the draft into a complete story that satisfies the selected ${lengthSpec.minWords}-${lengthSpec.maxWords} word target. This is expansion attempt ${attempt} of ${maxAttempts}.
 
-Compare the draft against the private blueprint and PREMISE REQUIREMENTS. Expand missing or compressed premise details, scenes, consequences, costs, revelations, character pressure, sensory anchors, and the changed world state. Do not merely add more dialogue, atmosphere, reflection, or debate.
+The current draft is under target: it has ${currentWordCount} words, while the target minimum is ${lengthSpec.minWords} words. Rewrite the whole story so the final story is at least ${lengthSpec.minWords} words and remains no more than ${lengthSpec.maxWords} words.
+${beatWordBudgetInstruction}
+
+Compare the draft against the private blueprint and PREMISE REQUIREMENTS. Expand missing or compressed premise details, scene action, sensory detail, character stakes, consequences, transitions, aftermath, costs, revelations, character pressure, sensory anchors, and the changed world state. Do not add filler, summary padding, meta commentary, generic atmosphere, abstract reflection, philosophical padding, or debate that does not change what characters do.
 
 Hard requirements:
 - Fulfill every PREMISE REQUIREMENT through concrete scene action; do not quote or restate the Story Request as exposition.
-- Dramatize every blueprint scene beat in order.
+- Dramatize every blueprint scene beat in order as a substantial scene or scene movement.
+- Preserve all premiseRequirements, scene beats, character consistency, world rules, final decision, final image/action, changed world state, plot, characters, scene structure, selected length target, and explicit premise requirements.
 - Do not summarize the blueprint.
 - Do not use section labels, headings, outline language, ---, or "Earlier that evening" as a retelling device.
 - Do not make philosophical debate the main action; convert abstract claims into behavior, objects, damage, movement, and choices.
 - Reveal mystery through action, clues, behavior, sensory detail, and consequence.
 - Include the protagonistPersonalStake, antagonistOrOpposingForceStake, concreteIrreversibleCost, final decision, finalImageOrAction, and changed world state.
+- Add connective tissue where the draft jumps: arrival, discovery, reaction, choice, consequence, transition, and aftermath should be visible on the page.
 - The final paragraph must end on a concrete visible image or action from finalImageOrAction, not a summary of theme, hope, freedom, change, or uncertainty.
-- Preserve the plot, characters, scene structure, selected length target, and explicit premise requirements.
+- Avoid abstract engine-like story terms such as "protocol" unless the story defines them in-world through concrete action, objects, and consequences.
 ${forbiddenRule}
 
 PREMISE REQUIREMENTS JSON
@@ -668,9 +684,9 @@ function buildForbiddenRepairPrompt(
   const lengthSpec = getLengthTargetSpec(input.lengthTarget);
   return `Rewrite the story to remove these forbidden terms: ${foundTerms.join(", ")}.
 
-Preserve plot, characters, scene order, every premise requirement, every blueprint beat, concrete cost, final decision, changed world state, and the selected ${lengthSpec.minWords}-${lengthSpec.maxWords} word target. Replace forbidden meta language with concrete story-world phenomena such as ${STORY_WORLD_TRANSLATIONS.join(", ")}.
+Preserve plot, characters, scene order, every premise requirement, every blueprint beat, concrete cost, final decision, final image/action, changed world state, and the selected ${lengthSpec.minWords}-${lengthSpec.maxWords} word target. Replace forbidden meta language with concrete story-world phenomena such as ${STORY_WORLD_TRANSLATIONS.join(", ")}.
 
-Do not use section labels, headings, outline language, ---, or "Earlier that evening" as a retelling device. Do not quote, paraphrase, or restate the Story Request as exposition. Return only valid JSON with story, charactersUsed, and rulesReferenced.
+Do not use section labels, headings, outline language, ---, or "Earlier that evening" as a retelling device. Do not quote, paraphrase, or restate the Story Request as exposition. Avoid abstract engine-like story terms such as "protocol" unless the story defines them in-world through concrete action, objects, and consequences. Return only valid JSON with story, charactersUsed, and rulesReferenced.
 
 PREMISE REQUIREMENTS JSON
 ${formatPremiseRequirementsForPrompt(blueprint.premiseRequirements)}
@@ -765,6 +781,20 @@ function formatPremiseRequirementsForPrompt(requirements: string[]): string {
   return JSON.stringify(requirements, null, 2);
 }
 
+function buildBeatWordBudgetInstruction(
+  input: GenerateStoryRequest,
+  blueprint: StoryBlueprint,
+  lengthSpec: (typeof LENGTH_TARGETS)[number]
+): string {
+  if (input.lengthTarget !== "Long") {
+    return "";
+  }
+
+  const minimumPerBeat = Math.max(280, Math.floor(lengthSpec.minWords / blueprint.sceneBeats.length));
+  const maximumPerBeat = Math.max(minimumPerBeat + 120, Math.ceil(lengthSpec.maxWords / blueprint.sceneBeats.length));
+  return `- Long target word budget: aim for roughly ${minimumPerBeat}-${maximumPerBeat} words per blueprint beat on average. Opening, climax, and aftermath may run longer, but every beat must become substantial scene action rather than summary.`;
+}
+
 function parseStoryPayload(rawText: string): OpenAIStoryPayload {
   const payload = normalizeStoryPayload(rawText);
   const story = normalizeStoryText(payload.story ?? rawText);
@@ -810,7 +840,11 @@ function getBlueprintBeatRange(lengthTarget: LengthTarget): { min: number; max: 
 }
 
 function getMaxExpansionAttempts(lengthTarget: LengthTarget): number {
-  if (lengthTarget === "Standard" || lengthTarget === "Long") {
+  if (lengthTarget === "Long") {
+    return 3;
+  }
+
+  if (lengthTarget === "Standard") {
     return 2;
   }
 
