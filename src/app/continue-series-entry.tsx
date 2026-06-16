@@ -13,7 +13,7 @@ type SavedStorySnapshot = {
 };
 
 const SAVED_STORIES_STORAGE_KEY = "story-world-engine:saved-stories:v1";
-const CONTINUE_BUTTON_MARKER = "story-world-engine-continue-series";
+const CONTINUE_BUTTON_ATTRIBUTE = "data-story-world-engine-continue-series";
 const CONTINUATION_NOTICE_ID = "story-world-engine-continuation-notice";
 
 export function ContinueSeriesEntry() {
@@ -52,7 +52,7 @@ function attachSavedStoryActions(savedStories: SavedStorySnapshot[]) {
 
   const articles = Array.from(savedStoriesSection.querySelectorAll("article"));
   articles.forEach((article) => {
-    if (article.querySelector(`[data-${CONTINUE_BUTTON_MARKER}]`)) return;
+    if (article.querySelector(`[${CONTINUE_BUTTON_ATTRIBUTE}]`)) return;
     const title = article.querySelector("h3")?.textContent?.trim();
     const savedStory = savedStories.find((story) => story.title === title);
     if (!savedStory?.story) return;
@@ -64,7 +64,7 @@ function attachSavedStoryActions(savedStories: SavedStorySnapshot[]) {
 
 function attachGeneratedStoryAction(savedStories: SavedStorySnapshot[]) {
   const generatedStorySection = findSectionByEyebrow("Generated Story");
-  if (!generatedStorySection || generatedStorySection.querySelector(`[data-${CONTINUE_BUTTON_MARKER}]`)) return;
+  if (!generatedStorySection || generatedStorySection.querySelector(`[${CONTINUE_BUTTON_ATTRIBUTE}]`)) return;
 
   const storyText = generatedStorySection.querySelector("article")?.textContent?.trim();
   if (!storyText) return;
@@ -81,7 +81,7 @@ function createContinueButton(story: SavedStorySnapshot): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
   button.textContent = "Continue Series";
-  button.dataset[CONTINUE_BUTTON_MARKER] = "true";
+  button.setAttribute(CONTINUE_BUTTON_ATTRIBUTE, "true");
   button.className = "rounded-md border border-brass/40 bg-white/75 px-3 py-2 text-xs font-semibold text-brass transition hover:border-brass hover:bg-paper";
   button.addEventListener("click", () => prepareContinuation(story));
   return button;
