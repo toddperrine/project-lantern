@@ -84,6 +84,8 @@ export type StoryDiagnostics = {
   characterArc: CharacterArc;
   endingType: EndingType;
   lengthTarget: string;
+  targetMinimumWordCount?: number;
+  targetMaximumWordCount?: number;
   finalWordCount: number;
   expansionAttempted: boolean;
   expansionSucceeded: boolean;
