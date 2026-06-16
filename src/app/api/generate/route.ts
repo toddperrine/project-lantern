@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getBuildInfo } from "@/lib/build-info";
 import { generateFallbackStory } from "@/lib/fallback-generator";
-import { generateOpenAIStory, getOpenAIDiagnostics, hasOpenAIKey } from "@/lib/openai-generator";
+import { generateOpenAIStoryWithLongFloor } from "@/lib/long-floor-generator";
+import { getOpenAIDiagnostics, hasOpenAIKey } from "@/lib/openai-generator";
 import { formatStoryCraftGuidance } from "@/lib/story-craft";
 import {
   CHARACTER_ARCS,
@@ -76,13 +77,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    return NextResponse.json(withServerGenerationDuration(await generateOpenAIStory(input), generationStartedAt));
+    return NextResponse.json(withServerGenerationDuration(await generateOpenAIStoryWithLongFloor(input), generationStartedAt));
   } catch (error) {
     const errorSummary = summarizeOpenAIError(error);
 
     if (isBlueprintGenerationFailure(errorSummary)) {
       try {
-        const repairedResponse = await generateOpenAIStory(buildBlueprintRepairRetryInput(input, errorSummary));
+        const repairedResponse = await generateOpenAIStoryWithLongFloor(buildBlueprintRepairRetryInput(input, errorSummary));
         return NextResponse.json(
           withServerGenerationDuration(
             withBlueprintRepairSuccessDiagnostics(repairedResponse, errorSummary),
