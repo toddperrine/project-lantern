@@ -104,4 +104,9 @@ export type StoryDiagnostics = {
   blueprintGenerated: boolean;
   blueprintSceneCount: number;
   blueprintFailedReason: string | null;
+  initialBlueprintCompleteBeatCount?: number;
+  repairBlueprintCompleteBeatCount?: number;
+  partialBeatNormalizationUsed?: boolean;
+  missingBeatRepairAttempted?: boolean;
+  finalAcceptedBlueprintSceneCount?: number;
 };
