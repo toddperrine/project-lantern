@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { ContinueSeriesEntry } from "./continue-series-entry";
+import { ProjectLanternShell } from "./project-lantern-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Story World Engine",
-  description: "Generate canon-aware short stories from a local storyworld, cast, and story spark."
+  title: "Project Lantern",
+  description: "A personalized streaming home for Living Series, Episodes, and story worlds."
 };
 
 export default function RootLayout({
@@ -16,7 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {children}
+        <ProjectLanternShell>{children}</ProjectLanternShell>
         <ContinueSeriesEntry />
       </body>
     </html>
