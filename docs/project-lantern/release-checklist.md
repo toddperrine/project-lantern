@@ -42,8 +42,10 @@ Check that the release does not make any step harder to find, harder to understa
 - The work produced one focused draft PR.
 - The PR summary explains the product intent.
 - Validation notes identify Vercel/GitHub checks as the validation path.
+- Validation notes do not list unattempted local checks as failed, skipped, unavailable, or blocked.
 - Local filesystem execution, localhost testing, and local dev-server validation were not attempted unless explicitly requested.
 - Local sandbox or tooling availability was not treated as a task blocker.
+- Local sandbox warnings appear only when there is a real repo, GitHub, or Vercel blocker, or when explicitly requested local validation exposed a blocker.
 - Unrelated cleanup was avoided.
 
 ## Documentation Review

@@ -33,6 +33,7 @@ Do not bundle unrelated fixes, refactors, visual changes, config changes, or cle
 - Do not block tasks because local sandbox or tooling is unavailable.
 - Make focused changes, open one draft PR, and rely on GitHub/Vercel Preview checks as the validation path.
 - In PR validation notes, say Vercel/GitHub checks are the validation path.
+- Do not describe unattempted local checks as failed, skipped, unavailable, or blocked.
 - Avoid repeating local sandbox warnings unless there is a real repo, GitHub, or Vercel blocker.
 
 ## Default Constraints
@@ -56,6 +57,7 @@ For documentation-only tasks:
 - Do not change package files, lockfiles, configuration, or source code.
 - Validate by reviewing the rendered markdown intent and checking that only the intended files changed.
 - Use GitHub/Vercel Preview checks as the standard validation path when a PR is opened.
+- Do not add local sandbox or local execution caveats to validation notes unless the task explicitly requested local validation and that requested validation exposed a real blocker.
 
 ## PR Expectations
 

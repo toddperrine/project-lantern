@@ -20,4 +20,4 @@ Use the GitHub/Codex cloud PR workflow for repo changes. Do not attempt local fi
 
 Do not block tasks because local sandbox or tooling is unavailable. Make focused changes, open one draft PR, and rely on GitHub/Vercel Preview checks as the validation path.
 
-In PR validation notes, state that Vercel/GitHub checks are the validation path. Avoid repeating local sandbox warnings unless there is a real repo, GitHub, or Vercel blocker.
+In PR validation notes, state that Vercel/GitHub checks are the validation path. Do not list unattempted local checks as failed, skipped, or unavailable. Avoid repeating local sandbox warnings unless there is a real repo, GitHub, or Vercel blocker.
