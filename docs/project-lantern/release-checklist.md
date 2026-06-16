@@ -41,7 +41,9 @@ Check that the release does not make any step harder to find, harder to understa
 - One GitHub Issue mapped to one Codex task.
 - The work produced one focused draft PR.
 - The PR summary explains the product intent.
-- Validation notes are included.
+- Validation notes identify Vercel/GitHub checks as the validation path.
+- Local filesystem execution, localhost testing, and local dev-server validation were not attempted unless explicitly requested.
+- Local sandbox or tooling availability was not treated as a task blocker.
 - Unrelated cleanup was avoided.
 
 ## Documentation Review
