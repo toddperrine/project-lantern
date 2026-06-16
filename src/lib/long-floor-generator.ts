@@ -11,7 +11,7 @@ export async function generateOpenAIStoryWithLongFloor(input: GenerateStoryReque
   const response = await generateOpenAIStory(input);
 
   if (!shouldAttemptLongFloor(input, response)) {
-    return response;
+    return input.lengthTarget === "Long" ? withLongFloorNotAttemptedDiagnostics(response) : response;
   }
 
   return applyLongFloorPass(input, response);
@@ -24,6 +24,24 @@ function shouldAttemptLongFloor(input: GenerateStoryRequest, response: GenerateS
     countWords(response.story) < LONG_FLOOR_MIN_WORDS &&
     response.metadata.diagnostics.stoppedReason !== "time-budget"
   );
+}
+
+function withLongFloorNotAttemptedDiagnostics(response: GenerateStoryResponse): GenerateStoryResponse {
+  const finalWordCount = countWords(response.story);
+  return {
+    ...response,
+    metadata: {
+      ...response.metadata,
+      diagnostics: {
+        ...response.metadata.diagnostics,
+        longFloorPassAttempted: false,
+        longFloorPassSucceeded: finalWordCount >= LONG_FLOOR_MIN_WORDS,
+        longFloorPassFinalWordCount: finalWordCount,
+        longFloorPassTargetMinimumWordCount: LONG_FLOOR_MIN_WORDS,
+        targetMinimumWordCount: response.metadata.diagnostics.targetMinimumWordCount ?? LONG_FLOOR_MIN_WORDS
+      }
+    }
+  };
 }
 
 async function applyLongFloorPass(
