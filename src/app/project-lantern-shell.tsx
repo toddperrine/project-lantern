@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 
 const NAV_ITEMS = ["Home", "Your Series", "Create", "Discover", "Library"];
 
-const CONTINUE_SERIES = [
-  { title: "The Saltwind Door", detail: "Episode 3 ready from your last Story Spark", tone: "Cinematic mystery" },
-  { title: "Lanterns Under Mercy Street", detail: "A saved cast is waiting for the next turn", tone: "Warm suspense" },
-  { title: "The Orchard That Remembers", detail: "Continue from the changed world state", tone: "Mythic quiet" }
+const FEATURED_LIVING_SERIES = [
+  { title: "The Saltwind Door", detail: "Episode ideas shaped by a coastal mystery Story Spark", tone: "Cinematic mystery" },
+  { title: "Lanterns Under Mercy Street", detail: "A saved cast and warm suspense premise to explore", tone: "Warm suspense" },
+  { title: "The Orchard That Remembers", detail: "A changed world state with room for another Episode", tone: "Mythic quiet" }
 ];
 
 const NEW_EPISODES = [
@@ -46,7 +46,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
           <div className="p-6 md:p-8">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-lantern-gold">Now Playing</p>
             <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight text-primary-light md:text-6xl">Start a Living Series that remembers the world you made.</h2>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-muted-dark">Create an Episode from a Storyworld, favorite cast, and Story Spark. Continue Series when a saved episode is ready for its next chapter.</p>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-muted-dark">Create an Episode from a Storyworld, favorite cast, and Story Spark. Saved Episodes can become the foundation for future series tools as Project Lantern grows.</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#create-episode">Start a Living Series</a>
               <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#create-episode">Create an Episode</a>
@@ -57,12 +57,12 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
             <h3 className="mt-3 text-2xl font-semibold text-primary-light">Personal story worlds, ready to stream.</h3>
             <div className="mt-5 grid gap-3 text-sm text-muted-dark">
               <p className="rounded-md border border-tide-teal/35 bg-tide-teal/10 px-3 py-2">Living Series are built from your saved Storyworlds and Episodes.</p>
-              <p className="rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-3 py-2">Continue Series prepares the next Story Spark while the original episode stays untouched.</p>
+              <p className="rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-3 py-2">Future Episode tools can use saved story context while the original Episode stays untouched.</p>
             </div>
           </aside>
         </section>
 
-        <StreamingRow title="Continue Your Series" items={CONTINUE_SERIES} />
+        <StreamingRow title="Featured Living Series" items={FEATURED_LIVING_SERIES} />
         <StreamingRow title="New Episodes for You" items={NEW_EPISODES} accent="teal" />
 
         <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
