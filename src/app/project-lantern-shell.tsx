@@ -20,7 +20,7 @@ const STORY_SPARKS = ["A map changes only when no one looks", "An old radio spea
 export function ProjectLanternShell({ children }: { children: ReactNode }) {
   return (
     <div className="project-lantern-shell min-h-screen bg-night-ink text-primary-light">
-      <header className="sticky top-0 z-20 border-b border-warm-paper/10 bg-night-ink/92 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-warm-paper/10 bg-night-ink/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-lantern-gold">Project Lantern</p>
@@ -57,7 +57,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
             <h3 className="mt-3 text-2xl font-semibold text-primary-light">Personal story worlds, ready to stream.</h3>
             <div className="mt-5 grid gap-3 text-sm text-muted-dark">
               <p className="rounded-md border border-tide-teal/35 bg-tide-teal/10 px-3 py-2">Living Series are built from your saved Storyworlds and Episodes.</p>
-              <p className="rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-3 py-2">Use Continue Series to prepare Story Spark context without overwriting the original.</p>
+              <p className="rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-3 py-2">Continue Series prepares the next Story Spark while the original episode stays untouched.</p>
             </div>
           </aside>
         </section>
@@ -90,7 +90,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
           <div className="border-b border-primary-dark/10 px-5 py-5 md:px-7">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aged-brass">Create</p>
             <h2 className="mt-2 text-3xl font-semibold text-primary-dark">Create an Episode</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-light">The existing generation controls are here: choose a Storyworld, Cast, Story Spark, craft settings, saved stories, persistence, exports, diagnostics, and Continue Series.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-light">Choose the world, cast, and spark for the next installment.</p>
           </div>
           {children}
         </section>
@@ -105,7 +105,7 @@ function StreamingRow({ accent = "gold", items, title }: { accent?: "gold" | "te
     <section>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-primary-light">{title}</h2>
-        <span className={`rounded-md px-2 py-1 text-xs font-semibold ${badgeClass}`}>Episode row</span>
+        <span className={`rounded-md px-2 py-1 text-xs font-semibold ${badgeClass}`}>For you</span>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         {items.map((item) => (
