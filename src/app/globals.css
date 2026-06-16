@@ -3,19 +3,24 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(187, 90, 60, 0.12), transparent 36rem),
-    linear-gradient(135deg, #fffaf2 0%, #f3ebdc 100%);
-  color: #171412;
+    radial-gradient(circle at top left, rgba(217, 164, 65, 0.12), transparent 34rem),
+    radial-gradient(circle at 85% 10%, rgba(47, 143, 139, 0.12), transparent 28rem),
+    linear-gradient(135deg, #0B1020 0%, #111827 58%, #0B1020 100%);
+  color: #F6EFE2;
 }
 
 button,
@@ -25,5 +30,39 @@ textarea {
 }
 
 ::selection {
-  background: rgba(155, 107, 47, 0.24);
+  background: rgba(217, 164, 65, 0.32);
+}
+
+.project-lantern-workspace main {
+  min-height: auto;
+  padding: 1.25rem;
+}
+
+.project-lantern-workspace main > section {
+  max-width: none;
+}
+
+.project-lantern-workspace main > section > header {
+  display: none;
+}
+
+.project-lantern-workspace main > section > div {
+  align-items: start;
+}
+
+.project-lantern-workspace section[class*="bg-white"],
+.project-lantern-workspace article[class*="bg-white"] {
+  background-color: rgba(255, 248, 234, 0.84);
+}
+
+.project-lantern-workspace textarea,
+.project-lantern-workspace input,
+.project-lantern-workspace select {
+  background-color: #FFF8EA;
+}
+
+@media (min-width: 768px) {
+  .project-lantern-workspace main {
+    padding: 1.75rem;
+  }
 }
