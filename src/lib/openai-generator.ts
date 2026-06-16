@@ -54,6 +54,22 @@ type BlueprintSceneBeat = {
 type BlueprintRequestResult = {
   blueprint: StoryBlueprint;
   repairAttemptsCount: number;
+  initialBlueprintCompleteBeatCount?: number;
+  repairBlueprintCompleteBeatCount?: number;
+  partialBeatNormalizationUsed: boolean;
+  missingBeatRepairAttempted: boolean;
+  finalAcceptedBlueprintSceneCount: number;
+};
+
+type BlueprintParseResult = {
+  blueprint: StoryBlueprint;
+  completeBeatCount: number;
+  partialBeatNormalizationUsed: boolean;
+};
+
+type NormalizedBeatResult = {
+  beat: BlueprintSceneBeat | null;
+  normalizationUsed: boolean;
 };
 
 type ForbiddenRepairResult = {
@@ -69,6 +85,7 @@ const DEFAULT_STORY_MODEL = "gpt-4.1";
 const DEFAULT_EXPANSION_MODEL = "gpt-4.1";
 const OPTIONAL_CALL_TIME_BUDGET_MS = 240_000;
 const MAX_FORBIDDEN_REPAIR_ATTEMPTS = 1;
+const LONG_BLUEPRINT_TARGET_BEATS = 10;
 const POV = "Third-person limited";
 const DEFAULT_NARRATIVE_RULES = `Every story must obey these rules:
 1. Begin in-scene with concrete action, setting, or dialogue.
@@ -206,6 +223,11 @@ export function getOpenAIDiagnostics(overrides: Partial<StoryDiagnostics> = {}):
     blueprintGenerated: false,
     blueprintSceneCount: 0,
     blueprintFailedReason: null,
+    initialBlueprintCompleteBeatCount: undefined,
+    repairBlueprintCompleteBeatCount: undefined,
+    partialBeatNormalizationUsed: false,
+    missingBeatRepairAttempted: false,
+    finalAcceptedBlueprintSceneCount: undefined,
     ...overrides
   };
 }
@@ -219,11 +241,12 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
   const disallowedTerms = getDisallowedForbiddenTerms(input.storyRules);
   let repairAttemptsCount = 0;
   let blueprint: StoryBlueprint;
+  let blueprintResult: BlueprintRequestResult;
   let stoppedReason: StoryDiagnostics["stoppedReason"] = "complete";
   let remainingForbiddenTerms: string[] = [];
 
   try {
-    const blueprintResult = await requestBlueprint(client, input, blueprintRange);
+    blueprintResult = await requestBlueprint(client, input, blueprintRange);
     blueprint = blueprintResult.blueprint;
     repairAttemptsCount += blueprintResult.repairAttemptsCount;
   } catch (error) {
@@ -320,6 +343,7 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
     wordCount < lengthSpec.minWords
       ? `Final story is below the selected ${formatLengthTarget(input.lengthTarget)} target. Target minimum: ${lengthSpec.minWords} words. Final word count: ${wordCount}. Expansion attempts: ${expansionAttemptsCount}. Stopped reason: ${stoppedReason}.`
       : null;
+  const blueprintNotice = buildBlueprintDiagnosticsNotice(blueprintResult);
   const ruleSources = `${input.worldBible}\n\n${input.storyRules || DEFAULT_NARRATIVE_RULES}`;
   const rulesReferenced = cleanRulesReferenced(
     normalizeList(payload.rulesReferenced, inferRulesReferenced(story, ruleSources)),
@@ -336,7 +360,7 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
       diagnostics: getOpenAIDiagnostics({
         openAIRequestAttempted: true,
         openAIRequestSucceeded: true,
-        notice: underTargetNotice,
+        notice: [underTargetNotice, blueprintNotice].filter(Boolean).join(" ") || null,
         genrePreset: input.genrePreset,
         narrativeArchitecture: input.narrativeArchitecture,
         characterArc: input.characterArc,
@@ -355,7 +379,12 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
         underTargetNotice,
         blueprintGenerated: true,
         blueprintSceneCount: blueprint.sceneBeats.length,
-        blueprintFailedReason: null
+        blueprintFailedReason: null,
+        initialBlueprintCompleteBeatCount: blueprintResult.initialBlueprintCompleteBeatCount,
+        repairBlueprintCompleteBeatCount: blueprintResult.repairBlueprintCompleteBeatCount,
+        partialBeatNormalizationUsed: blueprintResult.partialBeatNormalizationUsed,
+        missingBeatRepairAttempted: blueprintResult.missingBeatRepairAttempted,
+        finalAcceptedBlueprintSceneCount: blueprintResult.finalAcceptedBlueprintSceneCount
       })
     }
   };
@@ -368,6 +397,10 @@ async function requestBlueprint(
 ): Promise<BlueprintRequestResult> {
   let repairAttemptsCount = 0;
   let lastError = "Blueprint generation did not return a usable plan.";
+  let initialBlueprintCompleteBeatCount: number | undefined;
+  let repairBlueprintCompleteBeatCount: number | undefined;
+  let partialBeatNormalizationUsed = false;
+  let bestPartial: BlueprintParseResult | null = null;
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const response = await client.chat.completions.create({
@@ -389,15 +422,102 @@ async function requestBlueprint(
     });
 
     try {
-      const blueprint = parseBlueprint(response.choices[0]?.message.content ?? "", beatRange);
-      return { blueprint, repairAttemptsCount };
+      const parseResult = parseBlueprint(response.choices[0]?.message.content ?? "", beatRange, { allowPartial: true });
+      if (attempt === 0) {
+        initialBlueprintCompleteBeatCount = parseResult.completeBeatCount;
+      } else {
+        repairBlueprintCompleteBeatCount = parseResult.completeBeatCount;
+      }
+      partialBeatNormalizationUsed = partialBeatNormalizationUsed || parseResult.partialBeatNormalizationUsed;
+      if (!bestPartial || parseResult.completeBeatCount > bestPartial.completeBeatCount) {
+        bestPartial = parseResult;
+      }
+      if (parseResult.completeBeatCount >= beatRange.min) {
+        return {
+          blueprint: trimBlueprintBeats(parseResult.blueprint, beatRange.max),
+          repairAttemptsCount,
+          initialBlueprintCompleteBeatCount,
+          repairBlueprintCompleteBeatCount,
+          partialBeatNormalizationUsed,
+          missingBeatRepairAttempted: false,
+          finalAcceptedBlueprintSceneCount: Math.min(parseResult.completeBeatCount, beatRange.max)
+        };
+      }
+      lastError = `Blueprint included ${parseResult.completeBeatCount} usable scene beats; ${beatRange.min}-${beatRange.max} are required.`;
+      repairAttemptsCount += 1;
     } catch (error) {
       lastError = summarizeError(error);
       repairAttemptsCount += 1;
     }
   }
 
-  throw new Error(lastError);
+  if (input.lengthTarget === "Long" && bestPartial && bestPartial.completeBeatCount > 0 && bestPartial.completeBeatCount < beatRange.min) {
+    const missingBeatCount = LONG_BLUEPRINT_TARGET_BEATS - bestPartial.completeBeatCount;
+    if (missingBeatCount > 0) {
+      try {
+        const repairedBlueprint = await requestMissingSceneBeats(client, input, bestPartial.blueprint, missingBeatCount, beatRange);
+        const parseResult = parseBlueprintFromPayload(repairedBlueprint, beatRange, { allowPartial: true });
+        repairAttemptsCount += 1;
+        repairBlueprintCompleteBeatCount = parseResult.completeBeatCount;
+        partialBeatNormalizationUsed = partialBeatNormalizationUsed || parseResult.partialBeatNormalizationUsed;
+        if (parseResult.completeBeatCount >= beatRange.min) {
+          return {
+            blueprint: trimBlueprintBeats(parseResult.blueprint, beatRange.max),
+            repairAttemptsCount,
+            initialBlueprintCompleteBeatCount,
+            repairBlueprintCompleteBeatCount,
+            partialBeatNormalizationUsed,
+            missingBeatRepairAttempted: true,
+            finalAcceptedBlueprintSceneCount: Math.min(parseResult.completeBeatCount, beatRange.max)
+          };
+        }
+        lastError = `Blueprint included ${parseResult.completeBeatCount} usable scene beats after missing-beat repair; ${beatRange.min}-${beatRange.max} are required.`;
+      } catch (error) {
+        repairAttemptsCount += 1;
+        lastError = `Missing-beat repair failed: ${summarizeError(error)}`;
+      }
+    }
+  }
+
+  throw new Error(formatBlueprintFailure(lastError, {
+    initialBlueprintCompleteBeatCount,
+    repairBlueprintCompleteBeatCount,
+    partialBeatNormalizationUsed,
+    missingBeatRepairAttempted: input.lengthTarget === "Long" && Boolean(bestPartial && bestPartial.completeBeatCount > 0 && bestPartial.completeBeatCount < beatRange.min),
+    finalAcceptedBlueprintSceneCount: bestPartial?.completeBeatCount
+  }));
+}
+
+async function requestMissingSceneBeats(
+  client: OpenAI,
+  input: GenerateStoryRequest,
+  partialBlueprint: StoryBlueprint,
+  missingBeatCount: number,
+  beatRange: { min: number; max: number }
+): Promise<Partial<StoryBlueprint>> {
+  const response = await client.chat.completions.create({
+    model: getBlueprintModel(),
+    temperature: 0.25,
+    max_tokens: 2600,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: "Return only valid JSON. Add missing compact sceneBeats for an existing private fiction blueprint."
+      },
+      {
+        role: "user",
+        content: buildMissingSceneBeatsPrompt(input, partialBlueprint, missingBeatCount, beatRange)
+      }
+    ]
+  });
+  const payload = normalizeStoryPayload(response.choices[0]?.message.content ?? "") as Partial<StoryBlueprint>;
+  const repairedBeats = Array.isArray(payload.sceneBeats) ? payload.sceneBeats : [];
+
+  return {
+    ...partialBlueprint,
+    sceneBeats: [...partialBlueprint.sceneBeats, ...repairedBeats].slice(0, beatRange.max)
+  } as Partial<StoryBlueprint>;
 }
 
 async function requestStory(
@@ -483,8 +603,11 @@ function buildBlueprintPrompt(
     attempt > 0
       ? `\nPrevious blueprint was invalid: ${previousError}. Regenerate the full blueprint and satisfy every schema and beat-count requirement.`
       : "";
+  const longBeatInstruction = input.lengthTarget === "Long"
+    ? `\nFor Long, sceneBeats must contain exactly ${LONG_BLUEPRINT_TARGET_BEATS} beats. Do not return fewer than ${LONG_BLUEPRINT_TARGET_BEATS}. Do not return more than ${LONG_BLUEPRINT_TARGET_BEATS}.`
+    : "";
 
-  return `Build a private story blueprint as JSON. The blueprint is for planning only and must never be displayed to the reader.${repairInstruction}
+  return `Build a private story blueprint as JSON. The blueprint is for planning only and must never be displayed to the reader.${repairInstruction}${longBeatInstruction}
 
 Return exactly one JSON object with these keys:
 - protagonist
@@ -510,7 +633,7 @@ Return exactly one JSON object with these keys:
 
 premiseRequirements must be an array of 3-12 short strings. Extract explicit, concrete obligations from STORY REQUEST only: required events, objects, witness relationships, locations, separation or convergence, sequence, outcomes, and named character roles. Treat them as hard narrative requirements, not optional inspiration.
 
-sceneBeats must contain ${beatRange.min}-${beatRange.max} beats for the selected length target. Each beat must include:
+sceneBeats must contain ${input.lengthTarget === "Long" ? `exactly ${LONG_BLUEPRINT_TARGET_BEATS}` : `${beatRange.min}-${beatRange.max}`} beats for the selected length target. Each beat must include:
 - location
 - activeCharacters
 - concreteAction
@@ -522,6 +645,12 @@ sceneBeats must contain ${beatRange.min}-${beatRange.max} beats for the selected
 - characterPressure
 - characterStake
 - materialConsequence
+
+Scene beat style requirements:
+- Every sceneBeat must be compact but complete.
+- Keep every sceneBeat field short: one concise phrase or sentence, no paragraphs.
+- Prefer concrete nouns, verbs, obstacles, and consequences over explanation.
+- Do not overload a beat with long prose. The story drafting pass will expand the beat later.
 
 Planning requirements:
 - Use the selected narrative architecture, character arc, and ending type.
@@ -570,6 +699,42 @@ ${input.storySeed}
 
 NARRATIVE RULES
 ${narrativeRules}`;
+}
+
+function buildMissingSceneBeatsPrompt(
+  input: GenerateStoryRequest,
+  partialBlueprint: StoryBlueprint,
+  missingBeatCount: number,
+  beatRange: { min: number; max: number }
+): string {
+  return `The current Long blueprint has ${partialBlueprint.sceneBeats.length} usable sceneBeats, but Long requires ${beatRange.min}-${beatRange.max} and should have exactly ${LONG_BLUEPRINT_TARGET_BEATS}.
+
+Return a JSON object with only this key: sceneBeats.
+sceneBeats must contain exactly ${missingBeatCount} additional beats that continue after the existing beats and complete the arc.
+
+Each new beat must be compact but complete. Use short strings for every required field. Do not write paragraphs.
+Each beat must include location, activeCharacters, concreteAction, newInformation, conflictOrObstacle, irreversibleTurn, consequence, sensoryAnchor, characterPressure, characterStake, and materialConsequence.
+Core fields cannot be empty: location, activeCharacters, concreteAction, conflictOrObstacle, irreversibleTurn, consequence.
+
+Do not repeat existing beats. Add only missing scene-level actions needed to reach a valid Long blueprint before story drafting.
+
+GENRE PRESET
+${input.genrePreset}
+
+NARRATIVE ARCHITECTURE
+${input.narrativeArchitecture}
+
+CHARACTER ARC
+${input.characterArc}
+
+ENDING TYPE
+${input.endingType}
+
+PARTIAL BLUEPRINT JSON
+${JSON.stringify(partialBlueprint, null, 2)}
+
+STORY REQUEST
+${input.storySeed}`;
 }
 
 function buildStoryPrompt(
@@ -706,17 +871,24 @@ function buildForbiddenLanguageRule(disallowedTerms: string[]): string {
   return `- Hard forbidden language: do not use these terms in the final story: ${disallowedTerms.join(", ")}.`;
 }
 
-function parseBlueprint(rawText: string, beatRange: { min: number; max: number }): StoryBlueprint {
+function parseBlueprint(rawText: string, beatRange: { min: number; max: number }, options: { allowPartial?: boolean } = {}): BlueprintParseResult {
   const payload = normalizeStoryPayload(rawText) as Partial<StoryBlueprint>;
-  const sceneBeats = Array.isArray(payload.sceneBeats)
-    ? payload.sceneBeats.filter(isBlueprintSceneBeat).slice(0, beatRange.max)
-    : [];
+  return parseBlueprintFromPayload(payload, beatRange, options);
+}
 
-  if (sceneBeats.length < beatRange.min) {
-    throw new Error(`Blueprint included ${sceneBeats.length} complete scene beats; ${beatRange.min}-${beatRange.max} are required.`);
+function parseBlueprintFromPayload(
+  payload: Partial<StoryBlueprint>,
+  beatRange: { min: number; max: number },
+  options: { allowPartial?: boolean } = {}
+): BlueprintParseResult {
+  const normalizedBeats = normalizeBlueprintSceneBeats(payload.sceneBeats, beatRange.max);
+  const sceneBeats = normalizedBeats.beats;
+
+  if (!options.allowPartial && sceneBeats.length < beatRange.min) {
+    throw new Error(`Blueprint included ${sceneBeats.length} usable scene beats; ${beatRange.min}-${beatRange.max} are required.`);
   }
 
-  return {
+  const blueprint = {
     protagonist: requireString(payload.protagonist, "protagonist"),
     pointOfViewCharacter: requireString(payload.pointOfViewCharacter, "pointOfViewCharacter"),
     centralAnomaly: requireString(payload.centralAnomaly, "centralAnomaly"),
@@ -738,28 +910,84 @@ function parseBlueprint(rawText: string, beatRange: { min: number; max: number }
     changedWorldState: requireString(payload.changedWorldState, "changedWorldState"),
     sceneBeats
   };
+
+  return {
+    blueprint,
+    completeBeatCount: sceneBeats.length,
+    partialBeatNormalizationUsed: normalizedBeats.normalizationUsed
+  };
 }
 
-function isBlueprintSceneBeat(value: unknown): value is BlueprintSceneBeat {
+function normalizeBlueprintSceneBeats(value: unknown, maxBeats: number): { beats: BlueprintSceneBeat[]; normalizationUsed: boolean } {
+  if (!Array.isArray(value)) {
+    return { beats: [], normalizationUsed: false };
+  }
+
+  let normalizationUsed = false;
+  const beats: BlueprintSceneBeat[] = [];
+
+  for (const item of value) {
+    const result = normalizeBlueprintSceneBeat(item);
+    normalizationUsed = normalizationUsed || result.normalizationUsed;
+    if (result.beat) {
+      beats.push(result.beat);
+    }
+    if (beats.length >= maxBeats) {
+      break;
+    }
+  }
+
+  return { beats, normalizationUsed };
+}
+
+function normalizeBlueprintSceneBeat(value: unknown): NormalizedBeatResult {
   if (!value || typeof value !== "object") {
-    return false;
+    return { beat: null, normalizationUsed: false };
   }
 
   const beat = value as Partial<BlueprintSceneBeat>;
-  return Boolean(
-    beat.location &&
-      Array.isArray(beat.activeCharacters) &&
-      beat.concreteAction &&
-      beat.newInformation &&
-      beat.conflictOrObstacle &&
-      beat.irreversibleTurn &&
-      beat.consequence &&
-      beat.sensoryAnchor &&
-      beat.characterPressure &&
-      beat.characterStake &&
-      beat.materialConsequence &&
-      !isDiscussionOnlyBeat(beat)
-  );
+  const location = optionalString(beat.location);
+  const activeCharacters = normalizeStringList(beat.activeCharacters) ?? [];
+  const concreteAction = optionalString(beat.concreteAction);
+  const conflictOrObstacle = optionalString(beat.conflictOrObstacle);
+  const irreversibleTurn = optionalString(beat.irreversibleTurn);
+  const consequence = optionalString(beat.consequence);
+
+  if (!location || activeCharacters.length === 0 || !concreteAction || !conflictOrObstacle || !irreversibleTurn || !consequence) {
+    return { beat: null, normalizationUsed: false };
+  }
+
+  const normalizedBeat: BlueprintSceneBeat = {
+    location,
+    activeCharacters,
+    concreteAction,
+    newInformation: optionalString(beat.newInformation) || irreversibleTurn || consequence,
+    conflictOrObstacle,
+    irreversibleTurn,
+    consequence,
+    sensoryAnchor: optionalString(beat.sensoryAnchor) || location,
+    characterPressure: optionalString(beat.characterPressure) || conflictOrObstacle,
+    characterStake: optionalString(beat.characterStake) || consequence,
+    materialConsequence: optionalString(beat.materialConsequence) || consequence
+  };
+
+  if (isDiscussionOnlyBeat(normalizedBeat)) {
+    return { beat: null, normalizationUsed: false };
+  }
+
+  return {
+    beat: normalizedBeat,
+    normalizationUsed:
+      normalizedBeat.newInformation !== optionalString(beat.newInformation) ||
+      normalizedBeat.sensoryAnchor !== optionalString(beat.sensoryAnchor) ||
+      normalizedBeat.characterPressure !== optionalString(beat.characterPressure) ||
+      normalizedBeat.characterStake !== optionalString(beat.characterStake) ||
+      normalizedBeat.materialConsequence !== optionalString(beat.materialConsequence)
+  };
+}
+
+function trimBlueprintBeats(blueprint: StoryBlueprint, maxBeats: number): StoryBlueprint {
+  return { ...blueprint, sceneBeats: blueprint.sceneBeats.slice(0, maxBeats) };
 }
 
 function requireString(value: unknown, label: string): string {
@@ -767,6 +995,10 @@ function requireString(value: unknown, label: string): string {
     throw new Error(`Blueprint missing ${label}.`);
   }
   return value.trim();
+}
+
+function optionalString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function requirePremiseRequirements(value: unknown): string[] {
@@ -793,6 +1025,31 @@ function buildBeatWordBudgetInstruction(
   const minimumPerBeat = Math.max(280, Math.floor(lengthSpec.minWords / blueprint.sceneBeats.length));
   const maximumPerBeat = Math.max(minimumPerBeat + 120, Math.ceil(lengthSpec.maxWords / blueprint.sceneBeats.length));
   return `- Long target word budget: aim for roughly ${minimumPerBeat}-${maximumPerBeat} words per blueprint beat on average. Opening, climax, and aftermath may run longer, but every beat must become substantial scene action rather than summary.`;
+}
+
+function buildBlueprintDiagnosticsNotice(result: BlueprintRequestResult): string | null {
+  if (!result.partialBeatNormalizationUsed && !result.missingBeatRepairAttempted) {
+    return null;
+  }
+
+  return `Blueprint diagnostics: initial complete beats ${formatOptionalNumber(result.initialBlueprintCompleteBeatCount)}; repair complete beats ${formatOptionalNumber(result.repairBlueprintCompleteBeatCount)}; partial beat normalization used ${result.partialBeatNormalizationUsed ? "yes" : "no"}; missing beat repair attempted ${result.missingBeatRepairAttempted ? "yes" : "no"}; final accepted scene count ${result.finalAcceptedBlueprintSceneCount}.`;
+}
+
+function formatBlueprintFailure(
+  lastError: string,
+  diagnostics: {
+    initialBlueprintCompleteBeatCount?: number;
+    repairBlueprintCompleteBeatCount?: number;
+    partialBeatNormalizationUsed: boolean;
+    missingBeatRepairAttempted: boolean;
+    finalAcceptedBlueprintSceneCount?: number;
+  }
+): string {
+  return `${lastError} Diagnostics: initial complete beats ${formatOptionalNumber(diagnostics.initialBlueprintCompleteBeatCount)}; repair complete beats ${formatOptionalNumber(diagnostics.repairBlueprintCompleteBeatCount)}; partial beat normalization used ${diagnostics.partialBeatNormalizationUsed ? "yes" : "no"}; missing beat repair attempted ${diagnostics.missingBeatRepairAttempted ? "yes" : "no"}; final accepted scene count ${formatOptionalNumber(diagnostics.finalAcceptedBlueprintSceneCount)}.`;
+}
+
+function formatOptionalNumber(value: number | undefined): string {
+  return typeof value === "number" ? value.toString() : "unknown";
 }
 
 function parseStoryPayload(rawText: string): OpenAIStoryPayload {
