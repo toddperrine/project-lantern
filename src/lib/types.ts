@@ -87,6 +87,10 @@ export type StoryDiagnostics = {
   targetMinimumWordCount?: number;
   targetMaximumWordCount?: number;
   finalWordCount: number;
+  longFloorPassAttempted?: boolean;
+  longFloorPassSucceeded?: boolean;
+  longFloorPassFinalWordCount?: number;
+  longFloorPassTargetMinimumWordCount?: number;
   expansionAttempted: boolean;
   expansionSucceeded: boolean;
   expansionAttemptsCount?: number;
