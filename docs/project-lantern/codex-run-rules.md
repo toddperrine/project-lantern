@@ -25,6 +25,16 @@ One GitHub Issue = one Codex task = one focused draft PR.
 
 Do not bundle unrelated fixes, refactors, visual changes, config changes, or cleanup into the same PR.
 
+## Standard Workflow
+
+- Use Project Lantern / Story World Engine only.
+- Use the GitHub/Codex cloud PR workflow for repo changes.
+- Do not attempt local filesystem execution, localhost testing, or local dev-server validation unless the task explicitly requests it.
+- Do not block tasks because local sandbox or tooling is unavailable.
+- Make focused changes, open one draft PR, and rely on GitHub/Vercel Preview checks as the validation path.
+- In PR validation notes, say Vercel/GitHub checks are the validation path.
+- Avoid repeating local sandbox warnings unless there is a real repo, GitHub, or Vercel blocker.
+
 ## Default Constraints
 
 Unless the issue explicitly asks for it:
@@ -45,6 +55,7 @@ For documentation-only tasks:
 - Do not run formatters that rewrite application files.
 - Do not change package files, lockfiles, configuration, or source code.
 - Validate by reviewing the rendered markdown intent and checking that only the intended files changed.
+- Use GitHub/Vercel Preview checks as the standard validation path when a PR is opened.
 
 ## PR Expectations
 
@@ -53,7 +64,7 @@ Open draft PRs by default.
 Each draft PR should include:
 
 - Summary of what changed.
-- Validation notes.
+- Validation notes that identify Vercel/GitHub checks as the validation path.
 - Any known limitations or intentionally deferred work.
 
 Keep PR descriptions clear enough that future Codex runs can understand the product reason, not just the file diff.
