@@ -59,7 +59,7 @@ async function applyLongFloorPass(
     finalWordCount,
     expansionSucceeded: response.metadata.diagnostics.expansionSucceeded || longFloorPassSucceeded,
     stoppedReason: longFloorPassSucceeded ? "complete" : stoppedReason,
-    underTargetNotice: buildUnderTargetNotice(input, response.metadata.diagnostics.expansionAttemptsCount ?? 0, finalWordCount, longFloorPassSucceeded ? "complete" : stoppedReason),
+    underTargetNotice: buildUnderTargetNotice(response.metadata.diagnostics.expansionAttemptsCount ?? 0, finalWordCount, longFloorPassSucceeded ? "complete" : stoppedReason),
     notice: buildNotice(response.metadata.diagnostics.notice, finalWordCount, longFloorPassSucceeded),
     longFloorPassAttempted: true,
     longFloorPassSucceeded,
@@ -142,7 +142,6 @@ ${story}`;
 }
 
 function buildUnderTargetNotice(
-  input: GenerateStoryRequest,
   expansionAttemptsCount: number,
   finalWordCount: number,
   stoppedReason: StoryDiagnostics["stoppedReason"]
@@ -156,5 +155,8 @@ function buildUnderTargetNotice(
 
 function buildNotice(previousNotice: string | null, finalWordCount: number, longFloorPassSucceeded: boolean): string {
   const floorNotice = `Long floor pass attempted: yes. Long floor pass succeeded: ${longFloorPassSucceeded ? "yes" : "no"}. Final word count after Long floor pass: ${finalWordCount}. Target minimum word count: ${LONG_FLOOR_MIN_WORDS}.`;
+  if (longFloorPassSucceeded) {
+    return floorNotice;
+  }
   return [previousNotice, floorNotice].filter(Boolean).join(" ");
 }
