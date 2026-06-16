@@ -16,39 +16,39 @@ export const dynamic = "force-dynamic";
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const configError = getCloudSavedStoryConfigError();
-  if (configError) return cloudConfigErrorResponse(configError.missingVariables);
+  if (configError) return cloudConfigErrorResponse("Cloud story list", "Cloud saved story persistence is not configured.");
 
   try {
     const stories = await listCloudSavedStories(params.id);
-    if (!stories) return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    if (!stories) return NextResponse.json({ error: "Cloud story list failed because the selected project was not found.", action: "Cloud story list", diagnostic: "missing-project" }, { status: 404 });
     return NextResponse.json({ stories });
   } catch (error) {
-    return cloudPersistenceErrorResponse(error);
+    return cloudPersistenceErrorResponse(error, "Cloud story list");
   }
 }
 
 export async function POST(request: Request, { params }: RouteContext) {
   const configError = getCloudSavedStoryConfigError();
-  if (configError) return cloudConfigErrorResponse(configError.missingVariables);
+  if (configError) return cloudConfigErrorResponse("Cloud story save", "Cloud saved story persistence is not configured.");
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+    return NextResponse.json({ error: "Cloud story save failed because the request was not valid JSON.", action: "Cloud story save", diagnostic: "invalid-request" }, { status: 400 });
   }
 
   const storyInput = parseCloudSavedStoryInput(body);
   if (!storyInput) {
-    return NextResponse.json({ error: "Request body must include a valid saved story." }, { status: 400 });
+    return NextResponse.json({ error: "Cloud story save failed because the request did not include a valid saved story.", action: "Cloud story save", diagnostic: "invalid-story" }, { status: 400 });
   }
 
   try {
     const story = await saveCloudSavedStory(params.id, storyInput);
-    if (!story) return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    if (!story) return NextResponse.json({ error: "Cloud story save failed because the selected project was not found.", action: "Cloud story save", diagnostic: "missing-project" }, { status: 404 });
     return NextResponse.json({ story }, { status: 201 });
   } catch (error) {
-    return cloudPersistenceErrorResponse(error);
+    return cloudPersistenceErrorResponse(error, "Cloud story save");
   }
 }
 
@@ -90,20 +90,25 @@ function parseCloudSavedStoryInput(body: unknown): CloudSavedStoryInput | null {
   };
 }
 
-function cloudConfigErrorResponse(missingVariables: string[]) {
+function cloudConfigErrorResponse(action: string, error: string) {
   return NextResponse.json(
     {
-      error: "Cloud saved story persistence is not configured.",
-      missingVariables
+      error,
+      action,
+      diagnostic: "configuration-unavailable"
     },
     { status: 503 }
   );
 }
 
-function cloudPersistenceErrorResponse(error: unknown) {
-  const message = error instanceof Error ? error.message : "Cloud saved story persistence request failed.";
-  if (error instanceof CloudSavedStoryPersistenceError) {
-    return NextResponse.json({ error: message, ...error.details }, { status: 502 });
-  }
-  return NextResponse.json({ error: message }, { status: 502 });
+function cloudPersistenceErrorResponse(error: unknown, action: string) {
+  const diagnostic = error instanceof CloudSavedStoryPersistenceError ? "cloud-request-failed" : "cloud-unexpected-error";
+  return NextResponse.json(
+    {
+      error: `${action} failed. Cloud persistence could not complete the request.`,
+      action,
+      diagnostic
+    },
+    { status: 502 }
+  );
 }
