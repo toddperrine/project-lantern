@@ -18,6 +18,7 @@ type StoryBlueprint = {
   protagonist: string;
   pointOfViewCharacter: string;
   centralAnomaly: string;
+  premiseRequirements: string[];
   speculativeRuleUnderPressure: string;
   characterDesire: string;
   characterFear: string;
@@ -484,6 +485,7 @@ Return exactly one JSON object with these keys:
 - protagonist
 - pointOfViewCharacter
 - centralAnomaly
+- premiseRequirements
 - speculativeRuleUnderPressure
 - characterDesire
 - characterFear
@@ -501,6 +503,8 @@ Return exactly one JSON object with these keys:
 - changedWorldState
 - sceneBeats
 
+premiseRequirements must be an array of 3-12 short strings. Extract explicit, concrete obligations from STORY REQUEST only: required events, objects, witness relationships, locations, separation or convergence, sequence, outcomes, and named character roles. Treat them as hard narrative requirements, not optional inspiration.
+
 sceneBeats must contain ${beatRange.min}-${beatRange.max} beats for the selected length target. Each beat must include:
 - location
 - activeCharacters
@@ -516,6 +520,9 @@ sceneBeats must contain ${beatRange.min}-${beatRange.max} beats for the selected
 
 Planning requirements:
 - Use the selected narrative architecture, character arc, and ending type.
+- Preserve every explicit Story Request premise detail in premiseRequirements and assign each one to scene-level action, not exposition.
+- If the Story Request says several characters witness the same event from separate places and converge at a site, the blueprint must show the shared event, each required separate vantage, the movement toward convergence, and the impact or meeting site.
+- Do not copy or paraphrase the Story Request as prose. Convert it into dramatized beats, choices, sensory evidence, movement, obstacles, and consequences.
 - Make each beat a scene-level action, not a discussion, realization, or philosophical exchange.
 - Each beat must introduce new information, a conflict or obstacle, an irreversible turn, and a consequence.
 - Each beat must include a sensory anchor, specific character pressure, a personal characterStake, and a materialConsequence visible in the world.
@@ -578,9 +585,12 @@ Length requirements:
 - The blueprint has ${blueprint.sceneBeats.length} beats; dramatize every beat as a distinct lived scene or scene movement.
 
 Final story requirements:
+- Treat PREMISE REQUIREMENTS as non-negotiable story obligations. Fulfill every one on the page through concrete scene action.
+- Dramatize explicit Story Request details naturally through behavior, movement, sensory evidence, choices, obstacles, and consequences. Do not quote, paraphrase, or restate the request as exposition.
+- If the premise requires multiple characters to perceive the same event from separate locations and converge at an impact or meeting site, show those separate perceptions, the convergence, and the site in scene.
 - Follow every blueprint scene beat in order, turning each beat into lived scene action.
 - Do not compress beats into summary.
-- Do not skip any beat, personal stake, material consequence, cost, consequence, revelation, final decision, final image/action, or changed world state.
+- Do not skip any beat, personal stake, material consequence, cost, consequence, revelation, final decision, final image/action, changed world state, or premise requirement.
 - Do not use section labels, headings, outline language, bullet-like transitions, synopsis language, ---, or "Earlier that evening" as a retelling device.
 - Do not make philosophical debate the main action. Characters should want concrete things and reveal beliefs through behavior, choices, omissions, and pressure.
 - Reveal the mystery through action, clues, behavior, sensory detail, and consequence.
@@ -592,6 +602,9 @@ Final story requirements:
 - For this length target, a valid blueprint has ${beatRange.min}-${beatRange.max} beats; treat all ${blueprint.sceneBeats.length} provided beats as mandatory.
 ${forbiddenRule}
 - If source concepts resemble forbidden language, translate them into story-world phenomena: ${STORY_WORLD_TRANSLATIONS.join(", ")}.
+
+PREMISE REQUIREMENTS JSON
+${formatPremiseRequirementsForPrompt(blueprint.premiseRequirements)}
 
 PRIVATE BLUEPRINT JSON
 ${JSON.stringify(blueprint, null, 2)}
@@ -622,9 +635,10 @@ function buildExpansionPrompt(
 
   return `Rewrite and expand the draft into a complete story that satisfies the selected ${lengthSpec.minWords}-${lengthSpec.maxWords} word target. This is expansion attempt ${attempt} of ${maxAttempts}.
 
-Compare the draft against the private blueprint. Expand missing or compressed scenes, consequences, costs, revelations, character pressure, sensory anchors, and the changed world state. Do not merely add more dialogue, atmosphere, reflection, or debate.
+Compare the draft against the private blueprint and PREMISE REQUIREMENTS. Expand missing or compressed premise details, scenes, consequences, costs, revelations, character pressure, sensory anchors, and the changed world state. Do not merely add more dialogue, atmosphere, reflection, or debate.
 
 Hard requirements:
+- Fulfill every PREMISE REQUIREMENT through concrete scene action; do not quote or restate the Story Request as exposition.
 - Dramatize every blueprint scene beat in order.
 - Do not summarize the blueprint.
 - Do not use section labels, headings, outline language, ---, or "Earlier that evening" as a retelling device.
@@ -632,8 +646,11 @@ Hard requirements:
 - Reveal mystery through action, clues, behavior, sensory detail, and consequence.
 - Include the protagonistPersonalStake, antagonistOrOpposingForceStake, concreteIrreversibleCost, final decision, finalImageOrAction, and changed world state.
 - The final paragraph must end on a concrete visible image or action from finalImageOrAction, not a summary of theme, hope, freedom, change, or uncertainty.
-- Preserve the plot, characters, scene structure, and selected length target.
+- Preserve the plot, characters, scene structure, selected length target, and explicit premise requirements.
 ${forbiddenRule}
+
+PREMISE REQUIREMENTS JSON
+${formatPremiseRequirementsForPrompt(blueprint.premiseRequirements)}
 
 PRIVATE BLUEPRINT JSON
 ${JSON.stringify(blueprint, null, 2)}
@@ -651,9 +668,12 @@ function buildForbiddenRepairPrompt(
   const lengthSpec = getLengthTargetSpec(input.lengthTarget);
   return `Rewrite the story to remove these forbidden terms: ${foundTerms.join(", ")}.
 
-Preserve plot, characters, scene order, every blueprint beat, concrete cost, final decision, changed world state, and the selected ${lengthSpec.minWords}-${lengthSpec.maxWords} word target. Replace forbidden meta language with concrete story-world phenomena such as ${STORY_WORLD_TRANSLATIONS.join(", ")}.
+Preserve plot, characters, scene order, every premise requirement, every blueprint beat, concrete cost, final decision, changed world state, and the selected ${lengthSpec.minWords}-${lengthSpec.maxWords} word target. Replace forbidden meta language with concrete story-world phenomena such as ${STORY_WORLD_TRANSLATIONS.join(", ")}.
 
-Do not use section labels, headings, outline language, ---, or "Earlier that evening" as a retelling device. Return only valid JSON with story, charactersUsed, and rulesReferenced.
+Do not use section labels, headings, outline language, ---, or "Earlier that evening" as a retelling device. Do not quote, paraphrase, or restate the Story Request as exposition. Return only valid JSON with story, charactersUsed, and rulesReferenced.
+
+PREMISE REQUIREMENTS JSON
+${formatPremiseRequirementsForPrompt(blueprint.premiseRequirements)}
 
 PRIVATE BLUEPRINT JSON
 ${JSON.stringify(blueprint, null, 2)}
@@ -684,6 +704,7 @@ function parseBlueprint(rawText: string, beatRange: { min: number; max: number }
     protagonist: requireString(payload.protagonist, "protagonist"),
     pointOfViewCharacter: requireString(payload.pointOfViewCharacter, "pointOfViewCharacter"),
     centralAnomaly: requireString(payload.centralAnomaly, "centralAnomaly"),
+    premiseRequirements: requirePremiseRequirements(payload.premiseRequirements),
     speculativeRuleUnderPressure: requireString(payload.speculativeRuleUnderPressure, "speculativeRuleUnderPressure"),
     characterDesire: requireString(payload.characterDesire, "characterDesire"),
     characterFear: requireString(payload.characterFear, "characterFear"),
@@ -730,6 +751,18 @@ function requireString(value: unknown, label: string): string {
     throw new Error(`Blueprint missing ${label}.`);
   }
   return value.trim();
+}
+
+function requirePremiseRequirements(value: unknown): string[] {
+  const requirements = (normalizeStringList(value) ?? []).slice(0, 12);
+  if (requirements.length === 0) {
+    throw new Error("Blueprint missing premiseRequirements from the Story Request.");
+  }
+  return requirements;
+}
+
+function formatPremiseRequirementsForPrompt(requirements: string[]): string {
+  return JSON.stringify(requirements, null, 2);
 }
 
 function parseStoryPayload(rawText: string): OpenAIStoryPayload {
