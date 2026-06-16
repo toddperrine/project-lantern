@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { getBuildInfo } from "@/lib/build-info";
 
 const NAV_ITEMS = ["Home", "Your Series", "Create", "Discover", "Library"];
 
@@ -18,6 +19,9 @@ const FAVORITE_CAST = ["The Keeper", "The Witness", "The Repairer", "The Singer"
 const STORY_SPARKS = ["A map changes only when no one looks", "An old radio speaks in tomorrow's weather", "A train arrives carrying letters from the missing"];
 
 export function ProjectLanternShell({ children }: { children: ReactNode }) {
+  const buildInfo = getBuildInfo();
+  const versionLabel = `Version ${buildInfo.appVersion} | ${buildInfo.buildEnvironment} | ${buildInfo.gitBranch} | ${buildInfo.shortCommitSha}`;
+
   return (
     <div className="project-lantern-shell min-h-screen bg-night-ink text-primary-light">
       <header className="sticky top-0 z-20 border-b border-warm-paper/10 bg-night-ink/90 backdrop-blur">
@@ -25,6 +29,9 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-lantern-gold">Project Lantern</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-primary-light">Living Series</h1>
+            <p aria-label="Project Lantern build information" className="mt-2 inline-flex w-fit rounded-md border border-aged-brass/40 bg-deep-navy/80 px-2.5 py-1 text-xs font-semibold leading-5 text-sea-glass shadow-soft">
+              {versionLabel}
+            </p>
           </div>
           <nav aria-label="Project Lantern" className="flex gap-2 overflow-x-auto pb-1 md:pb-0">
             {NAV_ITEMS.map((item, index) => (
