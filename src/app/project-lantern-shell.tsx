@@ -41,7 +41,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main id="home" className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 md:px-8 md:py-8">
+      <div id="home" className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 md:px-8 md:py-8">
         <section className="grid gap-5 overflow-hidden rounded-md border border-warm-paper/10 bg-deep-navy shadow-soft md:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
           <div className="p-6 md:p-8">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-lantern-gold">Now Playing</p>
@@ -94,7 +94,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
           </div>
           {children}
         </section>
-      </main>
+      </div>
     </div>
   );
 }
