@@ -754,7 +754,7 @@ function requireString(value: unknown, label: string): string {
 }
 
 function requirePremiseRequirements(value: unknown): string[] {
-  const requirements = normalizeStringList(value).slice(0, 12);
+  const requirements = (normalizeStringList(value) ?? []).slice(0, 12);
   if (requirements.length === 0) {
     throw new Error("Blueprint missing premiseRequirements from the Story Request.");
   }
