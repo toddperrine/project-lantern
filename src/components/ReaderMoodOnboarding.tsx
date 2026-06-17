@@ -158,6 +158,9 @@ function createStoryDirection({ characterArc, direction, endingType, mood, narra
 }
 
 function applyDirectionToGenerator(inputs: DirectionInputs) {
+  const advancedControls = document.getElementById("advanced-story-controls");
+  if (advancedControls instanceof HTMLDetailsElement) advancedControls.open = true;
+
   const workspace = document.getElementById("create-episode");
   if (!workspace) return;
 
