@@ -33,6 +33,19 @@ textarea {
   background: rgba(217, 164, 65, 0.32);
 }
 
+.project-lantern-shell [data-device-preview-content] > main {
+  min-height: auto;
+  padding: 0;
+}
+
+.project-lantern-shell [data-device-preview-content] > main > section {
+  max-width: none;
+}
+
+.project-lantern-shell [data-device-preview-content] > main > section > header {
+  display: none;
+}
+
 .project-lantern-workspace main {
   min-height: auto;
   padding: 1.25rem;
