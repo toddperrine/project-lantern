@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FIRST_PARTY_LIBRARY, type FirstPartyAsset } from "@/lib/first-party-library";
 import type { CharacterArc, EndingType, GenrePreset, LengthTarget, NarrativeArchitecture } from "@/lib/types";
 
 type MoodOption = {
@@ -22,11 +23,14 @@ type DirectionInputs = {
   lengthTarget: LengthTarget;
 };
 
+type LibraryTouchstone = Pick<FirstPartyAsset, "assetType" | "title" | "description" | "tags">;
+
 type StoryDirection = {
   title: string;
   premise: string;
   tone: string;
   detail: string;
+  libraryTouchstones: LibraryTouchstone[];
   inputs: DirectionInputs;
 };
 
@@ -43,6 +47,15 @@ const MOOD_OPTIONS: MoodOption[] = [
 
 const DEFAULT_MOOD = MOOD_OPTIONS[1];
 const PLACEHOLDER_PROMPT = "I want a scary story, but not a slasher and no ghosts. Make the hero feel like me, and set it in the town where I used to live.";
+const ASSET_TYPE_LABELS: Record<FirstPartyAsset["assetType"], string> = {
+  character: "Character",
+  world: "World",
+  location: "Location",
+  "story-spark": "Story spark",
+  theme: "Theme",
+  "series-seed": "Series seed",
+  "craft-rule": "Craft rule"
+};
 
 export function ReaderMoodOnboarding() {
   const [selectedMood, setSelectedMood] = useState(DEFAULT_MOOD.label);
@@ -89,6 +102,16 @@ export function ReaderMoodOnboarding() {
               <h3 className="text-lg font-semibold leading-7 text-primary-dark">{direction.title}</h3>
               <p className="mt-3 text-sm leading-7 text-muted-light">{direction.premise}</p>
               <p className="mt-4 rounded-md bg-white/75 px-3 py-2.5 text-sm leading-6 text-muted-light"><span className="font-semibold text-primary-dark">Tone:</span> {direction.tone}</p>
+              {direction.libraryTouchstones.length > 0 ? (
+                <div className="mt-4 rounded-md border border-lantern-gold/25 bg-white/65 px-3 py-3 text-sm leading-6 text-muted-light">
+                  <p className="font-semibold text-primary-dark">Library touchstones</p>
+                  <ul className="mt-2 space-y-1.5">
+                    {direction.libraryTouchstones.map((asset) => (
+                      <li key={`${asset.assetType}-${asset.title}`}><span className="font-semibold text-primary-dark">{ASSET_TYPE_LABELS[asset.assetType]}:</span> {asset.title}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               <p className="mt-4 text-sm leading-6 text-muted-light">{direction.detail}</p>
               <button className="mt-5 min-h-11 w-full rounded-md border border-aged-brass bg-white/80 px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-lantern-gold" onClick={() => handleUseDirection(direction)} type="button">Use this direction</button>
             </article>
@@ -102,6 +125,22 @@ export function ReaderMoodOnboarding() {
 function buildStoryDirections(mood: MoodOption, readerPrompt: string): StoryDirection[] {
   const preference = readerPrompt.trim();
   const readerContext = preference || "No extra reader notes yet; keep the direction easy to personalize.";
+  const personalTouchstones = compact([
+    findLibraryAsset(FIRST_PARTY_LIBRARY.characters, mood, ["memory", "healing", "friendship"]),
+    findLibraryAsset(FIRST_PARTY_LIBRARY.themes, mood, ["growth", "connection", "courage"])
+  ]);
+  const placeTouchstones = compact([
+    findLibraryAsset(FIRST_PARTY_LIBRARY.worlds, mood, ["home", "coastal", "journey"]),
+    findLibraryAsset(FIRST_PARTY_LIBRARY.locations, mood, ["threshold", "cozy", "choice"]),
+    findLibraryAsset(FIRST_PARTY_LIBRARY.storySparks, mood, ["clue", "memory", "choice"])
+  ]);
+  const turnaboutTouchstones = compact([
+    findLibraryAsset(FIRST_PARTY_LIBRARY.characters, mood, ["chaos", "wonder", "clues"]),
+    findLibraryAsset(FIRST_PARTY_LIBRARY.worlds, mood, ["secrets", "science fiction", "magical realist"]),
+    findLibraryAsset(FIRST_PARTY_LIBRARY.storySparks, mood, ["transformation", "revelation", "healing"]),
+    findLibraryAsset(FIRST_PARTY_LIBRARY.themes, mood, ["change", "belonging", "courage"])
+  ]);
+
   return [
     createStoryDirection({
       mood,
@@ -111,7 +150,8 @@ function buildStoryDirections(mood: MoodOption, readerPrompt: string): StoryDire
       direction: "Make the hero's emotional situation echo the reader notes without requiring the reader to write the plot.",
       narrativeArchitecture: "Character Transformation Story",
       characterArc: "Positive Change Arc",
-      endingType: "Resolution with Residue"
+      endingType: "Resolution with Residue",
+      libraryTouchstones: personalTouchstones
     }),
     createStoryDirection({
       mood,
@@ -121,7 +161,8 @@ function buildStoryDirections(mood: MoodOption, readerPrompt: string): StoryDire
       direction: "Use setting, memory, and specific avoidances from the reader notes as the strongest personalization signal.",
       narrativeArchitecture: "Revelation Story",
       characterArc: "Flat / Testing Arc",
-      endingType: "Revelation with Cost"
+      endingType: "Revelation with Cost",
+      libraryTouchstones: placeTouchstones
     }),
     createStoryDirection({
       mood,
@@ -131,23 +172,27 @@ function buildStoryDirections(mood: MoodOption, readerPrompt: string): StoryDire
       direction: "Honor the chosen mood while making the final movement surprising rather than predictable.",
       narrativeArchitecture: "Event Story",
       characterArc: "Disillusionment Arc",
-      endingType: "Transformation without Victory"
+      endingType: "Transformation without Victory",
+      libraryTouchstones: turnaboutTouchstones
     })
   ];
 }
 
-function createStoryDirection({ characterArc, direction, endingType, mood, narrativeArchitecture, premise, readerContext, title }: { characterArc: CharacterArc; direction: string; endingType: EndingType; mood: MoodOption; narrativeArchitecture: NarrativeArchitecture; premise: string; readerContext: string; title: string }): StoryDirection {
-  const storySeed = `${mood.seed}\n\nReader mood: ${mood.label}.\nReader notes: ${readerContext}\nStory direction: ${premise}`;
+function createStoryDirection({ characterArc, direction, endingType, libraryTouchstones, mood, narrativeArchitecture, premise, readerContext, title }: { characterArc: CharacterArc; direction: string; endingType: EndingType; libraryTouchstones: LibraryTouchstone[]; mood: MoodOption; narrativeArchitecture: NarrativeArchitecture; premise: string; readerContext: string; title: string }): StoryDirection {
+  const librarySummary = formatLibraryTouchstones(libraryTouchstones);
+  const libraryGuidance = formatLibraryGuidance(libraryTouchstones);
+  const storySeed = `${mood.seed}\n\nReader mood: ${mood.label}.\nReader notes: ${readerContext}\nStory direction: ${premise}${libraryGuidance ? `\n\nFirst-party touchstones:\n${libraryGuidance}` : ""}`;
   return {
     title,
     premise,
     tone: mood.tone,
-    detail: `Uses: ${readerContext}`,
+    detail: librarySummary ? `Blends ${librarySummary} with the reader's mood and notes.` : `Uses: ${readerContext}`,
+    libraryTouchstones,
     inputs: {
-      worldBible: `# ${title} Storyworld\n\nMood: ${mood.label}\nTone: ${mood.tone}\n\nReader preference:\n${readerContext}\n\nWorld guidance:\nBuild a personalized entertainment setting around the reader notes. Treat concrete places, avoidances, or desired feelings as canon for this episode. If the reader did not name a place, use an intimate, easy-to-enter setting that supports the mood.`,
-      characterProfiles: `## Reader-Shaped Lead\n\nFunction: A protagonist whose desire, fear, or ordinary routine reflects the reader preference.\nCore Desire: To move through a ${mood.label.toLowerCase()} situation without losing what matters personally.\nCore Fear: That the story pressure will expose something they are not ready to face.\nConflict Engine: The chosen mood tests the lead through choices, relationships, and discoveries instead of authorial plot chores.`,
+      worldBible: `# ${title} Storyworld\n\nMood: ${mood.label}\nTone: ${mood.tone}\n\nReader preference:\n${readerContext}${libraryGuidance ? `\n\nFirst-party touchstones:\n${libraryGuidance}` : ""}\n\nWorld guidance:\nBuild a personalized entertainment setting around the reader notes. Treat concrete places, avoidances, or desired feelings as canon for this episode. If the reader did not name a place, use an intimate, easy-to-enter setting that supports the mood.`,
+      characterProfiles: `## Reader-Shaped Lead\n\nFunction: A protagonist whose desire, fear, or ordinary routine reflects the reader preference.\nCore Desire: To move through a ${mood.label.toLowerCase()} situation without losing what matters personally.\nCore Fear: That the story pressure will expose something they are not ready to face.\nConflict Engine: The chosen mood tests the lead through choices, relationships, and discoveries instead of authorial plot chores.${libraryGuidance ? `\n\nUse these first-party touchstones as inspiration, adapting them around the reader:\n${libraryGuidance}` : ""}`,
       storySeed,
-      storyRules: `Prioritize the reader mood onboarding direction.\nTone: ${mood.tone}.\nDirection: ${direction}\nRespect reader avoidances and preferences from the free-form notes. Keep the result reader-first and episode-shaped, not a writing exercise.`,
+      storyRules: `Prioritize the reader mood onboarding direction.\nTone: ${mood.tone}.\nDirection: ${direction}${libraryGuidance ? `\nFirst-party touchstones: ${formatLibraryTouchstones(libraryTouchstones)}.` : ""}\nRespect reader avoidances and preferences from the free-form notes. Keep the result reader-first and episode-shaped, not a writing exercise.`,
       genrePreset: mood.genrePreset,
       narrativeArchitecture,
       characterArc,
@@ -155,6 +200,27 @@ function createStoryDirection({ characterArc, direction, endingType, mood, narra
       lengthTarget: "Standard"
     }
   };
+}
+
+function findLibraryAsset<Asset extends LibraryTouchstone>(assets: Asset[], mood: MoodOption, preferredTags: string[]): Asset | undefined {
+  const moodTag = normalizeTag(mood.label);
+  return assets.find((asset) => asset.tags.some((tag) => normalizeTag(tag) === moodTag)) ?? assets.find((asset) => asset.tags.some((tag) => preferredTags.includes(normalizeTag(tag)))) ?? assets[0];
+}
+
+function normalizeTag(tag: string) {
+  return tag.trim().toLowerCase();
+}
+
+function compact<T>(values: Array<T | undefined>): T[] {
+  return values.filter((value): value is T => Boolean(value));
+}
+
+function formatLibraryTouchstones(assets: LibraryTouchstone[]) {
+  return assets.map((asset) => `${ASSET_TYPE_LABELS[asset.assetType].toLowerCase()} ${asset.title}`).join(", ");
+}
+
+function formatLibraryGuidance(assets: LibraryTouchstone[]) {
+  return assets.map((asset) => `- ${ASSET_TYPE_LABELS[asset.assetType]}: ${asset.title}. ${asset.description}`).join("\n");
 }
 
 function applyDirectionToGenerator(inputs: DirectionInputs) {
