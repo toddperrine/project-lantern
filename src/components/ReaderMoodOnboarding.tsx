@@ -76,48 +76,52 @@ export function ReaderMoodOnboarding() {
   }
 
   return (
-    <section className="rounded-md border border-lantern-gold/35 bg-warm-paper p-5 text-primary-dark shadow-soft ring-1 ring-lantern-gold/10 md:p-7">
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aged-brass">Start with the reader</p>
-        <h2 className="text-3xl font-semibold leading-tight text-primary-dark md:text-4xl">What are you in the mood for?</h2>
-        <p className="max-w-3xl text-base leading-7 text-muted-light">Pick a mood or describe what you want and what to avoid. You will get three story directions before generation, with detailed controls still available below.</p>
-      </div>
-      <div className="mt-6 flex flex-wrap gap-2.5">
-        {MOOD_OPTIONS.map((mood) => (
-          <button aria-pressed={selectedMood === mood.label} className={`min-h-11 flex-1 basis-[calc(50%-0.3125rem)] rounded-md border px-4 py-3 text-base font-semibold transition sm:flex-none sm:text-sm ${selectedMood === mood.label ? "border-primary-dark bg-primary-dark text-primary-light" : "border-primary-dark/15 bg-white/75 text-primary-dark hover:border-aged-brass hover:bg-soft-card"}`} key={mood.label} onClick={() => setSelectedMood(mood.label)} type="button">
-            {mood.label}
-          </button>
-        ))}
-      </div>
-      <label className="mt-6 flex flex-col gap-2.5">
-        <span className="text-base font-semibold text-primary-dark md:text-sm">Describe the story you want</span>
-        <textarea className="min-h-36 rounded-md border border-primary-dark/15 bg-white px-4 py-3 text-base leading-7 text-primary-dark outline-none transition placeholder:text-primary-dark/35 focus:border-aged-brass focus:ring-2 focus:ring-aged-brass/20 md:text-sm md:leading-6" onChange={(event) => setReaderPrompt(event.target.value)} placeholder={PLACEHOLDER_PROMPT} value={readerPrompt} />
-      </label>
-      <button className="mt-5 min-h-12 w-full rounded-md bg-primary-dark px-5 py-3.5 text-base font-semibold text-primary-light transition hover:bg-primary-dark/90 sm:w-auto sm:text-sm" onClick={handleSuggestMatches} type="button">Suggest story matches</button>
-      {appliedDirectionTitle ? <p className="mt-5 rounded-md border border-tide-teal/30 bg-tide-teal/10 px-4 py-3 text-sm font-semibold leading-6 text-tide-teal">Loaded "{appliedDirectionTitle}" into Create an Episode.</p> : null}
-      {directions.length > 0 ? (
-        <div className="mt-6 grid gap-4 lg:grid-cols-3">
-          {directions.map((direction) => (
-            <article className="flex min-h-full flex-col rounded-md border border-primary-dark/10 bg-soft-card p-5" key={direction.title}>
-              <h3 className="text-lg font-semibold leading-7 text-primary-dark">{direction.title}</h3>
-              <p className="mt-3 text-sm leading-7 text-muted-light">{direction.premise}</p>
-              <p className="mt-4 rounded-md bg-white/75 px-3 py-2.5 text-sm leading-6 text-muted-light"><span className="font-semibold text-primary-dark">Tone:</span> {direction.tone}</p>
-              {direction.libraryTouchstones.length > 0 ? (
-                <div className="mt-4 rounded-md border border-lantern-gold/25 bg-white/65 px-3 py-3 text-sm leading-6 text-muted-light">
-                  <p className="font-semibold text-primary-dark">Library touchstones</p>
-                  <ul className="mt-2 space-y-1.5">
-                    {direction.libraryTouchstones.map((asset) => (
-                      <li key={`${asset.assetType}-${asset.title}`}><span className="font-semibold text-primary-dark">{ASSET_TYPE_LABELS[asset.assetType]}:</span> {asset.title}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              <p className="mt-4 text-sm leading-6 text-muted-light">{direction.detail}</p>
-              <button className="mt-5 min-h-11 w-full rounded-md border border-aged-brass bg-white/80 px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-lantern-gold" onClick={() => handleUseDirection(direction)} type="button">Use this direction</button>
-            </article>
+    <section className="overflow-hidden rounded-md border border-lantern-gold/30 bg-night-ink text-primary-light shadow-soft ring-1 ring-lantern-gold/15 md:bg-[radial-gradient(circle_at_top_left,rgba(217,164,65,0.18),transparent_36%),linear-gradient(135deg,#0B1020_0%,#111827_52%,#21170f_100%)]">
+      <div className="border-b border-warm-paper/10 px-5 py-6 md:px-7 md:py-7">
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold">Start with the reader</p>
+          <h2 className="text-3xl font-semibold leading-tight text-primary-light md:text-4xl">What are you in the mood for?</h2>
+          <p className="max-w-3xl text-base leading-7 text-muted-dark">Pick a mood or describe what you want and what to avoid. You will get three story directions before generation, with detailed controls still available below.</p>
+        </div>
+        <div className="mt-6 flex flex-wrap gap-2.5">
+          {MOOD_OPTIONS.map((mood) => (
+            <button aria-pressed={selectedMood === mood.label} className={`min-h-11 flex-1 basis-[calc(50%-0.3125rem)] rounded-md border px-4 py-3 text-base font-semibold shadow-sm transition sm:flex-none sm:text-sm ${selectedMood === mood.label ? "border-lantern-gold bg-lantern-gold text-primary-dark shadow-[0_10px_28px_rgba(217,164,65,0.22)]" : "border-warm-paper/15 bg-deep-navy/80 text-muted-dark hover:border-aged-brass hover:bg-deep-navy hover:text-primary-light"}`} key={mood.label} onClick={() => setSelectedMood(mood.label)} type="button">
+              {mood.label}
+            </button>
           ))}
         </div>
-      ) : null}
+      </div>
+      <div className="px-5 py-5 md:px-7 md:py-6">
+        <label className="flex flex-col gap-2.5">
+          <span className="text-base font-semibold text-warm-paper md:text-sm">Describe the story you want</span>
+          <textarea className="min-h-36 rounded-md border border-aged-brass/35 bg-warm-paper px-4 py-3 text-base leading-7 text-primary-dark shadow-inner outline-none transition placeholder:text-muted-light focus:border-lantern-gold focus:ring-2 focus:ring-lantern-gold/30 md:text-sm md:leading-6" onChange={(event) => setReaderPrompt(event.target.value)} placeholder={PLACEHOLDER_PROMPT} value={readerPrompt} />
+        </label>
+        <button className="mt-5 min-h-12 w-full rounded-md bg-lantern-gold px-5 py-3.5 text-base font-semibold text-primary-dark shadow-[0_12px_32px_rgba(217,164,65,0.22)] transition hover:bg-aged-brass hover:text-primary-light sm:w-auto sm:text-sm" onClick={handleSuggestMatches} type="button">Suggest story matches</button>
+        {appliedDirectionTitle ? <p className="mt-5 rounded-md border border-sea-glass/35 bg-sea-glass/10 px-4 py-3 text-sm font-semibold leading-6 text-sea-glass">Loaded "{appliedDirectionTitle}" into Create an Episode.</p> : null}
+        {directions.length > 0 ? (
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            {directions.map((direction) => (
+              <article className="flex min-h-full flex-col rounded-md border border-lantern-gold/20 bg-deep-navy/85 p-5 shadow-soft" key={direction.title}>
+                <h3 className="text-lg font-semibold leading-7 text-primary-light">{direction.title}</h3>
+                <p className="mt-3 text-sm leading-7 text-muted-dark">{direction.premise}</p>
+                <p className="mt-4 rounded-md border border-aged-brass/25 bg-night-ink/70 px-3 py-2.5 text-sm leading-6 text-muted-dark"><span className="font-semibold text-lantern-gold">Tone:</span> {direction.tone}</p>
+                {direction.libraryTouchstones.length > 0 ? (
+                  <div className="mt-4 rounded-md border border-sea-glass/25 bg-sea-glass/10 px-3 py-3 text-sm leading-6 text-muted-dark">
+                    <p className="font-semibold text-sea-glass">Library touchstones</p>
+                    <ul className="mt-2 space-y-1.5">
+                      {direction.libraryTouchstones.map((asset) => (
+                        <li key={`${asset.assetType}-${asset.title}`}><span className="font-semibold text-primary-light">{ASSET_TYPE_LABELS[asset.assetType]}:</span> {asset.title}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                <p className="mt-4 text-sm leading-6 text-muted-dark">{direction.detail}</p>
+                <button className="mt-5 min-h-11 w-full rounded-md border border-lantern-gold/65 bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" onClick={() => handleUseDirection(direction)} type="button">Use this direction</button>
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
