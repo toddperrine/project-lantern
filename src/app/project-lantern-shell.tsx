@@ -74,6 +74,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
             {children}
           </div>
         </details>
+        <ReaderFeedbackEnhancer />
 
         <section className="grid gap-5 overflow-hidden rounded-md border border-warm-paper/10 bg-deep-navy shadow-soft md:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
           <div className="p-6 md:p-8">
@@ -129,6 +130,107 @@ function getNavHref(item: string): string {
   if (item === "Create") return "#advanced-story-controls";
   if (item === "Continue Series") return "#continue-series";
   return "#home";
+}
+
+function ReaderFeedbackEnhancer() {
+  const script = `
+(() => {
+  const choices = ["Missed", "Not quite", "Good", "Great", "Favorite"];
+  const reasons = ["Too slow", "Too generic", "Loved the character", "Loved the world", "Want more like this", "Not my taste"];
+
+  function findFeedbackCard() {
+    const headings = Array.from(document.querySelectorAll("h3"));
+    const heading = headings.find((item) => item.textContent?.trim() === "Did this story land?");
+    return heading?.closest("section") || null;
+  }
+
+  function styleSelectedButtons(card) {
+    const scoreButtons = Array.from(card.querySelectorAll("button[data-reader-score]"));
+    const selectedScore = card.getAttribute("data-reader-score");
+    scoreButtons.forEach((button) => {
+      const isSelected = button.getAttribute("data-reader-score") === selectedScore;
+      button.className = isSelected
+        ? "rounded-md border border-brass bg-brass px-3 py-2 text-sm font-semibold text-white transition"
+        : "rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-sm font-semibold text-ink transition hover:bg-white";
+    });
+  }
+
+  function addConfirmation(card) {
+    let confirmation = card.querySelector("[data-reader-feedback-confirmation]");
+    if (!confirmation) {
+      confirmation = document.createElement("p");
+      confirmation.setAttribute("data-reader-feedback-confirmation", "true");
+      confirmation.className = "mt-3 rounded-md border border-brass/25 bg-white/70 px-3 py-2 text-xs font-semibold leading-5 text-ink/65";
+      const saveButton = Array.from(card.querySelectorAll("button")).find((button) => ["Save Feedback", "Update Feedback"].includes(button.textContent?.trim() || ""));
+      saveButton?.insertAdjacentElement("afterend", confirmation);
+    }
+    confirmation.textContent = "Feedback saved locally. Thanks.";
+  }
+
+  function rewriteReasonButtons(container) {
+    const buttons = Array.from(container.querySelectorAll("button"));
+    buttons.forEach((button, index) => {
+      if (!reasons[index]) button.remove();
+    });
+    reasons.forEach((reason, index) => {
+      let button = buttons[index];
+      if (!button || !button.isConnected) {
+        button = document.createElement("button");
+        button.type = "button";
+        container.appendChild(button);
+      }
+      button.textContent = reason;
+      button.disabled = false;
+    });
+  }
+
+  function refreshCard(card) {
+    const description = Array.from(card.querySelectorAll("p")).find((item) => item.textContent?.includes("Optional feedback"));
+    if (description) description.textContent = "Optional reader feedback, saved locally with this story.";
+
+    const scoreGrid = card.querySelector(".sm\\:grid-cols-5");
+    if (scoreGrid) {
+      Array.from(scoreGrid.querySelectorAll("button")).forEach((button, index) => {
+        if (!choices[index]) return;
+        button.textContent = choices[index];
+        button.setAttribute("data-reader-score", String(index + 1));
+        button.onclick = () => {
+          card.setAttribute("data-reader-score", String(index + 1));
+          styleSelectedButtons(card);
+        };
+      });
+      styleSelectedButtons(card);
+    }
+
+    const label = Array.from(card.querySelectorAll("p")).find((item) => item.textContent?.includes("What worked") || item.textContent?.includes("What could") || item.textContent?.trim() === "Optional reason");
+    if (label) label.textContent = "Optional reason";
+    const reasonContainer = label?.nextElementSibling;
+    if (reasonContainer instanceof HTMLElement) rewriteReasonButtons(reasonContainer);
+  }
+
+  function enhanceCard(card) {
+    refreshCard(card);
+    if (card.getAttribute("data-reader-feedback-enhanced") === "true") return;
+    card.setAttribute("data-reader-feedback-enhanced", "true");
+    card.addEventListener("click", (event) => {
+      const target = event.target;
+      if (target instanceof HTMLButtonElement && ["Save Feedback", "Update Feedback"].includes(target.textContent?.trim() || "")) {
+        window.setTimeout(() => addConfirmation(card), 0);
+      }
+    });
+  }
+
+  function enhance() {
+    const card = findFeedbackCard();
+    if (card instanceof HTMLElement) enhanceCard(card);
+  }
+
+  enhance();
+  const observer = new MutationObserver(enhance);
+  observer.observe(document.body, { childList: true, subtree: true });
+})();`;
+
+  return <script dangerouslySetInnerHTML={{ __html: script }} />;
 }
 
 function ContinueSeriesSpotlight() {
