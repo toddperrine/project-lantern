@@ -41,6 +41,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="project-lantern-shell min-h-screen bg-night-ink text-primary-light md:bg-[radial-gradient(circle_at_top,rgba(217,164,65,0.10),transparent_34%),linear-gradient(180deg,#0B1020_0%,#111827_46%,#0B1020_100%)]">
+      <DevicePreviewModeStyles />
       <header className="sticky top-0 z-20 border-b border-lantern-gold/15 bg-night-ink/92 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-8">
           <div>
@@ -67,13 +68,13 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <div id="home" data-device-preview-content className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 transition-[max-width] duration-200 md:px-8 md:py-8">
-        <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+      <div id="home" data-device-preview-content className="mx-auto flex w-full max-w-7xl flex-col gap-8 overflow-x-hidden px-5 py-6 transition-[max-width] duration-200 md:px-8 md:py-8">
+        <div className="device-preview-stack device-preview-tablet-stack grid gap-5 lg:grid-cols-2 lg:items-start">
           <ContinueSeriesSpotlight />
           <ReaderMoodOnboarding />
         </div>
 
-        <section className="grid gap-5 overflow-hidden rounded-md border border-warm-paper/10 bg-deep-navy shadow-soft md:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
+        <section className="device-preview-stack device-preview-tablet-stack grid gap-5 overflow-hidden rounded-md border border-warm-paper/10 bg-deep-navy shadow-soft md:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
           <div className="p-6 md:p-8">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-lantern-gold">Stories</p>
             <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight text-primary-light md:text-6xl">Start a story that remembers the world you made.</h2>
@@ -116,7 +117,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         <StreamingRow id="stories" title="Stories" items={FEATURED_LIVING_SERIES} />
         <StreamingRow title="More Stories for You" items={NEW_EPISODES} accent="teal" />
 
-        <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
+        <section className="device-preview-stack device-preview-tablet-stack grid gap-5 lg:grid-cols-[1fr_1fr]">
           <div id="characters" className="scroll-mt-32 rounded-md border border-lantern-gold/20 bg-deep-navy p-5 shadow-soft">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-semibold text-primary-light">Characters You Follow</h2>
@@ -170,6 +171,49 @@ function PreviewModeToggle() {
   );
 }
 
+function DevicePreviewModeStyles() {
+  const css = `
+[data-device-preview-content="phone"] {
+  overflow-x: hidden;
+}
+
+[data-device-preview-content="phone"] .device-preview-stack {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+[data-device-preview-content="phone"] .device-preview-stack > *,
+[data-device-preview-content="phone"] .project-lantern-workspace,
+[data-device-preview-content="phone"] .project-lantern-workspace * {
+  min-width: 0;
+}
+
+[data-device-preview-content="phone"] h1,
+[data-device-preview-content="phone"] h2,
+[data-device-preview-content="phone"] h3,
+[data-device-preview-content="phone"] p,
+[data-device-preview-content="phone"] a,
+[data-device-preview-content="phone"] button,
+[data-device-preview-content="phone"] span {
+  overflow-wrap: anywhere;
+}
+
+[data-device-preview-content="phone"] a,
+[data-device-preview-content="phone"] button {
+  max-width: 100%;
+}
+
+[data-device-preview-content="tablet"] .device-preview-tablet-stack {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+[data-device-preview-content="tablet"] .device-preview-tablet-cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+`;
+
+  return <style dangerouslySetInnerHTML={{ __html: css }} />;
+}
+
 function DevicePreviewModeScript() {
   const script = `
 (() => {
@@ -206,6 +250,7 @@ function DevicePreviewModeScript() {
     if (content instanceof HTMLElement) {
       content.dataset.devicePreviewContent = selectedMode;
       content.style.maxWidth = modes[selectedMode].maxWidth;
+      content.style.overflowX = selectedMode === "full" ? "" : "hidden";
     }
 
     buttons.forEach((button) => {
@@ -232,7 +277,7 @@ function DevicePreviewModeScript() {
 function ReaderProfileAndFavorites() {
   return (
     <section data-reader-profile-section className="hidden rounded-md border border-lantern-gold/25 bg-deep-navy/95 p-5 shadow-soft ring-1 ring-lantern-gold/10 md:p-6">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <div className="device-preview-stack device-preview-tablet-stack grid gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
         <article className="rounded-md border border-warm-paper/10 bg-night-ink/65 p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sea-glass">Reader Profile</p>
           <h2 className="mt-2 text-2xl font-semibold text-primary-light">Your story taste</h2>
@@ -247,7 +292,7 @@ function ReaderProfileAndFavorites() {
             </div>
             <span data-reader-favorites-count className="rounded-md bg-lantern-gold px-2 py-1 text-xs font-semibold text-primary-dark">0</span>
           </div>
-          <div data-reader-favorites-list className="mt-4 grid gap-3 md:grid-cols-2" />
+          <div data-reader-favorites-list className="device-preview-stack device-preview-tablet-cards mt-4 grid gap-3 md:grid-cols-2" />
         </article>
       </div>
     </section>
@@ -517,7 +562,7 @@ function ContinueSeriesSpotlight() {
           <a className="rounded-md border border-aged-brass/60 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#advanced-story-controls">Continue this story</a>
         </div>
       </div>
-      <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+      <div className="device-preview-stack mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
         {CONTINUE_DIRECTIONS.map((direction) => (
           <article className="rounded-md border border-warm-paper/10 bg-night-ink/70 p-4" key={direction}>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-aged-brass">Next Story</p>
@@ -537,7 +582,7 @@ function StreamingRow({ accent = "gold", id, items, title }: { accent?: "gold" |
         <h2 className="text-xl font-semibold text-primary-light">{title}</h2>
         <span className={`rounded-md px-2 py-1 text-xs font-semibold ${badgeClass}`}>For you</span>
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="device-preview-stack device-preview-tablet-cards grid gap-4 md:grid-cols-3">
         {items.map((item) => (
           <article className="min-h-40 rounded-md border border-warm-paper/10 bg-deep-navy p-4 shadow-soft transition hover:border-lantern-gold/60" key={item.title}>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Story</p>
