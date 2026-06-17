@@ -47,5 +47,7 @@ Pull Request Rules
 Validation
 
 - Do not mark work complete if Vercel build fails.
+
+  If local sandbox access is requested or unavailable, do not request local permissions. Continue through GitHub-connected tools only.
 - Fix build/type errors before requesting review.
 - Update the visible version badge when user-facing functionality changes.
