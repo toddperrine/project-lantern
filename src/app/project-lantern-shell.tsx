@@ -74,7 +74,31 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
       </header>
 
       <div id="home" className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 md:px-8 md:py-8">
-        <ReaderMoodOnboarding />
+        <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+          <ContinueSeriesSpotlight />
+          <ReaderMoodOnboarding />
+        </div>
+
+        <section className="grid gap-5 overflow-hidden rounded-md border border-warm-paper/10 bg-deep-navy shadow-soft md:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
+          <div className="p-6 md:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-lantern-gold">Now Playing</p>
+            <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight text-primary-light md:text-6xl">Start a Living Series that remembers the world you made.</h2>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-muted-dark">Create an Episode from a Storyworld, favorite cast, and Story Spark. Saved Episodes can become the foundation for future series tools as Project Lantern grows.</p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#advanced-story-controls">Start a Living Series</a>
+              <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#continue-series">Continue Series</a>
+              <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#advanced-story-controls">Create an Episode</a>
+            </div>
+          </div>
+          <aside className="border-t border-warm-paper/10 bg-night-ink/70 p-6 md:border-l md:border-t-0 md:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sea-glass">Make This Mine</p>
+            <h3 className="mt-3 text-2xl font-semibold text-primary-light">Personal story worlds, ready to stream.</h3>
+            <div className="mt-5 grid gap-3 text-sm text-muted-dark">
+              <p className="rounded-md border border-tide-teal/35 bg-tide-teal/10 px-3 py-2">Living Series are built from your saved Storyworlds and Episodes.</p>
+              <p className="rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-3 py-2">Next Episodes can use the latest story context while the original Episode stays untouched.</p>
+            </div>
+          </aside>
+        </section>
 
         <details id="advanced-story-controls" className="group scroll-mt-32 rounded-md border border-sea-glass/25 bg-deep-navy/95 text-primary-light shadow-soft ring-1 ring-lantern-gold/10">
           <summary className="flex cursor-pointer list-none flex-col gap-4 border-b border-warm-paper/10 px-5 py-5 md:flex-row md:items-center md:justify-between md:px-7 [&::-webkit-details-marker]:hidden">
@@ -95,29 +119,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         <ReaderFeedbackEnhancer />
         <ReaderProfileAndFavorites />
 
-        <section className="grid gap-5 overflow-hidden rounded-md border border-warm-paper/10 bg-deep-navy shadow-soft md:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
-          <div className="p-6 md:p-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-lantern-gold">Now Playing</p>
-            <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight text-primary-light md:text-6xl">Start a Living Series that remembers the world you made.</h2>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-muted-dark">Create an Episode from a Storyworld, favorite cast, and Story Spark. Saved Episodes can become the foundation for future series tools as Project Lantern grows.</p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#advanced-story-controls">Start a Living Series</a>
-              <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#story-world-engine-generated-continuation-panel">Generate next episode</a>
-              <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#advanced-story-controls">Create an Episode</a>
-            </div>
-          </div>
-          <aside className="border-t border-warm-paper/10 bg-night-ink/70 p-6 md:border-l md:border-t-0 md:p-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sea-glass">Make This Mine</p>
-            <h3 className="mt-3 text-2xl font-semibold text-primary-light">Personal story worlds, ready to stream.</h3>
-            <div className="mt-5 grid gap-3 text-sm text-muted-dark">
-              <p className="rounded-md border border-tide-teal/35 bg-tide-teal/10 px-3 py-2">Living Series are built from your saved Storyworlds and Episodes.</p>
-              <p className="rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-3 py-2">Next Episodes can use the latest story context while the original Episode stays untouched.</p>
-            </div>
-          </aside>
-        </section>
-
-        <ContinueSeriesSpotlight />
-        <StreamingRow id="your-series" title="Featured Living Series" items={FEATURED_LIVING_SERIES} />
+        <StreamingRow id="your-series" title="Your Series" items={FEATURED_LIVING_SERIES} />
         <StreamingRow title="New Episodes for You" items={NEW_EPISODES} accent="teal" />
 
         <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
@@ -196,7 +198,7 @@ function ReaderFeedbackEnhancer() {
   }
 
   function normalizeText(value) {
-    return String(value || "").replace(/\\s+/g, " ").trim();
+    return String(value || "").replace(/\s+/g, " ").trim();
   }
 
   function slugify(value) {
@@ -204,7 +206,7 @@ function ReaderFeedbackEnhancer() {
   }
 
   function escapeHtml(value) {
-    return String(value || "").replace(/[&<>"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\\\"": "&quot;" }[character] || character));
+    return String(value || "").replace(/[&<>"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[character] || character));
   }
 
   function findFeedbackCard() {
@@ -423,17 +425,17 @@ function ReaderFeedbackEnhancer() {
 
 function ContinueSeriesSpotlight() {
   return (
-    <section id="continue-series" className="scroll-mt-32 grid gap-5 rounded-md border border-lantern-gold/25 bg-deep-navy/95 p-5 text-primary-light shadow-soft ring-1 ring-lantern-gold/10 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:p-7">
+    <section id="continue-series" className="scroll-mt-32 rounded-md border border-lantern-gold/25 bg-deep-navy/95 p-5 text-primary-light shadow-soft ring-1 ring-lantern-gold/10 md:p-7">
       <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold">Continue Series</p>
-        <h2 className="mt-2 text-3xl font-semibold leading-tight text-primary-light">Pick up where the last Episode left off.</h2>
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold">Continue Reading</p>
+        <h2 className="mt-2 text-3xl font-semibold leading-tight text-primary-light md:text-4xl">Pick up where you left off.</h2>
         <p className="mt-3 text-sm leading-6 text-muted-dark">Current story context, changed world state, and suggested next directions stay close to the post-story path.</p>
         <div className="mt-5 flex flex-wrap gap-3">
           <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#story-world-engine-generated-continuation-panel">Generate next episode</a>
           <a className="rounded-md border border-aged-brass/60 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#advanced-story-controls">Continue this series</a>
         </div>
       </div>
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
         {CONTINUE_DIRECTIONS.map((direction) => (
           <article className="rounded-md border border-warm-paper/10 bg-night-ink/70 p-4" key={direction}>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-aged-brass">Next Episode</p>
