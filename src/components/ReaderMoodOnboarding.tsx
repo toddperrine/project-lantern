@@ -11,6 +11,11 @@ type MoodOption = {
   tone: string;
 };
 
+type PromptSuggestion = {
+  label: string;
+  prompt: string;
+};
+
 type DirectionInputs = {
   worldBible: string;
   characterProfiles: string;
@@ -45,6 +50,49 @@ const MOOD_OPTIONS: MoodOption[] = [
   { label: "Surprise Me", genrePreset: "Literary Science Fiction", seed: "A strange invitation arrives with a rule nobody understands and a reward nobody fully trusts.", tone: "unexpected, vivid, and genre-blending" }
 ];
 
+const PROMPT_SUGGESTIONS: Record<string, PromptSuggestion[]> = {
+  Scary: [
+    { label: "No gore", prompt: "Make it scary through atmosphere and dread, but avoid gore, slashers, and ghosts." },
+    { label: "Small town", prompt: "Set the scary story in a familiar small town where one ordinary place feels wrong after dark." },
+    { label: "Brave hero", prompt: "Give me a scared but brave hero who has to protect someone they care about." }
+  ],
+  Mysterious: [
+    { label: "Hidden clue", prompt: "Build the mystery around one hidden clue that changes what everyone thought happened." },
+    { label: "Family secret", prompt: "Make the mystery personal, with a family secret and a discovery in an old place." },
+    { label: "No murder", prompt: "Keep it mysterious without murder; make the central question strange, emotional, and solvable." }
+  ],
+  Adventurous: [
+    { label: "Secret route", prompt: "Send the hero through a secret route that opens into a dangerous, wondrous place." },
+    { label: "Found crew", prompt: "Make it an adventure about a small found crew learning to trust each other." },
+    { label: "Big choice", prompt: "Give the adventure one thrilling choice where courage matters more than strength." }
+  ],
+  Funny: [
+    { label: "Low stakes", prompt: "Keep it funny and low-stakes, with a tiny problem spiraling into ridiculous consequences." },
+    { label: "Awkward magic", prompt: "Make the humor come from awkward magical rules interrupting normal life." },
+    { label: "Warm ending", prompt: "Make it playful and weird, but let the ending feel warm instead of mean." }
+  ],
+  Thoughtful: [
+    { label: "Quiet choice", prompt: "Center the story on a quiet choice that helps the hero understand what they have been avoiding." },
+    { label: "Memory place", prompt: "Set it in a place full of memory, where small details carry emotional weight." },
+    { label: "Soft sci-fi", prompt: "Use a subtle speculative idea to make an ordinary feeling easier to see." }
+  ],
+  Emotional: [
+    { label: "Second chance", prompt: "Give the hero a second chance to say something honest to someone who matters." },
+    { label: "Healing", prompt: "Make it tender and cathartic, with healing that feels earned rather than easy." },
+    { label: "Bittersweet", prompt: "Let the story be emotional and bittersweet, but not hopeless." }
+  ],
+  Relaxing: [
+    { label: "Cozy place", prompt: "Set it in a cozy, sensory place where a gentle discovery helps the hero feel steady." },
+    { label: "Low conflict", prompt: "Keep conflict soft and manageable, with wonder, kindness, and a calm ending." },
+    { label: "Small magic", prompt: "Use one small magical detail to make an ordinary day feel meaningful." }
+  ],
+  "Surprise Me": [
+    { label: "Strange invite", prompt: "Start with a strange invitation and take the story somewhere vivid and unexpected." },
+    { label: "Genre twist", prompt: "Blend genres in a surprising way while keeping the hero emotionally grounded." },
+    { label: "Wild rule", prompt: "Give the world one wild rule nobody understands at first, then reveal its cost." }
+  ]
+};
+
 const DEFAULT_MOOD = MOOD_OPTIONS[1];
 const PLACEHOLDER_PROMPT = "I want a scary story, but not a slasher and no ghosts. Make the hero feel like me, and set it in the town where I used to live.";
 const ASSET_TYPE_LABELS: Record<FirstPartyAsset["assetType"], string> = {
@@ -58,13 +106,26 @@ const ASSET_TYPE_LABELS: Record<FirstPartyAsset["assetType"], string> = {
 };
 
 export function ReaderMoodOnboarding() {
-  const [selectedMood, setSelectedMood] = useState(DEFAULT_MOOD.label);
+  const [selectedMood, setSelectedMood] = useState("");
   const [readerPrompt, setReaderPrompt] = useState("");
   const [directions, setDirections] = useState<StoryDirection[]>([]);
 
-  const activeMood = MOOD_OPTIONS.find((mood) => mood.label === selectedMood) ?? DEFAULT_MOOD;
+  const activeMood = MOOD_OPTIONS.find((mood) => mood.label === selectedMood);
+  const promptSuggestions = activeMood ? PROMPT_SUGGESTIONS[activeMood.label] ?? [] : [];
+
+  function handleMoodSelection(mood: MoodOption) {
+    setSelectedMood(mood.label);
+    setReaderPrompt("");
+    setDirections(mood.label === "Surprise Me" ? buildStoryDirections(mood, "") : []);
+  }
+
+  function handlePromptSuggestion(prompt: string) {
+    setReaderPrompt(prompt);
+    setDirections([]);
+  }
 
   function handleSuggestMatches() {
+    if (!activeMood) return;
     setDirections(buildStoryDirections(activeMood, readerPrompt));
   }
 
@@ -78,46 +139,58 @@ export function ReaderMoodOnboarding() {
         <div className="flex flex-col gap-3">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold">Start with the reader</p>
           <h2 className="text-3xl font-semibold leading-tight text-primary-light md:text-4xl">What are you in the mood for?</h2>
-          <p className="max-w-3xl text-base leading-7 text-muted-dark">Pick a mood or describe what you want and what to avoid. You will get three story directions before generation, with detailed controls still available below.</p>
+          <p className="max-w-3xl text-base leading-7 text-muted-dark">Pick a mood first. Then use a quick suggestion or add optional details only if you want a more specific story.</p>
         </div>
         <div className="mt-6 flex flex-wrap gap-2.5">
           {MOOD_OPTIONS.map((mood) => (
-            <button aria-pressed={selectedMood === mood.label} className={`min-h-11 flex-1 basis-[calc(50%-0.3125rem)] rounded-md border px-4 py-3 text-base font-semibold shadow-sm transition sm:flex-none sm:text-sm ${selectedMood === mood.label ? "border-lantern-gold bg-lantern-gold text-primary-dark shadow-[0_10px_28px_rgba(217,164,65,0.22)]" : "border-warm-paper/15 bg-deep-navy/80 text-muted-dark hover:border-aged-brass hover:bg-deep-navy hover:text-primary-light"}`} key={mood.label} onClick={() => setSelectedMood(mood.label)} type="button">
+            <button aria-pressed={selectedMood === mood.label} className={`min-h-11 flex-1 basis-[calc(50%-0.3125rem)] rounded-md border px-4 py-3 text-base font-semibold shadow-sm transition sm:flex-none sm:text-sm ${selectedMood === mood.label ? "border-lantern-gold bg-lantern-gold text-primary-dark shadow-[0_10px_28px_rgba(217,164,65,0.22)]" : "border-warm-paper/15 bg-deep-navy/80 text-muted-dark hover:border-aged-brass hover:bg-deep-navy hover:text-primary-light"}`} key={mood.label} onClick={() => handleMoodSelection(mood)} type="button">
               {mood.label}
             </button>
           ))}
         </div>
       </div>
-      <div className="px-5 py-5 md:px-7 md:py-6">
-        <label className="flex flex-col gap-2.5">
-          <span className="text-base font-semibold text-warm-paper md:text-sm">Describe the story you want</span>
-          <textarea className="min-h-36 rounded-md border border-aged-brass/35 bg-warm-paper px-4 py-3 text-base leading-7 text-primary-dark shadow-inner outline-none transition placeholder:text-muted-light focus:border-lantern-gold focus:ring-2 focus:ring-lantern-gold/30 md:text-sm md:leading-6" onChange={(event) => setReaderPrompt(event.target.value)} placeholder={PLACEHOLDER_PROMPT} value={readerPrompt} />
-        </label>
-        <button className="mt-5 min-h-12 w-full rounded-md bg-lantern-gold px-5 py-3.5 text-base font-semibold text-primary-dark shadow-[0_12px_32px_rgba(217,164,65,0.22)] transition hover:bg-aged-brass hover:text-primary-light sm:w-auto sm:text-sm" onClick={handleSuggestMatches} type="button">Suggest story matches</button>
-        {directions.length > 0 ? (
-          <div className="mt-6 grid gap-4 lg:grid-cols-3">
-            {directions.map((direction) => (
-              <article className="flex min-h-full flex-col rounded-md border border-lantern-gold/20 bg-deep-navy/85 p-5 shadow-soft" key={direction.title}>
-                <h3 className="text-lg font-semibold leading-7 text-primary-light">{direction.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-muted-dark">{direction.premise}</p>
-                <p className="mt-4 rounded-md border border-aged-brass/25 bg-night-ink/70 px-3 py-2.5 text-sm leading-6 text-muted-dark"><span className="font-semibold text-lantern-gold">Tone:</span> {direction.tone}</p>
-                {direction.libraryTouchstones.length > 0 ? (
-                  <div className="mt-4 rounded-md border border-sea-glass/25 bg-sea-glass/10 px-3 py-3 text-sm leading-6 text-muted-dark">
-                    <p className="font-semibold text-sea-glass">Library touchstones</p>
-                    <ul className="mt-2 space-y-1.5">
-                      {direction.libraryTouchstones.map((asset) => (
-                        <li key={`${asset.assetType}-${asset.title}`}><span className="font-semibold text-primary-light">{ASSET_TYPE_LABELS[asset.assetType]}:</span> {asset.title}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-                <p className="mt-4 text-sm leading-6 text-muted-dark">{direction.detail}</p>
-                <button className="mt-5 min-h-11 w-full rounded-md border border-lantern-gold/65 bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" onClick={() => handleGenerateDirection(direction)} type="button">Generate this story</button>
-              </article>
-            ))}
+      {activeMood ? (
+        <div className="px-5 py-5 md:px-7 md:py-6">
+          <div className="rounded-md border border-warm-paper/10 bg-deep-navy/70 px-4 py-4">
+            <p className="text-base font-semibold text-warm-paper md:text-sm">Try one of these</p>
+            <div className="mt-3 flex flex-wrap gap-2.5">
+              {promptSuggestions.map((suggestion) => (
+                <button aria-label={`Use prompt: ${suggestion.prompt}`} className="rounded-md border border-aged-brass/45 bg-night-ink/70 px-3 py-2 text-sm font-semibold leading-5 text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy hover:text-primary-light" key={suggestion.label} onClick={() => handlePromptSuggestion(suggestion.prompt)} type="button">
+                  {suggestion.label}
+                </button>
+              ))}
+            </div>
           </div>
-        ) : null}
-      </div>
+          <label className="mt-4 flex flex-col gap-2.5">
+            <span className="text-base font-semibold text-warm-paper md:text-sm">Describe exactly what you want <span className="font-normal text-muted-dark">optional</span></span>
+            <textarea className="min-h-24 rounded-md border border-aged-brass/35 bg-warm-paper px-4 py-3 text-base leading-7 text-primary-dark shadow-inner outline-none transition placeholder:text-muted-light focus:border-lantern-gold focus:ring-2 focus:ring-lantern-gold/30 md:text-sm md:leading-6" onChange={(event) => setReaderPrompt(event.target.value)} placeholder={PLACEHOLDER_PROMPT} value={readerPrompt} />
+          </label>
+          <button className="mt-5 min-h-12 w-full rounded-md bg-lantern-gold px-5 py-3.5 text-base font-semibold text-primary-dark shadow-[0_12px_32px_rgba(217,164,65,0.22)] transition hover:bg-aged-brass hover:text-primary-light sm:w-auto sm:text-sm" onClick={handleSuggestMatches} type="button">Suggest story matches</button>
+          {directions.length > 0 ? (
+            <div className="mt-6 grid gap-4 lg:grid-cols-3">
+              {directions.map((direction) => (
+                <article className="flex min-h-full flex-col rounded-md border border-lantern-gold/20 bg-deep-navy/85 p-5 shadow-soft" key={direction.title}>
+                  <h3 className="text-lg font-semibold leading-7 text-primary-light">{direction.title}</h3>
+                  <p className="mt-3 text-sm leading-7 text-muted-dark">{direction.premise}</p>
+                  <p className="mt-4 rounded-md border border-aged-brass/25 bg-night-ink/70 px-3 py-2.5 text-sm leading-6 text-muted-dark"><span className="font-semibold text-lantern-gold">Tone:</span> {direction.tone}</p>
+                  {direction.libraryTouchstones.length > 0 ? (
+                    <div className="mt-4 rounded-md border border-sea-glass/25 bg-sea-glass/10 px-3 py-3 text-sm leading-6 text-muted-dark">
+                      <p className="font-semibold text-sea-glass">Library touchstones</p>
+                      <ul className="mt-2 space-y-1.5">
+                        {direction.libraryTouchstones.map((asset) => (
+                          <li key={`${asset.assetType}-${asset.title}`}><span className="font-semibold text-primary-light">{ASSET_TYPE_LABELS[asset.assetType]}:</span> {asset.title}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  <p className="mt-4 text-sm leading-6 text-muted-dark">{direction.detail}</p>
+                  <button className="mt-5 min-h-11 w-full rounded-md border border-lantern-gold/65 bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" onClick={() => handleGenerateDirection(direction)} type="button">Generate this story</button>
+                </article>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
