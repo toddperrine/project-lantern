@@ -2,7 +2,14 @@ import type { ReactNode } from "react";
 import { getBuildInfo } from "@/lib/build-info";
 import { ReaderMoodOnboarding } from "@/components/ReaderMoodOnboarding";
 
-const NAV_ITEMS = ["Home", "Your Series", "Continue Series", "Create", "Discover", "Library"];
+const NAV_ITEMS = [
+  { label: "Home", href: "#home" },
+  { label: "Your Series", href: "#your-series" },
+  { label: "Continue Series", href: "#continue-series" },
+  { label: "Create", href: "#advanced-story-controls" },
+  { label: "Discover", status: "Coming soon" },
+  { label: "Library", status: "Coming soon" }
+];
 
 const FEATURED_LIVING_SERIES = [
   { title: "The Saltwind Door", detail: "Episode ideas shaped by a coastal mystery Story Spark", tone: "Cinematic mystery" },
@@ -34,22 +41,33 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-20 border-b border-lantern-gold/15 bg-night-ink/92 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-8">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-lantern-gold">Project Lantern</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-primary-light">Living Series</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-primary-light">Project Lantern</h1>
             <p aria-label="Project Lantern build information" className="mt-2 inline-flex w-fit rounded-md border border-aged-brass/40 bg-deep-navy/80 px-2.5 py-1 text-xs font-semibold leading-5 text-sea-glass shadow-soft">
               {versionLabel}
             </p>
           </div>
           <nav aria-label="Project Lantern" className="flex gap-2 overflow-x-auto pb-1 md:pb-0">
             {NAV_ITEMS.map((item, index) => (
-              <a
-                aria-current={index === 0 ? "page" : undefined}
-                className={`whitespace-nowrap rounded-md border px-3 py-2 text-sm font-semibold transition ${index === 0 ? "border-lantern-gold bg-lantern-gold text-primary-dark" : "border-warm-paper/10 bg-deep-navy text-muted-dark hover:border-aged-brass hover:text-primary-light"}`}
-                href={getNavHref(item)}
-                key={item}
-              >
-                {item}
-              </a>
+              item.href ? (
+                <a
+                  aria-current={index === 0 ? "page" : undefined}
+                  className={`whitespace-nowrap rounded-md border px-3 py-2 text-sm font-semibold transition ${index === 0 ? "border-lantern-gold bg-lantern-gold text-primary-dark" : "border-warm-paper/10 bg-deep-navy text-muted-dark hover:border-aged-brass hover:text-primary-light"}`}
+                  href={item.href}
+                  key={item.label}
+                >
+                  {item.label}
+                </a>
+              ) : (
+                <span
+                  aria-disabled="true"
+                  className="inline-flex cursor-not-allowed items-center gap-2 whitespace-nowrap rounded-md border border-warm-paper/10 bg-deep-navy/55 px-3 py-2 text-sm font-semibold text-muted-dark/70"
+                  key={item.label}
+                  title={`${item.label} coming soon`}
+                >
+                  {item.label}
+                  <span className="rounded-sm border border-aged-brass/35 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-aged-brass">Soon</span>
+                </span>
+              )
             ))}
           </nav>
         </div>
@@ -58,7 +76,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
       <div id="home" className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 md:px-8 md:py-8">
         <ReaderMoodOnboarding />
 
-        <details id="advanced-story-controls" className="group rounded-md border border-sea-glass/25 bg-deep-navy/95 text-primary-light shadow-soft ring-1 ring-lantern-gold/10">
+        <details id="advanced-story-controls" className="group scroll-mt-32 rounded-md border border-sea-glass/25 bg-deep-navy/95 text-primary-light shadow-soft ring-1 ring-lantern-gold/10">
           <summary className="flex cursor-pointer list-none flex-col gap-4 border-b border-warm-paper/10 px-5 py-5 md:flex-row md:items-center md:justify-between md:px-7 [&::-webkit-details-marker]:hidden">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sea-glass">Advanced Story Controls</p>
@@ -99,7 +117,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         </section>
 
         <ContinueSeriesSpotlight />
-        <StreamingRow title="Featured Living Series" items={FEATURED_LIVING_SERIES} />
+        <StreamingRow id="your-series" title="Featured Living Series" items={FEATURED_LIVING_SERIES} />
         <StreamingRow title="New Episodes for You" items={NEW_EPISODES} accent="teal" />
 
         <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
@@ -125,12 +143,6 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
       </div>
     </div>
   );
-}
-
-function getNavHref(item: string): string {
-  if (item === "Create") return "#advanced-story-controls";
-  if (item === "Continue Series") return "#continue-series";
-  return "#home";
 }
 
 function ReaderProfileAndFavorites() {
@@ -411,7 +423,7 @@ function ReaderFeedbackEnhancer() {
 
 function ContinueSeriesSpotlight() {
   return (
-    <section id="continue-series" className="grid gap-5 rounded-md border border-lantern-gold/25 bg-deep-navy/95 p-5 text-primary-light shadow-soft ring-1 ring-lantern-gold/10 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:p-7">
+    <section id="continue-series" className="scroll-mt-32 grid gap-5 rounded-md border border-lantern-gold/25 bg-deep-navy/95 p-5 text-primary-light shadow-soft ring-1 ring-lantern-gold/10 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:p-7">
       <div>
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold">Continue Series</p>
         <h2 className="mt-2 text-3xl font-semibold leading-tight text-primary-light">Pick up where the last Episode left off.</h2>
@@ -433,10 +445,10 @@ function ContinueSeriesSpotlight() {
   );
 }
 
-function StreamingRow({ accent = "gold", items, title }: { accent?: "gold" | "teal"; items: { title: string; detail: string; tone?: string }[]; title: string }) {
+function StreamingRow({ accent = "gold", id, items, title }: { accent?: "gold" | "teal"; id?: string; items: { title: string; detail: string; tone?: string }[]; title: string }) {
   const badgeClass = accent === "teal" ? "bg-tide-teal text-primary-light" : "bg-lantern-gold text-primary-dark";
   return (
-    <section>
+    <section className="scroll-mt-32" id={id}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-primary-light">{title}</h2>
         <span className={`rounded-md px-2 py-1 text-xs font-semibold ${badgeClass}`}>For you</span>
