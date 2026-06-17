@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { getBuildInfo } from "@/lib/build-info";
 import { ReaderMoodOnboarding } from "@/components/ReaderMoodOnboarding";
 
-const NAV_ITEMS = ["Home", "Your Series", "Create", "Discover", "Library"];
+const NAV_ITEMS = ["Home", "Your Series", "Continue Series", "Create", "Discover", "Library"];
 
 const FEATURED_LIVING_SERIES = [
   { title: "The Saltwind Door", detail: "Episode ideas shaped by a coastal mystery Story Spark", tone: "Cinematic mystery" },
@@ -14,6 +14,12 @@ const NEW_EPISODES = [
   { title: "A Storm Remembers Your Name", detail: "A tide-clock, a lost sibling, and one impossible harbor" },
   { title: "The House With Two Midnights", detail: "A family archive opens into a second version of home" },
   { title: "After the Fireflies Leave", detail: "A village bargains with the dark to keep one promise" }
+];
+
+const CONTINUE_DIRECTIONS = [
+  "Follow the biggest consequence into a fresh problem the cast cannot ignore.",
+  "Shift focus to the character most changed by the ending.",
+  "Reveal a new rule, cost, or secret that turns the ending into a beginning."
 ];
 
 const FAVORITE_CAST = ["The Keeper", "The Witness", "The Repairer", "The Singer"];
@@ -39,7 +45,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
               <a
                 aria-current={index === 0 ? "page" : undefined}
                 className={`whitespace-nowrap rounded-md border px-3 py-2 text-sm font-semibold transition ${index === 0 ? "border-lantern-gold bg-lantern-gold text-primary-dark" : "border-warm-paper/10 bg-deep-navy text-muted-dark hover:border-aged-brass hover:text-primary-light"}`}
-                href={item === "Create" ? "#advanced-story-controls" : "#home"}
+                href={getNavHref(item)}
                 key={item}
               >
                 {item}
@@ -76,6 +82,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
             <p className="mt-5 max-w-2xl text-base leading-7 text-muted-dark">Create an Episode from a Storyworld, favorite cast, and Story Spark. Saved Episodes can become the foundation for future series tools as Project Lantern grows.</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#advanced-story-controls">Start a Living Series</a>
+              <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#story-world-engine-generated-continuation-panel">Generate next episode</a>
               <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#advanced-story-controls">Create an Episode</a>
             </div>
           </div>
@@ -84,11 +91,12 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
             <h3 className="mt-3 text-2xl font-semibold text-primary-light">Personal story worlds, ready to stream.</h3>
             <div className="mt-5 grid gap-3 text-sm text-muted-dark">
               <p className="rounded-md border border-tide-teal/35 bg-tide-teal/10 px-3 py-2">Living Series are built from your saved Storyworlds and Episodes.</p>
-              <p className="rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-3 py-2">Future Episode tools can use saved story context while the original Episode stays untouched.</p>
+              <p className="rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-3 py-2">Next Episodes can use the latest story context while the original Episode stays untouched.</p>
             </div>
           </aside>
         </section>
 
+        <ContinueSeriesSpotlight />
         <StreamingRow title="Featured Living Series" items={FEATURED_LIVING_SERIES} />
         <StreamingRow title="New Episodes for You" items={NEW_EPISODES} accent="teal" />
 
@@ -114,6 +122,36 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         </section>
       </div>
     </div>
+  );
+}
+
+function getNavHref(item: string): string {
+  if (item === "Create") return "#advanced-story-controls";
+  if (item === "Continue Series") return "#continue-series";
+  return "#home";
+}
+
+function ContinueSeriesSpotlight() {
+  return (
+    <section id="continue-series" className="grid gap-5 rounded-md border border-lantern-gold/25 bg-warm-paper p-5 text-primary-dark shadow-soft md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:p-7">
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aged-brass">Continue Series</p>
+        <h2 className="mt-2 text-3xl font-semibold leading-tight text-primary-dark">Pick up where the last Episode left off.</h2>
+        <p className="mt-3 text-sm leading-6 text-muted-light">Current story context, changed world state, and suggested next directions stay close to the post-story path.</p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <a className="rounded-md bg-primary-dark px-4 py-3 text-sm font-semibold text-warm-paper transition hover:bg-deep-navy" href="#story-world-engine-generated-continuation-panel">Generate next episode</a>
+          <a className="rounded-md border border-aged-brass/60 bg-white/75 px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-lantern-gold" href="#advanced-story-controls">Continue this series</a>
+        </div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {CONTINUE_DIRECTIONS.map((direction) => (
+          <article className="rounded-md border border-primary-dark/10 bg-white/70 p-4" key={direction}>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-aged-brass">Next Episode</p>
+            <p className="mt-3 text-sm leading-6 text-muted-light">{direction}</p>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
