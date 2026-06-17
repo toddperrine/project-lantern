@@ -8,6 +8,8 @@ const NAV_ITEMS = [
   { label: "Worlds", href: "#worlds" }
 ];
 
+const PREVIEW_MODES = ["Phone", "Tablet", "Full"] as const;
+
 const FEATURED_LIVING_SERIES = [
   { title: "The Saltwind Door", detail: "A coastal mystery with room for your next favorite chapter", tone: "Cinematic mystery" },
   { title: "Lanterns Under Mercy Street", detail: "A warm suspense story with characters ready to follow", tone: "Warm suspense" },
@@ -43,9 +45,12 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-8">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-primary-light">Project Lantern</h1>
-            <p aria-label="Project Lantern build information" className="mt-2 inline-flex w-fit rounded-md border border-aged-brass/40 bg-deep-navy/80 px-2.5 py-1 text-xs font-semibold leading-5 text-sea-glass shadow-soft">
-              {versionLabel}
-            </p>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <p aria-label="Project Lantern build information" className="inline-flex w-fit rounded-md border border-aged-brass/40 bg-deep-navy/80 px-2.5 py-1 text-xs font-semibold leading-5 text-sea-glass shadow-soft">
+                {versionLabel}
+              </p>
+              <PreviewModeToggle />
+            </div>
           </div>
           <nav aria-label="Project Lantern" className="flex gap-2 overflow-x-auto pb-1 md:pb-0">
             {NAV_ITEMS.map((item, index) => (
@@ -62,7 +67,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <div id="home" className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 md:px-8 md:py-8">
+      <div id="home" data-device-preview-content className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 transition-[max-width] duration-200 md:px-8 md:py-8">
         <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
           <ContinueSeriesSpotlight />
           <ReaderMoodOnboarding />
@@ -137,8 +142,91 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
           </div>
         </section>
       </div>
+      <DevicePreviewModeScript />
     </div>
   );
+}
+
+function PreviewModeToggle() {
+  return (
+    <div aria-label="Preview mode" className="inline-flex w-fit rounded-md border border-warm-paper/10 bg-deep-navy/80 p-1 shadow-soft" data-device-preview-toggle role="group">
+      {PREVIEW_MODES.map((mode) => {
+        const value = mode.toLowerCase();
+        const isFull = mode === "Full";
+
+        return (
+          <button
+            aria-pressed={isFull ? "true" : "false"}
+            className={isFull ? "rounded-sm bg-lantern-gold px-2.5 py-1 text-xs font-semibold text-primary-dark transition" : "rounded-sm px-2.5 py-1 text-xs font-semibold text-muted-dark transition hover:text-primary-light"}
+            data-device-preview-mode={value}
+            key={mode}
+            type="button"
+          >
+            {mode}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function DevicePreviewModeScript() {
+  const script = `
+(() => {
+  const storageKey = "projectLantern.devicePreviewMode.v1";
+  const modes = {
+    phone: { maxWidth: "430px" },
+    tablet: { maxWidth: "820px" },
+    full: { maxWidth: "" }
+  };
+  const selectedClass = "rounded-sm bg-lantern-gold px-2.5 py-1 text-xs font-semibold text-primary-dark transition";
+  const defaultClass = "rounded-sm px-2.5 py-1 text-xs font-semibold text-muted-dark transition hover:text-primary-light";
+
+  function readMode() {
+    try {
+      const storedMode = window.localStorage.getItem(storageKey);
+      return storedMode && modes[storedMode] ? storedMode : "full";
+    } catch {
+      return "full";
+    }
+  }
+
+  function persistMode(mode) {
+    try {
+      window.localStorage.setItem(storageKey, mode);
+    } catch {
+    }
+  }
+
+  function applyMode(mode) {
+    const selectedMode = modes[mode] ? mode : "full";
+    const content = document.querySelector("[data-device-preview-content]");
+    const buttons = Array.from(document.querySelectorAll("[data-device-preview-mode]"));
+
+    if (content instanceof HTMLElement) {
+      content.dataset.devicePreviewContent = selectedMode;
+      content.style.maxWidth = modes[selectedMode].maxWidth;
+    }
+
+    buttons.forEach((button) => {
+      if (!(button instanceof HTMLButtonElement)) return;
+      const isSelected = button.dataset.devicePreviewMode === selectedMode;
+      button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+      button.className = isSelected ? selectedClass : defaultClass;
+    });
+
+    persistMode(selectedMode);
+  }
+
+  Array.from(document.querySelectorAll("[data-device-preview-mode]")).forEach((button) => {
+    if (!(button instanceof HTMLButtonElement)) return;
+    button.addEventListener("click", () => applyMode(button.dataset.devicePreviewMode || "full"));
+  });
+
+  applyMode(readMode());
+})();`;
+
+  return <script dangerouslySetInnerHTML={{ __html: script }} />;
 }
 
 function ReaderProfileAndFavorites() {
