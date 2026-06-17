@@ -9,6 +9,8 @@ const NAV_ITEMS = [
 ];
 
 const PREVIEW_MODES = ["Phone", "Tablet", "Full"] as const;
+const NAV_SELECTED_CLASS = "whitespace-nowrap rounded-md border border-lantern-gold bg-lantern-gold px-3 py-2 text-sm font-semibold text-primary-dark transition";
+const NAV_DEFAULT_CLASS = "whitespace-nowrap rounded-md border border-warm-paper/10 bg-deep-navy px-3 py-2 text-sm font-semibold text-muted-dark transition hover:border-aged-brass hover:text-primary-light";
 
 const FEATURED_LIVING_SERIES = [
   { title: "The Saltwind Door", detail: "A coastal mystery with room for your next favorite chapter", tone: "Cinematic mystery" },
@@ -23,9 +25,21 @@ const NEW_EPISODES = [
 ];
 
 const CONTINUE_DIRECTIONS = [
-  "Follow the biggest consequence into a fresh problem the characters cannot ignore.",
-  "Shift focus to the character most changed by the ending.",
-  "Reveal a new rule, cost, or secret that turns the ending into a beginning."
+  {
+    title: "Follow the Consequence",
+    detail: "Follow the biggest consequence into a fresh problem the characters cannot ignore.",
+    seed: "Continue the latest Project Lantern story by following the biggest consequence of the ending into a fresh problem the characters cannot ignore. Keep continuity with the current world and character state."
+  },
+  {
+    title: "Follow the Changed Character",
+    detail: "Shift focus to the character most changed by the ending.",
+    seed: "Continue the latest Project Lantern story by shifting focus to the character most changed by the ending. Let their new need, wound, or choice create the next episode."
+  },
+  {
+    title: "Reveal the New Rule",
+    detail: "Reveal a new rule, cost, or secret that turns the ending into a beginning.",
+    seed: "Continue the latest Project Lantern story by revealing a new rule, cost, or secret that turns the ending into a beginning. Preserve the original story while opening the next chapter."
+  }
 ];
 
 const FAVORITE_CAST = ["The Keeper", "The Witness", "The Repairer", "The Singer"];
@@ -57,7 +71,8 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
             {NAV_ITEMS.map((item, index) => (
               <a
                 aria-current={index === 0 ? "page" : undefined}
-                className={`whitespace-nowrap rounded-md border px-3 py-2 text-sm font-semibold transition ${index === 0 ? "border-lantern-gold bg-lantern-gold text-primary-dark" : "border-warm-paper/10 bg-deep-navy text-muted-dark hover:border-aged-brass hover:text-primary-light"}`}
+                className={index === 0 ? NAV_SELECTED_CLASS : NAV_DEFAULT_CLASS}
+                data-lantern-nav-link="true"
                 href={item.href}
                 key={item.label}
               >
@@ -75,7 +90,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
             <ReaderMoodOnboarding />
           </div>
 
-          <section className="device-preview-stack device-preview-tablet-stack grid gap-5 overflow-hidden rounded-md border border-warm-paper/10 bg-deep-navy shadow-soft md:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
+          <section id="stories" className="device-preview-stack device-preview-tablet-stack scroll-mt-32 grid gap-5 overflow-hidden rounded-md border border-warm-paper/10 bg-deep-navy shadow-soft md:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
             <div className="p-6 md:p-8">
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-lantern-gold">Stories</p>
               <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight text-primary-light md:text-6xl">Start a story that remembers the world you made.</h2>
@@ -115,7 +130,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
           <ReaderFeedbackEnhancer />
           <ReaderProfileAndFavorites />
 
-          <StreamingRow id="stories" title="Stories" items={FEATURED_LIVING_SERIES} />
+          <StreamingRow title="Story Library" items={FEATURED_LIVING_SERIES} />
           <StreamingRow title="More Stories for You" items={NEW_EPISODES} accent="teal" />
 
           <section className="device-preview-stack device-preview-tablet-stack grid gap-5 lg:grid-cols-[1fr_1fr]">
@@ -124,6 +139,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
                 <h2 className="text-xl font-semibold text-primary-light">Characters You Follow</h2>
                 <span className="rounded-md bg-sea-glass px-2 py-1 text-xs font-semibold text-primary-dark">Characters</span>
               </div>
+              <p className="mt-3 text-sm leading-6 text-muted-dark">These starter cast touchstones can shape new stories. Add or upload a cast in Story Controls to use your own characters.</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {FAVORITE_CAST.map((name) => <span className="rounded-md border border-sea-glass/35 bg-sea-glass/10 px-3 py-2 text-sm font-semibold text-sea-glass" key={name}>{name}</span>)}
               </div>
@@ -133,6 +149,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
                 <h2 className="text-xl font-semibold text-primary-light">Worlds</h2>
                 <span className="rounded-md bg-lantern-gold px-2 py-1 text-xs font-semibold text-primary-dark">Worlds</span>
               </div>
+              <p className="mt-3 text-sm leading-6 text-muted-dark">Followed places are available as story inspiration. Save or load a full world in Story Controls when you want generation to use a specific world bible.</p>
               <div className="mt-4 grid gap-2">
                 {FOLLOWED_WORLDS.map((world) => (
                   <article className="rounded-md border border-aged-brass/25 bg-night-ink/65 px-3 py-2" key={world.title}>
@@ -146,6 +163,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         </div>
       </div>
       <DevicePreviewModeScript />
+      <ProjectLanternActionScript />
     </div>
   );
 }
@@ -329,6 +347,144 @@ function DevicePreviewModeScript() {
   });
 
   applyMode(readMode());
+})();`;
+
+  return <script dangerouslySetInnerHTML={{ __html: script }} />;
+}
+
+function ProjectLanternActionScript() {
+  const continueDirections = JSON.stringify(CONTINUE_DIRECTIONS);
+  const script = `
+(() => {
+  const directions = ${continueDirections};
+  const navSelectedClass = ${JSON.stringify(NAV_SELECTED_CLASS)};
+  const navDefaultClass = ${JSON.stringify(NAV_DEFAULT_CLASS)};
+
+  function normalizeHash(hash) {
+    return hash && hash !== "#" ? hash : "#stories";
+  }
+
+  function setNavState(hash) {
+    const selectedHash = normalizeHash(hash);
+    Array.from(document.querySelectorAll("[data-lantern-nav-link]")).forEach((link) => {
+      if (!(link instanceof HTMLAnchorElement)) return;
+      const isSelected = link.hash === selectedHash;
+      link.className = isSelected ? navSelectedClass : navDefaultClass;
+      if (isSelected) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    });
+  }
+
+  function openStoryControls() {
+    const controls = document.getElementById("advanced-story-controls");
+    if (controls instanceof HTMLDetailsElement) controls.open = true;
+    controls?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function setStatus(message) {
+    const status = document.querySelector("[data-continuation-status]");
+    if (status) status.textContent = message;
+  }
+
+  function setNativeValue(element, value) {
+    if (!element) return;
+    const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), "value");
+    if (descriptor && descriptor.set) descriptor.set.call(element, value);
+    else element.value = value;
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function setSelectValue(workspace, value) {
+    const select = Array.from(workspace.querySelectorAll("select")).find((candidate) => Array.from(candidate.options).some((option) => option.value === value));
+    if (select) setNativeValue(select, value);
+  }
+
+  function buildContinuationInputs(direction) {
+    return {
+      worldBible: "# Continuing Project Lantern World\\n\\nUse the latest generated story as continuity context when it is present. Preserve established places, rules, promises, and changed world state. If no generated story is available yet, create an accessible Lantern story world around this continuation direction.\\n\\nContinuation direction: " + direction.detail,
+      characterProfiles: "## Continuing Cast\\n\\nUse the latest story characters when present. Focus on the character pressure implied by this direction and keep motivations emotionally legible.\\n\\nContinuation direction: " + direction.detail,
+      storySeed: direction.seed,
+      storyRules: "Write the next Project Lantern story from the selected continuation direction. Keep this as a continuation or next episode, not a reset. Do not overwrite or summarize the previous story. Use the direction as the main story pressure: " + direction.detail,
+      genrePreset: "Speculative Mystery",
+      narrativeArchitecture: "Revelation Story",
+      characterArc: "Positive Change Arc",
+      endingType: "Resolution with Residue",
+      lengthTarget: "Standard"
+    };
+  }
+
+  function clickGenerateButton(workspace) {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const generateButton = Array.from(workspace.querySelectorAll("button")).find((button) => button.textContent?.trim() === "Generate Story");
+        if (generateButton instanceof HTMLButtonElement && !generateButton.disabled) {
+          generateButton.click();
+          setStatus("Generating from the selected next-story direction.");
+        } else {
+          setStatus("Add story materials in Story Controls, then Generate Story will become available.");
+        }
+      });
+    });
+  }
+
+  function generateContinuation(index) {
+    const direction = directions[index] || directions[0];
+    const workspace = document.getElementById("create-episode");
+    if (!direction || !workspace) {
+      setStatus("Story Controls are unavailable right now.");
+      return;
+    }
+
+    const inputs = buildContinuationInputs(direction);
+    const textareas = Array.from(workspace.querySelectorAll("textarea"));
+    setNativeValue(textareas[0], inputs.worldBible);
+    setNativeValue(textareas[1], inputs.characterProfiles);
+    setNativeValue(textareas[2], inputs.storySeed);
+    setNativeValue(textareas[3], inputs.storyRules);
+    setSelectValue(workspace, inputs.genrePreset);
+    setSelectValue(workspace, inputs.narrativeArchitecture);
+    setSelectValue(workspace, inputs.characterArc);
+    setSelectValue(workspace, inputs.endingType);
+    setSelectValue(workspace, inputs.lengthTarget);
+    openStoryControls();
+    setStatus("Selected: " + direction.detail);
+    clickGenerateButton(workspace);
+  }
+
+  function wire() {
+    Array.from(document.querySelectorAll("[data-lantern-nav-link]")).forEach((link) => {
+      if (!(link instanceof HTMLAnchorElement) || link.dataset.lanternNavWired === "true") return;
+      link.dataset.lanternNavWired = "true";
+      link.addEventListener("click", () => setNavState(link.hash));
+    });
+
+    const continueButton = document.querySelector("[data-open-continuation-controls]");
+    if (continueButton instanceof HTMLAnchorElement && continueButton.dataset.wired !== "true") {
+      continueButton.dataset.wired = "true";
+      continueButton.addEventListener("click", () => {
+        openStoryControls();
+        setStatus("Story Controls are open. Use Generate Story or choose a Next Story card.");
+      });
+    }
+
+    const generateButton = document.querySelector("[data-generate-next-story]");
+    if (generateButton instanceof HTMLButtonElement && generateButton.dataset.wired !== "true") {
+      generateButton.dataset.wired = "true";
+      generateButton.addEventListener("click", () => generateContinuation(0));
+    }
+
+    Array.from(document.querySelectorAll("[data-continuation-index]")).forEach((button) => {
+      if (!(button instanceof HTMLButtonElement) || button.dataset.wired === "true") return;
+      button.dataset.wired = "true";
+      button.addEventListener("click", () => generateContinuation(Number(button.dataset.continuationIndex || 0)));
+    });
+
+    setNavState(window.location.hash);
+  }
+
+  wire();
+  window.addEventListener("hashchange", () => setNavState(window.location.hash));
 })();`;
 
   return <script dangerouslySetInnerHTML={{ __html: script }} />;
@@ -618,16 +774,18 @@ function ContinueSeriesSpotlight() {
         <h2 className="mt-2 text-3xl font-semibold leading-tight text-primary-light md:text-4xl">Pick up where you left off.</h2>
         <p className="mt-3 text-sm leading-6 text-muted-dark">Current story context, changed world state, and suggested next directions stay close to your latest story.</p>
         <div className="mt-5 flex flex-wrap gap-3">
-          <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#story-world-engine-generated-continuation-panel">Generate next story</a>
-          <a className="rounded-md border border-aged-brass/60 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#advanced-story-controls">Continue this story</a>
+          <button className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" data-generate-next-story="true" type="button">Generate next story</button>
+          <a className="rounded-md border border-aged-brass/60 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" data-open-continuation-controls="true" href="#advanced-story-controls">Continue this story</a>
         </div>
+        <p data-continuation-status className="mt-4 rounded-md border border-warm-paper/10 bg-night-ink/60 px-3 py-2 text-xs font-semibold leading-5 text-muted-dark">Choose a Next Story direction, or open Story Controls to continue manually.</p>
       </div>
       <div className="device-preview-stack mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-        {CONTINUE_DIRECTIONS.map((direction) => (
-          <article className="rounded-md border border-warm-paper/10 bg-night-ink/70 p-4" key={direction}>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-aged-brass">Next Story</p>
-            <p className="mt-3 text-sm leading-6 text-muted-dark">{direction}</p>
-          </article>
+        {CONTINUE_DIRECTIONS.map((direction, index) => (
+          <button className="rounded-md border border-warm-paper/10 bg-night-ink/70 p-4 text-left transition hover:border-lantern-gold/60 focus:outline-none focus:ring-2 focus:ring-lantern-gold/50" data-continuation-index={index} key={direction.detail} type="button">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-aged-brass">Next Story</span>
+            <span className="mt-2 block text-sm font-semibold leading-6 text-primary-light">{direction.title}</span>
+            <span className="mt-3 block text-sm leading-6 text-muted-dark">{direction.detail}</span>
+          </button>
         ))}
       </div>
     </section>
@@ -640,15 +798,18 @@ function StreamingRow({ accent = "gold", id, items, title }: { accent?: "gold" |
     <section className="scroll-mt-32" id={id}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-primary-light">{title}</h2>
-        <span className={`rounded-md px-2 py-1 text-xs font-semibold ${badgeClass}`}>For you</span>
+        <span className={`rounded-md px-2 py-1 text-xs font-semibold ${badgeClass}`}>Coming soon</span>
       </div>
       <div className="device-preview-stack device-preview-tablet-cards grid gap-4 md:grid-cols-3">
         {items.map((item) => (
-          <article className="min-h-40 rounded-md border border-warm-paper/10 bg-deep-navy p-4 shadow-soft transition hover:border-lantern-gold/60" key={item.title}>
+          <article aria-disabled="true" className="min-h-40 rounded-md border border-warm-paper/10 bg-deep-navy/80 p-4 opacity-85 shadow-soft" key={item.title}>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Story</p>
             <h3 className="mt-3 text-lg font-semibold leading-6 text-primary-light">{item.title}</h3>
             <p className="mt-3 text-sm leading-6 text-muted-dark">{item.detail}</p>
-            {item.tone ? <p className="mt-4 inline-flex rounded-md border border-sea-glass/35 bg-sea-glass/10 px-2 py-1 text-xs font-semibold text-sea-glass">{item.tone}</p> : null}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {item.tone ? <p className="inline-flex rounded-md border border-sea-glass/35 bg-sea-glass/10 px-2 py-1 text-xs font-semibold text-sea-glass">{item.tone}</p> : null}
+              <p className="inline-flex rounded-md border border-warm-paper/15 bg-warm-paper/5 px-2 py-1 text-xs font-semibold text-muted-dark">Coming soon</p>
+            </div>
           </article>
         ))}
       </div>
