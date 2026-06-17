@@ -30,8 +30,8 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
   const versionLabel = `Version ${buildInfo.appVersion} | ${buildInfo.buildEnvironment} | ${buildInfo.gitBranch} | ${buildInfo.shortCommitSha}`;
 
   return (
-    <div className="project-lantern-shell min-h-screen bg-night-ink text-primary-light">
-      <header className="sticky top-0 z-20 border-b border-warm-paper/10 bg-night-ink/90 backdrop-blur">
+    <div className="project-lantern-shell min-h-screen bg-night-ink text-primary-light md:bg-[radial-gradient(circle_at_top,rgba(217,164,65,0.10),transparent_34%),linear-gradient(180deg,#0B1020_0%,#111827_46%,#0B1020_100%)]">
+      <header className="sticky top-0 z-20 border-b border-lantern-gold/15 bg-night-ink/92 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-lantern-gold">Project Lantern</p>
@@ -58,14 +58,14 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
       <div id="home" className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 md:px-8 md:py-8">
         <ReaderMoodOnboarding />
 
-        <details id="advanced-story-controls" className="group rounded-md border border-lantern-gold/20 bg-warm-paper text-primary-dark shadow-soft">
-          <summary className="flex cursor-pointer list-none flex-col gap-4 border-b border-primary-dark/10 px-5 py-5 md:flex-row md:items-center md:justify-between md:px-7 [&::-webkit-details-marker]:hidden">
+        <details id="advanced-story-controls" className="group rounded-md border border-sea-glass/25 bg-deep-navy/95 text-primary-light shadow-soft ring-1 ring-lantern-gold/10">
+          <summary className="flex cursor-pointer list-none flex-col gap-4 border-b border-warm-paper/10 px-5 py-5 md:flex-row md:items-center md:justify-between md:px-7 [&::-webkit-details-marker]:hidden">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aged-brass">Advanced Story Controls</p>
-              <h2 className="mt-2 text-3xl font-semibold text-primary-dark">Create an Episode</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-light">Fine-tune the world, cast, spark, and structure for the next installment.</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sea-glass">Advanced Story Controls</p>
+              <h2 className="mt-2 text-3xl font-semibold text-primary-light">Create an Episode</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-dark">Fine-tune the world, cast, spark, and structure for the next installment.</p>
             </div>
-            <span className="inline-flex w-fit rounded-md border border-aged-brass/60 bg-white/75 px-3 py-2 text-sm font-semibold text-primary-dark transition group-open:bg-lantern-gold">
+            <span className="inline-flex w-fit rounded-md border border-aged-brass/60 bg-night-ink/70 px-3 py-2 text-sm font-semibold text-lantern-gold transition group-open:bg-lantern-gold group-open:text-primary-dark">
               <span className="group-open:hidden">Open controls</span>
               <span className="hidden group-open:inline">Hide controls</span>
             </span>
@@ -103,7 +103,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         <StreamingRow title="New Episodes for You" items={NEW_EPISODES} accent="teal" />
 
         <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
-          <div className="rounded-md border border-warm-paper/10 bg-deep-navy p-5">
+          <div className="rounded-md border border-lantern-gold/20 bg-deep-navy p-5 shadow-soft">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-semibold text-primary-light">Your Favorite Cast</h2>
               <span className="rounded-md bg-sea-glass px-2 py-1 text-xs font-semibold text-primary-dark">Cast</span>
@@ -112,7 +112,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
               {FAVORITE_CAST.map((name) => <span className="rounded-md border border-sea-glass/35 bg-sea-glass/10 px-3 py-2 text-sm font-semibold text-sea-glass" key={name}>{name}</span>)}
             </div>
           </div>
-          <div className="rounded-md border border-warm-paper/10 bg-deep-navy p-5">
+          <div className="rounded-md border border-lantern-gold/20 bg-deep-navy p-5 shadow-soft">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-semibold text-primary-light">Story Sparks</h2>
               <span className="rounded-md bg-lantern-gold px-2 py-1 text-xs font-semibold text-primary-dark">Episode seeds</span>
@@ -135,15 +135,15 @@ function getNavHref(item: string): string {
 
 function ReaderProfileAndFavorites() {
   return (
-    <section data-reader-profile-section className="hidden rounded-md border border-sea-glass/30 bg-deep-navy p-5 shadow-soft md:p-6">
+    <section data-reader-profile-section className="hidden rounded-md border border-lantern-gold/25 bg-deep-navy/95 p-5 shadow-soft ring-1 ring-lantern-gold/10 md:p-6">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-        <article className="rounded-md border border-warm-paper/10 bg-night-ink/55 p-4">
+        <article className="rounded-md border border-warm-paper/10 bg-night-ink/65 p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sea-glass">Reader Profile</p>
           <h2 className="mt-2 text-2xl font-semibold text-primary-light">Your story taste</h2>
           <p data-reader-profile-summary className="mt-3 text-sm leading-6 text-muted-dark">Feedback history will shape this summary.</p>
           <div data-reader-profile-preferences className="mt-4 flex flex-wrap gap-2" />
         </article>
-        <article data-reader-favorites-card className="hidden rounded-md border border-lantern-gold/25 bg-night-ink/55 p-4">
+        <article data-reader-favorites-card className="hidden rounded-md border border-lantern-gold/25 bg-night-ink/65 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-lantern-gold">Favorites</p>
@@ -310,7 +310,7 @@ function ReaderFeedbackEnhancer() {
     if (favoritesCard instanceof HTMLElement) favoritesCard.classList.toggle("hidden", favorites.length === 0);
     if (favoritesCount) favoritesCount.textContent = String(favorites.length);
     if (favoritesList) {
-      favoritesList.innerHTML = favorites.map((favorite) => "<article class=\"rounded-md border border-warm-paper/10 bg-deep-navy p-4\"><h3 class=\"text-base font-semibold leading-6 text-primary-light\">" + escapeHtml(favorite?.title || "Favorite story") + "</h3><p class=\"mt-2 text-sm leading-6 text-muted-dark\">" + escapeHtml(favorite?.detail || "Saved from reader feedback.") + "</p></article>").join("");
+      favoritesList.innerHTML = favorites.map((favorite) => "<article class=\"rounded-md border border-lantern-gold/20 bg-night-ink/70 p-4\"><h3 class=\"text-base font-semibold leading-6 text-primary-light\">" + escapeHtml(favorite?.title || "Favorite story") + "</h3><p class=\"mt-2 text-sm leading-6 text-muted-dark\">" + escapeHtml(favorite?.detail || "Saved from reader feedback.") + "</p></article>").join("");
     }
   }
 
@@ -321,8 +321,8 @@ function ReaderFeedbackEnhancer() {
       const isSelected = button.getAttribute("data-reader-score") === selectedScore;
       button.setAttribute("aria-pressed", isSelected ? "true" : "false");
       button.className = isSelected
-        ? "rounded-md border border-brass bg-brass px-3 py-2 text-sm font-semibold text-white transition"
-        : "rounded-md border border-ink/15 bg-white/75 px-3 py-2 text-sm font-semibold text-ink transition hover:bg-white";
+        ? "rounded-md border border-lantern-gold bg-lantern-gold px-3 py-2 text-sm font-semibold text-primary-dark transition"
+        : "rounded-md border border-warm-paper/15 bg-night-ink/70 px-3 py-2 text-sm font-semibold text-muted-dark transition hover:border-aged-brass hover:text-primary-light";
     });
   }
 
@@ -331,7 +331,7 @@ function ReaderFeedbackEnhancer() {
     if (!confirmation) {
       confirmation = document.createElement("p");
       confirmation.setAttribute("data-reader-feedback-confirmation", "true");
-      confirmation.className = "mt-3 rounded-md border border-brass/25 bg-white/70 px-3 py-2 text-xs font-semibold leading-5 text-ink/65";
+      confirmation.className = "mt-3 rounded-md border border-lantern-gold/25 bg-night-ink/70 px-3 py-2 text-xs font-semibold leading-5 text-muted-dark";
       const saveButton = Array.from(card.querySelectorAll("button")).find((button) => ["Save Feedback", "Update Feedback"].includes(button.textContent?.trim() || ""));
       saveButton?.insertAdjacentElement("afterend", confirmation);
     }
@@ -411,21 +411,21 @@ function ReaderFeedbackEnhancer() {
 
 function ContinueSeriesSpotlight() {
   return (
-    <section id="continue-series" className="grid gap-5 rounded-md border border-lantern-gold/25 bg-warm-paper p-5 text-primary-dark shadow-soft md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:p-7">
+    <section id="continue-series" className="grid gap-5 rounded-md border border-lantern-gold/25 bg-deep-navy/95 p-5 text-primary-light shadow-soft ring-1 ring-lantern-gold/10 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:p-7">
       <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aged-brass">Continue Series</p>
-        <h2 className="mt-2 text-3xl font-semibold leading-tight text-primary-dark">Pick up where the last Episode left off.</h2>
-        <p className="mt-3 text-sm leading-6 text-muted-light">Current story context, changed world state, and suggested next directions stay close to the post-story path.</p>
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold">Continue Series</p>
+        <h2 className="mt-2 text-3xl font-semibold leading-tight text-primary-light">Pick up where the last Episode left off.</h2>
+        <p className="mt-3 text-sm leading-6 text-muted-dark">Current story context, changed world state, and suggested next directions stay close to the post-story path.</p>
         <div className="mt-5 flex flex-wrap gap-3">
-          <a className="rounded-md bg-primary-dark px-4 py-3 text-sm font-semibold text-warm-paper transition hover:bg-deep-navy" href="#story-world-engine-generated-continuation-panel">Generate next episode</a>
-          <a className="rounded-md border border-aged-brass/60 bg-white/75 px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-lantern-gold" href="#advanced-story-controls">Continue this series</a>
+          <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#story-world-engine-generated-continuation-panel">Generate next episode</a>
+          <a className="rounded-md border border-aged-brass/60 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#advanced-story-controls">Continue this series</a>
         </div>
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         {CONTINUE_DIRECTIONS.map((direction) => (
-          <article className="rounded-md border border-primary-dark/10 bg-white/70 p-4" key={direction}>
+          <article className="rounded-md border border-warm-paper/10 bg-night-ink/70 p-4" key={direction}>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-aged-brass">Next Episode</p>
-            <p className="mt-3 text-sm leading-6 text-muted-light">{direction}</p>
+            <p className="mt-3 text-sm leading-6 text-muted-dark">{direction}</p>
           </article>
         ))}
       </div>
@@ -443,7 +443,7 @@ function StreamingRow({ accent = "gold", items, title }: { accent?: "gold" | "te
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         {items.map((item) => (
-          <article className="min-h-40 rounded-md border border-warm-paper/10 bg-deep-navy p-4 transition hover:border-lantern-gold/60" key={item.title}>
+          <article className="min-h-40 rounded-md border border-warm-paper/10 bg-deep-navy p-4 shadow-soft transition hover:border-lantern-gold/60" key={item.title}>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Living Series</p>
             <h3 className="mt-3 text-lg font-semibold leading-6 text-primary-light">{item.title}</h3>
             <p className="mt-3 text-sm leading-6 text-muted-dark">{item.detail}</p>
