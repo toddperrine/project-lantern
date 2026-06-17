@@ -39,7 +39,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
               <a
                 aria-current={index === 0 ? "page" : undefined}
                 className={`whitespace-nowrap rounded-md border px-3 py-2 text-sm font-semibold transition ${index === 0 ? "border-lantern-gold bg-lantern-gold text-primary-dark" : "border-warm-paper/10 bg-deep-navy text-muted-dark hover:border-aged-brass hover:text-primary-light"}`}
-                href={item === "Create" ? "#create-episode" : "#home"}
+                href={item === "Create" ? "#advanced-story-controls" : "#home"}
                 key={item}
               >
                 {item}
@@ -52,14 +52,31 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
       <div id="home" className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 md:px-8 md:py-8">
         <ReaderMoodOnboarding />
 
+        <details id="advanced-story-controls" className="group rounded-md border border-lantern-gold/20 bg-warm-paper text-primary-dark shadow-soft">
+          <summary className="flex cursor-pointer list-none flex-col gap-4 border-b border-primary-dark/10 px-5 py-5 md:flex-row md:items-center md:justify-between md:px-7 [&::-webkit-details-marker]:hidden">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aged-brass">Advanced Story Controls</p>
+              <h2 className="mt-2 text-3xl font-semibold text-primary-dark">Create an Episode</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-light">Fine-tune the world, cast, spark, and structure for the next installment.</p>
+            </div>
+            <span className="inline-flex w-fit rounded-md border border-aged-brass/60 bg-white/75 px-3 py-2 text-sm font-semibold text-primary-dark transition group-open:bg-lantern-gold">
+              <span className="group-open:hidden">Open controls</span>
+              <span className="hidden group-open:inline">Hide controls</span>
+            </span>
+          </summary>
+          <div id="create-episode" className="project-lantern-workspace">
+            {children}
+          </div>
+        </details>
+
         <section className="grid gap-5 overflow-hidden rounded-md border border-warm-paper/10 bg-deep-navy shadow-soft md:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
           <div className="p-6 md:p-8">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-lantern-gold">Now Playing</p>
             <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight text-primary-light md:text-6xl">Start a Living Series that remembers the world you made.</h2>
             <p className="mt-5 max-w-2xl text-base leading-7 text-muted-dark">Create an Episode from a Storyworld, favorite cast, and Story Spark. Saved Episodes can become the foundation for future series tools as Project Lantern grows.</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#create-episode">Start a Living Series</a>
-              <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#create-episode">Create an Episode</a>
+              <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#advanced-story-controls">Start a Living Series</a>
+              <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#advanced-story-controls">Create an Episode</a>
             </div>
           </div>
           <aside className="border-t border-warm-paper/10 bg-night-ink/70 p-6 md:border-l md:border-t-0 md:p-8">
@@ -94,15 +111,6 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
               {STORY_SPARKS.map((spark) => <p className="rounded-md border border-aged-brass/25 bg-night-ink/65 px-3 py-2 text-sm leading-6 text-muted-dark" key={spark}>{spark}</p>)}
             </div>
           </div>
-        </section>
-
-        <section id="create-episode" className="project-lantern-workspace rounded-md border border-lantern-gold/20 bg-warm-paper text-primary-dark shadow-soft">
-          <div className="border-b border-primary-dark/10 px-5 py-5 md:px-7">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aged-brass">Create</p>
-            <h2 className="mt-2 text-3xl font-semibold text-primary-dark">Create an Episode</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-light">Choose the world, cast, and spark for the next installment.</p>
-          </div>
-          {children}
         </section>
       </div>
     </div>
