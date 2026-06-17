@@ -3,18 +3,15 @@ import { getBuildInfo } from "@/lib/build-info";
 import { ReaderMoodOnboarding } from "@/components/ReaderMoodOnboarding";
 
 const NAV_ITEMS = [
-  { label: "Home", href: "#home" },
-  { label: "Your Series", href: "#your-series" },
-  { label: "Continue Series", href: "#continue-series" },
-  { label: "Create", href: "#advanced-story-controls" },
-  { label: "Discover", status: "Coming soon" },
-  { label: "Library", status: "Coming soon" }
+  { label: "Stories", href: "#stories" },
+  { label: "Characters", href: "#characters" },
+  { label: "Worlds", href: "#worlds" }
 ];
 
 const FEATURED_LIVING_SERIES = [
-  { title: "The Saltwind Door", detail: "Episode ideas shaped by a coastal mystery Story Spark", tone: "Cinematic mystery" },
-  { title: "Lanterns Under Mercy Street", detail: "A saved cast and warm suspense premise to explore", tone: "Warm suspense" },
-  { title: "The Orchard That Remembers", detail: "A changed world state with room for another Episode", tone: "Mythic quiet" }
+  { title: "The Saltwind Door", detail: "A coastal mystery with room for your next favorite chapter", tone: "Cinematic mystery" },
+  { title: "Lanterns Under Mercy Street", detail: "A warm suspense story with characters ready to follow", tone: "Warm suspense" },
+  { title: "The Orchard That Remembers", detail: "A changed world with another story waiting inside it", tone: "Mythic quiet" }
 ];
 
 const NEW_EPISODES = [
@@ -24,13 +21,17 @@ const NEW_EPISODES = [
 ];
 
 const CONTINUE_DIRECTIONS = [
-  "Follow the biggest consequence into a fresh problem the cast cannot ignore.",
+  "Follow the biggest consequence into a fresh problem the characters cannot ignore.",
   "Shift focus to the character most changed by the ending.",
   "Reveal a new rule, cost, or secret that turns the ending into a beginning."
 ];
 
 const FAVORITE_CAST = ["The Keeper", "The Witness", "The Repairer", "The Singer"];
 const STORY_SPARKS = ["A map changes only when no one looks", "An old radio speaks in tomorrow's weather", "A train arrives carrying letters from the missing"];
+const FOLLOWED_WORLDS = STORY_SPARKS.map((detail, index) => ({
+  title: ["Saltwind Coast", "Mercy Street", "The Remembering Orchard"][index] || "A World You Follow",
+  detail
+}));
 
 export function ProjectLanternShell({ children }: { children: ReactNode }) {
   const buildInfo = getBuildInfo();
@@ -48,26 +49,14 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
           </div>
           <nav aria-label="Project Lantern" className="flex gap-2 overflow-x-auto pb-1 md:pb-0">
             {NAV_ITEMS.map((item, index) => (
-              item.href ? (
-                <a
-                  aria-current={index === 0 ? "page" : undefined}
-                  className={`whitespace-nowrap rounded-md border px-3 py-2 text-sm font-semibold transition ${index === 0 ? "border-lantern-gold bg-lantern-gold text-primary-dark" : "border-warm-paper/10 bg-deep-navy text-muted-dark hover:border-aged-brass hover:text-primary-light"}`}
-                  href={item.href}
-                  key={item.label}
-                >
-                  {item.label}
-                </a>
-              ) : (
-                <span
-                  aria-disabled="true"
-                  className="inline-flex cursor-not-allowed items-center gap-2 whitespace-nowrap rounded-md border border-warm-paper/10 bg-deep-navy/55 px-3 py-2 text-sm font-semibold text-muted-dark/70"
-                  key={item.label}
-                  title={`${item.label} coming soon`}
-                >
-                  {item.label}
-                  <span className="rounded-sm border border-aged-brass/35 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-aged-brass">Soon</span>
-                </span>
-              )
+              <a
+                aria-current={index === 0 ? "page" : undefined}
+                className={`whitespace-nowrap rounded-md border px-3 py-2 text-sm font-semibold transition ${index === 0 ? "border-lantern-gold bg-lantern-gold text-primary-dark" : "border-warm-paper/10 bg-deep-navy text-muted-dark hover:border-aged-brass hover:text-primary-light"}`}
+                href={item.href}
+                key={item.label}
+              >
+                {item.label}
+              </a>
             ))}
           </nav>
         </div>
@@ -81,21 +70,21 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
 
         <section className="grid gap-5 overflow-hidden rounded-md border border-warm-paper/10 bg-deep-navy shadow-soft md:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
           <div className="p-6 md:p-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-lantern-gold">Now Playing</p>
-            <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight text-primary-light md:text-6xl">Start a Living Series that remembers the world you made.</h2>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-muted-dark">Create an Episode from a Storyworld, favorite cast, and Story Spark. Saved Episodes can become the foundation for future series tools as Project Lantern grows.</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-lantern-gold">Stories</p>
+            <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight text-primary-light md:text-6xl">Start a story that remembers the world you made.</h2>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-muted-dark">Create a new story from a world, characters you follow, and the kind of reading mood you want. Saved stories can become the foundation for future chapters as Project Lantern grows.</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#advanced-story-controls">Start a Living Series</a>
-              <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#continue-series">Continue Series</a>
-              <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#advanced-story-controls">Create an Episode</a>
+              <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#advanced-story-controls">Start a Story</a>
+              <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#continue-series">Continue Reading</a>
+              <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#characters">Characters</a>
             </div>
           </div>
           <aside className="border-t border-warm-paper/10 bg-night-ink/70 p-6 md:border-l md:border-t-0 md:p-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sea-glass">Make This Mine</p>
-            <h3 className="mt-3 text-2xl font-semibold text-primary-light">Personal story worlds, ready to stream.</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sea-glass">Worlds</p>
+            <h3 className="mt-3 text-2xl font-semibold text-primary-light">Personal story worlds, ready to continue.</h3>
             <div className="mt-5 grid gap-3 text-sm text-muted-dark">
-              <p className="rounded-md border border-tide-teal/35 bg-tide-teal/10 px-3 py-2">Living Series are built from your saved Storyworlds and Episodes.</p>
-              <p className="rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-3 py-2">Next Episodes can use the latest story context while the original Episode stays untouched.</p>
+              <p className="rounded-md border border-tide-teal/35 bg-tide-teal/10 px-3 py-2">Stories are built from your saved worlds, characters, and reading history.</p>
+              <p className="rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-3 py-2">Next chapters can use the latest story context while the original story stays untouched.</p>
             </div>
           </aside>
         </section>
@@ -103,9 +92,9 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         <details id="advanced-story-controls" className="group scroll-mt-32 rounded-md border border-sea-glass/25 bg-deep-navy/95 text-primary-light shadow-soft ring-1 ring-lantern-gold/10">
           <summary className="flex cursor-pointer list-none flex-col gap-4 border-b border-warm-paper/10 px-5 py-5 md:flex-row md:items-center md:justify-between md:px-7 [&::-webkit-details-marker]:hidden">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sea-glass">Advanced Story Controls</p>
-              <h2 className="mt-2 text-3xl font-semibold text-primary-light">Create an Episode</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-dark">Fine-tune the world, cast, spark, and structure for the next installment.</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sea-glass">Story Controls</p>
+              <h2 className="mt-2 text-3xl font-semibold text-primary-light">Create a Story</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-dark">Fine-tune the world, characters, and shape of the next story.</p>
             </div>
             <span className="inline-flex w-fit rounded-md border border-aged-brass/60 bg-night-ink/70 px-3 py-2 text-sm font-semibold text-lantern-gold transition group-open:bg-lantern-gold group-open:text-primary-dark">
               <span className="group-open:hidden">Open controls</span>
@@ -119,26 +108,31 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         <ReaderFeedbackEnhancer />
         <ReaderProfileAndFavorites />
 
-        <StreamingRow id="your-series" title="Your Series" items={FEATURED_LIVING_SERIES} />
-        <StreamingRow title="New Episodes for You" items={NEW_EPISODES} accent="teal" />
+        <StreamingRow id="stories" title="Stories" items={FEATURED_LIVING_SERIES} />
+        <StreamingRow title="More Stories for You" items={NEW_EPISODES} accent="teal" />
 
         <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
-          <div className="rounded-md border border-lantern-gold/20 bg-deep-navy p-5 shadow-soft">
+          <div id="characters" className="scroll-mt-32 rounded-md border border-lantern-gold/20 bg-deep-navy p-5 shadow-soft">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold text-primary-light">Your Favorite Cast</h2>
-              <span className="rounded-md bg-sea-glass px-2 py-1 text-xs font-semibold text-primary-dark">Cast</span>
+              <h2 className="text-xl font-semibold text-primary-light">Characters You Follow</h2>
+              <span className="rounded-md bg-sea-glass px-2 py-1 text-xs font-semibold text-primary-dark">Characters</span>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               {FAVORITE_CAST.map((name) => <span className="rounded-md border border-sea-glass/35 bg-sea-glass/10 px-3 py-2 text-sm font-semibold text-sea-glass" key={name}>{name}</span>)}
             </div>
           </div>
-          <div className="rounded-md border border-lantern-gold/20 bg-deep-navy p-5 shadow-soft">
+          <div id="worlds" className="scroll-mt-32 rounded-md border border-lantern-gold/20 bg-deep-navy p-5 shadow-soft">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold text-primary-light">Story Sparks</h2>
-              <span className="rounded-md bg-lantern-gold px-2 py-1 text-xs font-semibold text-primary-dark">Episode seeds</span>
+              <h2 className="text-xl font-semibold text-primary-light">Worlds</h2>
+              <span className="rounded-md bg-lantern-gold px-2 py-1 text-xs font-semibold text-primary-dark">Worlds</span>
             </div>
             <div className="mt-4 grid gap-2">
-              {STORY_SPARKS.map((spark) => <p className="rounded-md border border-aged-brass/25 bg-night-ink/65 px-3 py-2 text-sm leading-6 text-muted-dark" key={spark}>{spark}</p>)}
+              {FOLLOWED_WORLDS.map((world) => (
+                <article className="rounded-md border border-aged-brass/25 bg-night-ink/65 px-3 py-2" key={world.title}>
+                  <h3 className="text-sm font-semibold text-primary-light">{world.title}</h3>
+                  <p className="mt-1 text-sm leading-6 text-muted-dark">{world.detail}</p>
+                </article>
+              ))}
             </div>
           </div>
         </section>
@@ -429,16 +423,16 @@ function ContinueSeriesSpotlight() {
       <div>
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold">Continue Reading</p>
         <h2 className="mt-2 text-3xl font-semibold leading-tight text-primary-light md:text-4xl">Pick up where you left off.</h2>
-        <p className="mt-3 text-sm leading-6 text-muted-dark">Current story context, changed world state, and suggested next directions stay close to the post-story path.</p>
+        <p className="mt-3 text-sm leading-6 text-muted-dark">Current story context, changed world state, and suggested next directions stay close to your latest story.</p>
         <div className="mt-5 flex flex-wrap gap-3">
-          <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#story-world-engine-generated-continuation-panel">Generate next episode</a>
-          <a className="rounded-md border border-aged-brass/60 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#advanced-story-controls">Continue this series</a>
+          <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#story-world-engine-generated-continuation-panel">Generate next story</a>
+          <a className="rounded-md border border-aged-brass/60 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#advanced-story-controls">Continue this story</a>
         </div>
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
         {CONTINUE_DIRECTIONS.map((direction) => (
           <article className="rounded-md border border-warm-paper/10 bg-night-ink/70 p-4" key={direction}>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-aged-brass">Next Episode</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-aged-brass">Next Story</p>
             <p className="mt-3 text-sm leading-6 text-muted-dark">{direction}</p>
           </article>
         ))}
@@ -458,7 +452,7 @@ function StreamingRow({ accent = "gold", id, items, title }: { accent?: "gold" |
       <div className="grid gap-4 md:grid-cols-3">
         {items.map((item) => (
           <article className="min-h-40 rounded-md border border-warm-paper/10 bg-deep-navy p-4 shadow-soft transition hover:border-lantern-gold/60" key={item.title}>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Living Series</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Story</p>
             <h3 className="mt-3 text-lg font-semibold leading-6 text-primary-light">{item.title}</h3>
             <p className="mt-3 text-sm leading-6 text-muted-dark">{item.detail}</p>
             {item.tone ? <p className="mt-4 inline-flex rounded-md border border-sea-glass/35 bg-sea-glass/10 px-2 py-1 text-xs font-semibold text-sea-glass">{item.tone}</p> : null}
