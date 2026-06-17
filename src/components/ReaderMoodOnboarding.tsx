@@ -61,18 +61,15 @@ export function ReaderMoodOnboarding() {
   const [selectedMood, setSelectedMood] = useState(DEFAULT_MOOD.label);
   const [readerPrompt, setReaderPrompt] = useState("");
   const [directions, setDirections] = useState<StoryDirection[]>([]);
-  const [appliedDirectionTitle, setAppliedDirectionTitle] = useState("");
 
   const activeMood = MOOD_OPTIONS.find((mood) => mood.label === selectedMood) ?? DEFAULT_MOOD;
 
   function handleSuggestMatches() {
     setDirections(buildStoryDirections(activeMood, readerPrompt));
-    setAppliedDirectionTitle("");
   }
 
-  function handleUseDirection(direction: StoryDirection) {
-    applyDirectionToGenerator(direction.inputs);
-    setAppliedDirectionTitle(direction.title);
+  function handleGenerateDirection(direction: StoryDirection) {
+    generateDirectionStory(direction.inputs);
   }
 
   return (
@@ -97,7 +94,6 @@ export function ReaderMoodOnboarding() {
           <textarea className="min-h-36 rounded-md border border-aged-brass/35 bg-warm-paper px-4 py-3 text-base leading-7 text-primary-dark shadow-inner outline-none transition placeholder:text-muted-light focus:border-lantern-gold focus:ring-2 focus:ring-lantern-gold/30 md:text-sm md:leading-6" onChange={(event) => setReaderPrompt(event.target.value)} placeholder={PLACEHOLDER_PROMPT} value={readerPrompt} />
         </label>
         <button className="mt-5 min-h-12 w-full rounded-md bg-lantern-gold px-5 py-3.5 text-base font-semibold text-primary-dark shadow-[0_12px_32px_rgba(217,164,65,0.22)] transition hover:bg-aged-brass hover:text-primary-light sm:w-auto sm:text-sm" onClick={handleSuggestMatches} type="button">Suggest story matches</button>
-        {appliedDirectionTitle ? <p className="mt-5 rounded-md border border-sea-glass/35 bg-sea-glass/10 px-4 py-3 text-sm font-semibold leading-6 text-sea-glass">Loaded "{appliedDirectionTitle}" into Create an Episode.</p> : null}
         {directions.length > 0 ? (
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
             {directions.map((direction) => (
@@ -116,7 +112,7 @@ export function ReaderMoodOnboarding() {
                   </div>
                 ) : null}
                 <p className="mt-4 text-sm leading-6 text-muted-dark">{direction.detail}</p>
-                <button className="mt-5 min-h-11 w-full rounded-md border border-lantern-gold/65 bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" onClick={() => handleUseDirection(direction)} type="button">Use this direction</button>
+                <button className="mt-5 min-h-11 w-full rounded-md border border-lantern-gold/65 bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" onClick={() => handleGenerateDirection(direction)} type="button">Generate this story</button>
               </article>
             ))}
           </div>
@@ -227,10 +223,7 @@ function formatLibraryGuidance(assets: LibraryTouchstone[]) {
   return assets.map((asset) => `- ${ASSET_TYPE_LABELS[asset.assetType]}: ${asset.title}. ${asset.description}`).join("\n");
 }
 
-function applyDirectionToGenerator(inputs: DirectionInputs) {
-  const advancedControls = document.getElementById("advanced-story-controls");
-  if (advancedControls instanceof HTMLDetailsElement) advancedControls.open = true;
-
+function generateDirectionStory(inputs: DirectionInputs) {
   const workspace = document.getElementById("create-episode");
   if (!workspace) return;
 
@@ -244,7 +237,16 @@ function applyDirectionToGenerator(inputs: DirectionInputs) {
   setSelectValue(workspace, inputs.characterArc);
   setSelectValue(workspace, inputs.endingType);
   setSelectValue(workspace, inputs.lengthTarget);
-  workspace.scrollIntoView({ behavior: "smooth", block: "start" });
+  clickGenerateButton(workspace);
+}
+
+function clickGenerateButton(workspace: HTMLElement) {
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      const generateButton = Array.from(workspace.querySelectorAll("button")).find((button) => button.textContent?.trim() === "Generate Story");
+      if (generateButton instanceof HTMLButtonElement && !generateButton.disabled) generateButton.click();
+    });
+  });
 }
 
 function setTextAreaValue(textarea: HTMLTextAreaElement | undefined, value: string) {
