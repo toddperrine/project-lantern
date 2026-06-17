@@ -43,11 +43,11 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
     <div className="project-lantern-shell min-h-screen bg-night-ink text-primary-light md:bg-[radial-gradient(circle_at_top,rgba(217,164,65,0.10),transparent_34%),linear-gradient(180deg,#0B1020_0%,#111827_46%,#0B1020_100%)]">
       <DevicePreviewModeStyles />
       <header className="sticky top-0 z-20 border-b border-lantern-gold/15 bg-night-ink/92 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-8">
-          <div>
+        <div data-device-preview-header-inner className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-5 py-4 transition-[max-width,padding] duration-200 md:flex-row md:items-center md:justify-between md:px-8">
+          <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight text-primary-light">Project Lantern</h1>
             <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <p aria-label="Project Lantern build information" className="inline-flex w-fit rounded-md border border-aged-brass/40 bg-deep-navy/80 px-2.5 py-1 text-xs font-semibold leading-5 text-sea-glass shadow-soft">
+              <p aria-label="Project Lantern build information" className="inline-flex max-w-full rounded-md border border-aged-brass/40 bg-deep-navy/80 px-2.5 py-1 text-xs font-semibold leading-5 text-sea-glass shadow-soft">
                 {versionLabel}
               </p>
               <PreviewModeToggle />
@@ -68,80 +68,82 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <div id="home" data-device-preview-content className="mx-auto flex w-full max-w-7xl flex-col gap-8 overflow-x-hidden px-5 py-6 transition-[max-width] duration-200 md:px-8 md:py-8">
-        <div className="device-preview-stack device-preview-tablet-stack grid gap-5 lg:grid-cols-2 lg:items-start">
-          <ContinueSeriesSpotlight />
-          <ReaderMoodOnboarding />
+      <div data-device-preview-stage className="mx-auto w-full transition-[max-width,padding,margin] duration-200">
+        <div id="home" data-device-preview-content className="mx-auto flex w-full max-w-7xl flex-col gap-8 overflow-x-hidden px-5 py-6 transition-[max-width,padding] duration-200 md:px-8 md:py-8">
+          <div className="device-preview-stack device-preview-tablet-stack grid gap-5 lg:grid-cols-2 lg:items-start">
+            <ContinueSeriesSpotlight />
+            <ReaderMoodOnboarding />
+          </div>
+
+          <section className="device-preview-stack device-preview-tablet-stack grid gap-5 overflow-hidden rounded-md border border-warm-paper/10 bg-deep-navy shadow-soft md:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
+            <div className="p-6 md:p-8">
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-lantern-gold">Stories</p>
+              <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight text-primary-light md:text-6xl">Start a story that remembers the world you made.</h2>
+              <p className="mt-5 max-w-2xl text-base leading-7 text-muted-dark">Create a new story from a world, characters you follow, and the kind of reading mood you want. Saved stories can become the foundation for future chapters as Project Lantern grows.</p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#advanced-story-controls">Start a Story</a>
+                <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#continue-series">Continue Reading</a>
+                <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#characters">Characters</a>
+              </div>
+            </div>
+            <aside className="border-t border-warm-paper/10 bg-night-ink/70 p-6 md:border-l md:border-t-0 md:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sea-glass">Worlds</p>
+              <h3 className="mt-3 text-2xl font-semibold text-primary-light">Personal story worlds, ready to continue.</h3>
+              <div className="mt-5 grid gap-3 text-sm text-muted-dark">
+                <p className="rounded-md border border-tide-teal/35 bg-tide-teal/10 px-3 py-2">Stories are built from your saved worlds, characters, and reading history.</p>
+                <p className="rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-3 py-2">Next chapters can use the latest story context while the original story stays untouched.</p>
+              </div>
+            </aside>
+          </section>
+
+          <details id="advanced-story-controls" className="group scroll-mt-32 rounded-md border border-sea-glass/25 bg-deep-navy/95 text-primary-light shadow-soft ring-1 ring-lantern-gold/10">
+            <summary className="flex cursor-pointer list-none flex-col gap-4 border-b border-warm-paper/10 px-5 py-5 md:flex-row md:items-center md:justify-between md:px-7 [&::-webkit-details-marker]:hidden">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sea-glass">Story Controls</p>
+                <h2 className="mt-2 text-3xl font-semibold text-primary-light">Create a Story</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-dark">Fine-tune the world, characters, and shape of the next story.</p>
+              </div>
+              <span className="inline-flex w-fit rounded-md border border-aged-brass/60 bg-night-ink/70 px-3 py-2 text-sm font-semibold text-lantern-gold transition group-open:bg-lantern-gold group-open:text-primary-dark">
+                <span className="group-open:hidden">Open controls</span>
+                <span className="hidden group-open:inline">Hide controls</span>
+              </span>
+            </summary>
+            <div id="create-episode" className="project-lantern-workspace">
+              {children}
+            </div>
+          </details>
+          <ReaderFeedbackEnhancer />
+          <ReaderProfileAndFavorites />
+
+          <StreamingRow id="stories" title="Stories" items={FEATURED_LIVING_SERIES} />
+          <StreamingRow title="More Stories for You" items={NEW_EPISODES} accent="teal" />
+
+          <section className="device-preview-stack device-preview-tablet-stack grid gap-5 lg:grid-cols-[1fr_1fr]">
+            <div id="characters" className="scroll-mt-32 rounded-md border border-lantern-gold/20 bg-deep-navy p-5 shadow-soft">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl font-semibold text-primary-light">Characters You Follow</h2>
+                <span className="rounded-md bg-sea-glass px-2 py-1 text-xs font-semibold text-primary-dark">Characters</span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {FAVORITE_CAST.map((name) => <span className="rounded-md border border-sea-glass/35 bg-sea-glass/10 px-3 py-2 text-sm font-semibold text-sea-glass" key={name}>{name}</span>)}
+              </div>
+            </div>
+            <div id="worlds" className="scroll-mt-32 rounded-md border border-lantern-gold/20 bg-deep-navy p-5 shadow-soft">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl font-semibold text-primary-light">Worlds</h2>
+                <span className="rounded-md bg-lantern-gold px-2 py-1 text-xs font-semibold text-primary-dark">Worlds</span>
+              </div>
+              <div className="mt-4 grid gap-2">
+                {FOLLOWED_WORLDS.map((world) => (
+                  <article className="rounded-md border border-aged-brass/25 bg-night-ink/65 px-3 py-2" key={world.title}>
+                    <h3 className="text-sm font-semibold text-primary-light">{world.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-muted-dark">{world.detail}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
         </div>
-
-        <section className="device-preview-stack device-preview-tablet-stack grid gap-5 overflow-hidden rounded-md border border-warm-paper/10 bg-deep-navy shadow-soft md:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
-          <div className="p-6 md:p-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-lantern-gold">Stories</p>
-            <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight text-primary-light md:text-6xl">Start a story that remembers the world you made.</h2>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-muted-dark">Create a new story from a world, characters you follow, and the kind of reading mood you want. Saved stories can become the foundation for future chapters as Project Lantern grows.</p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <a className="rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-aged-brass hover:text-primary-light" href="#advanced-story-controls">Start a Story</a>
-              <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#continue-series">Continue Reading</a>
-              <a className="rounded-md border border-aged-brass/70 bg-night-ink/70 px-4 py-3 text-sm font-semibold text-lantern-gold transition hover:border-lantern-gold hover:bg-deep-navy" href="#characters">Characters</a>
-            </div>
-          </div>
-          <aside className="border-t border-warm-paper/10 bg-night-ink/70 p-6 md:border-l md:border-t-0 md:p-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sea-glass">Worlds</p>
-            <h3 className="mt-3 text-2xl font-semibold text-primary-light">Personal story worlds, ready to continue.</h3>
-            <div className="mt-5 grid gap-3 text-sm text-muted-dark">
-              <p className="rounded-md border border-tide-teal/35 bg-tide-teal/10 px-3 py-2">Stories are built from your saved worlds, characters, and reading history.</p>
-              <p className="rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-3 py-2">Next chapters can use the latest story context while the original story stays untouched.</p>
-            </div>
-          </aside>
-        </section>
-
-        <details id="advanced-story-controls" className="group scroll-mt-32 rounded-md border border-sea-glass/25 bg-deep-navy/95 text-primary-light shadow-soft ring-1 ring-lantern-gold/10">
-          <summary className="flex cursor-pointer list-none flex-col gap-4 border-b border-warm-paper/10 px-5 py-5 md:flex-row md:items-center md:justify-between md:px-7 [&::-webkit-details-marker]:hidden">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sea-glass">Story Controls</p>
-              <h2 className="mt-2 text-3xl font-semibold text-primary-light">Create a Story</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-dark">Fine-tune the world, characters, and shape of the next story.</p>
-            </div>
-            <span className="inline-flex w-fit rounded-md border border-aged-brass/60 bg-night-ink/70 px-3 py-2 text-sm font-semibold text-lantern-gold transition group-open:bg-lantern-gold group-open:text-primary-dark">
-              <span className="group-open:hidden">Open controls</span>
-              <span className="hidden group-open:inline">Hide controls</span>
-            </span>
-          </summary>
-          <div id="create-episode" className="project-lantern-workspace">
-            {children}
-          </div>
-        </details>
-        <ReaderFeedbackEnhancer />
-        <ReaderProfileAndFavorites />
-
-        <StreamingRow id="stories" title="Stories" items={FEATURED_LIVING_SERIES} />
-        <StreamingRow title="More Stories for You" items={NEW_EPISODES} accent="teal" />
-
-        <section className="device-preview-stack device-preview-tablet-stack grid gap-5 lg:grid-cols-[1fr_1fr]">
-          <div id="characters" className="scroll-mt-32 rounded-md border border-lantern-gold/20 bg-deep-navy p-5 shadow-soft">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold text-primary-light">Characters You Follow</h2>
-              <span className="rounded-md bg-sea-glass px-2 py-1 text-xs font-semibold text-primary-dark">Characters</span>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {FAVORITE_CAST.map((name) => <span className="rounded-md border border-sea-glass/35 bg-sea-glass/10 px-3 py-2 text-sm font-semibold text-sea-glass" key={name}>{name}</span>)}
-            </div>
-          </div>
-          <div id="worlds" className="scroll-mt-32 rounded-md border border-lantern-gold/20 bg-deep-navy p-5 shadow-soft">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold text-primary-light">Worlds</h2>
-              <span className="rounded-md bg-lantern-gold px-2 py-1 text-xs font-semibold text-primary-dark">Worlds</span>
-            </div>
-            <div className="mt-4 grid gap-2">
-              {FOLLOWED_WORLDS.map((world) => (
-                <article className="rounded-md border border-aged-brass/25 bg-night-ink/65 px-3 py-2" key={world.title}>
-                  <h3 className="text-sm font-semibold text-primary-light">{world.title}</h3>
-                  <p className="mt-1 text-sm leading-6 text-muted-dark">{world.detail}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
       </div>
       <DevicePreviewModeScript />
     </div>
@@ -209,6 +211,51 @@ function DevicePreviewModeStyles() {
 [data-device-preview-content="tablet"] .device-preview-tablet-cards {
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
+
+@media (min-width: 768px) {
+  [data-device-preview-header-inner="phone"] {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  [data-device-preview-stage="phone"] {
+    margin: 1.5rem auto 2.5rem;
+    padding: 0.85rem;
+    border: 1px solid rgba(246, 239, 226, 0.14);
+    border-radius: 2rem;
+    background: linear-gradient(180deg, rgba(246, 239, 226, 0.13), rgba(11, 16, 32, 0.86));
+    box-shadow: 0 32px 90px rgba(0, 0, 0, 0.34);
+  }
+
+  [data-device-preview-stage="tablet"] {
+    margin: 1.5rem auto 2.5rem;
+    padding: 1rem;
+    border: 1px solid rgba(246, 239, 226, 0.12);
+    border-radius: 1.6rem;
+    background: linear-gradient(180deg, rgba(167, 199, 186, 0.12), rgba(11, 16, 32, 0.78));
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+  }
+
+  [data-device-preview-content="phone"],
+  [data-device-preview-content="tablet"] {
+    border: 1px solid rgba(246, 239, 226, 0.12);
+    background: #0B1020;
+    box-shadow: inset 0 0 0 1px rgba(11, 16, 32, 0.45);
+    scrollbar-gutter: stable;
+  }
+
+  [data-device-preview-content="phone"] {
+    max-height: calc(100vh - 7rem);
+    border-radius: 1.45rem;
+    padding: 1rem;
+    overflow-y: auto;
+  }
+
+  [data-device-preview-content="tablet"] {
+    border-radius: 1.1rem;
+    padding: 1.25rem;
+  }
+}
 `;
 
   return <style dangerouslySetInnerHTML={{ __html: css }} />;
@@ -219,9 +266,9 @@ function DevicePreviewModeScript() {
 (() => {
   const storageKey = "projectLantern.devicePreviewMode.v1";
   const modes = {
-    phone: { maxWidth: "430px" },
-    tablet: { maxWidth: "820px" },
-    full: { maxWidth: "" }
+    phone: { contentMaxWidth: "430px", stageMaxWidth: "486px", headerMaxWidth: "486px" },
+    tablet: { contentMaxWidth: "820px", stageMaxWidth: "884px", headerMaxWidth: "884px" },
+    full: { contentMaxWidth: "", stageMaxWidth: "", headerMaxWidth: "" }
   };
   const selectedClass = "rounded-sm bg-lantern-gold px-2.5 py-1 text-xs font-semibold text-primary-dark transition";
   const defaultClass = "rounded-sm px-2.5 py-1 text-xs font-semibold text-muted-dark transition hover:text-primary-light";
@@ -245,12 +292,25 @@ function DevicePreviewModeScript() {
   function applyMode(mode) {
     const selectedMode = modes[mode] ? mode : "full";
     const content = document.querySelector("[data-device-preview-content]");
+    const stage = document.querySelector("[data-device-preview-stage]");
+    const headerInner = document.querySelector("[data-device-preview-header-inner]");
     const buttons = Array.from(document.querySelectorAll("[data-device-preview-mode]"));
+    const modeSettings = modes[selectedMode];
 
     if (content instanceof HTMLElement) {
       content.dataset.devicePreviewContent = selectedMode;
-      content.style.maxWidth = modes[selectedMode].maxWidth;
+      content.style.maxWidth = modeSettings.contentMaxWidth;
       content.style.overflowX = selectedMode === "full" ? "" : "hidden";
+    }
+
+    if (stage instanceof HTMLElement) {
+      stage.dataset.devicePreviewStage = selectedMode;
+      stage.style.maxWidth = modeSettings.stageMaxWidth;
+    }
+
+    if (headerInner instanceof HTMLElement) {
+      headerInner.dataset.devicePreviewHeaderInner = selectedMode;
+      headerInner.style.maxWidth = modeSettings.headerMaxWidth;
     }
 
     buttons.forEach((button) => {
