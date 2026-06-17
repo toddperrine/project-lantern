@@ -184,9 +184,7 @@ function ReaderFeedbackEnhancer() {
     });
   }
 
-  function enhanceCard(card) {
-    if (card.getAttribute("data-reader-feedback-enhanced") === "true") return;
-    card.setAttribute("data-reader-feedback-enhanced", "true");
+  function refreshCard(card) {
     const description = Array.from(card.querySelectorAll("p")).find((item) => item.textContent?.includes("Optional feedback"));
     if (description) description.textContent = "Optional reader feedback, saved locally with this story.";
 
@@ -196,18 +194,24 @@ function ReaderFeedbackEnhancer() {
         if (!choices[index]) return;
         button.textContent = choices[index];
         button.setAttribute("data-reader-score", String(index + 1));
-        button.addEventListener("click", () => {
+        button.onclick = () => {
           card.setAttribute("data-reader-score", String(index + 1));
           styleSelectedButtons(card);
-        });
+        };
       });
+      styleSelectedButtons(card);
     }
 
-    const label = Array.from(card.querySelectorAll("p")).find((item) => item.textContent?.includes("What worked") || item.textContent?.includes("What could"));
+    const label = Array.from(card.querySelectorAll("p")).find((item) => item.textContent?.includes("What worked") || item.textContent?.includes("What could") || item.textContent?.trim() === "Optional reason");
     if (label) label.textContent = "Optional reason";
     const reasonContainer = label?.nextElementSibling;
     if (reasonContainer instanceof HTMLElement) rewriteReasonButtons(reasonContainer);
+  }
 
+  function enhanceCard(card) {
+    refreshCard(card);
+    if (card.getAttribute("data-reader-feedback-enhanced") === "true") return;
+    card.setAttribute("data-reader-feedback-enhanced", "true");
     card.addEventListener("click", (event) => {
       const target = event.target;
       if (target instanceof HTMLButtonElement && ["Save Feedback", "Update Feedback"].includes(target.textContent?.trim() || "")) {
