@@ -63,34 +63,34 @@ export function ReaderMoodOnboarding() {
   }
 
   return (
-    <section className="rounded-md border border-lantern-gold/25 bg-warm-paper p-5 text-primary-dark shadow-soft md:p-6">
-      <div className="flex flex-col gap-2">
+    <section className="rounded-md border border-lantern-gold/35 bg-warm-paper p-5 text-primary-dark shadow-soft ring-1 ring-lantern-gold/10 md:p-7">
+      <div className="flex flex-col gap-3">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aged-brass">Start with the reader</p>
-        <h2 className="text-2xl font-semibold text-primary-dark md:text-3xl">What are you in the mood for?</h2>
-        <p className="max-w-3xl text-sm leading-6 text-muted-light">Pick a mood or describe what you want and what to avoid. You will get three story directions before generation, with detailed controls still available below.</p>
+        <h2 className="text-3xl font-semibold leading-tight text-primary-dark md:text-4xl">What are you in the mood for?</h2>
+        <p className="max-w-3xl text-base leading-7 text-muted-light">Pick a mood or describe what you want and what to avoid. You will get three story directions before generation, with detailed controls still available below.</p>
       </div>
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-6 flex flex-wrap gap-2.5">
         {MOOD_OPTIONS.map((mood) => (
-          <button aria-pressed={selectedMood === mood.label} className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${selectedMood === mood.label ? "border-primary-dark bg-primary-dark text-primary-light" : "border-primary-dark/15 bg-white/75 text-primary-dark hover:border-aged-brass hover:bg-soft-card"}`} key={mood.label} onClick={() => setSelectedMood(mood.label)} type="button">
+          <button aria-pressed={selectedMood === mood.label} className={`min-h-11 flex-1 basis-[calc(50%-0.3125rem)] rounded-md border px-4 py-3 text-base font-semibold transition sm:flex-none sm:text-sm ${selectedMood === mood.label ? "border-primary-dark bg-primary-dark text-primary-light" : "border-primary-dark/15 bg-white/75 text-primary-dark hover:border-aged-brass hover:bg-soft-card"}`} key={mood.label} onClick={() => setSelectedMood(mood.label)} type="button">
             {mood.label}
           </button>
         ))}
       </div>
-      <label className="mt-5 flex flex-col gap-2">
-        <span className="text-sm font-semibold text-primary-dark">Describe the story you want</span>
-        <textarea className="min-h-32 rounded-md border border-primary-dark/15 bg-white px-3 py-2 text-sm leading-6 text-primary-dark outline-none transition placeholder:text-primary-dark/35 focus:border-aged-brass focus:ring-2 focus:ring-aged-brass/20" onChange={(event) => setReaderPrompt(event.target.value)} placeholder={PLACEHOLDER_PROMPT} value={readerPrompt} />
+      <label className="mt-6 flex flex-col gap-2.5">
+        <span className="text-base font-semibold text-primary-dark md:text-sm">Describe the story you want</span>
+        <textarea className="min-h-36 rounded-md border border-primary-dark/15 bg-white px-4 py-3 text-base leading-7 text-primary-dark outline-none transition placeholder:text-primary-dark/35 focus:border-aged-brass focus:ring-2 focus:ring-aged-brass/20 md:text-sm md:leading-6" onChange={(event) => setReaderPrompt(event.target.value)} placeholder={PLACEHOLDER_PROMPT} value={readerPrompt} />
       </label>
-      <button className="mt-4 rounded-md bg-primary-dark px-5 py-3 text-sm font-semibold text-primary-light transition hover:bg-primary-dark/90" onClick={handleSuggestMatches} type="button">Suggest story matches</button>
-      {appliedDirectionTitle ? <p className="mt-4 rounded-md border border-tide-teal/30 bg-tide-teal/10 px-3 py-2 text-sm font-semibold text-tide-teal">Loaded "{appliedDirectionTitle}" into Create an Episode.</p> : null}
+      <button className="mt-5 min-h-12 w-full rounded-md bg-primary-dark px-5 py-3.5 text-base font-semibold text-primary-light transition hover:bg-primary-dark/90 sm:w-auto sm:text-sm" onClick={handleSuggestMatches} type="button">Suggest story matches</button>
+      {appliedDirectionTitle ? <p className="mt-5 rounded-md border border-tide-teal/30 bg-tide-teal/10 px-4 py-3 text-sm font-semibold leading-6 text-tide-teal">Loaded "{appliedDirectionTitle}" into Create an Episode.</p> : null}
       {directions.length > 0 ? (
-        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
           {directions.map((direction) => (
-            <article className="flex min-h-full flex-col rounded-md border border-primary-dark/10 bg-soft-card p-4" key={direction.title}>
-              <h3 className="text-base font-semibold leading-6 text-primary-dark">{direction.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-muted-light">{direction.premise}</p>
-              <p className="mt-3 rounded-md bg-white/75 px-3 py-2 text-xs leading-5 text-muted-light"><span className="font-semibold text-primary-dark">Tone:</span> {direction.tone}</p>
-              <p className="mt-3 text-xs leading-5 text-muted-light">{direction.detail}</p>
-              <button className="mt-4 rounded-md border border-aged-brass bg-white/80 px-3 py-2 text-sm font-semibold text-primary-dark transition hover:bg-lantern-gold" onClick={() => handleUseDirection(direction)} type="button">Use this direction</button>
+            <article className="flex min-h-full flex-col rounded-md border border-primary-dark/10 bg-soft-card p-5" key={direction.title}>
+              <h3 className="text-lg font-semibold leading-7 text-primary-dark">{direction.title}</h3>
+              <p className="mt-3 text-sm leading-7 text-muted-light">{direction.premise}</p>
+              <p className="mt-4 rounded-md bg-white/75 px-3 py-2.5 text-sm leading-6 text-muted-light"><span className="font-semibold text-primary-dark">Tone:</span> {direction.tone}</p>
+              <p className="mt-4 text-sm leading-6 text-muted-light">{direction.detail}</p>
+              <button className="mt-5 min-h-11 w-full rounded-md border border-aged-brass bg-white/80 px-4 py-3 text-sm font-semibold text-primary-dark transition hover:bg-lantern-gold" onClick={() => handleUseDirection(direction)} type="button">Use this direction</button>
             </article>
           ))}
         </div>
