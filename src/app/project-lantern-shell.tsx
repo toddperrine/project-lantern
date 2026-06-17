@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { getBuildInfo } from "@/lib/build-info";
+import { ReaderMoodOnboarding } from "@/components/ReaderMoodOnboarding";
 
 const NAV_ITEMS = ["Home", "Your Series", "Create", "Discover", "Library"];
 
@@ -49,6 +50,8 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
       </header>
 
       <div id="home" className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 md:px-8 md:py-8">
+        <ReaderMoodOnboarding />
+
         <section className="grid gap-5 overflow-hidden rounded-md border border-warm-paper/10 bg-deep-navy shadow-soft md:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
           <div className="p-6 md:p-8">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-lantern-gold">Now Playing</p>
