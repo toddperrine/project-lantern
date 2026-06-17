@@ -52,6 +52,24 @@ export type FirstPartyContentLibrary = {
   craftRules: FirstPartyCraftRule[];
 };
 
+export type FirstPartyCaptureTemplateField = {
+  name: string;
+  description: string;
+};
+
+export type FirstPartyCaptureTemplateExample = {
+  rawNote: string;
+  normalizedAsset: Pick<FirstPartyAssetMetadata, "title" | "description" | "tags">;
+};
+
+export type FirstPartyCaptureTemplate<Type extends FirstPartyAssetType> = {
+  assetType: Type;
+  requiredFields: FirstPartyCaptureTemplateField[];
+  optionalFields: FirstPartyCaptureTemplateField[];
+  ipMetadataDefaults: Pick<FirstPartyAssetMetadata, "source" | "createdBy" | "ipOwner" | "ipStatus" | "usageRights">;
+  normalizationExamples: FirstPartyCaptureTemplateExample[];
+};
+
 export const DEFAULT_FIRST_PARTY_IP_METADATA = {
   source: "Project Lantern First-Party Library",
   createdBy: "Project Lantern",
@@ -59,6 +77,191 @@ export const DEFAULT_FIRST_PARTY_IP_METADATA = {
   ipStatus: "first-party",
   usageRights: "Company-owned content for Project Lantern product use."
 } satisfies Pick<FirstPartyAssetMetadata, "source" | "createdBy" | "ipOwner" | "ipStatus" | "usageRights">;
+
+const SHARED_CAPTURE_REQUIRED_FIELDS = [
+  { name: "id", description: "Stable kebab-case asset id with an asset-type prefix." },
+  { name: "title", description: "Short display name for the reusable asset." },
+  { name: "description", description: "One concise sentence that preserves the asset's story value." },
+  { name: "tags", description: "Search and matching tags using existing tone, mood, and story-purpose language." }
+] satisfies FirstPartyCaptureTemplateField[];
+
+const SHARED_CAPTURE_OPTIONAL_FIELDS = [
+  { name: "sourceNote", description: "Original spoken, raw, or workshop note before normalization." },
+  { name: "audienceFit", description: "Reader-facing fit notes such as cozy, eerie, high-action, reflective, or younger-reader friendly." },
+  { name: "continuityNotes", description: "Constraints that help future Living Series uses stay consistent." },
+  { name: "avoid", description: "Specific details, tones, or implications that should not be used with this asset." }
+] satisfies FirstPartyCaptureTemplateField[];
+
+export const FIRST_PARTY_CAPTURE_TEMPLATES = {
+  character: {
+    assetType: "character",
+    requiredFields: [
+      ...SHARED_CAPTURE_REQUIRED_FIELDS,
+      { name: "role", description: "The character's reusable story function, such as lead, ally, rival, mentor, or mystery figure." },
+      { name: "definingTrait", description: "The memorable behavior, wound, want, or contradiction that makes the character recognizable." }
+    ],
+    optionalFields: [
+      ...SHARED_CAPTURE_OPTIONAL_FIELDS,
+      { name: "relationships", description: "Important bonds, tensions, or recurring dynamics with other assets." },
+      { name: "visualCue", description: "A simple recognizable detail that can anchor future presentation or generation." }
+    ],
+    ipMetadataDefaults: DEFAULT_FIRST_PARTY_IP_METADATA,
+    normalizationExamples: [
+      {
+        rawNote: "Kid courier, talks too much when nervous, always takes the weird shortcut.",
+        normalizedAsset: {
+          title: "Nervous Shortcut Courier",
+          description: "A fast-talking courier whose nerves send them through impossible routes that often reveal the truth first.",
+          tags: ["adventurous", "funny", "clues", "motion", "choice"]
+        }
+      }
+    ]
+  },
+  world: {
+    assetType: "world",
+    requiredFields: [
+      ...SHARED_CAPTURE_REQUIRED_FIELDS,
+      { name: "coreRule", description: "The simple rule, premise, or recurring pressure that makes the world behave differently." },
+      { name: "readerPromise", description: "The experience this world reliably offers, such as wonder, suspense, comfort, or discovery." }
+    ],
+    optionalFields: [
+      ...SHARED_CAPTURE_OPTIONAL_FIELDS,
+      { name: "recurringPlaces", description: "Locations that naturally belong inside this world." },
+      { name: "socialTexture", description: "How people live, trade, gather, celebrate, or keep secrets here." }
+    ],
+    ipMetadataDefaults: DEFAULT_FIRST_PARTY_IP_METADATA,
+    normalizationExamples: [
+      {
+        rawNote: "Town where every porch light answers another one after midnight, maybe like a code.",
+        normalizedAsset: {
+          title: "The Answering Lights",
+          description: "A quiet town where porch lights blink messages after midnight and residents pretend not to understand them.",
+          tags: ["mysterious", "cozy", "secrets", "community", "signals"]
+        }
+      }
+    ]
+  },
+  location: {
+    assetType: "location",
+    requiredFields: [
+      ...SHARED_CAPTURE_REQUIRED_FIELDS,
+      { name: "settingFunction", description: "What this place does for a story, such as threshold, refuge, reveal point, test, or return path." },
+      { name: "sensoryAnchor", description: "One concrete sound, image, texture, or ritual that makes the place easy to recall." }
+    ],
+    optionalFields: [
+      ...SHARED_CAPTURE_OPTIONAL_FIELDS,
+      { name: "connectedWorld", description: "World asset id or title this location naturally belongs to." },
+      { name: "secret", description: "A hidden fact or unresolved question that can drive future episodes." }
+    ],
+    ipMetadataDefaults: DEFAULT_FIRST_PARTY_IP_METADATA,
+    normalizationExamples: [
+      {
+        rawNote: "Tiny observatory over a tea shop, steam shows tomorrow's weather but only for one person.",
+        normalizedAsset: {
+          title: "Teashop Observatory",
+          description: "A rooftop observatory where tea steam reveals one visitor's personal weather for the day ahead.",
+          tags: ["relaxing", "thoughtful", "wonder", "cozy", "forecast"]
+        }
+      }
+    ]
+  },
+  "story-spark": {
+    assetType: "story-spark",
+    requiredFields: [
+      ...SHARED_CAPTURE_REQUIRED_FIELDS,
+      { name: "incitingChange", description: "The event, arrival, discovery, loss, invitation, or warning that starts motion." },
+      { name: "choicePressure", description: "The decision or emotional pressure the reader should feel through the premise." }
+    ],
+    optionalFields: [
+      ...SHARED_CAPTURE_OPTIONAL_FIELDS,
+      { name: "twistDirection", description: "A soft hint for how the spark might deepen without prescribing a full plot." },
+      { name: "bestFitAssets", description: "Character, world, location, theme, or series seed ids this spark pairs well with." }
+    ],
+    ipMetadataDefaults: DEFAULT_FIRST_PARTY_IP_METADATA,
+    normalizationExamples: [
+      {
+        rawNote: "Message shows up a day early and says don't trust the obvious answer.",
+        normalizedAsset: {
+          title: "The Early Warning",
+          description: "A message arrives one day before it was written, warning the hero away from the answer everyone else accepts.",
+          tags: ["mysterious", "clue", "choice", "time", "revelation"]
+        }
+      }
+    ]
+  },
+  theme: {
+    assetType: "theme",
+    requiredFields: [
+      ...SHARED_CAPTURE_REQUIRED_FIELDS,
+      { name: "emotionalQuestion", description: "The human question the theme keeps returning to." },
+      { name: "storyExpression", description: "How the theme should show up through choices, relationships, or consequences." }
+    ],
+    optionalFields: [
+      ...SHARED_CAPTURE_OPTIONAL_FIELDS,
+      { name: "counterpoint", description: "The opposing belief, fear, or temptation that makes the theme active." },
+      { name: "toneFit", description: "Tones where this theme works especially well or poorly." }
+    ],
+    ipMetadataDefaults: DEFAULT_FIRST_PARTY_IP_METADATA,
+    normalizationExamples: [
+      {
+        rawNote: "Small brave things, not big speeches. Choosing again when scared.",
+        normalizedAsset: {
+          title: "Courage in Small Steps",
+          description: "Bravery grows through ordinary repeatable choices rather than grand declarations.",
+          tags: ["thoughtful", "adventurous", "growth", "courage", "choice"]
+        }
+      }
+    ]
+  },
+  "series-seed": {
+    assetType: "series-seed",
+    requiredFields: [
+      ...SHARED_CAPTURE_REQUIRED_FIELDS,
+      { name: "seriesPromise", description: "The repeatable reason a reader would return for another episode." },
+      { name: "continuationEngine", description: "The mystery, journey, relationship, job, place, or ritual that can produce multiple episodes." }
+    ],
+    optionalFields: [
+      ...SHARED_CAPTURE_OPTIONAL_FIELDS,
+      { name: "starterCast", description: "Suggested character roles or existing character ids for the first version of the series." },
+      { name: "episodePattern", description: "The natural rhythm of installments, such as case-of-the-week, journey stop, seasonal reveal, or cozy ritual." }
+    ],
+    ipMetadataDefaults: DEFAULT_FIRST_PARTY_IP_METADATA,
+    normalizationExamples: [
+      {
+        rawNote: "Every week they repair a strange little machine and learn who it belonged to.",
+        normalizedAsset: {
+          title: "The Memory Repair Shop",
+          description: "A gentle ongoing series about repairing impossible machines and uncovering the lives they quietly protected.",
+          tags: ["relaxing", "emotional", "wonder", "memory", "episodic"]
+        }
+      }
+    ]
+  },
+  "craft-rule": {
+    assetType: "craft-rule",
+    requiredFields: [
+      ...SHARED_CAPTURE_REQUIRED_FIELDS,
+      { name: "rule", description: "A clear reusable storytelling constraint or preference." },
+      { name: "readerBenefit", description: "Why the rule improves the reader's experience." }
+    ],
+    optionalFields: [
+      ...SHARED_CAPTURE_OPTIONAL_FIELDS,
+      { name: "appliesTo", description: "Asset types, tones, series patterns, or episode moments where the rule is most useful." },
+      { name: "exampleUse", description: "A short demonstration of the rule in practice." }
+    ],
+    ipMetadataDefaults: DEFAULT_FIRST_PARTY_IP_METADATA,
+    normalizationExamples: [
+      {
+        rawNote: "Don't explain the weird thing right away; let one normal detail make it feel real first.",
+        normalizedAsset: {
+          title: "Ground Wonder Before Explaining It",
+          description: "Introduce a strange element through one ordinary detail before naming how it works.",
+          tags: ["craft", "wonder", "clarity", "immersion", "pacing"]
+        }
+      }
+    ]
+  }
+} satisfies { [Type in FirstPartyAssetType]: FirstPartyCaptureTemplate<Type> };
 
 export const FIRST_PARTY_LIBRARY = {
   characters: [
