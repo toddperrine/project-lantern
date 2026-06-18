@@ -26,6 +26,13 @@ const ART_BY_TITLE: Record<string, string> = {
   "Stars Remember": "stars-remember"
 };
 const FALLBACK_ART_SEQUENCE = ["whisper-in-the-static", "under-lantern-light", "stars-remember", "orchard-of-borrowed-moons", "quiet-engine"];
+const FALLBACK_STARTS = [
+  { title: "The Lighthouse Under Main Street", premise: "A working lighthouse waits beneath a landlocked town.", tags: ["Mystery", "Civic"] },
+  { title: "Orchard of Borrowed Moons", premise: "Small moons ripen with unfinished wishes inside.", tags: ["Wonder", "Magic"] },
+  { title: "The Quiet Engine", premise: "A machine turns silence into possible futures.", tags: ["Emotional", "Sci-fi"] },
+  { title: "Map of the Seventh Door", premise: "A courier races through impossible thresholds before sunrise.", tags: ["Adventure", "Mystery"] }
+];
+const FALLBACK_MOODS = ["Mystery", "Wonder", "Emotional", "Adventure", "Strange", "Hopeful", "Dark", "Reflective"];
 
 function currentView() {
   return new URLSearchParams(window.location.search).get("view") ?? "home";
@@ -122,9 +129,14 @@ function hideDemoMessages() {
   });
 }
 
+function getHomeStorySignal(main: HTMLElement) {
+  const text = cleanText(main.textContent ?? "");
+  return /Continue Reading|Next Chapter|The Half-Life of Magic|Recent Story|Generated Story/.test(text);
+}
+
 function ensureReferenceContinueCard() {
   const main = document.querySelector<HTMLElement>(".project-lantern-shell main[data-mobile-active-view='home']");
-  if (!main) return;
+  if (!main || !getHomeStorySignal(main)) return;
   if (main.querySelector("[data-mobile-continue-card='true']")) return;
 
   const homeContent = main.querySelector<HTMLElement>(":scope > section > div > .md\\:hidden > div, :scope > section > div > div > div");
@@ -145,6 +157,120 @@ function ensureReferenceContinueCard() {
   `;
   parent.insertBefore(section, parent.firstElementChild);
   applyContinueArtwork(section.querySelector<HTMLElement>("[data-mobile-continue-image='true']"));
+}
+
+function findHomeRoot(main: HTMLElement) {
+  return main.querySelector<HTMLElement>(":scope > section") ?? main;
+}
+
+function clickOriginalButtonByText(text: string) {
+  const button = Array.from(document.querySelectorAll<HTMLButtonElement>(".project-lantern-shell button")).find((candidate) => cleanText(candidate.textContent ?? "").includes(text) && !candidate.closest("[data-mobile-home-fallback='true']"));
+  button?.click();
+}
+
+function clickMobileNav(label: string) {
+  const button = Array.from(document.querySelectorAll<HTMLButtonElement>('nav[aria-label="Mobile primary"] button')).find((candidate) => cleanText(candidate.textContent ?? "") === label);
+  button?.click();
+}
+
+function buildFallbackContinue() {
+  return `
+    <section data-mobile-fallback-continue="true" data-mobile-continue-card="true">
+      <div data-mobile-continue-image="true">
+        <div data-mobile-continue-copy="true">
+          <p>Chapter 1 • 8 min read</p>
+          <h2>The Half-Life of Magic</h2>
+        </div>
+        <button aria-label="Open last chapter recap" type="button">↺</button>
+      </div>
+    </section>
+  `;
+}
+
+function buildFallbackHome(hasStory: boolean) {
+  return `
+    ${hasStory ? buildFallbackContinue() : ""}
+    <section data-mobile-fallback-moods="true">
+      <h2>What are you in the mood to read?</h2>
+      <div>${FALLBACK_MOODS.map((mood) => `<button data-mobile-fallback-mood="${mood}" type="button">${mood}</button>`).join("")}</div>
+    </section>
+    <section data-mobile-fallback-starts="true">
+      <div data-mobile-fallback-start-heading="true"><h2>Start Something New</h2></div>
+      <div data-mobile-fallback-start-list="true">
+        ${FALLBACK_STARTS.map((story, index) => {
+          const artKey = artKeyForTitle(story.title, index);
+          return `<button data-mobile-story-row="true" data-mobile-fallback-start="${story.title}" data-mobile-art="${artKey}" type="button">
+            <span data-mobile-thumbnail="true" style="background-image:url('${artUrl(artKey)}')"></span>
+            <span data-mobile-row-copy="true">
+              <strong>${story.title}</strong>
+              <em>${story.premise}</em>
+              <span data-mobile-row-tags="true">${story.tags.map((tag) => `<span>${tag}</span>`).join("")}</span>
+            </span>
+            <span data-mobile-row-chevron="true">›</span>
+          </button>`;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function bindFallbackHome(fallback: HTMLElement) {
+  if (fallback.dataset.mobileFallbackBound === "true") return;
+  fallback.dataset.mobileFallbackBound = "true";
+  fallback.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const mood = target?.closest<HTMLElement>("[data-mobile-fallback-mood]")?.dataset.mobileFallbackMood;
+    if (mood) {
+      clickOriginalButtonByText(mood);
+      return;
+    }
+
+    const start = target?.closest<HTMLElement>("[data-mobile-fallback-start]")?.dataset.mobileFallbackStart;
+    if (start) {
+      clickOriginalButtonByText(start);
+      clickMobileNav("Create");
+    }
+  });
+}
+
+function ensureMobileHomeFallback() {
+  const main = document.querySelector<HTMLElement>(".project-lantern-shell main");
+  if (!main) return;
+  const fallback = main.querySelector<HTMLElement>("[data-mobile-home-fallback='true']");
+  const root = findHomeRoot(main);
+
+  if (currentView() !== "home") {
+    fallback?.remove();
+    Array.from(root.children).forEach((child) => delete (child as HTMLElement).dataset.mobileOriginalHomeContent);
+    return;
+  }
+
+  let nextFallback = fallback;
+  if (!nextFallback) {
+    nextFallback = document.createElement("section");
+    nextFallback.dataset.mobileHomeFallback = "true";
+    const firstHeader = root.querySelector(":scope > header");
+    if (firstHeader?.nextSibling) root.insertBefore(nextFallback, firstHeader.nextSibling);
+    else root.insertBefore(nextFallback, root.firstChild);
+  }
+
+  const hasStory = getHomeStorySignal(main);
+  const nextMarkup = buildFallbackHome(hasStory);
+  if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || cleanText(nextFallback.innerHTML) === "") {
+    nextFallback.innerHTML = nextMarkup;
+    nextFallback.dataset.mobileFallbackHasStory = String(hasStory);
+    applyContinueArtwork(nextFallback.querySelector<HTMLElement>("[data-mobile-continue-image='true']"));
+  }
+  bindFallbackHome(nextFallback);
+
+  Array.from(root.children).forEach((child) => {
+    const element = child as HTMLElement;
+    if (element === nextFallback || element.tagName === "HEADER") {
+      delete element.dataset.mobileOriginalHomeContent;
+      return;
+    }
+    element.dataset.mobileOriginalHomeContent = "true";
+  });
 }
 
 function markHomeCards() {
@@ -185,7 +311,9 @@ function markLibraryPage() {
     const title = article.querySelector("h3")?.textContent ?? "";
     article.dataset.mobileCompactCard = "true";
     article.dataset.mobileArt = artKeyForTitle(title, index);
+    article.dataset.mobileDestination = "library";
   });
+  storyCards[0]?.parentElement?.setAttribute("data-mobile-library-story-list", "true");
 }
 
 function markCompactDestinationCards() {
@@ -197,6 +325,7 @@ function markCompactDestinationCards() {
   Array.from(main.querySelectorAll<HTMLElement>("article")).forEach((article, index) => {
     const title = article.querySelector("h3")?.textContent ?? article.textContent ?? "";
     article.dataset.mobileCompactCard = "true";
+    article.dataset.mobileDestination = view;
     article.dataset.mobileArt = artKeyForTitle(title, index);
   });
 }
@@ -213,6 +342,7 @@ function applyMobileShell(mobileQuery: MediaQueryList) {
   hideDemoMessages();
   ensureReferenceContinueCard();
   markHomeCards();
+  ensureMobileHomeFallback();
   markLibraryPage();
   markCompactDestinationCards();
 }
