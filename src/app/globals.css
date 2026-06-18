@@ -84,7 +84,7 @@ textarea {
   margin-top: auto;
 }
 
-.project-lantern-shell [aria-label$="artwork"] {
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) [aria-label$="artwork"] {
   min-height: auto !important;
   max-width: none !important;
   height: 100%;
@@ -100,20 +100,20 @@ textarea {
   color: #101820;
 }
 
-.project-lantern-shell [aria-label$="artwork"]::before,
-.project-lantern-shell [aria-label$="artwork"]::after {
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) [aria-label$="artwork"]::before,
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) [aria-label$="artwork"]::after {
   content: "";
   position: absolute;
   pointer-events: none;
 }
 
-.project-lantern-shell [aria-label$="artwork"]::before {
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) [aria-label$="artwork"]::before {
   inset: 1.15rem 1rem;
   border: 1px solid rgba(16, 24, 32, 0.28);
   border-bottom-color: rgba(16, 24, 32, 0.14);
 }
 
-.project-lantern-shell [aria-label$="artwork"]::after {
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) [aria-label$="artwork"]::after {
   left: 26%;
   right: 18%;
   top: 39%;
@@ -124,16 +124,16 @@ textarea {
   transform: rotate(-7deg);
 }
 
-.project-lantern-shell [aria-label$="artwork"] > .absolute {
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) [aria-label$="artwork"] > .absolute {
   display: none;
 }
 
-.project-lantern-shell [aria-label$="artwork"] > .relative {
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) [aria-label$="artwork"] > .relative {
   justify-content: space-between;
   gap: 1rem;
 }
 
-.project-lantern-shell [aria-label$="artwork"] > .relative span:first-child {
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) [aria-label$="artwork"] > .relative span:first-child {
   max-width: 100%;
   font-size: 0.62rem;
   line-height: 1.35;
@@ -141,14 +141,14 @@ textarea {
   color: rgba(16, 24, 32, 0.58);
 }
 
-.project-lantern-shell [aria-label$="artwork"] > .relative span:last-child {
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) [aria-label$="artwork"] > .relative span:last-child {
   max-width: 11.5rem;
   font-size: clamp(1rem, 1.6vw, 1.35rem);
   line-height: 1.14;
   color: rgba(16, 24, 32, 0.86);
 }
 
-.project-lantern-shell [aria-label$="artwork"] > .relative span:last-child::after {
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) [aria-label$="artwork"] > .relative span:last-child::after {
   content: "";
   display: block;
   width: 2.5rem;
