@@ -8,9 +8,9 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
   const buildInfo = getBuildInfo();
 
   return (
-    <div className="project-lantern-shell min-h-screen overflow-x-hidden bg-night-ink text-primary-light md:bg-[radial-gradient(circle_at_top,rgba(217,164,65,0.10),transparent_34%),linear-gradient(180deg,#0B1020_0%,#111827_46%,#0B1020_100%)]">
+    <div className="project-lantern-shell min-h-screen overflow-x-hidden bg-[#fbf7ef] text-primary-dark md:bg-[radial-gradient(circle_at_top,rgba(217,164,65,0.10),transparent_34%),linear-gradient(180deg,#0B1020_0%,#111827_46%,#0B1020_100%)] md:text-primary-light">
       <DevicePreviewModeStyles />
-      <header className="sticky top-0 z-20 border-b border-lantern-gold/15 bg-night-ink/92 backdrop-blur">
+      <header className="sticky top-0 z-20 hidden border-b border-lantern-gold/15 bg-night-ink/92 backdrop-blur md:block">
         <div data-device-preview-header-inner className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-4 px-4 py-5 transition-[max-width,padding] duration-200 sm:px-5 md:flex-row md:items-center md:justify-between md:px-8 md:py-6">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between md:block">
             <h1 className="text-2xl font-semibold tracking-tight text-primary-light">Project Lantern</h1>
@@ -23,9 +23,9 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
       </header>
 
       <div data-device-preview-stage className="mx-auto w-full transition-[max-width,padding,margin] duration-200">
-        <div data-device-preview-content className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 py-6 transition-[max-width,padding] duration-200 sm:px-5 md:px-8 md:py-8">
+        <div data-device-preview-content className="mx-auto w-full max-w-7xl overflow-x-hidden transition-[max-width,padding] duration-200 md:px-8 md:py-8">
           {children}
-          <footer className="mt-8 border-t border-warm-paper/10 pt-5 text-center text-xs font-semibold text-muted-dark">
+          <footer className="border-t border-warm-paper/10 px-4 py-5 text-center text-xs font-semibold text-muted-light md:mt-8 md:px-0 md:text-muted-dark">
             Version {buildInfo.appVersion}
           </footer>
         </div>
@@ -58,7 +58,7 @@ function DevicePreviewModeStyles() {
 }
 
 [data-device-preview-content="tablet"] .device-preview-tablet-cards {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr) !important;
 }
 
 @media (max-width: 767px) {
