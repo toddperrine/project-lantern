@@ -58,7 +58,7 @@ function DevicePreviewModeStyles() {
 }
 
 [data-device-preview-content="tablet"] .device-preview-tablet-cards {
-  grid-template-columns: repeat(2, minmax(0, 1fr) !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 
 @media (max-width: 767px) {
