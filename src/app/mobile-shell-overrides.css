@@ -9,6 +9,10 @@
     padding-bottom: calc(8rem + env(safe-area-inset-bottom)) !important;
   }
 
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > [data-mobile-continue-card="true"]:has(+ header) {
+    display: none !important;
+  }
+
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-card="true"] {
     display: grid !important;
     gap: 0.72rem !important;
@@ -43,6 +47,15 @@
     background-repeat: no-repeat !important;
     background-size: cover !important;
     box-shadow: 0 14px 34px rgba(29, 25, 18, 0.18) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] > img,
+  .project-lantern-shell [data-mobile-thumbnail="true"] > img,
+  .project-lantern-shell [data-mobile-compact-card-thumb="true"] > img {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] > div:first-child:not([data-mobile-continue-copy]),
@@ -126,7 +139,7 @@
     background-color: #e7e1d6 !important;
     background-position: center !important;
     background-repeat: no-repeat !important;
-    background-size: contain !important;
+    background-size: cover !important;
   }
 
   .project-lantern-shell [data-mobile-thumbnail="true"] [aria-label$="artwork"],
@@ -233,7 +246,7 @@
     background-color: #e7e1d6;
     background-position: center;
     background-repeat: no-repeat;
-    background-size: contain;
+    background-size: cover;
   }
 
   .project-lantern-shell main:not([data-mobile-active-view="home"]) [data-mobile-compact-card="true"] > * {
