@@ -37,6 +37,147 @@ textarea {
   background: rgba(217, 164, 65, 0.32);
 }
 
+.project-lantern-shell main > section > header p:first-child::after {
+  content: " v0.1.2";
+  margin-left: 0.65rem;
+  color: rgba(246, 239, 226, 0.46);
+  font-size: 0.72em;
+  letter-spacing: 0.1em;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) {
+  overflow: hidden;
+  padding: 0;
+  border-color: rgba(246, 239, 226, 0.16);
+  background:
+    linear-gradient(135deg, rgba(246, 239, 226, 0.13), rgba(246, 239, 226, 0.07)),
+    rgba(11, 16, 32, 0.58);
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) > div {
+  display: grid;
+  grid-template-columns: minmax(10.75rem, 34%) minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) > div > div:not([aria-label$="artwork"]) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 1.25rem;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) > div > div:not([aria-label$="artwork"]) > h3 {
+  max-width: 28rem;
+  font-size: 1.35rem;
+  line-height: 1.16;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) > div > div:not([aria-label$="artwork"]) > p {
+  max-width: 36rem;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]) button {
+  width: fit-content;
+  min-width: 6.5rem;
+  margin-top: auto;
+}
+
+.project-lantern-shell [aria-label$="artwork"] {
+  min-height: auto !important;
+  max-width: none !important;
+  height: 100%;
+  aspect-ratio: 2 / 3;
+  align-self: stretch;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(90deg, rgba(12, 18, 31, 0.2) 0 0.55rem, transparent 0.55rem),
+    radial-gradient(circle at 50% 43%, rgba(246, 239, 226, 0.16) 0 1.9rem, transparent 1.95rem),
+    linear-gradient(145deg, #ded5bf 0%, #a99776 53%, #263b3f 100%) !important;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.18), inset 0 0 0 1px rgba(11, 16, 32, 0.16);
+  color: #101820;
+}
+
+.project-lantern-shell [aria-label$="artwork"]::before,
+.project-lantern-shell [aria-label$="artwork"]::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.project-lantern-shell [aria-label$="artwork"]::before {
+  inset: 1.15rem 1rem;
+  border: 1px solid rgba(16, 24, 32, 0.28);
+  border-bottom-color: rgba(16, 24, 32, 0.14);
+}
+
+.project-lantern-shell [aria-label$="artwork"]::after {
+  left: 26%;
+  right: 18%;
+  top: 39%;
+  height: 30%;
+  border-top: 1px solid rgba(16, 24, 32, 0.28);
+  border-right: 1px solid rgba(16, 24, 32, 0.24);
+  border-radius: 50% 50% 0 0;
+  transform: rotate(-7deg);
+}
+
+.project-lantern-shell [aria-label$="artwork"] > .absolute {
+  display: none;
+}
+
+.project-lantern-shell [aria-label$="artwork"] > .relative {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.project-lantern-shell [aria-label$="artwork"] > .relative span:first-child {
+  max-width: 100%;
+  font-size: 0.62rem;
+  line-height: 1.35;
+  letter-spacing: 0.16em;
+  color: rgba(16, 24, 32, 0.58);
+}
+
+.project-lantern-shell [aria-label$="artwork"] > .relative span:last-child {
+  max-width: 11.5rem;
+  font-size: clamp(1rem, 1.6vw, 1.35rem);
+  line-height: 1.14;
+  color: rgba(16, 24, 32, 0.86);
+}
+
+.project-lantern-shell [aria-label$="artwork"] > .relative span:last-child::after {
+  content: "";
+  display: block;
+  width: 2.5rem;
+  height: 1px;
+  margin-top: 0.85rem;
+  background: rgba(16, 24, 32, 0.36);
+}
+
+@media (max-width: 639px) {
+  .project-lantern-shell article:has(> div > [aria-label$="artwork"]) > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-lantern-shell article:has(> div > [aria-label$="artwork"]) > div > [aria-label$="artwork"] {
+    width: min(100%, 14.5rem);
+    height: auto;
+    margin: 1rem auto 0;
+    border-radius: 0.375rem;
+  }
+
+  .project-lantern-shell article:has(> div > [aria-label$="artwork"]) > div > div:not([aria-label$="artwork"]) {
+    padding: 1rem;
+  }
+
+  .project-lantern-shell article:has(> div > [aria-label$="artwork"]) button {
+    width: 100%;
+  }
+}
+
 .project-lantern-shell [data-device-preview-content] > main {
   min-height: auto;
   padding: 0;
