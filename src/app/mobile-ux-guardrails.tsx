@@ -75,7 +75,7 @@ function markContinueReading() {
   if (!section) return;
 
   section.dataset.mobileContinueReading = "true";
-  const title = cleanText(section.querySelector("h2")?.textContent ?? "The Half-Life of Magic");
+  const title = cleanText(section.querySelector("h2:not(.mobile-continue-heading)")?.textContent ?? "The Half-Life of Magic");
 
   let heading = section.querySelector<HTMLHeadingElement>(".mobile-continue-heading");
   if (!heading) {
