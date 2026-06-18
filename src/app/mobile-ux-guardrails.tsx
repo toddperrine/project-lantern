@@ -39,10 +39,13 @@ function normalizePrimaryNav() {
     byLabel.set(cleanText(button.textContent ?? ""), button);
   });
 
-  NAV_ORDER.forEach((label) => {
-    const button = byLabel.get(label);
-    if (button) row.appendChild(button);
-  });
+  const orderedButtons = NAV_ORDER.map((label) => byLabel.get(label)).filter((button): button is HTMLButtonElement => Boolean(button));
+  const currentOrder = buttons.map((button) => cleanText(button.textContent ?? "")).join("|");
+  const nextOrder = orderedButtons.map((button) => cleanText(button.textContent ?? "")).join("|");
+
+  if (currentOrder !== nextOrder || buttons.length !== orderedButtons.length) {
+    orderedButtons.forEach((button) => row.appendChild(button));
+  }
 }
 
 export function MobileUxGuardrails() {
