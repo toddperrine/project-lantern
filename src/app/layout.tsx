@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { ContinueSeriesEntry } from "./continue-series-entry";
 import { ProjectLanternShell } from "./project-lantern-shell";
 import "./globals.css";
@@ -17,7 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ProjectLanternShell>{children}</ProjectLanternShell>
+        <ProjectLanternShell><Suspense>{children}</Suspense></ProjectLanternShell>
         <ContinueSeriesEntry />
       </body>
     </html>
