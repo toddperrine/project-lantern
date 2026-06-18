@@ -19,14 +19,19 @@ export default function CharactersPage() {
       <div className="device-preview-stack device-preview-tablet-cards mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {CHARACTER_CARDS.map((character) => (
           <article className="rounded-md border border-warm-paper/10 bg-night-ink/65 p-4" key={character.name}>
-            <div className="flex items-start gap-3">
-              <div className="flex h-20 w-16 shrink-0 items-center justify-center rounded-md border border-sea-glass/30 bg-sea-glass/10 text-lg font-semibold text-sea-glass">#{character.rank}</div>
-              <div className="min-w-0">
-                <h3 className="text-base font-semibold leading-6 text-primary-light">{character.name}</h3>
-                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-aged-brass">{character.signal}</p>
+            <div className="relative flex aspect-[3/4] min-h-48 overflow-hidden rounded-md border border-sea-glass/20 bg-[linear-gradient(145deg,#d8ded5_0%,#738176_48%,#1f2d3b_100%)] p-4 text-primary-dark shadow-soft">
+              <div className="absolute inset-x-5 top-7 h-px bg-primary-dark/30" />
+              <div className="absolute inset-x-8 top-12 h-px bg-primary-dark/20" />
+              <div className="absolute right-6 top-20 h-24 w-12 border-r border-primary-dark/20" />
+              <div className="absolute bottom-0 left-0 h-20 w-full bg-primary-dark/10" />
+              <div className="relative z-10 flex h-full w-full flex-col justify-between">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-primary-dark/65">Cast #{character.rank}</span>
+                <span className="max-w-full text-2xl font-semibold leading-tight">{character.name}</span>
               </div>
             </div>
-            <p className="mt-4 text-sm leading-6 text-muted-dark">{character.bio}</p>
+            <h3 className="mt-4 text-base font-semibold leading-6 text-primary-light">{character.name}</h3>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-aged-brass">{character.signal}</p>
+            <p className="mt-3 text-sm leading-6 text-muted-dark">{character.bio}</p>
             <p className="mt-4 rounded-md border border-warm-paper/10 bg-deep-navy/70 px-3 py-2 text-xs leading-5 text-muted-dark"><span className="font-semibold text-primary-light">Appeared in:</span> {character.appearedIn}</p>
           </article>
         ))}
