@@ -17,20 +17,20 @@ const TEXT_SKIP_SELECTOR = "script, style, textarea, input";
 const ART_BY_TITLE: Record<string, string> = {
   "The Half-Life of Magic": "half-life-of-magic",
   "A forgotten talisman from an estate sale begins to hum with a magic that should have died years ago": "half-life-of-magic",
-  "The Lighthouse Under Main Street": "under-lantern-light",
-  "Orchard of Borrowed Moons": "orchard-of-borrowed-moons",
-  "The Quiet Engine": "quiet-engine",
-  "Map of the Seventh Door": "stars-remember",
+  "A Whisper in the Static": "whisper-in-the-static",
   "Whisper in the Static": "whisper-in-the-static",
   "Under Lantern Light": "under-lantern-light",
-  "Stars Remember": "stars-remember"
+  "When the Stars Remember": "stars-remember",
+  "Stars Remember": "stars-remember",
+  "Orchard of Borrowed Moons": "orchard-of-borrowed-moons",
+  "The Quiet Engine": "quiet-engine"
 };
-const FALLBACK_ART_SEQUENCE = ["whisper-in-the-static", "under-lantern-light", "stars-remember", "orchard-of-borrowed-moons", "quiet-engine"];
 const FALLBACK_STARTS = [
-  { title: "The Lighthouse Under Main Street", premise: "A working lighthouse waits beneath a landlocked town.", tags: ["Mystery", "Civic"] },
+  { title: "A Whisper in the Static", premise: "A signal hidden in old recordings starts answering back.", tags: ["Mystery", "Strange"] },
+  { title: "Under Lantern Light", premise: "A town's lanterns reveal the paths people tried to forget.", tags: ["Wonder", "Magic"] },
+  { title: "When the Stars Remember", premise: "A stargazer learns the sky has been keeping human memories.", tags: ["Reflective", "Hopeful"] },
   { title: "Orchard of Borrowed Moons", premise: "Small moons ripen with unfinished wishes inside.", tags: ["Wonder", "Magic"] },
-  { title: "The Quiet Engine", premise: "A machine turns silence into possible futures.", tags: ["Emotional", "Sci-fi"] },
-  { title: "Map of the Seventh Door", premise: "A courier races through impossible thresholds before sunrise.", tags: ["Adventure", "Mystery"] }
+  { title: "The Quiet Engine", premise: "A machine turns silence into possible futures.", tags: ["Emotional", "Sci-fi"] }
 ];
 const FALLBACK_MOODS = ["Mystery", "Wonder", "Emotional", "Adventure", "Strange", "Hopeful", "Dark", "Reflective"];
 
@@ -50,9 +50,13 @@ function shouldSkipTextNode(node: Text) {
   return Boolean(node.parentElement?.closest(TEXT_SKIP_SELECTOR));
 }
 
-function artKeyForTitle(title: string, index = 0) {
+function mappedArtKeyForTitle(title: string) {
   const normalizedTitle = cleanText(title).replace(/[.!?]$/, "");
-  return ART_BY_TITLE[normalizedTitle] ?? FALLBACK_ART_SEQUENCE[index % FALLBACK_ART_SEQUENCE.length];
+  return ART_BY_TITLE[normalizedTitle] ?? null;
+}
+
+function artKeyForTitle(title: string) {
+  return mappedArtKeyForTitle(title) ?? "neutral";
 }
 
 function artUrl(key: string) {
@@ -61,15 +65,22 @@ function artUrl(key: string) {
 
 function applyThumbnailArtwork(element: HTMLElement | null | undefined, key: string) {
   if (!element) return;
+  if (key === "neutral") {
+    element.style.removeProperty("background-image");
+    element.style.setProperty("background-color", "#e7e1d6", "important");
+    return;
+  }
   element.style.setProperty("background-image", `url("${artUrl(key)}")`, "important");
   element.style.setProperty("background-position", "center", "important");
-  element.style.setProperty("background-size", "cover", "important");
+  element.style.setProperty("background-repeat", "no-repeat", "important");
+  element.style.setProperty("background-size", "contain", "important");
 }
 
 function applyContinueArtwork(element: HTMLElement | null | undefined) {
   if (!element) return;
   element.style.setProperty("background-image", "linear-gradient(180deg, rgba(8, 10, 12, 0.04), rgba(8, 10, 12, 0.86)), url(\"/artwork/half-life-of-magic.png\")", "important");
   element.style.setProperty("background-position", "center", "important");
+  element.style.setProperty("background-repeat", "no-repeat", "important");
   element.style.setProperty("background-size", "cover", "important");
 }
 
@@ -197,10 +208,10 @@ function buildFallbackHome(hasStory: boolean) {
     <section data-mobile-fallback-starts="true">
       <div data-mobile-fallback-start-heading="true"><h2>Start Something New</h2></div>
       <div data-mobile-fallback-start-list="true">
-        ${FALLBACK_STARTS.map((story, index) => {
-          const artKey = artKeyForTitle(story.title, index);
+        ${FALLBACK_STARTS.map((story) => {
+          const artKey = artKeyForTitle(story.title);
           return `<button data-mobile-story-row="true" data-mobile-fallback-start="${story.title}" data-mobile-art="${artKey}" type="button">
-            <span data-mobile-thumbnail="true" style="background-image:url('${artUrl(artKey)}')"></span>
+            <span data-mobile-thumbnail="true" style="background-image:url('${artUrl(artKey)}');background-size:contain;background-repeat:no-repeat;background-position:center"></span>
             <span data-mobile-row-copy="true">
               <strong>${story.title}</strong>
               <em>${story.premise}</em>
@@ -288,9 +299,9 @@ function markHomeCards() {
   }
 
   const rows = Array.from(main.querySelectorAll<HTMLButtonElement>("button")).filter((button) => button.querySelector("h3") && button.closest("section")?.textContent?.includes("Start Something New"));
-  rows.forEach((row, index) => {
+  rows.forEach((row) => {
     const title = row.querySelector("h3")?.textContent ?? "";
-    const artKey = artKeyForTitle(title, index);
+    const artKey = artKeyForTitle(title);
     const thumbnail = row.querySelector<HTMLElement>(":scope > div:first-child");
     row.dataset.mobileStoryRow = "true";
     row.dataset.mobileArt = artKey;
@@ -307,10 +318,10 @@ function markLibraryPage() {
   if (tools) tools.dataset.mobileLibraryTools = "true";
 
   const storyCards = Array.from(main.querySelectorAll<HTMLElement>("article")).filter((article) => article.querySelector("h3"));
-  storyCards.forEach((article, index) => {
+  storyCards.forEach((article) => {
     const title = article.querySelector("h3")?.textContent ?? "";
     article.dataset.mobileCompactCard = "true";
-    article.dataset.mobileArt = artKeyForTitle(title, index);
+    article.dataset.mobileArt = artKeyForTitle(title);
     article.dataset.mobileDestination = "library";
   });
   storyCards[0]?.parentElement?.setAttribute("data-mobile-library-story-list", "true");
@@ -322,11 +333,11 @@ function markCompactDestinationCards() {
   const main = document.querySelector<HTMLElement>(`.project-lantern-shell main[data-mobile-active-view='${view}']`);
   if (!main) return;
 
-  Array.from(main.querySelectorAll<HTMLElement>("article")).forEach((article, index) => {
+  Array.from(main.querySelectorAll<HTMLElement>("article")).forEach((article) => {
     const title = article.querySelector("h3")?.textContent ?? article.textContent ?? "";
     article.dataset.mobileCompactCard = "true";
     article.dataset.mobileDestination = view;
-    article.dataset.mobileArt = artKeyForTitle(title, index);
+    article.dataset.mobileArt = artKeyForTitle(title);
   });
 }
 
