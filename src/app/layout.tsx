@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense, type ReactNode } from "react";
 import { ContinueSeriesEntry } from "./continue-series-entry";
+import { MobileShellRuntime } from "./mobile-shell-runtime";
 import { ProjectLanternShell } from "./project-lantern-shell";
 import "./globals.css";
 import "./mobile-shell.css";
@@ -19,6 +20,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <ProjectLanternShell><Suspense>{children}</Suspense></ProjectLanternShell>
+        <MobileShellRuntime />
         <ContinueSeriesEntry />
       </body>
     </html>
