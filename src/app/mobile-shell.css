@@ -204,7 +204,7 @@
     min-height: 12.4rem !important;
     overflow: hidden !important;
     border-radius: 1rem !important;
-    background-image: linear-gradient(180deg, rgba(7, 10, 15, 0.02), rgba(7, 10, 15, 0.84)), url("/artwork/half-life-magic.svg") !important;
+    background-image: linear-gradient(180deg, rgba(7, 10, 15, 0.02), rgba(7, 10, 15, 0.84)), url("/artwork/half-life-of-magic.png") !important;
     background-position: center !important;
     background-size: cover !important;
     box-shadow: 0 14px 34px rgba(29, 25, 18, 0.18) !important;
@@ -348,19 +348,23 @@
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section > div > div.md\:hidden section:nth-child(3) div.mt-3 button:nth-child(1) > div:first-child {
-    background-image: url("/artwork/lighthouse-main-street.svg") !important;
+    background-image: url("/artwork/whisper-in-the-static.png") !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section > div > div.md\:hidden section:nth-child(3) div.mt-3 button:nth-child(2) > div:first-child {
-    background-image: url("/artwork/borrowed-moons.svg") !important;
+    background-image: url("/artwork/under-lantern-light.png") !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section > div > div.md\:hidden section:nth-child(3) div.mt-3 button:nth-child(3) > div:first-child {
-    background-image: url("/artwork/quiet-engine.svg") !important;
+    background-image: url("/artwork/stars-remember.png") !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section > div > div.md\:hidden section:nth-child(3) div.mt-3 button:nth-child(4) > div:first-child {
-    background-image: url("/artwork/seventh-door.svg") !important;
+    background-image: url("/artwork/orchard-of-borrowed-moons.png") !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > div > div.md\:hidden section:nth-child(3) div.mt-3 button:nth-child(5) > div:first-child {
+    background-image: url("/artwork/quiet-engine.png") !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section > div > div.md\:hidden section:nth-child(3) button [aria-label$="artwork"] {
