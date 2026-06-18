@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { getBuildInfo } from "@/lib/build-info";
 import { ProjectLanternNav } from "./project-lantern-nav";
 
@@ -16,7 +16,9 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
             <h1 className="text-2xl font-semibold tracking-tight text-primary-light">Project Lantern</h1>
             <PreviewModeToggle />
           </div>
-          <ProjectLanternNav />
+          <Suspense>
+            <ProjectLanternNav />
+          </Suspense>
         </div>
       </header>
 
