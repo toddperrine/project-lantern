@@ -1,0 +1,132 @@
+@media (max-width: 767px) {
+  .project-lantern-shell [data-mobile-continue-action="true"] {
+    cursor: pointer !important;
+  }
+
+  .project-lantern-shell [data-mobile-mood-subtext="true"] {
+    margin: -0.35rem 0 0 !important;
+    color: #7a7166 !important;
+    font-size: 0.78rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .project-lantern-shell [data-mobile-fallback-mood][aria-pressed="true"] {
+    border-color: rgba(178, 135, 62, 0.42) !important;
+    background: #f5ead2 !important;
+    color: #8b621f !important;
+    box-shadow: 0 9px 22px rgba(178, 135, 62, 0.14) !important;
+  }
+
+  [data-mobile-menu="true"],
+  [data-mobile-recap-modal="true"] {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 120 !important;
+    display: flex !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    background: rgba(20, 17, 12, 0.38) !important;
+    padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)) !important;
+  }
+
+  [data-mobile-menu-sheet="true"],
+  [data-mobile-recap-panel="true"] {
+    width: min(100%, 27rem) !important;
+    max-height: min(82svh, 40rem) !important;
+    overflow: auto !important;
+    border: 1px solid rgba(27, 23, 16, 0.08) !important;
+    border-radius: 1.1rem !important;
+    background: #fffdf8 !important;
+    color: #171510 !important;
+    box-shadow: 0 24px 70px rgba(27, 23, 16, 0.24) !important;
+  }
+
+  [data-mobile-menu-header="true"],
+  [data-mobile-recap-header="true"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 1rem !important;
+    border-bottom: 1px solid rgba(27, 23, 16, 0.08) !important;
+    padding: 0.92rem 1rem !important;
+  }
+
+  [data-mobile-menu-header="true"] p,
+  [data-mobile-recap-header="true"] p {
+    margin: 0 !important;
+    color: #171510 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+  }
+
+  [data-mobile-menu-close="true"],
+  [data-mobile-recap-header="true"] button {
+    display: grid !important;
+    width: 2.35rem !important;
+    height: 2.35rem !important;
+    place-items: center !important;
+    border: 1px solid rgba(27, 23, 16, 0.1) !important;
+    border-radius: 999px !important;
+    background: #f8f1e5 !important;
+    color: #171510 !important;
+    font-size: 1.25rem !important;
+    line-height: 1 !important;
+  }
+
+  [data-mobile-menu-list="true"] {
+    display: grid !important;
+    gap: 0.46rem !important;
+    padding: 0.72rem !important;
+  }
+
+  [data-mobile-menu-list="true"] button {
+    width: 100% !important;
+    border: 1px solid rgba(27, 23, 16, 0.08) !important;
+    border-radius: 0.82rem !important;
+    background: #fbf7ef !important;
+    padding: 0.86rem 0.9rem !important;
+    color: #171510 !important;
+    font-size: 0.92rem !important;
+    font-weight: 700 !important;
+    text-align: left !important;
+  }
+
+  [data-mobile-menu-load-demo="true"],
+  [data-mobile-menu-clear-demo="true"] {
+    margin-top: 0.18rem !important;
+    background: #f5ead2 !important;
+    color: #805b1f !important;
+  }
+
+  [data-mobile-recap-panel="true"] {
+    padding-bottom: 0.9rem !important;
+  }
+
+  [data-mobile-recap-panel="true"] h2 {
+    margin: 1rem 1rem 0 !important;
+    color: #171510 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 1.24rem !important;
+    line-height: 1.15 !important;
+  }
+
+  [data-mobile-recap-panel="true"] > p {
+    margin: 0.65rem 1rem 0 !important;
+    color: #5f584f !important;
+    font-size: 0.9rem !important;
+    line-height: 1.55 !important;
+  }
+
+  [data-mobile-recap-continue="true"] {
+    width: calc(100% - 2rem) !important;
+    margin: 1rem 1rem 0 !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: #b2873e !important;
+    padding: 0.82rem 1rem !important;
+    color: #171510 !important;
+    font-size: 0.9rem !important;
+    font-weight: 800 !important;
+  }
+}
