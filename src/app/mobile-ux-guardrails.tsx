@@ -89,14 +89,14 @@ function markMobileHomeSections() {
   const mood = sections.find((candidate) => candidate.textContent?.includes("What are you in the mood"));
   if (mood) {
     mood.dataset.mobileMoodRail = "true";
-    const track = mood.querySelector<HTMLElement>("div");
+    const track = mood.querySelector<HTMLElement>(":scope > div");
     if (track) track.dataset.mobileMoodRailTrack = "true";
   }
 
   const starts = sections.find((candidate) => cleanText(candidate.querySelector("h2")?.textContent ?? "") === "Start Something New");
   if (!starts) return;
   starts.dataset.mobileStoryRows = "true";
-  starts.querySelector<HTMLElement>("div:last-child")?.setAttribute("data-mobile-story-list", "true");
+  starts.querySelector<HTMLElement>(":scope > div:last-child")?.setAttribute("data-mobile-story-list", "true");
   Array.from(starts.querySelectorAll<HTMLButtonElement>("button")).forEach((button) => {
     const title = cleanText(button.querySelector("h3")?.textContent ?? "");
     if (!title) return;
