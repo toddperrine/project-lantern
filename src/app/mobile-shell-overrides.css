@@ -9,12 +9,24 @@
     padding-bottom: calc(8rem + env(safe-area-inset-bottom)) !important;
   }
 
-  .project-lantern-shell main[data-mobile-active-view="home"] > section > [data-mobile-continue-card="true"]:has(+ header) {
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > [data-mobile-continue-card="true"]:has(~ header) {
     display: none !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-fallback-continue="true"] {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] {
+    padding: 0 !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-card="true"] {
     display: grid !important;
+    width: 100% !important;
     gap: 0.72rem !important;
     margin: 0 !important;
     overflow: visible !important;
@@ -37,6 +49,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] {
     position: relative !important;
     display: block !important;
+    width: 100% !important;
     min-height: 15.5rem !important;
     overflow: hidden !important;
     border: 0 !important;
@@ -70,13 +83,23 @@
     right: 4.2rem !important;
     bottom: 1rem !important;
     z-index: 2 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.42rem !important;
     padding: 0 !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] p,
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-copy="true"] p {
-    display: block !important;
-    margin: 0 0 0.35rem !important;
+    display: none !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-copy="true"]::after,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] > div:nth-child(2)::after {
+    content: "Chapter 1 · 8 min read";
+    order: 2;
+    display: block;
+    margin: 0 !important;
     color: rgba(255, 250, 242, 0.82) !important;
     font-size: 0.72rem !important;
     font-weight: 700 !important;
@@ -86,6 +109,7 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] h2,
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-copy="true"] h2 {
+    order: 1;
     margin: 0 !important;
     color: #fffaf2 !important;
     font-family: Georgia, "Times New Roman", serif !important;
