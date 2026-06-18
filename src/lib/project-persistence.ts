@@ -34,6 +34,12 @@ export type SavedStory = {
   endingType: EndingType;
   lengthTarget: string;
   diagnosticsNotice: string | null;
+  coverImageUrl?: string;
+  coverImage?: string;
+  heroImageUrl?: string;
+  heroImage?: string;
+  characterImageUrl?: string;
+  characterImage?: string;
   feedback?: StoryFeedback[];
 };
 export type StoryFeedbackScore = 1 | 2 | 3 | 4 | 5;
