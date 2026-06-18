@@ -59,6 +59,12 @@ function DevicePreviewModeStyles() {
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 
+@media (max-width: 767px) {
+  [data-device-preview-toggle] {
+    display: none !important;
+  }
+}
+
 @media (min-width: 768px) {
   [data-device-preview-stage="tablet"] {
     margin: 1.5rem auto 2.5rem;
@@ -87,6 +93,7 @@ function DevicePreviewModeScript() {
   const script = `
 (() => {
   const storageKey = "projectLantern.devicePreviewMode.v1";
+  const mobileQuery = window.matchMedia("(max-width: 767px)");
   const modes = {
     tablet: { contentMaxWidth: "820px", stageMaxWidth: "884px", headerMaxWidth: "884px" },
     full: { contentMaxWidth: "", stageMaxWidth: "", headerMaxWidth: "" }
@@ -95,6 +102,8 @@ function DevicePreviewModeScript() {
   const defaultClass = "rounded-sm px-2.5 py-1 text-xs font-semibold text-muted-dark transition hover:text-primary-light";
 
   function readMode() {
+    if (mobileQuery.matches) return "full";
+
     try {
       const storedMode = window.localStorage.getItem(storageKey);
       return storedMode && modes[storedMode] ? storedMode : "full";
@@ -111,7 +120,7 @@ function DevicePreviewModeScript() {
   }
 
   function applyMode(mode) {
-    const selectedMode = modes[mode] ? mode : "full";
+    const selectedMode = mobileQuery.matches || !modes[mode] ? "full" : mode;
     const content = document.querySelector("[data-device-preview-content]");
     const stage = document.querySelector("[data-device-preview-stage]");
     const headerInner = document.querySelector("[data-device-preview-header-inner]");
@@ -141,7 +150,7 @@ function DevicePreviewModeScript() {
       button.className = isSelected ? selectedClass : defaultClass;
     });
 
-    persistMode(selectedMode);
+    if (!mobileQuery.matches) persistMode(selectedMode);
   }
 
   Array.from(document.querySelectorAll("[data-device-preview-mode]")).forEach((button) => {
@@ -149,6 +158,12 @@ function DevicePreviewModeScript() {
     button.addEventListener("click", () => applyMode(button.dataset.devicePreviewMode || "full"));
   });
 
+  const refreshPreviewMode = () => applyMode(readMode());
+  if (typeof mobileQuery.addEventListener === "function") {
+    mobileQuery.addEventListener("change", refreshPreviewMode);
+  } else if (typeof mobileQuery.addListener === "function") {
+    mobileQuery.addListener(refreshPreviewMode);
+  }
   applyMode(readMode());
 })();`;
 

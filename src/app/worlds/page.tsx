@@ -12,15 +12,22 @@ export default function WorldsPage() {
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold">Worlds</p>
           <h2 className="mt-2 text-3xl font-semibold text-primary-light">World Library</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-dark">World cards are structured for future saved library data, with placeholder image blocks, descriptions, story references, and simple ranking.</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-dark">World cards are structured for future saved library data, with quiet cover-style placeholders, descriptions, story references, and simple ranking.</p>
         </div>
         <span className="w-fit rounded-md bg-lantern-gold px-2 py-1 text-xs font-semibold text-primary-dark">Destination</span>
       </div>
       <div className="device-preview-stack device-preview-tablet-cards mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {WORLD_CARDS.map((world) => (
           <article className="rounded-md border border-warm-paper/10 bg-night-ink/65 p-4" key={world.title}>
-            <div className="flex h-28 items-end rounded-md border border-lantern-gold/25 bg-[linear-gradient(135deg,rgba(217,164,65,0.22),rgba(61,122,124,0.18),rgba(246,239,226,0.06))] p-3">
-              <span className="rounded-md bg-night-ink/75 px-2 py-1 text-xs font-semibold text-lantern-gold">Rank #{world.rank}</span>
+            <div className="relative flex aspect-[3/4] min-h-48 overflow-hidden rounded-md border border-warm-paper/10 bg-[linear-gradient(145deg,#d9d0bf_0%,#8c785f_48%,#21313a_100%)] p-4 text-primary-dark shadow-soft">
+              <div className="absolute inset-x-5 top-7 h-px bg-primary-dark/30" />
+              <div className="absolute inset-x-8 top-12 h-px bg-primary-dark/20" />
+              <div className="absolute left-6 top-20 h-20 w-10 border-l border-primary-dark/20" />
+              <div className="absolute bottom-0 left-0 h-20 w-full bg-primary-dark/10" />
+              <div className="relative z-10 flex h-full w-full flex-col justify-between">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-primary-dark/65">World #{world.rank}</span>
+                <span className="max-w-full text-2xl font-semibold leading-tight">{world.title}</span>
+              </div>
             </div>
             <h3 className="mt-4 text-base font-semibold leading-6 text-primary-light">{world.title}</h3>
             <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-aged-brass">{world.signal}</p>

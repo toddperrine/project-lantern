@@ -11,11 +11,15 @@
 }
 
 html {
+  max-width: 100%;
+  overflow-x: hidden;
   scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
+  max-width: 100%;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at top left, rgba(217, 164, 65, 0.12), transparent 34rem),
     radial-gradient(circle at 85% 10%, rgba(47, 143, 139, 0.12), transparent 28rem),
