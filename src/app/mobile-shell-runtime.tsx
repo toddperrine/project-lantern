@@ -3,7 +3,16 @@
 import { useEffect } from "react";
 
 const MOBILE_QUERY = "(max-width: 767px)";
+const DEMO_LATEST_STORY_STORAGE_KEY = "projectLantern.demoLatestStory.v1";
+const DEMO_LATEST_STORY_ID = "demo-the-half-life-of-magic";
 const NAV_ORDER = ["Home", "Story Library", "Characters", "Worlds", "Create"];
+const VIEW_BY_LABEL: Record<string, string> = {
+  Home: "home",
+  "Story Library": "library",
+  Characters: "characters",
+  Worlds: "worlds",
+  Create: "create"
+};
 const TEXT_REPLACEMENTS: Array<[RegExp, string]> = [
   [/Characters\s*\/\s*Cast/g, "Characters"],
   [/\bCAST\b/g, "CHARACTERS"],
@@ -26,13 +35,21 @@ const ART_BY_TITLE: Record<string, string> = {
   "The Quiet Engine": "quiet-engine"
 };
 const FALLBACK_STARTS = [
-  { title: "A Whisper in the Static", premise: "A signal hidden in old recordings starts answering back.", tags: ["Mystery", "Strange"] },
-  { title: "Under Lantern Light", premise: "A town's lanterns reveal the paths people tried to forget.", tags: ["Wonder", "Magic"] },
-  { title: "When the Stars Remember", premise: "A stargazer learns the sky has been keeping human memories.", tags: ["Reflective", "Hopeful"] },
-  { title: "Orchard of Borrowed Moons", premise: "Small moons ripen with unfinished wishes inside.", tags: ["Wonder", "Magic"] },
-  { title: "The Quiet Engine", premise: "A machine turns silence into possible futures.", tags: ["Emotional", "Sci-fi"] }
+  { title: "A Whisper in the Static", premise: "A signal hidden in old recordings starts answering back.", tags: ["Mystery", "Strange"], mood: "Mystery" },
+  { title: "Under Lantern Light", premise: "A town's lanterns reveal the paths people tried to forget.", tags: ["Wonder", "Magic"], mood: "Wonder" },
+  { title: "When the Stars Remember", premise: "A stargazer learns the sky has been keeping human memories.", tags: ["Reflective", "Hopeful"], mood: "Reflective" },
+  { title: "Orchard of Borrowed Moons", premise: "Small moons ripen with unfinished wishes inside.", tags: ["Wonder", "Magic"], mood: "Wonder" },
+  { title: "The Quiet Engine", premise: "A machine turns silence into possible futures.", tags: ["Emotional", "Sci-fi"], mood: "Emotional" }
 ];
 const FALLBACK_MOODS = ["Mystery", "Wonder", "Emotional", "Adventure", "Strange", "Hopeful", "Dark", "Reflective"];
+const DEMO_STORY_TEXT = [
+  "A forgotten talisman from an estate sale begins to hum with a magic that should have died years ago.",
+  "Mara Vale found the first talisman inside a box of ordinary estate-sale objects.",
+  "When she touched it, the room shifted, a hidden mark appeared on an old receipt, and somewhere far away an ancient wanderer felt the signal return.",
+  "Mara must decide whether to follow the talisman's signal before she understands what it is waking.",
+  "Someone else knows the talisman has awakened, and they are already looking for it."
+].join("\n\n");
+const DEMO_RECAP = "Mara found the first talisman inside a box of ordinary estate-sale objects. When she touched it, the room shifted, a hidden mark appeared on an old receipt, and somewhere far away an ancient wanderer felt the signal return.";
 
 function currentView() {
   return new URLSearchParams(window.location.search).get("view") ?? "home";
@@ -48,6 +65,14 @@ function replaceText(value: string) {
 
 function shouldSkipTextNode(node: Text) {
   return Boolean(node.parentElement?.closest(TEXT_SKIP_SELECTOR));
+}
+
+function selectedMood() {
+  return window.sessionStorage.getItem("projectLantern.mobileMood") || "Mystery";
+}
+
+function setSelectedMood(mood: string) {
+  window.sessionStorage.setItem("projectLantern.mobileMood", mood);
 }
 
 function mappedArtKeyForTitle(title: string) {
@@ -140,9 +165,141 @@ function hideDemoMessages() {
   });
 }
 
+function sourceTextOutsideMobileFallback(main: HTMLElement) {
+  const clone = main.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll("[data-mobile-home-fallback='true'], [data-mobile-menu='true'], [data-mobile-recap-modal='true']").forEach((element) => element.remove());
+  return cleanText(clone.textContent ?? "");
+}
+
+function isDemoStoryActive() {
+  try {
+    const raw = window.localStorage.getItem(DEMO_LATEST_STORY_STORAGE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { id?: string; story?: string };
+    return parsed?.id === DEMO_LATEST_STORY_ID && typeof parsed.story === "string";
+  } catch {
+    return false;
+  }
+}
+
 function getHomeStorySignal(main: HTMLElement) {
-  const text = cleanText(main.textContent ?? "");
-  return /Continue Reading|Next Chapter|The Half-Life of Magic|Recent Story|Generated Story/.test(text);
+  if (isDemoStoryActive()) return true;
+  return /Continue Reading|Next Chapter|The Half-Life of Magic|Recent Story|Generated Story/.test(sourceTextOutsideMobileFallback(main));
+}
+
+function hasRealStorySignal() {
+  const main = document.querySelector<HTMLElement>(".project-lantern-shell main");
+  if (!main) return false;
+  return /Continue Reading|Next Chapter|Recent Story|Generated Story/.test(sourceTextOutsideMobileFallback(main));
+}
+
+function createDemoLatestStory() {
+  return {
+    id: DEMO_LATEST_STORY_ID,
+    title: "The Half-Life of Magic",
+    createdAt: new Date().toISOString(),
+    story: DEMO_STORY_TEXT,
+    wordCount: DEMO_STORY_TEXT.trim().split(/\s+/).length,
+    generatorSource: "fallback",
+    charactersUsed: ["Mara Vale"],
+    rulesReferenced: [],
+    genrePreset: "Contemporary Fantastical / Magical Realist",
+    narrativeArchitecture: "Revelation Story",
+    characterArc: "Positive Change Arc",
+    endingType: "Resolution with Residue",
+    lengthTarget: "Standard",
+    diagnosticsNotice: null
+  };
+}
+
+function findButtonByText(pattern: RegExp, excludeMobileFallback = true) {
+  return Array.from(document.querySelectorAll<HTMLButtonElement>(".project-lantern-shell button")).find((candidate) => {
+    if (excludeMobileFallback && candidate.closest("[data-mobile-home-fallback='true'], [data-mobile-menu='true'], [data-mobile-recap-modal='true']")) return false;
+    return pattern.test(cleanText(candidate.textContent ?? ""));
+  });
+}
+
+function clickOriginalButtonByText(text: string) {
+  findButtonByText(new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"))?.click();
+}
+
+function clickMobileNav(label: string) {
+  const button = Array.from(document.querySelectorAll<HTMLButtonElement>('nav[aria-label="Mobile primary"] button')).find((candidate) => cleanText(candidate.textContent ?? "") === label);
+  if (button) {
+    button.click();
+    return;
+  }
+
+  const view = VIEW_BY_LABEL[label];
+  if (!view) return;
+  const nextUrl = view === "home" ? window.location.pathname : `${window.location.pathname}?view=${view}`;
+  window.history.pushState(null, "", nextUrl);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+function loadDemoStory() {
+  const existing = findButtonByText(/load demo story|load demo/i);
+  if (existing) {
+    existing.click();
+    return;
+  }
+  window.localStorage.setItem(DEMO_LATEST_STORY_STORAGE_KEY, JSON.stringify(createDemoLatestStory()));
+  clickMobileNav("Home");
+  window.location.reload();
+}
+
+function clearDemoStory() {
+  const existing = findButtonByText(/clear demo story|clear demo/i);
+  if (existing) {
+    existing.click();
+    return;
+  }
+  window.localStorage.removeItem(DEMO_LATEST_STORY_STORAGE_KEY);
+  clickMobileNav("Home");
+  window.location.reload();
+}
+
+function continueLatestStory() {
+  const nextButton = findButtonByText(/next chapter|continue reading|continue/i);
+  if (nextButton) {
+    nextButton.click();
+    return;
+  }
+  clickMobileNav("Create");
+}
+
+function openRecapModal() {
+  closeMobileMenu();
+  closeRecapModal();
+  const modal = document.createElement("div");
+  modal.dataset.mobileRecapModal = "true";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-label", "Last Chapter Recap");
+  modal.innerHTML = `
+    <div data-mobile-recap-panel="true">
+      <div data-mobile-recap-header="true">
+        <p>Last Chapter Recap</p>
+        <button type="button" aria-label="Close recap">×</button>
+      </div>
+      <h2>The Half-Life of Magic</h2>
+      <p>${DEMO_RECAP}</p>
+      <button data-mobile-recap-continue="true" type="button">Next Chapter</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target === modal || target?.closest("[aria-label='Close recap']")) closeRecapModal();
+    if (target?.closest("[data-mobile-recap-continue='true']")) {
+      closeRecapModal();
+      continueLatestStory();
+    }
+  });
+}
+
+function closeRecapModal() {
+  document.querySelector("[data-mobile-recap-modal='true']")?.remove();
 }
 
 function ensureReferenceContinueCard() {
@@ -157,15 +314,7 @@ function ensureReferenceContinueCard() {
 
   const section = document.createElement("section");
   section.dataset.mobileContinueCard = "true";
-  section.innerHTML = `
-    <div data-mobile-continue-image="true">
-      <div data-mobile-continue-copy="true">
-        <p>Chapter 1 • 8 min read</p>
-        <h2>The Half-Life of Magic</h2>
-      </div>
-      <button aria-label="Open last chapter recap" type="button">↺</button>
-    </div>
-  `;
+  section.innerHTML = buildFallbackContinue();
   parent.insertBefore(section, parent.firstElementChild);
   applyContinueArtwork(section.querySelector<HTMLElement>("[data-mobile-continue-image='true']"));
 }
@@ -174,20 +323,14 @@ function findHomeRoot(main: HTMLElement) {
   return main.querySelector<HTMLElement>(":scope > section") ?? main;
 }
 
-function clickOriginalButtonByText(text: string) {
-  const button = Array.from(document.querySelectorAll<HTMLButtonElement>(".project-lantern-shell button")).find((candidate) => cleanText(candidate.textContent ?? "").includes(text) && !candidate.closest("[data-mobile-home-fallback='true']"));
-  button?.click();
-}
-
-function clickMobileNav(label: string) {
-  const button = Array.from(document.querySelectorAll<HTMLButtonElement>('nav[aria-label="Mobile primary"] button')).find((candidate) => cleanText(candidate.textContent ?? "") === label);
-  button?.click();
+function sortedStartsForMood(mood: string) {
+  return [...FALLBACK_STARTS].sort((a, b) => Number(b.mood === mood || b.tags.includes(mood)) - Number(a.mood === mood || a.tags.includes(mood)));
 }
 
 function buildFallbackContinue() {
   return `
     <section data-mobile-fallback-continue="true" data-mobile-continue-card="true">
-      <div data-mobile-continue-image="true">
+      <div data-mobile-continue-image="true" data-mobile-continue-action="true">
         <div data-mobile-continue-copy="true">
           <p>Chapter 1 • 8 min read</p>
           <h2>The Half-Life of Magic</h2>
@@ -199,23 +342,26 @@ function buildFallbackContinue() {
 }
 
 function buildFallbackHome(hasStory: boolean) {
+  const mood = selectedMood();
+  const starts = sortedStartsForMood(mood);
   return `
     ${hasStory ? buildFallbackContinue() : ""}
     <section data-mobile-fallback-moods="true">
       <h2>What are you in the mood to read?</h2>
-      <div>${FALLBACK_MOODS.map((mood) => `<button data-mobile-fallback-mood="${mood}" type="button">${mood}</button>`).join("")}</div>
+      <p data-mobile-mood-subtext="true">${mood} picks for your next read.</p>
+      <div>${FALLBACK_MOODS.map((item) => `<button data-mobile-fallback-mood="${item}" aria-pressed="${String(item === mood)}" type="button">${item}</button>`).join("")}</div>
     </section>
     <section data-mobile-fallback-starts="true">
       <div data-mobile-fallback-start-heading="true"><h2>Start Something New</h2></div>
       <div data-mobile-fallback-start-list="true">
-        ${FALLBACK_STARTS.map((story) => {
+        ${starts.map((story) => {
           const artKey = artKeyForTitle(story.title);
           return `<button data-mobile-story-row="true" data-mobile-fallback-start="${story.title}" data-mobile-art="${artKey}" type="button">
             <span data-mobile-thumbnail="true" style="background-image:url('${artUrl(artKey)}');background-size:contain;background-repeat:no-repeat;background-position:center"></span>
             <span data-mobile-row-copy="true">
               <strong>${story.title}</strong>
               <em>${story.premise}</em>
-              <span data-mobile-row-tags="true">${story.tags.map((tag) => `<span>${tag}</span>`).join("")}</span>
+              <span data-mobile-row-tags="true">${story.tags.slice(0, 2).map((tag) => `<span>${tag}</span>`).join("")}</span>
             </span>
             <span data-mobile-row-chevron="true">›</span>
           </button>`;
@@ -225,14 +371,37 @@ function buildFallbackHome(hasStory: boolean) {
   `;
 }
 
+function renderFallbackHome(fallback: HTMLElement, hasStory: boolean) {
+  fallback.innerHTML = buildFallbackHome(hasStory);
+  fallback.dataset.mobileFallbackHasStory = String(hasStory);
+  fallback.dataset.mobileFallbackMood = selectedMood();
+  applyContinueArtwork(fallback.querySelector<HTMLElement>("[data-mobile-continue-image='true']"));
+}
+
 function bindFallbackHome(fallback: HTMLElement) {
   if (fallback.dataset.mobileFallbackBound === "true") return;
   fallback.dataset.mobileFallbackBound = "true";
   fallback.addEventListener("click", (event) => {
     const target = event.target instanceof Element ? event.target : null;
+    const recap = target?.closest("[aria-label='Open last chapter recap']");
+    if (recap) {
+      event.preventDefault();
+      event.stopPropagation();
+      openRecapModal();
+      return;
+    }
+
+    if (target?.closest("[data-mobile-continue-action='true']")) {
+      continueLatestStory();
+      return;
+    }
+
     const mood = target?.closest<HTMLElement>("[data-mobile-fallback-mood]")?.dataset.mobileFallbackMood;
     if (mood) {
+      setSelectedMood(mood);
       clickOriginalButtonByText(mood);
+      const main = document.querySelector<HTMLElement>(".project-lantern-shell main");
+      renderFallbackHome(fallback, main ? getHomeStorySignal(main) : false);
       return;
     }
 
@@ -266,11 +435,8 @@ function ensureMobileHomeFallback() {
   }
 
   const hasStory = getHomeStorySignal(main);
-  const nextMarkup = buildFallbackHome(hasStory);
-  if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || cleanText(nextFallback.innerHTML) === "") {
-    nextFallback.innerHTML = nextMarkup;
-    nextFallback.dataset.mobileFallbackHasStory = String(hasStory);
-    applyContinueArtwork(nextFallback.querySelector<HTMLElement>("[data-mobile-continue-image='true']"));
+  if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || nextFallback.dataset.mobileFallbackMood !== selectedMood() || cleanText(nextFallback.innerHTML) === "") {
+    renderFallbackHome(nextFallback, hasStory);
   }
   bindFallbackHome(nextFallback);
 
@@ -288,17 +454,18 @@ function markHomeCards() {
   const main = document.querySelector<HTMLElement>(".project-lantern-shell main[data-mobile-active-view='home']");
   if (!main) return;
 
-  const continueSection = Array.from(main.querySelectorAll<HTMLElement>("section")).find((section) => section.textContent?.includes("Next Chapter") && section.textContent?.includes("Continue Reading"));
+  const continueSection = Array.from(main.querySelectorAll<HTMLElement>("section")).find((section) => !section.closest("[data-mobile-home-fallback='true']") && section.textContent?.includes("Next Chapter") && section.textContent?.includes("Continue Reading"));
   if (continueSection) {
     continueSection.dataset.mobileContinueCard = "true";
     const image = continueSection.querySelector<HTMLElement>(":scope > div:first-child");
     image?.setAttribute("data-mobile-continue-image", "true");
+    image?.setAttribute("data-mobile-continue-action", "true");
     applyContinueArtwork(image);
     const chapterLine = image?.querySelector("p");
     if (chapterLine) chapterLine.textContent = "Chapter 1 • 8 min read";
   }
 
-  const rows = Array.from(main.querySelectorAll<HTMLButtonElement>("button")).filter((button) => button.querySelector("h3") && button.closest("section")?.textContent?.includes("Start Something New"));
+  const rows = Array.from(main.querySelectorAll<HTMLButtonElement>("button")).filter((button) => !button.closest("[data-mobile-home-fallback='true']") && button.querySelector("h3") && button.closest("section")?.textContent?.includes("Start Something New"));
   rows.forEach((row) => {
     const title = row.querySelector("h3")?.textContent ?? "";
     const artKey = artKeyForTitle(title);
@@ -341,6 +508,93 @@ function markCompactDestinationCards() {
   });
 }
 
+function openMobileMenu() {
+  closeRecapModal();
+  let menu = document.querySelector<HTMLElement>("[data-mobile-menu='true']");
+  if (!menu) {
+    menu = document.createElement("div");
+    menu.dataset.mobileMenu = "true";
+    menu.setAttribute("role", "dialog");
+    menu.setAttribute("aria-modal", "true");
+    menu.setAttribute("aria-label", "Project Lantern menu");
+    document.body.appendChild(menu);
+    menu.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target === menu || target?.closest("[data-mobile-menu-close='true']")) {
+        closeMobileMenu();
+        return;
+      }
+
+      const navLabel = target?.closest<HTMLElement>("[data-mobile-menu-nav]")?.dataset.mobileMenuNav;
+      if (navLabel) {
+        clickMobileNav(navLabel);
+        closeMobileMenu();
+        return;
+      }
+
+      if (target?.closest("[data-mobile-menu-load-demo='true']")) {
+        closeMobileMenu();
+        loadDemoStory();
+        return;
+      }
+
+      if (target?.closest("[data-mobile-menu-clear-demo='true']")) {
+        closeMobileMenu();
+        clearDemoStory();
+      }
+    });
+  }
+
+  const demoActive = isDemoStoryActive();
+  const anyStory = demoActive || hasRealStorySignal();
+  menu.innerHTML = `
+    <div data-mobile-menu-sheet="true">
+      <div data-mobile-menu-header="true">
+        <p>Project Lantern</p>
+        <button data-mobile-menu-close="true" type="button" aria-label="Close menu">×</button>
+      </div>
+      <div data-mobile-menu-list="true">
+        ${NAV_ORDER.map((label) => `<button data-mobile-menu-nav="${label}" type="button">${label}</button>`).join("")}
+        ${!anyStory ? `<button data-mobile-menu-load-demo="true" type="button">Load demo story</button>` : ""}
+        ${demoActive ? `<button data-mobile-menu-clear-demo="true" type="button">Clear demo story</button>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function closeMobileMenu() {
+  document.querySelector("[data-mobile-menu='true']")?.remove();
+}
+
+function bindHeaderActions() {
+  const menuButton = document.querySelector<HTMLButtonElement>('.project-lantern-shell button[aria-label="Open menu"]');
+  if (menuButton && menuButton.dataset.mobileMenuBound !== "true") {
+    menuButton.dataset.mobileMenuBound = "true";
+    menuButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      openMobileMenu();
+    });
+  }
+
+  const profileButton = document.querySelector<HTMLButtonElement>('.project-lantern-shell button[aria-label="Open profile"]');
+  if (profileButton && profileButton.dataset.mobileProfileBound !== "true") {
+    profileButton.dataset.mobileProfileBound = "true";
+    profileButton.addEventListener("click", () => openMobileMenu());
+  }
+}
+
+function bindVisibleRecapButtons() {
+  Array.from(document.querySelectorAll<HTMLButtonElement>('.project-lantern-shell button[aria-label*="recap" i], .project-lantern-shell button[aria-label*="last chapter" i]')).forEach((button) => {
+    if (button.dataset.mobileRecapBound === "true") return;
+    button.dataset.mobileRecapBound = "true";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openRecapModal();
+    });
+  });
+}
+
 function applyMobileShell(mobileQuery: MediaQueryList) {
   if (!mobileQuery.matches) return;
   const root = document.querySelector(".project-lantern-shell");
@@ -356,6 +610,8 @@ function applyMobileShell(mobileQuery: MediaQueryList) {
   ensureMobileHomeFallback();
   markLibraryPage();
   markCompactDestinationCards();
+  bindHeaderActions();
+  bindVisibleRecapButtons();
 }
 
 export function MobileShellRuntime() {
@@ -371,6 +627,12 @@ export function MobileShellRuntime() {
     const observer = new MutationObserver(apply);
     observer.observe(document.body, { childList: true, characterData: true, subtree: true });
     window.addEventListener("popstate", apply);
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeMobileMenu();
+        closeRecapModal();
+      }
+    });
 
     if (typeof mobileQuery.addEventListener === "function") mobileQuery.addEventListener("change", apply);
     else if (typeof mobileQuery.addListener === "function") mobileQuery.addListener(apply);
