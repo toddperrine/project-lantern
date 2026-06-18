@@ -50,6 +50,12 @@ const DEMO_STORY_TEXT = [
   "Someone else knows the talisman has awakened, and they are already looking for it."
 ].join("\n\n");
 const DEMO_RECAP = "Mara found the first talisman inside a box of ordinary estate-sale objects. When she touched it, the room shifted, a hidden mark appeared on an old receipt, and somewhere far away an ancient wanderer felt the signal return.";
+const PROFILE_ICON = `
+  <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="8" r="3.25" stroke="currentColor" stroke-width="1.8" />
+    <path d="M5.75 19.25c.85-3.15 3.15-5 6.25-5s5.4 1.85 6.25 5" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+  </svg>
+`;
 
 function currentView() {
   return new URLSearchParams(window.location.search).get("view") ?? "home";
@@ -163,11 +169,10 @@ function hideDemoMessages() {
     if (isDemoStatus) element.dataset.mobileHiddenStatus = "true";
     else delete element.dataset.mobileHiddenStatus;
   });
-}
-
+}\n
 function sourceTextOutsideMobileFallback(main: HTMLElement) {
   const clone = main.cloneNode(true) as HTMLElement;
-  clone.querySelectorAll("[data-mobile-home-fallback='true'], [data-mobile-menu='true'], [data-mobile-recap-modal='true']").forEach((element) => element.remove());
+  clone.querySelectorAll("[data-mobile-home-fallback='true'], [data-mobile-menu='true'], [data-mobile-account-modal='true'], [data-mobile-recap-modal='true']").forEach((element) => element.remove());
   return cleanText(clone.textContent ?? "");
 }
 
@@ -214,7 +219,7 @@ function createDemoLatestStory() {
 
 function findButtonByText(pattern: RegExp, excludeMobileFallback = true) {
   return Array.from(document.querySelectorAll<HTMLButtonElement>(".project-lantern-shell button")).find((candidate) => {
-    if (excludeMobileFallback && candidate.closest("[data-mobile-home-fallback='true'], [data-mobile-menu='true'], [data-mobile-recap-modal='true']")) return false;
+    if (excludeMobileFallback && candidate.closest("[data-mobile-home-fallback='true'], [data-mobile-menu='true'], [data-mobile-account-modal='true'], [data-mobile-recap-modal='true']")) return false;
     return pattern.test(cleanText(candidate.textContent ?? ""));
   });
 }
@@ -270,6 +275,7 @@ function continueLatestStory() {
 
 function openRecapModal() {
   closeMobileMenu();
+  closeAccountModal();
   closeRecapModal();
   const modal = document.createElement("div");
   modal.dataset.mobileRecapModal = "true";
@@ -300,6 +306,35 @@ function openRecapModal() {
 
 function closeRecapModal() {
   document.querySelector("[data-mobile-recap-modal='true']")?.remove();
+}
+
+function openAccountModal() {
+  closeMobileMenu();
+  closeRecapModal();
+  closeAccountModal();
+  const modal = document.createElement("div");
+  modal.dataset.mobileAccountModal = "true";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-label", "Profile settings");
+  modal.innerHTML = `
+    <div data-mobile-account-sheet="true">
+      <div data-mobile-account-header="true">
+        <p>Profile</p>
+        <button data-mobile-account-close="true" type="button" aria-label="Close profile settings">×</button>
+      </div>
+      <p>Profile settings coming soon</p>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target === modal || target?.closest("[data-mobile-account-close='true']")) closeAccountModal();
+  });
+}
+
+function closeAccountModal() {
+  document.querySelector("[data-mobile-account-modal='true']")?.remove();
 }
 
 function ensureReferenceContinueCard() {
@@ -509,6 +544,7 @@ function markCompactDestinationCards() {
 }
 
 function openMobileMenu() {
+  closeAccountModal();
   closeRecapModal();
   let menu = document.querySelector<HTMLElement>("[data-mobile-menu='true']");
   if (!menu) {
@@ -567,19 +603,34 @@ function closeMobileMenu() {
 }
 
 function bindHeaderActions() {
-  const menuButton = document.querySelector<HTMLButtonElement>('.project-lantern-shell button[aria-label="Open menu"]');
-  if (menuButton && menuButton.dataset.mobileMenuBound !== "true") {
-    menuButton.dataset.mobileMenuBound = "true";
-    menuButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      openMobileMenu();
-    });
+  const mobileHeader = document.querySelector<HTMLElement>(".project-lantern-shell main > section > header:first-child");
+  const headerButtons = mobileHeader ? Array.from(mobileHeader.querySelectorAll<HTMLButtonElement>("button")) : [];
+  const menuButton = document.querySelector<HTMLButtonElement>('.project-lantern-shell button[aria-label="Open menu"]') ?? headerButtons[0];
+  if (menuButton) {
+    menuButton.setAttribute("aria-label", "Open menu");
+    if (menuButton.dataset.mobileMenuBound !== "true") {
+      menuButton.dataset.mobileMenuBound = "true";
+      menuButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        openMobileMenu();
+      });
+    }
   }
 
-  const profileButton = document.querySelector<HTMLButtonElement>('.project-lantern-shell button[aria-label="Open profile"]');
-  if (profileButton && profileButton.dataset.mobileProfileBound !== "true") {
-    profileButton.dataset.mobileProfileBound = "true";
-    profileButton.addEventListener("click", () => openMobileMenu());
+  const profileButton = document.querySelector<HTMLButtonElement>('.project-lantern-shell button[aria-label="Open profile"]') ?? headerButtons[headerButtons.length - 1];
+  if (profileButton && profileButton !== menuButton) {
+    profileButton.setAttribute("aria-label", "Open profile");
+    if (profileButton.dataset.mobileProfileIcon !== "true") {
+      profileButton.dataset.mobileProfileIcon = "true";
+      profileButton.innerHTML = PROFILE_ICON;
+    }
+    if (profileButton.dataset.mobileProfileBound !== "true") {
+      profileButton.dataset.mobileProfileBound = "true";
+      profileButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        openAccountModal();
+      });
+    }
   }
 }
 
@@ -630,6 +681,7 @@ export function MobileShellRuntime() {
     window.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         closeMobileMenu();
+        closeAccountModal();
         closeRecapModal();
       }
     });
