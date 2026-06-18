@@ -42,6 +42,16 @@ const FALLBACK_STARTS = [
   { title: "The Quiet Engine", premise: "A machine turns silence into possible futures.", tags: ["Emotional", "Sci-fi"], mood: "Emotional" }
 ];
 const FALLBACK_MOODS = ["Mystery", "Wonder", "Emotional", "Adventure", "Strange", "Hopeful", "Dark", "Reflective"];
+const FALLBACK_MOOD_ICONS: Record<string, string> = {
+  Mystery: "?",
+  Wonder: "*",
+  Emotional: "~",
+  Adventure: ">",
+  Strange: "!",
+  Hopeful: "+",
+  Dark: "-",
+  Reflective: "o"
+};
 const DEMO_STORY_TEXT = [
   "A forgotten talisman from an estate sale begins to hum with a magic that should have died years ago.",
   "Mara Vale found the first talisman inside a box of ordinary estate-sale objects.",
@@ -379,11 +389,12 @@ function openMobileMenu() {
 function buildFallbackContinue() {
   return `
     <section data-mobile-fallback-continue="true" data-mobile-continue-card="true">
-      <div data-mobile-continue-image="true" data-mobile-continue-action="true">
+      <div data-mobile-continue-image="true" data-mobile-continue-action="true" role="button" tabindex="0" aria-label="Continue The Half-Life of Magic">
         <div data-mobile-continue-copy="true">
           <p>Chapter 1 • 8 min read</p>
           <h2>The Half-Life of Magic</h2>
         </div>
+        <span data-mobile-continue-cta="true">Continue</span>
         <button aria-label="Open last chapter recap" type="button">↺</button>
       </div>
     </section>
@@ -394,6 +405,10 @@ function sortedStartsForMood(mood: string) {
   return [...FALLBACK_STARTS].sort((a, b) => Number(b.mood === mood || b.tags.includes(mood)) - Number(a.mood === mood || a.tags.includes(mood)));
 }
 
+function moodIcon(mood: string) {
+  return FALLBACK_MOOD_ICONS[mood] ?? "*";
+}
+
 function buildFallbackHome(hasStory: boolean) {
   const mood = selectedMood();
   return `
@@ -401,7 +416,7 @@ function buildFallbackHome(hasStory: boolean) {
     <section data-mobile-fallback-moods="true">
       <h2>What are you in the mood to read?</h2>
       <p data-mobile-mood-subtext="true">${mood} picks for your next read.</p>
-      <div>${FALLBACK_MOODS.map((item) => `<button data-mobile-fallback-mood="${item}" aria-pressed="${String(item === mood)}" type="button">${item}</button>`).join("")}</div>
+      <div>${FALLBACK_MOODS.map((item) => `<button data-mobile-fallback-mood="${item}" aria-pressed="${String(item === mood)}" type="button"><span data-mobile-mood-icon="true" aria-hidden="true">${moodIcon(item)}</span><span data-mobile-mood-label="true">${item}</span></button>`).join("")}</div>
     </section>
     <section data-mobile-fallback-starts="true">
       <div data-mobile-fallback-start-heading="true"><h2>Start Something New</h2></div>
@@ -423,11 +438,24 @@ function buildFallbackHome(hasStory: boolean) {
   `;
 }
 
+function keepSelectedMoodVisible(fallback: HTMLElement, mood = selectedMood()) {
+  const selectedButton = Array.from(fallback.querySelectorAll<HTMLButtonElement>("[data-mobile-fallback-mood]")).find((button) => button.dataset.mobileFallbackMood === mood);
+  const track = selectedButton?.parentElement;
+  if (!selectedButton || !track) return;
+  window.requestAnimationFrame(() => {
+    const buttonRect = selectedButton.getBoundingClientRect();
+    const trackRect = track.getBoundingClientRect();
+    const isVisible = buttonRect.left >= trackRect.left + 12 && buttonRect.right <= trackRect.right - 12;
+    if (!isVisible) selectedButton.scrollIntoView({ block: "nearest", inline: "center" });
+  });
+}
+
 function renderFallbackHome(fallback: HTMLElement, hasStory: boolean) {
   fallback.innerHTML = buildFallbackHome(hasStory);
   fallback.dataset.mobileFallbackHasStory = String(hasStory);
   fallback.dataset.mobileFallbackMood = selectedMood();
   applyContinueArtwork(fallback.querySelector<HTMLElement>("[data-mobile-continue-image='true']"));
+  keepSelectedMoodVisible(fallback);
 }
 
 function bindFallbackHome(fallback: HTMLElement) {
@@ -451,6 +479,7 @@ function bindFallbackHome(fallback: HTMLElement) {
       clickOriginalButtonByText(mood);
       const main = document.querySelector<HTMLElement>(".project-lantern-shell main");
       renderFallbackHome(fallback, main ? getHomeStorySignal(main) : false);
+      keepSelectedMoodVisible(fallback, mood);
       return;
     }
     const start = target?.closest<HTMLElement>("[data-mobile-fallback-start]")?.dataset.mobileFallbackStart;
@@ -458,6 +487,13 @@ function bindFallbackHome(fallback: HTMLElement) {
       clickOriginalButtonByText(start);
       clickMobileNav("Create");
     }
+  });
+  fallback.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest("[data-mobile-continue-action='true']")) return;
+    event.preventDefault();
+    continueLatestStory();
   });
 }
 
@@ -516,9 +552,18 @@ function markHomeCards() {
     const image = continueSection.querySelector<HTMLElement>(":scope > div:first-child");
     image?.setAttribute("data-mobile-continue-image", "true");
     image?.setAttribute("data-mobile-continue-action", "true");
+    image?.setAttribute("role", "button");
+    image?.setAttribute("tabindex", "0");
+    image?.setAttribute("aria-label", "Continue The Half-Life of Magic");
     applyContinueArtwork(image);
     const chapterLine = image?.querySelector("p");
     if (chapterLine) chapterLine.textContent = "Chapter 1 • 8 min read";
+    if (image && !image.querySelector("[data-mobile-continue-cta='true']")) {
+      const cta = document.createElement("span");
+      cta.dataset.mobileContinueCta = "true";
+      cta.textContent = "Continue";
+      image.appendChild(cta);
+    }
   }
   Array.from(main.querySelectorAll<HTMLButtonElement>("button")).filter((button) => !button.closest("[data-mobile-home-fallback='true']") && button.querySelector("h3") && button.closest("section")?.textContent?.includes("Start Something New")).forEach((row) => {
     const title = row.querySelector("h3")?.textContent ?? "";
