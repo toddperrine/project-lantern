@@ -72,11 +72,15 @@ function DevicePreviewModeStyles() {
 [data-device-preview-content="phone"] h2,
 [data-device-preview-content="phone"] h3,
 [data-device-preview-content="phone"] p,
-[data-device-preview-content="phone"] a,
-[data-device-preview-content="phone"] button,
-[data-device-preview-content="phone"] span,
 [data-device-preview-content="phone"] textarea {
   overflow-wrap: anywhere;
+}
+
+[data-device-preview-content="phone"] a,
+[data-device-preview-content="phone"] button,
+[data-device-preview-content="phone"] span {
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 [data-device-preview-content="phone"] a,
@@ -95,8 +99,14 @@ function DevicePreviewModeStyles() {
 
 @media (min-width: 768px) {
   [data-device-preview-header-inner="phone"] {
+    align-items: stretch;
+    flex-direction: column;
     padding-left: 1rem;
     padding-right: 1rem;
+  }
+
+  [data-device-preview-header-inner="phone"] nav {
+    width: 100%;
   }
 
   [data-device-preview-stage="phone"] {
