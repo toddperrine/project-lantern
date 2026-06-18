@@ -38,7 +38,7 @@ textarea {
 }
 
 .project-lantern-shell main > section > header p:first-child::after {
-  content: " v0.1.3";
+  content: " v0.1.4";
   margin-left: 0.65rem;
   color: rgba(246, 239, 226, 0.46);
   font-size: 0.72em;
