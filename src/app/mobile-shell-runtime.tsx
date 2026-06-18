@@ -13,7 +13,19 @@ const TEXT_REPLACEMENTS: Array<[RegExp, string]> = [
   [/Story Spark/g, "Story Idea"],
   [/-cast\.txt/g, "-characters.txt"]
 ];
-const TEXT_SKIP_SELECTOR = "script, style, textarea, input, select, option";
+const TEXT_SKIP_SELECTOR = "script, style, textarea, input";
+const ART_BY_TITLE: Record<string, string> = {
+  "The Half-Life of Magic": "half-life-of-magic",
+  "A forgotten talisman from an estate sale begins to hum with a magic that should have died years ago": "half-life-of-magic",
+  "The Lighthouse Under Main Street": "under-lantern-light",
+  "Orchard of Borrowed Moons": "orchard-of-borrowed-moons",
+  "The Quiet Engine": "quiet-engine",
+  "Map of the Seventh Door": "stars-remember",
+  "Whisper in the Static": "whisper-in-the-static",
+  "Under Lantern Light": "under-lantern-light",
+  "Stars Remember": "stars-remember"
+};
+const FALLBACK_ART_SEQUENCE = ["whisper-in-the-static", "under-lantern-light", "stars-remember", "orchard-of-borrowed-moons", "quiet-engine"];
 
 function currentView() {
   return new URLSearchParams(window.location.search).get("view") ?? "home";
@@ -29,6 +41,11 @@ function replaceText(value: string) {
 
 function shouldSkipTextNode(node: Text) {
   return Boolean(node.parentElement?.closest(TEXT_SKIP_SELECTOR));
+}
+
+function artKeyForTitle(title: string, index = 0) {
+  const normalizedTitle = cleanText(title).replace(/[.!?]$/, "");
+  return ART_BY_TITLE[normalizedTitle] ?? FALLBACK_ART_SEQUENCE[index % FALLBACK_ART_SEQUENCE.length];
 }
 
 function normalizeTextNodes(root: ParentNode) {
@@ -87,6 +104,77 @@ function hideDemoMessages() {
   });
 }
 
+function ensureReferenceContinueCard() {
+  const main = document.querySelector<HTMLElement>(".project-lantern-shell main[data-mobile-active-view='home']");
+  if (!main) return;
+  if (main.querySelector("[data-mobile-continue-card='true']")) return;
+
+  const homeContent = main.querySelector<HTMLElement>("main > section > div > .md\\:hidden > div, main > section > div > div > div");
+  const moodSection = Array.from(main.querySelectorAll<HTMLElement>("section")).find((section) => section.textContent?.includes("What are you in the mood"));
+  const parent = homeContent ?? moodSection?.parentElement;
+  if (!parent) return;
+
+  const section = document.createElement("section");
+  section.dataset.mobileContinueCard = "true";
+  section.innerHTML = `
+    <div data-mobile-continue-image="true">
+      <div data-mobile-continue-copy="true">
+        <p>Chapter 1 • 8 min read</p>
+        <h2>The Half-Life of Magic</h2>
+      </div>
+      <button aria-label="Open last chapter recap" type="button">↺</button>
+    </div>
+  `;
+  parent.insertBefore(section, parent.firstElementChild);
+}
+
+function markHomeCards() {
+  const main = document.querySelector<HTMLElement>(".project-lantern-shell main[data-mobile-active-view='home']");
+  if (!main) return;
+
+  const continueSection = Array.from(main.querySelectorAll<HTMLElement>("section")).find((section) => section.textContent?.includes("Next Chapter") && section.textContent?.includes("Continue Reading"));
+  if (continueSection) {
+    continueSection.dataset.mobileContinueCard = "true";
+    continueSection.querySelector<HTMLElement>(":scope > div:first-child")?.setAttribute("data-mobile-continue-image", "true");
+  }
+
+  const rows = Array.from(main.querySelectorAll<HTMLButtonElement>("button")).filter((button) => button.querySelector("h3") && button.closest("section")?.textContent?.includes("Start Something New"));
+  rows.forEach((row, index) => {
+    const title = row.querySelector("h3")?.textContent ?? "";
+    row.dataset.mobileStoryRow = "true";
+    row.dataset.mobileArt = artKeyForTitle(title, index);
+    row.querySelector<HTMLElement>(":scope > div:first-child")?.setAttribute("data-mobile-thumbnail", "true");
+  });
+}
+
+function markLibraryPage() {
+  const main = document.querySelector<HTMLElement>(".project-lantern-shell main[data-mobile-active-view='library']");
+  if (!main) return;
+
+  const tools = Array.from(main.querySelectorAll<HTMLElement>("section")).find((section) => section.querySelector("h2")?.textContent?.trim() === "Library Tools");
+  if (tools) tools.dataset.mobileLibraryTools = "true";
+
+  const storyCards = Array.from(main.querySelectorAll<HTMLElement>("article")).filter((article) => article.querySelector("h3"));
+  storyCards.forEach((article, index) => {
+    const title = article.querySelector("h3")?.textContent ?? "";
+    article.dataset.mobileCompactCard = "true";
+    article.dataset.mobileArt = artKeyForTitle(title, index);
+  });
+}
+
+function markCompactDestinationCards() {
+  const view = currentView();
+  if (view !== "characters" && view !== "worlds") return;
+  const main = document.querySelector<HTMLElement>(`.project-lantern-shell main[data-mobile-active-view='${view}']`);
+  if (!main) return;
+
+  Array.from(main.querySelectorAll<HTMLElement>("article")).forEach((article, index) => {
+    const title = article.querySelector("h3")?.textContent ?? article.textContent ?? "";
+    article.dataset.mobileCompactCard = "true";
+    article.dataset.mobileArt = artKeyForTitle(title, index);
+  });
+}
+
 function applyMobileShell(mobileQuery: MediaQueryList) {
   if (!mobileQuery.matches) return;
   const root = document.querySelector(".project-lantern-shell");
@@ -97,6 +185,10 @@ function applyMobileShell(mobileQuery: MediaQueryList) {
   normalizeMobileNav();
   markActiveMobileView();
   hideDemoMessages();
+  ensureReferenceContinueCard();
+  markHomeCards();
+  markLibraryPage();
+  markCompactDestinationCards();
 }
 
 export function MobileShellRuntime() {
