@@ -13,6 +13,7 @@ const TEXT_REPLACEMENTS: Array<[RegExp, string]> = [
   [/Story Spark/g, "Story Idea"],
   [/-cast\.txt/g, "-characters.txt"]
 ];
+const TEXT_SKIP_SELECTOR = "script, style, textarea, input, select, option";
 
 function currentView() {
   return new URLSearchParams(window.location.search).get("view") ?? "home";
@@ -26,12 +27,17 @@ function replaceText(value: string) {
   return TEXT_REPLACEMENTS.reduce((nextValue, [pattern, replacement]) => nextValue.replace(pattern, replacement), value);
 }
 
+function shouldSkipTextNode(node: Text) {
+  return Boolean(node.parentElement?.closest(TEXT_SKIP_SELECTOR));
+}
+
 function normalizeTextNodes(root: ParentNode) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
   while (walker.nextNode()) nodes.push(walker.currentNode as Text);
 
   nodes.forEach((node) => {
+    if (shouldSkipTextNode(node)) return;
     const nextValue = replaceText(node.nodeValue ?? "");
     if (nextValue !== node.nodeValue) node.nodeValue = nextValue;
   });
