@@ -10,7 +10,6 @@ import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, Upload
 
 type AppView = "home" | "create" | "library" | "characters" | "worlds";
 type Mood = "Mystery" | "Wonder" | "Emotional" | "Adventure";
-type BuildInfo = { appVersion: string; buildEnvironment: string; gitBranch: string; commitSha: string; shortCommitSha: string; buildTimestamp: string; vercelUrl: string };
 type CloudProjectSummary = Pick<SavedProject, "id" | "name" | "createdAt" | "updatedAt">;
 type StoryStart = { title: string; premise: string; genre: GenrePreset; mood: Mood; heroName: string; heroRole: string; heroBio: string; worldName: string; world: string; seed: string; cast: string; rules: string };
 type LibraryStory = SavedStory | { id: string; title: string; story: string; wordCount: number; createdAt: string; genrePreset: GenrePreset; charactersUsed: string[]; rulesReferenced: string[] };
@@ -18,10 +17,28 @@ type StoryBrief = { hook: string; recap: string; changed: string; tension: strin
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
 const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
-const DEFAULT_BUILD_INFO: BuildInfo = { appVersion: "0.7.42", buildEnvironment: "metadata unavailable", gitBranch: "metadata unavailable", commitSha: "metadata unavailable", shortCommitSha: "metadata unavailable", buildTimestamp: "unknown", vercelUrl: "metadata unavailable" };
 const INPUT_LABELS: Record<InputArtifactType, string> = { worldBible: "Storyworld", characterProfiles: "Cast", storySeed: "Story Spark", storyRules: "Craft Rules" };
 const MOODS: Mood[] = ["Mystery", "Wonder", "Emotional", "Adventure"];
 const DEFAULT_STORY_RULES_NOTICE = "Default craft rules are used automatically when this is empty.";
+const DEMO_LATEST_STORY_STORAGE_KEY = "projectLantern.demoLatestStory.v1";
+const DEMO_LATEST_STORY_ID = "demo-the-half-life-of-magic";
+const DEMO_STORY_TEXT = [
+  "A forgotten talisman from an estate sale begins to hum with a magic that should have died years ago.",
+  "Mara Vale found the first talisman inside a box of ordinary estate-sale objects.",
+  "When she touched it, the room shifted, a hidden mark appeared on an old receipt, and somewhere far away an ancient wanderer felt the signal return.",
+  "Mara must decide whether to follow the talisman's signal before she understands what it is waking.",
+  "Someone else knows the talisman has awakened, and they are already looking for it."
+].join("\n\n");
+const DEMO_STORY_BRIEF: StoryBrief = {
+  hook: "A forgotten talisman from an estate sale begins to hum with a magic that should have died years ago.",
+  recap: "Mara found the first talisman inside a box of ordinary estate-sale objects. When she touched it, the room shifted, a hidden mark appeared on an old receipt, and somewhere far away an ancient wanderer felt the signal return.",
+  changed: "The talisman has proven that dead magic is not dead at all, and Mara is now part of whatever has begun to wake.",
+  tension: "Someone else knows the talisman has awakened, and they are already looking for it.",
+  nextHook: "Mara must decide whether to follow the talisman's signal before she understands what it is waking.",
+  heroName: "Mara Vale",
+  heroRole: "The Seeker",
+  struggle: "Mara must decide whether to follow the talisman's signal before she understands what it is waking."
+};
 
 const SUGGESTED_STORY_STARTS: StoryStart[] = [
   { title: "The Lighthouse Under Main Street", premise: "A night-shift archivist finds a working lighthouse buried beneath a landlocked town.", genre: "Speculative Mystery", mood: "Mystery", heroName: "Mara Venn", heroRole: "Archivist investigator", heroBio: "A careful town archivist who notices when public records change after midnight and cannot leave an impossible civic mystery alone.", worldName: "Bellwether Courthouse Archive", world: "A rain-polished mill town where civic records sometimes rewrite themselves after midnight.", seed: "Mara Venn discovers a salt-stained lighthouse staircase below the courthouse archive and hears a foghorn answering from the town square.", cast: "Mara Venn - careful town archivist with a talent for noticing altered records. Jules Ardent - former surveyor who remembers streets no map admits.", rules: "Keep the mystery concrete, civic, and emotional. Let the lighthouse reveal one cost before it offers any answer." },
@@ -48,12 +65,12 @@ export default function Home() {
   const [inputArtifacts, setInputArtifacts] = useState<InputArtifact[]>([]);
   const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [demoStory, setDemoStory] = useState<SavedStory | null>(null);
   const [cloudProjects, setCloudProjects] = useState<CloudProjectSummary[]>([]);
   const [projectName, setProjectName] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [selectedCloudProjectId, setSelectedCloudProjectId] = useState("");
   const [cloudProjectMessage, setCloudProjectMessage] = useState("");
-  const [buildInfo, setBuildInfo] = useState<BuildInfo>(DEFAULT_BUILD_INFO);
   const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState("");
   const [isCloudProjectsLoading, setIsCloudProjectsLoading] = useState(false);
@@ -67,25 +84,19 @@ export default function Home() {
   }, [searchParams]);
 
   useEffect(() => {
+    const browserSavedStories = readSavedStories();
     setInputArtifacts(readInputArtifacts());
-    setSavedStories(readSavedStories());
+    setSavedStories(browserSavedStories);
     setSavedProjects(readSavedProjects());
+    setDemoStory(browserSavedStories.length === 0 ? readDemoLatestStory() : null);
     void handleRefreshCloudProjects();
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
-    fetch("/api/build-info", { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload: BuildInfo | null) => { if (isMounted && payload) setBuildInfo({ ...DEFAULT_BUILD_INFO, ...payload }); })
-      .catch(() => { if (isMounted) setBuildInfo(DEFAULT_BUILD_INFO); });
-    return () => { isMounted = false; };
-  }, []);
-
+  const hasRealLatestStory = Boolean(storyResponse || savedStories.length);
   const latestStory = useMemo<LibraryStory | null>(() => {
     if (storyResponse) return responseToLibraryStory(storyResponse, currentStoryId || createStoryId(storyResponse.story));
-    return savedStories[0] ?? null;
-  }, [currentStoryId, savedStories, storyResponse]);
+    return savedStories[0] ?? demoStory;
+  }, [currentStoryId, demoStory, savedStories, storyResponse]);
   const suggestedStarts = useMemo(() => sortStoryStartsByMood(activeMood), [activeMood]);
   const canGenerate = Boolean(worldBible.content.trim() && characterProfiles.content.trim() && storySeed.content.trim() && !isGenerating);
 
@@ -114,6 +125,8 @@ export default function Home() {
       const normalizedResponse = normalizeGenerateStoryResponse(payload);
       setStoryResponse(normalizedResponse);
       setCurrentStoryId(createStoryId(normalizedResponse.story));
+      clearDemoLatestStory();
+      setDemoStory(null);
       setActiveView("home");
       setStatusMessage("Story ready.");
     } catch (caughtError) {
@@ -136,6 +149,21 @@ export default function Home() {
     setActiveMood(story.mood);
     setActiveView("create");
     setStatusMessage(`${story.title} is ready to begin.`);
+  }
+
+  function handleLoadDemoStory() {
+    if (hasRealLatestStory) return;
+    const nextDemoStory = createDemoLatestStory();
+    persistDemoLatestStory(nextDemoStory);
+    setDemoStory(nextDemoStory);
+    setActiveView("home");
+    setStatusMessage("Demo story loaded for review. Your saved history was not changed.");
+  }
+
+  function handleClearDemoStory() {
+    clearDemoLatestStory();
+    setDemoStory(null);
+    setStatusMessage("Demo story cleared. Your saved history was not changed.");
   }
 
   function handleContinueLatest(direction?: string) {
@@ -169,6 +197,8 @@ export default function Home() {
   function handleRestoreStory(story: SavedStory) {
     setStoryResponse(savedStoryToResponse(story));
     setCurrentStoryId(story.id);
+    clearDemoLatestStory();
+    setDemoStory(null);
     setActiveView("home");
     setStatusMessage(`Restored ${story.title}.`);
   }
@@ -207,6 +237,8 @@ export default function Home() {
     const project = savedProjects.find((item) => item.id === projectId);
     if (!project) return;
     applyProject(project);
+    clearDemoLatestStory();
+    setDemoStory(null);
     setStatusMessage(`${project.name} loaded from this browser.`);
   }
 
@@ -270,6 +302,8 @@ export default function Home() {
       const payload = await fetchCloudJson<{ project?: SavedProject }>(`/api/projects/${encodeURIComponent(projectId)}`);
       if (!payload.project) throw new Error("Cloud project response was missing a project.");
       applyProject(payload.project);
+      clearDemoLatestStory();
+      setDemoStory(null);
       setCloudProjectMessage(`${payload.project.name} loaded from cloud projects.`);
     } catch (caughtError) {
       setCloudProjectMessage(`Cloud load failed: ${formatCaughtError(caughtError)} Local project save/load still works.`);
@@ -347,19 +381,19 @@ export default function Home() {
   return (
     <main className="min-h-screen overflow-x-hidden px-3 py-4 text-paper sm:px-4 md:px-8 md:py-7">
       <section className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6">
-        <header className="flex min-w-0 flex-col gap-4 border-b border-paper/10 pb-5 md:flex-row md:items-end md:justify-between">
+        <header className="flex min-w-0 flex-col gap-5 border-b border-paper/10 pb-6 md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold sm:tracking-[0.22em]">Project Lantern</p>
             <h1 className="mt-2 max-w-4xl text-3xl font-semibold leading-tight tracking-tight text-paper md:text-5xl">Living stories, ready when you are</h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-paper/70">Open the latest episode, remember what mattered, and choose what kind of story should find you next.</p>
           </div>
-          <div className="flex min-w-0 flex-col gap-2 md:items-end"><BuildBadge buildInfo={buildInfo} /><NavTabs activeView={activeView} onChange={setActiveView} /></div>
+          <div className="flex min-w-0 flex-col gap-2 md:items-end"><NavTabs activeView={activeView} onChange={setActiveView} /></div>
         </header>
 
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        {activeView === "home" ? <HomeView activeMood={activeMood} continueDirection={continueDirection} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onMoodSelect={handleMoodSelect} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} suggestedStarts={suggestedStarts} /> : null}
+        {activeView === "home" ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={() => void handleGenerate()} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "characters" ? <CharactersView onOpenStory={handleStartRecommendation} /> : null}
@@ -369,12 +403,12 @@ export default function Home() {
   );
 }
 
-function HomeView(props: { activeMood: Mood; continueDirection: string; isDirectionOpen: boolean; isGenerating: boolean; latestStory: LibraryStory | null; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onMoodSelect: (mood: Mood) => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; suggestedStarts: StoryStart[] }) {
-  const { activeMood, continueDirection, isDirectionOpen, isGenerating, latestStory, onContinue, onDirectionChange, onMoodSelect, onStartRecommendation, onToggleDirection, suggestedStarts } = props;
+function HomeView(props: { activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; suggestedStarts: StoryStart[] }) {
+  const { activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onLoadDemoStory, onMoodSelect, onStartRecommendation, onToggleDirection, suggestedStarts } = props;
   const [isRecapOpen, setIsRecapOpen] = useState(false);
   const storyBrief = latestStory ? createStoryBrief(latestStory) : null;
 
-  return <div className="grid min-w-0 gap-8">{latestStory && storyBrief ? <CurrentStoryCard brief={storyBrief} direction={continueDirection} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onDirectionChange={onDirectionChange} onOpenRecap={() => setIsRecapOpen(true)} onToggleDirection={onToggleDirection} story={latestStory} /> : null}<MoodPicker activeMood={activeMood} hasCurrentStory={Boolean(latestStory)} onSelect={onMoodSelect} /><SuggestedStoryStarts activeMood={activeMood} stories={suggestedStarts} onStart={onStartRecommendation} /></div>;
+  return <div className="grid min-w-0 gap-8">{latestStory && storyBrief ? <CurrentStoryCard brief={storyBrief} direction={continueDirection} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onDirectionChange={onDirectionChange} onOpenRecap={() => setIsRecapOpen(true)} onToggleDirection={onToggleDirection} story={latestStory} /> : null}<MoodPicker activeMood={activeMood} hasCurrentStory={Boolean(latestStory)} onSelect={onMoodSelect} />{canUseDemoStory ? <DemoStoryControls hasDemoStory={hasDemoStory} onClear={onClearDemoStory} onLoad={onLoadDemoStory} /> : null}<SuggestedStoryStarts activeMood={activeMood} stories={suggestedStarts} onStart={onStartRecommendation} /></div>;
 }
 
 function CurrentStoryCard({ brief, direction, isDirectionOpen, isGenerating, isRecapOpen, onCloseRecap, onContinue, onDirectionChange, onOpenRecap, onToggleDirection, story }: { brief: StoryBrief; direction: string; isDirectionOpen: boolean; isGenerating: boolean; isRecapOpen: boolean; onCloseRecap: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onOpenRecap: () => void; onToggleDirection: () => void; story: LibraryStory }) {
@@ -388,7 +422,11 @@ function RecapPanel({ brief, onClose, title }: { brief: StoryBrief; onClose: () 
 function RecapBlock({ body, title }: { body: string; title: string }) { return <section className="rounded-md border border-aged-brass/20 bg-white/65 p-4"><h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-aged-brass">{title}</h4><p className="mt-2 text-sm leading-6 text-primary-dark/75">{body}</p></section>; }
 
 function MoodPicker({ activeMood, hasCurrentStory, onSelect }: { activeMood: Mood; hasCurrentStory: boolean; onSelect: (mood: Mood) => void }) {
-  return <section className={hasCurrentStory ? "min-w-0" : "min-w-0 pt-1"}><div className="max-w-3xl"><h2 className="text-2xl font-semibold text-paper md:text-3xl">What are you in the mood for?</h2><p className="mt-2 text-sm leading-6 text-paper/62">Choose the emotional weather for the stories waiting below.</p></div><div className="mt-4 flex flex-wrap gap-3">{MOODS.map((mood) => <button className={`min-w-[9.25rem] flex-1 rounded-md border px-4 py-4 text-left transition ${activeMood === mood ? "border-lantern-gold bg-lantern-gold text-night-ink shadow-soft" : "border-paper/15 bg-paper/10 text-paper hover:border-lantern-gold/50 hover:bg-paper/15"}`} key={mood} onClick={() => onSelect(mood)} type="button"><span className="block text-base font-semibold">{mood}</span><span className="mt-2 block text-xs leading-5 opacity-70">{moodDescription(mood)}</span></button>)}</div></section>;
+  return <section className={hasCurrentStory ? "min-w-0" : "min-w-0 pt-1"}><div className="max-w-3xl"><h2 className="text-2xl font-semibold text-paper md:text-3xl">What are you in the mood for?</h2><p className="mt-2 text-sm leading-6 text-paper/62">Choose the emotional weather for the stories waiting below.</p>{!hasCurrentStory ? <p className="mt-3 text-sm leading-6 text-paper/70">Start your first story. Once you have one in progress, your next chapter will appear here.</p> : null}</div><div className="mt-4 flex flex-wrap gap-3">{MOODS.map((mood) => <button className={`min-w-[9.25rem] flex-1 rounded-md border px-4 py-4 text-left transition ${activeMood === mood ? "border-lantern-gold bg-lantern-gold text-night-ink shadow-soft" : "border-paper/15 bg-paper/10 text-paper hover:border-lantern-gold/50 hover:bg-paper/15"}`} key={mood} onClick={() => onSelect(mood)} type="button"><span className="block text-base font-semibold">{mood}</span><span className="mt-2 block text-xs leading-5 opacity-70">{moodDescription(mood)}</span></button>)}</div></section>;
+}
+
+function DemoStoryControls({ hasDemoStory, onClear, onLoad }: { hasDemoStory: boolean; onClear: () => void; onLoad: () => void }) {
+  return <section className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm leading-6 text-paper/65">Need a review story?</p><div className="flex flex-wrap gap-2"><SmallButton disabled={hasDemoStory} onClick={onLoad}>Load demo story</SmallButton>{hasDemoStory ? <SmallButton onClick={onClear}>Clear demo story</SmallButton> : null}</div></div></section>;
 }
 
 function SuggestedStoryStarts({ activeMood, onStart, stories }: { activeMood: Mood; onStart: (story: StoryStart) => void; stories: StoryStart[] }) { return <section className="min-w-0"><div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-2xl font-semibold text-paper md:text-3xl">Start Something New</h2><p className="mt-2 text-sm leading-6 text-paper/62">A small shelf of premieres, with {activeMood.toLowerCase()} closest to the front.</p></div></div><div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">{stories.map((story) => <StoryStartCard isFeatured={story.mood === activeMood} key={story.title} onStart={onStart} story={story} />)}</div></section>; }
@@ -424,7 +462,6 @@ function WorldsView({ onOpenStory }: { onOpenStory: (story: StoryStart) => void 
 }
 
 function NavTabs({ activeView, onChange }: { activeView: AppView; onChange: (view: AppView) => void }) { const tabs: { label: string; view: AppView }[] = [{ label: "Home", view: "home" }, { label: "Create", view: "create" }, { label: "Story Library", view: "library" }, { label: "Characters", view: "characters" }, { label: "Worlds", view: "worlds" }]; return <nav aria-label="Primary" className="max-w-full overflow-x-auto pb-1"><div className="flex w-max max-w-none gap-2 pr-1">{tabs.map((tab) => <button className={`shrink-0 whitespace-nowrap rounded-md border px-3 py-2 text-xs font-semibold ${activeView === tab.view ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper"}`} key={tab.view} onClick={() => onChange(tab.view)} type="button">{tab.label}</button>)}</div></nav>; }
-function BuildBadge({ buildInfo }: { buildInfo: BuildInfo }) { return <div className="max-w-full rounded-md border border-lantern-gold/25 bg-paper/10 px-3 py-2 text-xs font-semibold leading-5 text-paper/65">Version {buildInfo.appVersion} | {buildInfo.buildEnvironment} | {buildInfo.gitBranch} | {buildInfo.shortCommitSha}</div>; }
 function CoverArt({ label, title, tone = "cool", size = "normal" }: { label?: string; title: string; tone?: "cool" | "warm"; size?: "normal" | "feature" }) { const palette = tone === "warm" ? "linear-gradient(145deg, #efe5cf 0%, #c9a46a 42%, #2f4f4f 100%)" : "linear-gradient(145deg, #d8ded5 0%, #6f7f72 45%, #26364d 100%)"; const sizeClass = size === "feature" ? "min-h-[20rem] sm:min-h-[23rem] max-w-none" : "min-h-52 max-w-none sm:min-h-40 sm:max-w-40"; return <div aria-label={`${title} artwork`} className={`relative flex aspect-[3/4] w-full ${sizeClass} overflow-hidden rounded-md border border-primary-dark/10 p-4 text-night-ink shadow-soft`} style={{ background: palette }}><div className="absolute inset-x-5 top-7 h-px bg-night-ink/30" /><div className="absolute inset-x-8 top-12 h-px bg-night-ink/20" /><div className="absolute left-6 top-20 h-24 w-12 border-l border-night-ink/25" /><div className="absolute bottom-8 right-6 h-28 w-20 rounded-t-full border border-night-ink/20 bg-white/10" /><div className="absolute bottom-0 left-0 h-24 w-full bg-night-ink/10" /><div className="relative z-10 flex h-full w-full flex-col justify-between"><span className="max-w-full text-xs font-semibold uppercase tracking-[0.14em] opacity-70">{label ?? "Story Artwork"}</span><span className="max-w-[13rem] text-2xl font-semibold leading-tight md:text-3xl">{title.split(" ").slice(0, 5).join(" ")}</span></div></div>; }
 function HeroPortrait({ name, size = "normal" }: { name: string; size?: "normal" | "large" }) { const className = size === "large" ? "size-20 text-xl" : "size-16 text-lg"; return <div aria-label={`${name} portrait artwork`} className={`relative flex ${className} shrink-0 items-center justify-center overflow-hidden rounded-md border border-lantern-gold/35 bg-primary-dark font-semibold text-lantern-gold`}><span className="absolute top-2 h-8 w-10 rounded-full border border-lantern-gold/25 bg-lantern-gold/10" /><span className="absolute bottom-0 h-8 w-14 rounded-t-full border-x border-t border-paper/10 bg-paper/10" /><span className="relative z-10">{name.split(" ").map((part) => part[0]).join("").slice(0, 2)}</span></div>; }
 function Tag({ children }: { children: ReactNode }) { return <span className="inline-flex max-w-full items-center rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-2 py-1 text-xs font-semibold leading-5 text-lantern-gold">{children}</span>; }
@@ -440,7 +477,11 @@ async function fetchCloudJson<T>(input: string, init?: RequestInit): Promise<T> 
 function countWords(text: string): number { return text.trim().split(/\s+/).filter(Boolean).length; }
 function createStoryId(story: string, createdAt = new Date().toISOString()): string { return `${createdAt}-${story.length}`.replace(/[^a-zA-Z0-9_-]/g, "-"); }
 function createStoryTitle(story: string): string { const firstLine = story.split(/\n+/).find((line) => line.trim())?.trim() ?? "Generated Story"; const firstSentence = firstLine.split(/[.!?]/)[0]?.trim() || firstLine; return truncateText(firstSentence.replace(/^#+\s*/, ""), 72) || "Generated Story"; }
-function createStoryBrief(story: LibraryStory): StoryBrief { const sentences = extractSentences(story.story); const recapSentences = sentences.slice(0, 4); const heroName = story.charactersUsed[0] || "The lead"; const secondCharacter = story.charactersUsed[1]; const hook = sentences[0] ? truncateText(sentences[0], 190) : `${story.title} is waiting at the edge of its next turning point.`; const recap = recapSentences.length ? recapSentences.join(" ") : truncateText(story.story, 420); return { hook, recap, changed: sentences[4] || `${heroName} has crossed a threshold that makes the old version of the story impossible to return to.`, tension: secondCharacter ? `${heroName} and ${secondCharacter} are still caught in the pressure the last chapter exposed.` : `${heroName} is still carrying the central unanswered pressure of the last chapter.`, nextHook: sentences[5] || `The next chapter should press on the choice ${heroName} can no longer avoid.`, heroName, heroRole: story.genrePreset, struggle: `${heroName} is trying to move forward while the last chapter's consequences narrow the path ahead.` }; }
+function createDemoLatestStory(): SavedStory { return { id: DEMO_LATEST_STORY_ID, title: "The Half-Life of Magic", createdAt: new Date().toISOString(), story: DEMO_STORY_TEXT, wordCount: countWords(DEMO_STORY_TEXT), generatorSource: "fallback", charactersUsed: ["Mara Vale"], rulesReferenced: [], genrePreset: "Contemporary Fantastical / Magical Realist", narrativeArchitecture: "Revelation Story", characterArc: "Positive Change Arc", endingType: "Resolution with Residue", lengthTarget: "Standard", diagnosticsNotice: null }; }
+function readDemoLatestStory(): SavedStory | null { if (typeof window === "undefined") return null; try { const raw = window.localStorage.getItem(DEMO_LATEST_STORY_STORAGE_KEY); if (!raw) return null; const parsed = JSON.parse(raw) as SavedStory; return parsed?.id === DEMO_LATEST_STORY_ID && typeof parsed.story === "string" ? parsed : null; } catch { return null; } }
+function persistDemoLatestStory(story: SavedStory) { if (typeof window === "undefined") return; window.localStorage.setItem(DEMO_LATEST_STORY_STORAGE_KEY, JSON.stringify(story)); }
+function clearDemoLatestStory() { if (typeof window === "undefined") return; window.localStorage.removeItem(DEMO_LATEST_STORY_STORAGE_KEY); }
+function createStoryBrief(story: LibraryStory): StoryBrief { if (story.id === DEMO_LATEST_STORY_ID) return DEMO_STORY_BRIEF; const sentences = extractSentences(story.story); const recapSentences = sentences.slice(0, 4); const heroName = story.charactersUsed[0] || "The lead"; const secondCharacter = story.charactersUsed[1]; const hook = sentences[0] ? truncateText(sentences[0], 190) : `${story.title} is waiting at the edge of its next turning point.`; const recap = recapSentences.length ? recapSentences.join(" ") : truncateText(story.story, 420); return { hook, recap, changed: sentences[4] || `${heroName} has crossed a threshold that makes the old version of the story impossible to return to.`, tension: secondCharacter ? `${heroName} and ${secondCharacter} are still caught in the pressure the last chapter exposed.` : `${heroName} is still carrying the central unanswered pressure of the last chapter.`, nextHook: sentences[5] || `The next chapter should press on the choice ${heroName} can no longer avoid.`, heroName, heroRole: story.genrePreset, struggle: `${heroName} is trying to move forward while the last chapter's consequences narrow the path ahead.` }; }
 function extractSentences(text: string): string[] { return (text.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? []).map((sentence) => sentence.trim()).filter(Boolean); }
 function sortStoryStartsByMood(activeMood: Mood): StoryStart[] { return [...SUGGESTED_STORY_STARTS].sort((a, b) => Number(b.mood === activeMood) - Number(a.mood === activeMood)); }
 function moodDescription(mood: Mood): string { const descriptions: Record<Mood, string> = { Mystery: "Secrets, clues, and a door left open.", Wonder: "Luminous worlds with a human ache.", Emotional: "Intimate choices and unfinished goodbyes.", Adventure: "Momentum, thresholds, and daring turns." }; return descriptions[mood]; }
