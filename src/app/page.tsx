@@ -1,6 +1,7 @@
 "use client";
 
 import { type ChangeEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
 import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture } from "@/lib/types";
@@ -30,7 +31,8 @@ const SUGGESTED_STORY_STARTS: StoryStart[] = [
 ];
 
 export default function Home() {
-  const [activeView, setActiveView] = useState<AppView>("home");
+  const searchParams = useSearchParams();
+  const [activeView, setActiveView] = useState<AppView>(readAppView(searchParams.get("view")) ?? "home");
   const [activeMood, setActiveMood] = useState<Mood>("Mystery");
   const [worldBible, setWorldBible] = useState<UploadState>(EMPTY_UPLOAD);
   const [characterProfiles, setCharacterProfiles] = useState<UploadState>(EMPTY_UPLOAD);
@@ -58,6 +60,11 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [continueDirection, setContinueDirection] = useState("");
   const [isDirectionOpen, setIsDirectionOpen] = useState(false);
+
+  useEffect(() => {
+    const requestedView = readAppView(searchParams.get("view"));
+    if (requestedView) setActiveView(requestedView);
+  }, [searchParams]);
 
   useEffect(() => {
     setInputArtifacts(readInputArtifacts());
@@ -437,6 +444,7 @@ function createStoryBrief(story: LibraryStory): StoryBrief { const sentences = e
 function extractSentences(text: string): string[] { return (text.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? []).map((sentence) => sentence.trim()).filter(Boolean); }
 function sortStoryStartsByMood(activeMood: Mood): StoryStart[] { return [...SUGGESTED_STORY_STARTS].sort((a, b) => Number(b.mood === activeMood) - Number(a.mood === activeMood)); }
 function moodDescription(mood: Mood): string { const descriptions: Record<Mood, string> = { Mystery: "Secrets, clues, and a door left open.", Wonder: "Luminous worlds with a human ache.", Emotional: "Intimate choices and unfinished goodbyes.", Adventure: "Momentum, thresholds, and daring turns." }; return descriptions[mood]; }
+function readAppView(value: string | null): AppView | null { return value === "create" || value === "library" || value === "characters" || value === "worlds" || value === "home" ? value : null; }
 function truncateText(text: string, maxLength: number): string { const compact = text.replace(/\s+/g, " ").trim(); return compact.length <= maxLength ? compact : `${compact.slice(0, maxLength).replace(/[\s,.;:]+$/, "")}...`; }
 function slugify(value: string): string { return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "story-world-engine-story"; }
 function formatDateTime(value: string): string { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
