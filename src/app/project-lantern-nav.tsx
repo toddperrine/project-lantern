@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { label: "Home", href: "/" },
-  { label: "Create", href: "/?view=create", view: "create" },
+  { label: "Create", href: "/?view=create", isPlainLink: true },
   { label: "Story Library", href: "/stories" },
   { label: "Characters/Cast", href: "/characters" },
   { label: "Worlds", href: "/worlds" }
@@ -16,13 +16,16 @@ const NAV_DEFAULT_CLASS = "shrink-0 whitespace-nowrap rounded-md border border-w
 
 export function ProjectLanternNav() {
   const pathname = usePathname() || "/";
-  const searchParams = useSearchParams();
 
   return (
     <nav aria-label="Project Lantern" className="max-w-full min-w-0 overflow-x-auto pb-1 md:pb-0">
       <div className="flex w-max max-w-none gap-2 pr-1">
         {NAV_ITEMS.map((item) => {
-          const isActive = item.view === "create" ? pathname === "/" && searchParams.get("view") === "create" : item.href === "/" ? pathname === "/" && searchParams.get("view") !== "create" : pathname.startsWith(item.href);
+          const isActive = item.href === "/" ? pathname === "/" : !item.isPlainLink && pathname.startsWith(item.href);
+
+          if (item.isPlainLink) {
+            return <a className={isActive ? NAV_SELECTED_CLASS : NAV_DEFAULT_CLASS} href={item.href} key={item.href}>{item.label}</a>;
+          }
 
           return (
             <Link aria-current={isActive ? "page" : undefined} className={isActive ? NAV_SELECTED_CLASS : NAV_DEFAULT_CLASS} href={item.href} key={item.href}>
