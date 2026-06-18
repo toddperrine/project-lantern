@@ -1,0 +1,387 @@
+.project-lantern-shell main > section > header p:first-child::after {
+  content: "";
+}
+
+@media (max-width: 767px) {
+  :root {
+    color-scheme: light;
+  }
+
+  body,
+  .project-lantern-shell,
+  .project-lantern-shell main {
+    background: #fbf7ef !important;
+    color: #171510 !important;
+  }
+
+  .project-lantern-shell [data-device-preview-content] {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .project-lantern-shell main {
+    min-height: 100svh !important;
+    overflow-x: hidden !important;
+    padding: 0.95rem 1rem calc(6.35rem + env(safe-area-inset-bottom)) !important;
+  }
+
+  .project-lantern-shell main > section {
+    max-width: none !important;
+    gap: 1.25rem !important;
+  }
+
+  .project-lantern-shell main > section > header:first-child {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    color: #171510 !important;
+  }
+
+  .project-lantern-shell main > section > header:first-child button {
+    width: 2.55rem !important;
+    height: 2.55rem !important;
+    border: 1px solid rgba(23, 21, 16, 0.08) !important;
+    background: #fffdf8 !important;
+    color: #171510 !important;
+    box-shadow: 0 8px 22px rgba(40, 34, 24, 0.06) !important;
+  }
+
+  .project-lantern-shell main > section > header:first-child p {
+    color: #171510 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 1.05rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .project-lantern-shell main > section > header:nth-child(2),
+  .project-lantern-shell nav[aria-label="Primary"] {
+    display: none !important;
+  }
+
+  .project-lantern-shell .text-paper,
+  .project-lantern-shell .text-primary-light {
+    color: #171510 !important;
+  }
+
+  .project-lantern-shell .text-paper\/70,
+  .project-lantern-shell .text-paper\/65,
+  .project-lantern-shell .text-paper\/62,
+  .project-lantern-shell .text-paper\/60,
+  .project-lantern-shell .text-paper\/55,
+  .project-lantern-shell .text-paper\/45,
+  .project-lantern-shell .text-primary-light\/75,
+  .project-lantern-shell .text-primary-light\/55 {
+    color: #686157 !important;
+  }
+
+  .project-lantern-shell .bg-paper\/10,
+  .project-lantern-shell .bg-night-ink,
+  .project-lantern-shell .bg-deep-navy {
+    background-color: #fffdf8 !important;
+  }
+
+  .project-lantern-shell .border-paper\/10,
+  .project-lantern-shell .border-paper\/12,
+  .project-lantern-shell .border-paper\/15,
+  .project-lantern-shell .border-warm-paper\/10 {
+    border-color: rgba(27, 23, 16, 0.08) !important;
+  }
+
+  .project-lantern-shell [role="dialog"] {
+    z-index: 70 !important;
+    background: rgba(18, 16, 12, 0.48) !important;
+    padding: 1rem !important;
+  }
+
+  .project-lantern-shell [role="dialog"] > div {
+    border: 0 !important;
+    border-radius: 1rem !important;
+    background: #fffaf2 !important;
+    color: #171510 !important;
+  }
+
+  .project-lantern-shell footer {
+    background: #fbf7ef !important;
+    color: #8a8276 !important;
+  }
+
+  .project-lantern-shell nav[aria-label="Mobile primary"] {
+    display: block !important;
+    border-top: 1px solid rgba(23, 21, 16, 0.1) !important;
+    background: rgba(255, 252, 246, 0.98) !important;
+    box-shadow: 0 -10px 28px rgba(27, 23, 16, 0.08) !important;
+  }
+
+  .project-lantern-shell nav[aria-label="Mobile primary"] > div {
+    max-width: 30rem !important;
+  }
+
+  .project-lantern-shell nav[aria-label="Mobile primary"] button {
+    background: transparent !important;
+    color: #756d61 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    border-radius: 0.72rem !important;
+    white-space: normal !important;
+  }
+
+  .project-lantern-shell nav[aria-label="Mobile primary"] button[aria-current="page"] {
+    background: #f5ead2 !important;
+    color: #9c6e1d !important;
+  }
+
+  .project-lantern-shell nav[aria-label="Mobile primary"] button:nth-child(3) {
+    order: 4;
+  }
+
+  .project-lantern-shell nav[aria-label="Mobile primary"] button:nth-child(4) {
+    order: 5;
+  }
+
+  .project-lantern-shell nav[aria-label="Mobile primary"] button:nth-child(5) {
+    order: 3;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden {
+    display: block !important;
+  }
+
+  .project-lantern-shell main > section > div > div.hidden.md\:grid {
+    display: none !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden > div {
+    gap: 1.2rem !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:first-child {
+    display: grid !important;
+    gap: 0.72rem !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:first-child::before {
+    content: "Continue Reading";
+    color: #171510;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.2rem;
+    font-weight: 500;
+    line-height: 1.18;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:first-child > div:first-child {
+    position: relative !important;
+    display: block !important;
+    min-height: 12.75rem !important;
+    overflow: hidden !important;
+    border-radius: 1rem !important;
+    background-image: linear-gradient(180deg, rgba(7, 10, 15, 0.02), rgba(7, 10, 15, 0.84)), url("/artwork/half-life-magic.svg") !important;
+    background-position: center !important;
+    background-size: cover !important;
+    box-shadow: 0 14px 34px rgba(29, 25, 18, 0.18) !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:first-child > div:first-child > div:first-child {
+    display: none !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:first-child > div:first-child > div:nth-child(2) {
+    position: absolute !important;
+    left: 1rem !important;
+    right: 4.35rem !important;
+    bottom: 0.95rem !important;
+    z-index: 2 !important;
+    color: #fffaf2 !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:first-child > div:first-child h2,
+  .project-lantern-shell main > section > div > div.md\:hidden section:first-child > div:first-child p {
+    color: #fffaf2 !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:first-child > div:first-child h2 {
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 1.35rem !important;
+    font-weight: 600 !important;
+    line-height: 1.05 !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:first-child > div:first-child p:first-child {
+    display: none !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:first-child > div:first-child button:not([aria-label]) {
+    margin-top: 0.56rem !important;
+    border-radius: 999px !important;
+    background: rgba(255, 250, 242, 0.92) !important;
+    padding: 0.42rem 0.72rem !important;
+    color: #171510 !important;
+    font-size: 0.7rem !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:first-child button[aria-label="Open last chapter recap"] {
+    right: 0.9rem !important;
+    bottom: 0.9rem !important;
+    z-index: 3 !important;
+    border: 1px solid rgba(255, 250, 242, 0.45) !important;
+    background: rgba(0, 0, 0, 0.22) !important;
+    color: #fffaf2 !important;
+    backdrop-filter: blur(8px);
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(2) h2,
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) h2,
+  .project-lantern-shell section > div > h2,
+  .project-lantern-shell section h2:first-child {
+    color: #171510 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 1.2rem !important;
+    font-weight: 500 !important;
+    line-height: 1.18 !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(2) > div {
+    width: calc(100% + 2rem) !important;
+    margin-left: -1rem !important;
+    gap: 0.55rem !important;
+    overflow-x: auto !important;
+    padding: 0 1rem 0.25rem !important;
+    scrollbar-width: none;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(2) > div::-webkit-scrollbar {
+    display: none;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(2) button {
+    display: grid !important;
+    min-width: 4.9rem !important;
+    min-height: 4.9rem !important;
+    place-items: center !important;
+    border: 1px solid rgba(27, 23, 16, 0.09) !important;
+    border-radius: 0.72rem !important;
+    background: #fffdf8 !important;
+    padding: 0.56rem !important;
+    color: #28241d !important;
+    font-size: 0.68rem !important;
+    text-align: center !important;
+    box-shadow: 0 8px 18px rgba(41, 35, 24, 0.04) !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(2) button::before {
+    content: "*";
+    display: block;
+    color: #b2873e;
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(2) button[class*="bg-lantern-gold"] {
+    background: #f5ead2 !important;
+    color: #171510 !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) > div:first-child p,
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) > div:first-child > div:last-child {
+    display: none !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) > div:first-child::after {
+    content: "See all >";
+    color: #b2873e;
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) button {
+    display: grid !important;
+    grid-template-columns: 5.5rem minmax(0, 1fr) 1.25rem !important;
+    align-items: center !important;
+    gap: 0.7rem !important;
+    border: 1px solid rgba(27, 23, 16, 0.08) !important;
+    border-radius: 0.9rem !important;
+    background: #fffdf8 !important;
+    padding: 0.55rem !important;
+    color: #171510 !important;
+    box-shadow: 0 10px 24px rgba(40, 34, 24, 0.06) !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) button > div:first-child {
+    aspect-ratio: 1.35 / 1 !important;
+    width: 100% !important;
+    height: auto !important;
+    border-radius: 0.7rem !important;
+    background: #e7e1d6 !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) button:nth-child(1) > div:first-child,
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) div.mt-3 button:nth-child(1) > div:first-child {
+    background-image: url("/artwork/lighthouse-main-street.svg") !important;
+    background-position: center !important;
+    background-size: cover !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) div.mt-3 button:nth-child(2) > div:first-child {
+    background-image: url("/artwork/borrowed-moons.svg") !important;
+    background-position: center !important;
+    background-size: cover !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) div.mt-3 button:nth-child(3) > div:first-child {
+    background-image: url("/artwork/quiet-engine.svg") !important;
+    background-position: center !important;
+    background-size: cover !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) div.mt-3 button:nth-child(4) > div:first-child {
+    background-image: url("/artwork/seventh-door.svg") !important;
+    background-position: center !important;
+    background-size: cover !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) button [aria-label$="artwork"] {
+    display: none !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) h3 {
+    color: #171510 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 1rem !important;
+    font-weight: 500 !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) p {
+    color: #6d665d !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) span {
+    color: #6d665d !important;
+  }
+
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) > div:first-child,
+  .project-lantern-shell main > section > div > div.md\:hidden section:nth-child(3) div.mt-3 {
+    min-width: 0 !important;
+  }
+
+  .project-lantern-shell main > section > section,
+  .project-lantern-shell main > section > div:not(:first-child) section,
+  .project-lantern-shell main > section > section article,
+  .project-lantern-shell main > section > section > div > section,
+  .project-lantern-shell main > section > section > div > article {
+    background-color: #fffdf8 !important;
+    color: #171510 !important;
+  }
+
+  .project-lantern-shell input,
+  .project-lantern-shell textarea,
+  .project-lantern-shell select {
+    background-color: #fffaf2 !important;
+    color: #171510 !important;
+  }
+}
