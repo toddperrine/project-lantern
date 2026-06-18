@@ -1,3 +1,7 @@
+.project-lantern-shell main > section > header p:first-child::after {
+  content: " v0.1.4";
+}
+
 .project-lantern-shell nav[aria-label="Primary"] {
   width: 100%;
   max-width: 100%;
