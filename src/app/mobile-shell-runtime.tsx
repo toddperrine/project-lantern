@@ -48,6 +48,24 @@ function artKeyForTitle(title: string, index = 0) {
   return ART_BY_TITLE[normalizedTitle] ?? FALLBACK_ART_SEQUENCE[index % FALLBACK_ART_SEQUENCE.length];
 }
 
+function artUrl(key: string) {
+  return `/artwork/${key}.png`;
+}
+
+function applyThumbnailArtwork(element: HTMLElement | null | undefined, key: string) {
+  if (!element) return;
+  element.style.setProperty("background-image", `url("${artUrl(key)}")`, "important");
+  element.style.setProperty("background-position", "center", "important");
+  element.style.setProperty("background-size", "cover", "important");
+}
+
+function applyContinueArtwork(element: HTMLElement | null | undefined) {
+  if (!element) return;
+  element.style.setProperty("background-image", "linear-gradient(180deg, rgba(8, 10, 12, 0.04), rgba(8, 10, 12, 0.86)), url(\"/artwork/half-life-of-magic.png\")", "important");
+  element.style.setProperty("background-position", "center", "important");
+  element.style.setProperty("background-size", "cover", "important");
+}
+
 function normalizeTextNodes(root: ParentNode) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
@@ -126,6 +144,7 @@ function ensureReferenceContinueCard() {
     </div>
   `;
   parent.insertBefore(section, parent.firstElementChild);
+  applyContinueArtwork(section.querySelector<HTMLElement>("[data-mobile-continue-image='true']"));
 }
 
 function markHomeCards() {
@@ -137,6 +156,7 @@ function markHomeCards() {
     continueSection.dataset.mobileContinueCard = "true";
     const image = continueSection.querySelector<HTMLElement>(":scope > div:first-child");
     image?.setAttribute("data-mobile-continue-image", "true");
+    applyContinueArtwork(image);
     const chapterLine = image?.querySelector("p");
     if (chapterLine) chapterLine.textContent = "Chapter 1 • 8 min read";
   }
@@ -144,9 +164,12 @@ function markHomeCards() {
   const rows = Array.from(main.querySelectorAll<HTMLButtonElement>("button")).filter((button) => button.querySelector("h3") && button.closest("section")?.textContent?.includes("Start Something New"));
   rows.forEach((row, index) => {
     const title = row.querySelector("h3")?.textContent ?? "";
+    const artKey = artKeyForTitle(title, index);
+    const thumbnail = row.querySelector<HTMLElement>(":scope > div:first-child");
     row.dataset.mobileStoryRow = "true";
-    row.dataset.mobileArt = artKeyForTitle(title, index);
-    row.querySelector<HTMLElement>(":scope > div:first-child")?.setAttribute("data-mobile-thumbnail", "true");
+    row.dataset.mobileArt = artKey;
+    thumbnail?.setAttribute("data-mobile-thumbnail", "true");
+    applyThumbnailArtwork(thumbnail, artKey);
   });
 }
 
