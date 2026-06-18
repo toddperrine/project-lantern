@@ -40,6 +40,7 @@
     background-color: #d8d0c2 !important;
     background-image: linear-gradient(180deg, rgba(8, 10, 12, 0.04), rgba(8, 10, 12, 0.86)), url("/artwork/half-life-of-magic.png") !important;
     background-position: center !important;
+    background-repeat: no-repeat !important;
     background-size: cover !important;
     box-shadow: 0 14px 34px rgba(29, 25, 18, 0.18) !important;
   }
@@ -124,7 +125,8 @@
     border-radius: 0.7rem !important;
     background-color: #e7e1d6 !important;
     background-position: center !important;
-    background-size: cover !important;
+    background-repeat: no-repeat !important;
+    background-size: contain !important;
   }
 
   .project-lantern-shell [data-mobile-thumbnail="true"] [aria-label$="artwork"],
@@ -230,7 +232,8 @@
     border-radius: 0.72rem;
     background-color: #e7e1d6;
     background-position: center;
-    background-size: cover;
+    background-repeat: no-repeat;
+    background-size: contain;
   }
 
   .project-lantern-shell main:not([data-mobile-active-view="home"]) [data-mobile-compact-card="true"] > * {
