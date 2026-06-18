@@ -72,12 +72,11 @@ function markActiveMobileView() {
   main.dataset.mobileActiveView = currentView();
 }
 
-function hideCrossRouteDemoMessages() {
-  const view = currentView();
+function hideDemoMessages() {
   Array.from(document.querySelectorAll<HTMLElement>(".project-lantern-shell main > section > div")).forEach((element) => {
     const text = cleanText(element.textContent ?? "");
     const isDemoStatus = /Demo story|Demo Story|demo story/.test(text);
-    if (isDemoStatus && view !== "home") element.dataset.mobileHiddenStatus = "true";
+    if (isDemoStatus) element.dataset.mobileHiddenStatus = "true";
     else delete element.dataset.mobileHiddenStatus;
   });
 }
@@ -91,7 +90,7 @@ function applyMobileShell(mobileQuery: MediaQueryList) {
   normalizeAttributes(root);
   normalizeMobileNav();
   markActiveMobileView();
-  hideCrossRouteDemoMessages();
+  hideDemoMessages();
 }
 
 export function MobileShellRuntime() {
