@@ -109,7 +109,7 @@ function ensureReferenceContinueCard() {
   if (!main) return;
   if (main.querySelector("[data-mobile-continue-card='true']")) return;
 
-  const homeContent = main.querySelector<HTMLElement>("main > section > div > .md\\:hidden > div, main > section > div > div > div");
+  const homeContent = main.querySelector<HTMLElement>(":scope > section > div > .md\\:hidden > div, :scope > section > div > div > div");
   const moodSection = Array.from(main.querySelectorAll<HTMLElement>("section")).find((section) => section.textContent?.includes("What are you in the mood"));
   const parent = homeContent ?? moodSection?.parentElement;
   if (!parent) return;
@@ -135,7 +135,10 @@ function markHomeCards() {
   const continueSection = Array.from(main.querySelectorAll<HTMLElement>("section")).find((section) => section.textContent?.includes("Next Chapter") && section.textContent?.includes("Continue Reading"));
   if (continueSection) {
     continueSection.dataset.mobileContinueCard = "true";
-    continueSection.querySelector<HTMLElement>(":scope > div:first-child")?.setAttribute("data-mobile-continue-image", "true");
+    const image = continueSection.querySelector<HTMLElement>(":scope > div:first-child");
+    image?.setAttribute("data-mobile-continue-image", "true");
+    const chapterLine = image?.querySelector("p");
+    if (chapterLine) chapterLine.textContent = "Chapter 1 • 8 min read";
   }
 
   const rows = Array.from(main.querySelectorAll<HTMLButtonElement>("button")).filter((button) => button.querySelector("h3") && button.closest("section")?.textContent?.includes("Start Something New"));
