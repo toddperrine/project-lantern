@@ -7,124 +7,132 @@
     color-scheme: light;
   }
 
-  body {
-    background: #f7f0e4 !important;
-    color: #181712 !important;
-  }
-
-  .project-lantern-shell {
-    min-height: 100vh;
-    background: #f7f0e4 !important;
-    color: #181712 !important;
+  body,
+  .project-lantern-shell,
+  .project-lantern-shell [data-device-preview-content],
+  .project-lantern-shell main {
+    background: #fbf7ef !important;
+    color: #171510 !important;
   }
 
   .project-lantern-shell > header {
-    position: sticky;
-    top: 0;
-    z-index: 40;
-    border-bottom: 1px solid rgba(31, 29, 24, 0.07) !important;
-    background: rgba(255, 251, 244, 0.96) !important;
-    color: #181712 !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 90 !important;
+    border-bottom: 1px solid rgba(25, 22, 17, 0.08) !important;
+    background: rgba(255, 252, 246, 0.96) !important;
+    color: #171510 !important;
     backdrop-filter: blur(18px);
   }
 
   .project-lantern-shell > header [data-device-preview-header-inner] {
-    display: grid !important;
-    grid-template-columns: 2.45rem minmax(0, 1fr) 2.45rem !important;
+    position: relative;
+    display: flex !important;
     align-items: center !important;
-    gap: 0 !important;
-    padding: 0.78rem 1rem !important;
+    justify-content: center !important;
+    max-width: none !important;
+    min-height: 3.55rem;
+    padding: 0.7rem 1rem !important;
   }
 
   .project-lantern-shell > header [data-device-preview-header-inner]::before,
   .project-lantern-shell > header [data-device-preview-header-inner]::after {
+    position: absolute;
+    top: 50%;
     display: grid;
-    width: 2.18rem;
-    height: 2.18rem;
+    width: 2.2rem;
+    height: 2.2rem;
     place-items: center;
-    border: 1px solid rgba(31, 29, 24, 0.08);
-    border-radius: 999px;
-    background: #fffaf2;
-    color: #201f1a;
-    font-size: 1rem;
+    transform: translateY(-50%);
+    color: #171510;
+    font-size: 1.35rem;
     line-height: 1;
-    box-shadow: 0 6px 16px rgba(42, 36, 27, 0.05);
   }
 
   .project-lantern-shell > header [data-device-preview-header-inner]::before {
+    left: 0.82rem;
     content: "☰";
   }
 
   .project-lantern-shell > header [data-device-preview-header-inner]::after {
+    right: 0.82rem;
     content: "○";
-    justify-self: end;
+  }
+
+  .project-lantern-shell > header [data-device-preview-header-inner] > div:first-child {
+    display: block !important;
+    min-width: 0 !important;
   }
 
   .project-lantern-shell > header h1 {
-    width: 100%;
-    text-align: center;
-    color: #181712 !important;
+    color: #171510 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
     font-size: 1rem !important;
-    font-weight: 800 !important;
+    font-weight: 500 !important;
+    line-height: 1.1 !important;
     letter-spacing: 0 !important;
+    text-align: center !important;
   }
 
-  .project-lantern-shell > header [data-device-preview-toggle] {
+  .project-lantern-shell > header [data-device-preview-toggle],
+  .project-lantern-shell main > section > header,
+  .project-lantern-shell nav[aria-label="Primary"],
+  .project-lantern-shell nav[aria-label="Mobile primary"] {
     display: none !important;
   }
 
   .project-lantern-shell > header nav[aria-label="Project Lantern"] {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 60;
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 100 !important;
     width: 100% !important;
-    padding: 0.44rem max(0.58rem, env(safe-area-inset-left)) calc(0.48rem + env(safe-area-inset-bottom)) max(0.58rem, env(safe-area-inset-right));
-    border-top: 1px solid rgba(31, 29, 24, 0.09);
-    background: rgba(255, 251, 244, 0.98);
-    box-shadow: 0 -14px 34px rgba(39, 35, 28, 0.1);
+    padding: 0.42rem max(0.7rem, env(safe-area-inset-left)) calc(0.58rem + env(safe-area-inset-bottom)) max(0.7rem, env(safe-area-inset-right)) !important;
+    border-top: 1px solid rgba(23, 21, 16, 0.1) !important;
+    background: rgba(255, 252, 246, 0.98) !important;
+    box-shadow: 0 -10px 28px rgba(27, 23, 16, 0.08) !important;
   }
 
   .project-lantern-shell > header nav[aria-label="Project Lantern"] > div {
     display: grid !important;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.08rem !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 0.04rem !important;
   }
 
   .project-lantern-shell > header nav[aria-label="Project Lantern"] a {
     display: flex !important;
     min-width: 0 !important;
     flex: none !important;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.18rem;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.18rem !important;
     border: 0 !important;
     border-radius: 0.72rem !important;
     background: transparent !important;
-    padding: 0.3rem 0.1rem !important;
-    color: #887d6a !important;
-    font-size: 0.59rem !important;
-    font-weight: 750 !important;
+    padding: 0.22rem 0 !important;
+    color: #756d61 !important;
+    font-size: 0.58rem !important;
+    font-weight: 650 !important;
     line-height: 1.05 !important;
-    text-align: center;
-    white-space: normal;
+    text-align: center !important;
     box-shadow: none !important;
   }
 
   .project-lantern-shell > header nav[aria-label="Project Lantern"] a[aria-current="page"] {
-    color: #b58b37 !important;
+    color: #b2873e !important;
   }
 
   .mobile-nav-icon {
     display: grid;
-    width: 1.28rem;
-    height: 1.28rem;
+    width: 1.35rem;
+    height: 1.35rem;
     place-items: center;
     border-radius: 999px;
-    background: rgba(181, 139, 55, 0.1);
-    font-size: 0.68rem;
+    background: rgba(178, 135, 62, 0.1);
+    color: currentColor;
+    font-size: 0.76rem;
     font-weight: 850;
     line-height: 1;
   }
@@ -133,147 +141,158 @@
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .project-lantern-shell [data-device-preview-content] {
-    padding: 1.05rem 1rem 6.8rem !important;
-    background: #f7f0e4 !important;
-  }
-
-  .project-lantern-shell [data-device-preview-content] > footer {
-    margin-top: 1.15rem !important;
-    border-top: 0 !important;
-    color: #9a8f7c !important;
-    font-size: 0.68rem !important;
+    max-width: none !important;
+    padding: 0.95rem 1rem calc(5.75rem + env(safe-area-inset-bottom)) !important;
   }
 
   .project-lantern-shell main {
     min-height: auto !important;
     padding: 0 !important;
-    color: #181712 !important;
   }
 
   .project-lantern-shell main > section {
     max-width: none !important;
-    gap: 1.18rem !important;
-  }
-
-  .project-lantern-shell main > section > header,
-  .project-lantern-shell nav[aria-label="Primary"] {
-    display: none !important;
+    gap: 1.22rem !important;
   }
 
   .project-lantern-shell main > section > div {
-    gap: 1.28rem !important;
+    gap: 1.32rem !important;
   }
 
-  .mobile-continue-heading,
-  .project-lantern-shell [data-mobile-mood-rail="true"] h2,
-  .project-lantern-shell [data-mobile-story-rows="true"] h2 {
-    color: #181712 !important;
-    font-size: 1.14rem !important;
-    font-weight: 850 !important;
-    line-height: 1.18 !important;
-    letter-spacing: 0 !important;
+  .project-lantern-shell main[data-mobile-reference-home="true"] .text-paper,
+  .project-lantern-shell main[data-mobile-reference-home="true"] .text-primary-light {
+    color: #171510 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-reference-home="true"] .bg-paper\/10,
+  .project-lantern-shell main[data-mobile-reference-home="true"] .bg-night-ink,
+  .project-lantern-shell main[data-mobile-reference-home="true"] .bg-deep-navy {
+    background-color: #fffdf8 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-reference-home="true"] .border-paper\/12,
+  .project-lantern-shell main[data-mobile-reference-home="true"] .border-paper\/15,
+  .project-lantern-shell main[data-mobile-reference-home="true"] .border-warm-paper\/10 {
+    border-color: rgba(27, 23, 16, 0.08) !important;
   }
 
   .project-lantern-shell [data-mobile-continue-reading="true"] {
     display: grid !important;
-    gap: 0.78rem !important;
+    gap: 0.72rem !important;
     overflow: visible !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
+    padding: 0 !important;
+    color: #171510 !important;
     box-shadow: none !important;
   }
 
-  .project-lantern-shell [data-mobile-continue-reading="true"] > :not(.mobile-continue-heading):not(.mobile-continue-card):not(.fixed) {
+  .project-lantern-shell [data-mobile-continue-reading="true"]::before,
+  .project-lantern-shell [data-mobile-mood-rail="true"] h2,
+  .project-lantern-shell [data-mobile-story-rows="true"] h2 {
+    margin: 0 !important;
+    color: #171510 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 1.2rem !important;
+    font-weight: 500 !important;
+    line-height: 1.18 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .project-lantern-shell [data-mobile-continue-reading="true"]::before {
+    content: "Continue Reading";
+  }
+
+  .project-lantern-shell [data-mobile-continue-reading="true"] > div:first-child {
+    position: relative !important;
+    display: block !important;
+    min-height: 12.65rem !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    border-radius: 1rem !important;
+    background-image: linear-gradient(180deg, rgba(7, 10, 15, 0.04), rgba(7, 10, 15, 0.88)), url("/artwork/half-life-magic.svg") !important;
+    background-position: center !important;
+    background-size: cover !important;
+    box-shadow: 0 14px 34px rgba(29, 25, 18, 0.18) !important;
+  }
+
+  .project-lantern-shell [data-mobile-continue-reading="true"] > div:first-child > div:first-child {
     display: none !important;
   }
 
-  .mobile-continue-card {
-    position: relative;
-    display: block;
-    width: 100%;
-    min-height: 15.6rem;
-    overflow: hidden;
-    border: 0;
-    border-radius: 1.05rem;
-    background-image: linear-gradient(180deg, rgba(13, 16, 23, 0.04), rgba(13, 16, 23, 0.82)), url("/artwork/half-life-magic.svg");
-    background-position: center;
-    background-size: cover;
-    box-shadow: 0 18px 36px rgba(48, 42, 32, 0.18);
-    text-align: left;
+  .project-lantern-shell [data-mobile-continue-reading="true"] > div:first-child > div:nth-child(2) {
+    position: absolute !important;
+    left: 1rem !important;
+    right: 4.2rem !important;
+    bottom: 0.95rem !important;
+    z-index: 2 !important;
+    padding: 0 !important;
+    color: #fffaf2 !important;
   }
 
-  .mobile-continue-card::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(5, 8, 13, 0.02) 24%, rgba(5, 8, 13, 0.64) 72%, rgba(5, 8, 13, 0.9));
+  .project-lantern-shell [data-mobile-continue-reading="true"] > div:first-child > div:nth-child(2) p:first-child {
+    display: none !important;
   }
 
-  .mobile-continue-copy {
-    position: absolute;
-    left: 1rem;
-    right: 4rem;
-    bottom: 1rem;
-    z-index: 2;
-    display: grid;
-    gap: 0.18rem;
-    color: #fffaf2;
+  .project-lantern-shell [data-mobile-continue-reading="true"] h2 {
+    margin: 0 !important;
+    color: #fffaf2 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 1.35rem !important;
+    font-weight: 600 !important;
+    line-height: 1.05 !important;
+    letter-spacing: 0 !important;
   }
 
-  .mobile-continue-copy strong {
-    font-size: 1.38rem;
-    font-weight: 850;
-    line-height: 1.08;
+  .project-lantern-shell [data-mobile-continue-reading="true"] p {
+    margin-top: 0.35rem !important;
+    color: rgba(255, 250, 242, 0.84) !important;
+    font-size: 0.76rem !important;
+    font-weight: 650 !important;
+    line-height: 1.25 !important;
   }
 
-  .mobile-continue-copy span,
-  .mobile-continue-copy small {
-    color: rgba(255, 250, 242, 0.82);
-    font-size: 0.76rem;
-    font-weight: 700;
-    line-height: 1.25;
+  .project-lantern-shell [data-mobile-continue-reading="true"] button:not([aria-label]) {
+    margin-top: 0.56rem !important;
+    border-radius: 999px !important;
+    background: rgba(255, 250, 242, 0.9) !important;
+    padding: 0.42rem 0.72rem !important;
+    color: #171510 !important;
+    font-size: 0.7rem !important;
+    font-weight: 750 !important;
   }
 
-  .mobile-recap-chip {
-    position: absolute;
-    right: 0.9rem;
-    bottom: 0.9rem;
-    z-index: 3;
-    display: grid;
-    width: 2.55rem;
-    height: 2.55rem;
-    place-items: center;
-    border: 1px solid rgba(255, 250, 242, 0.38);
-    border-radius: 999px;
-    background: rgba(255, 250, 242, 0.16);
-    color: #fffaf2;
-    font-size: 0.86rem;
-    font-weight: 850;
-    backdrop-filter: blur(10px);
+  .project-lantern-shell [data-mobile-continue-reading="true"] button[aria-label="Open last chapter recap"] {
+    right: 0.9rem !important;
+    bottom: 0.9rem !important;
+    z-index: 3 !important;
+    width: 2.8rem !important;
+    height: 2.8rem !important;
+    border: 1px solid rgba(255, 250, 242, 0.45) !important;
+    border-radius: 999px !important;
+    background: rgba(0, 0, 0, 0.22) !important;
+    color: #fffaf2 !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(8px);
   }
 
   .project-lantern-shell [data-mobile-mood-rail="true"] {
-    display: grid;
-    gap: 0.72rem;
-  }
-
-  .project-lantern-shell [data-mobile-mood-rail="true"] h2 + p,
-  .project-lantern-shell [data-mobile-mood-rail="true"] h2 + p + p {
-    display: none !important;
+    display: grid !important;
+    gap: 0.72rem !important;
   }
 
   .project-lantern-shell [data-mobile-mood-rail-track="true"] {
     display: flex !important;
-    width: calc(100% + 2rem);
-    margin-left: -1rem;
-    margin-top: 0 !important;
+    width: calc(100% + 2rem) !important;
+    margin: 0 0 0 -1rem !important;
     gap: 0.55rem !important;
-    overflow-x: auto;
-    padding: 0.08rem 1rem 0.42rem;
+    overflow-x: auto !important;
+    padding: 0 1rem 0.25rem !important;
     scrollbar-width: none;
   }
 
@@ -282,234 +301,193 @@
   }
 
   .project-lantern-shell [data-mobile-mood-rail-track="true"] button {
-    display: inline-flex !important;
-    min-width: 5.7rem !important;
-    max-width: 6.7rem;
+    display: grid !important;
+    min-width: 4.9rem !important;
+    min-height: 4.9rem !important;
     flex: 0 0 auto !important;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    border: 1px solid rgba(31, 29, 24, 0.09) !important;
-    border-radius: 0.8rem !important;
-    background: #fffaf2 !important;
-    padding: 0.72rem 0.72rem !important;
-    color: #2b2923 !important;
-    box-shadow: 0 8px 20px rgba(40, 35, 27, 0.06) !important;
+    place-items: center !important;
+    border: 1px solid rgba(27, 23, 16, 0.09) !important;
+    border-radius: 0.72rem !important;
+    background: #fffdf8 !important;
+    padding: 0.56rem !important;
+    color: #28241d !important;
+    font-size: 0.68rem !important;
+    font-weight: 650 !important;
+    line-height: 1.05 !important;
     text-align: center !important;
+    box-shadow: 0 8px 18px rgba(41, 35, 24, 0.04) !important;
   }
 
-  .project-lantern-shell [data-mobile-mood-rail-track="true"] button[aria-disabled="true"] {
-    cursor: default;
+  .project-lantern-shell [data-mobile-mood-rail-track="true"] button::before {
+    content: "•";
+    display: block;
+    color: #b2873e;
+    font-size: 1.15rem;
+    line-height: 1;
   }
 
-  .project-lantern-shell [data-mobile-mood-rail-track="true"] button > span:first-child,
-  .project-lantern-shell [data-mobile-mood-rail-track="true"] button[data-extra-mood] span {
-    display: inline !important;
-    color: inherit !important;
-    font-size: 0.78rem !important;
-    font-weight: 780 !important;
-    line-height: 1.1 !important;
-  }
-
-  .project-lantern-shell [data-mobile-mood-rail-track="true"] button > span:not(:first-child) {
-    display: none !important;
+  .project-lantern-shell [data-mobile-mood-rail-track="true"] button[aria-current="true"],
+  .project-lantern-shell [data-mobile-mood-rail-track="true"] button[class*="bg-lantern-gold"] {
+    border-color: rgba(178, 135, 62, 0.34) !important;
+    background: #f5ead2 !important;
+    color: #171510 !important;
   }
 
   .project-lantern-shell [data-mobile-story-rows="true"] {
-    display: grid;
-    gap: 0.74rem;
+    display: grid !important;
+    gap: 0.7rem !important;
   }
 
   .project-lantern-shell [data-mobile-story-rows="true"] > div:first-child {
     display: flex !important;
-    flex-direction: row !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: 1rem !important;
   }
 
   .project-lantern-shell [data-mobile-story-rows="true"] > div:first-child p,
-  .project-lantern-shell [data-mobile-story-rows="true"] [data-mobile-demo-actions="true"] {
+  .project-lantern-shell [data-mobile-story-rows="true"] > div:first-child > div:last-child {
     display: none !important;
   }
 
-  .project-lantern-shell [data-mobile-see-all="true"],
   .project-lantern-shell [data-mobile-story-rows="true"] > div:first-child::after {
-    content: "See all";
-    color: #b58b37;
-    font-size: 0.82rem;
-    font-weight: 850;
+    content: "See all ›";
+    color: #b2873e;
+    font-size: 0.78rem;
+    font-weight: 700;
   }
 
-  .project-lantern-shell [data-mobile-story-rows="true"] > div:last-child {
+  .project-lantern-shell [data-mobile-story-list="true"] {
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) !important;
-    gap: 0.64rem !important;
+    gap: 0.55rem !important;
     margin-top: 0 !important;
   }
 
   .project-lantern-shell [data-mobile-story-row="true"] {
-    overflow: hidden !important;
-    border: 1px solid rgba(31, 29, 24, 0.08) !important;
-    border-radius: 0.95rem !important;
-    background: #fffaf2 !important;
-    padding: 0.72rem !important;
-    box-shadow: 0 10px 26px rgba(45, 40, 31, 0.07) !important;
-  }
-
-  .project-lantern-shell [data-mobile-story-row="true"] > div {
     display: grid !important;
-    grid-template-columns: 4.65rem minmax(0, 1fr) 1.35rem !important;
+    grid-template-columns: 5.5rem minmax(0, 1fr) 1.25rem !important;
     align-items: center !important;
-    gap: 0.75rem !important;
-  }
-
-  .project-lantern-shell [data-mobile-story-row="true"] > div::after {
-    content: ">";
-    color: #b58b37;
-    font-size: 1.25rem;
-    font-weight: 850;
-    line-height: 1;
-    text-align: right;
-  }
-
-  .project-lantern-shell [data-mobile-story-row="true"] [aria-label$="artwork"] {
-    aspect-ratio: 1 / 1 !important;
-    width: 4.65rem !important;
-    max-width: 4.65rem !important;
-    min-height: 0 !important;
-    height: auto !important;
-    margin: 0 !important;
+    gap: 0.7rem !important;
     overflow: hidden !important;
-    border: 0 !important;
-    border-radius: 0.72rem !important;
-    padding: 0 !important;
+    border: 1px solid rgba(27, 23, 16, 0.08) !important;
+    border-radius: 0.9rem !important;
+    background: #fffdf8 !important;
+    padding: 0.55rem !important;
+    text-align: left !important;
+    box-shadow: 0 10px 24px rgba(40, 34, 24, 0.06) !important;
+  }
+
+  .project-lantern-shell [data-mobile-story-row="true"] > div:first-child {
+    aspect-ratio: 1.35 / 1 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: hidden !important;
+    border-radius: 0.7rem !important;
     background-position: center !important;
     background-size: cover !important;
-    box-shadow: none !important;
-    color: transparent !important;
   }
 
-  .project-lantern-shell [data-mobile-story-row="true"] [aria-label$="artwork"]::before,
-  .project-lantern-shell [data-mobile-story-row="true"] [aria-label$="artwork"]::after,
-  .project-lantern-shell [data-mobile-story-row="true"] [aria-label$="artwork"] > * {
+  .project-lantern-shell [data-mobile-story-row="true"] > div:first-child [aria-label$="artwork"] {
     display: none !important;
   }
 
-  .project-lantern-shell [aria-label="The Lighthouse Under Main Street artwork"],
-  .project-lantern-shell [aria-label="Bellwether Courthouse Archive artwork"] {
-    background-image: linear-gradient(180deg, rgba(11, 16, 32, 0), rgba(11, 16, 32, 0.34)), url("/artwork/lighthouse-main-street.svg") !important;
+  .project-lantern-shell [data-mobile-story-row="true"][data-mobile-start-art="lighthouse"] > div:first-child {
+    background-image: url("/artwork/lighthouse-main-street.svg") !important;
   }
 
-  .project-lantern-shell [aria-label="Orchard of Borrowed Moons artwork"],
-  .project-lantern-shell [aria-label="Calder Moon Orchard artwork"] {
-    background-image: linear-gradient(180deg, rgba(11, 16, 32, 0), rgba(11, 16, 32, 0.34)), url("/artwork/borrowed-moons.svg") !important;
+  .project-lantern-shell [data-mobile-story-row="true"][data-mobile-start-art="moons"] > div:first-child {
+    background-image: url("/artwork/borrowed-moons.svg") !important;
   }
 
-  .project-lantern-shell [aria-label="The Quiet Engine artwork"],
-  .project-lantern-shell [aria-label="North Pier Repair Yard artwork"] {
-    background-image: linear-gradient(180deg, rgba(11, 16, 32, 0), rgba(11, 16, 32, 0.34)), url("/artwork/quiet-engine.svg") !important;
+  .project-lantern-shell [data-mobile-story-row="true"][data-mobile-start-art="engine"] > div:first-child {
+    background-image: url("/artwork/quiet-engine.svg") !important;
   }
 
-  .project-lantern-shell [aria-label="Map of the Seventh Door artwork"],
-  .project-lantern-shell [aria-label="The Seven-Door City artwork"] {
-    background-image: linear-gradient(180deg, rgba(11, 16, 32, 0), rgba(11, 16, 32, 0.34)), url("/artwork/seventh-door.svg") !important;
+  .project-lantern-shell [data-mobile-story-row="true"][data-mobile-start-art="door"] > div:first-child {
+    background-image: url("/artwork/seventh-door.svg") !important;
   }
 
-  .project-lantern-shell [data-mobile-story-row="true"] > div > div:not([aria-label$="artwork"]) {
+  .project-lantern-shell [data-mobile-story-row="true"] > div:nth-child(2) {
     min-width: 0 !important;
-    padding: 0 !important;
-  }
-
-  .project-lantern-shell [data-mobile-story-row="true"] div.flex {
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    gap: 0.28rem !important;
-    margin: 0.35rem 0 0 !important;
-    order: 3;
-  }
-
-  .project-lantern-shell [data-mobile-story-row="true"] div.flex span {
-    display: inline-flex;
-    align-items: center;
-    max-width: 5.4rem;
-    overflow: hidden;
-    border: 1px solid rgba(181, 139, 55, 0.22);
-    border-radius: 999px;
-    background: rgba(181, 139, 55, 0.08);
-    padding: 0.16rem 0.42rem;
-    color: #9a7330;
-    font-size: 0.6rem;
-    font-weight: 850;
-    line-height: 1.1;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .project-lantern-shell [data-mobile-story-row="true"] h3 {
     margin: 0 !important;
-    color: #181712 !important;
-    font-size: 0.94rem !important;
-    font-weight: 850 !important;
-    line-height: 1.16 !important;
-    overflow-wrap: normal !important;
+    overflow: hidden !important;
+    color: #171510 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 1rem !important;
+    font-weight: 500 !important;
+    line-height: 1.12 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
 
   .project-lantern-shell [data-mobile-story-row="true"] p {
     display: -webkit-box !important;
     margin: 0.22rem 0 0 !important;
-    max-width: none !important;
-    overflow: hidden;
-    color: #6f675a !important;
+    overflow: hidden !important;
+    color: #6d665d !important;
     font-size: 0.72rem !important;
-    font-weight: 500 !important;
-    line-height: 1.25 !important;
+    line-height: 1.2 !important;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 1;
   }
 
-  .project-lantern-shell [data-mobile-story-row="true"] div:has(> [aria-label$="portrait artwork"]),
-  .project-lantern-shell [data-mobile-story-row="true"] button {
-    display: none !important;
+  .project-lantern-shell [data-mobile-story-row="true"] div.flex {
+    display: flex !important;
+    gap: 0.28rem !important;
+    margin-top: 0.36rem !important;
+    overflow: hidden !important;
   }
 
-  .project-lantern-shell section:not([data-mobile-continue-reading]):not([data-mobile-mood-rail]):not([data-mobile-story-rows]) .text-paper,
-  .project-lantern-shell .text-paper,
-  .project-lantern-shell .text-primary-light {
-    color: #181712 !important;
+  .project-lantern-shell [data-mobile-story-row="true"] div.flex span {
+    max-width: 5.4rem !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: #ede9df !important;
+    padding: 0.14rem 0.45rem !important;
+    color: #5a554d !important;
+    font-size: 0.62rem !important;
+    font-weight: 650 !important;
+    line-height: 1.1 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
 
-  .project-lantern-shell .bg-paper\/10,
-  .project-lantern-shell .bg-night-ink,
-  .project-lantern-shell .bg-deep-navy {
-    background-color: #fffaf2 !important;
+  .project-lantern-shell [data-mobile-story-row="true"] > span:last-child {
+    color: #b2873e !important;
+    font-size: 1.2rem !important;
+    font-weight: 700 !important;
   }
 
-  .project-lantern-shell .border-paper\/12,
-  .project-lantern-shell .border-paper\/15,
-  .project-lantern-shell .border-warm-paper\/10 {
-    border-color: rgba(31, 29, 24, 0.09) !important;
-  }
-
-  .mobile-static-recap,
   .project-lantern-shell [role="dialog"] {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: flex-end;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 110 !important;
+    display: flex !important;
+    align-items: flex-end !important;
     background: rgba(18, 16, 12, 0.48) !important;
-    padding: 1rem;
+    padding: 1rem !important;
   }
 
   .project-lantern-shell [role="dialog"] > div {
-    width: 100%;
-    max-height: 84vh;
+    width: 100% !important;
+    max-height: 84vh !important;
     border: 0 !important;
     border-radius: 1rem !important;
     background: #fffaf2 !important;
     padding: 1.1rem !important;
-    color: #181712 !important;
+    color: #171510 !important;
     box-shadow: 0 24px 60px rgba(19, 16, 11, 0.28) !important;
+  }
+
+  .project-lantern-shell [data-device-preview-content] > footer {
+    margin-top: 1rem !important;
+    border-top: 0 !important;
+    color: #9b9388 !important;
+    font-size: 0.68rem !important;
   }
 }
