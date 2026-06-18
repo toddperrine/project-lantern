@@ -183,8 +183,7 @@
     overflow: hidden !important;
   }
 
-  .project-lantern-shell [data-mobile-row-tags="true"] span,
-  .project-lantern-shell [data-mobile-story-row="true"] span:not([data-mobile-thumbnail]):not([data-mobile-row-chevron]) {
+  .project-lantern-shell [data-mobile-row-tags="true"] span {
     width: fit-content !important;
     max-width: 5.8rem !important;
     overflow: hidden !important;
