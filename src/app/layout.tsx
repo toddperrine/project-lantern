@@ -5,6 +5,7 @@ import { MobileShellRuntime } from "./mobile-shell-runtime";
 import { ProjectLanternShell } from "./project-lantern-shell";
 import "./globals.css";
 import "./mobile-shell.css";
+import "./mobile-shell-overrides.css";
 
 export const metadata: Metadata = {
   title: "Project Lantern",
