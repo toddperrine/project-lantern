@@ -39,6 +39,10 @@ function cleanText(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function getNavLabel(item: HTMLElement) {
+  return item.dataset.mobileNavItem || cleanText(item.querySelector(".mobile-nav-label")?.textContent ?? item.textContent ?? "");
+}
+
 function replaceCastLabels(root: ParentNode) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
@@ -64,11 +68,14 @@ function normalizeNav(nav: HTMLElement) {
   const byLabel = new Map<string, HTMLAnchorElement | HTMLButtonElement>();
 
   items.forEach((item) => {
-    const currentLabel = cleanText(item.textContent ?? "");
+    const currentLabel = getNavLabel(item);
     const nextLabel = currentLabel === "Cast" ? "Characters" : currentLabel;
     byLabel.set(nextLabel, item);
     item.dataset.mobileNavItem = nextLabel;
-    item.innerHTML = `<span aria-hidden="true" class="mobile-nav-icon">${NAV_ICONS[nextLabel] ?? "•"}</span><span class="mobile-nav-label">${nextLabel}</span>`;
+    if (item.dataset.mobileRenderedLabel !== nextLabel) {
+      item.innerHTML = `<span aria-hidden="true" class="mobile-nav-icon">${NAV_ICONS[nextLabel] ?? "•"}</span><span class="mobile-nav-label">${nextLabel}</span>`;
+      item.dataset.mobileRenderedLabel = nextLabel;
+    }
   });
 
   const orderedItems = NAV_ORDER.map((label) => byLabel.get(label)).filter((item): item is HTMLAnchorElement | HTMLButtonElement => Boolean(item));
@@ -151,7 +158,7 @@ function enhanceMoodRail() {
   if (!section) return;
   section.dataset.mobileMoodRail = "true";
   const heading = section.querySelector("h2");
-  if (heading) heading.textContent = "What are you in the mood to read?";
+  if (heading && heading.textContent !== "What are you in the mood to read?") heading.textContent = "What are you in the mood to read?";
   const rail = Array.from(section.querySelectorAll<HTMLElement>("div")).find((candidate) => candidate.querySelectorAll("button").length >= 4);
   if (!rail) return;
   rail.dataset.mobileMoodRailTrack = "true";
@@ -178,7 +185,7 @@ function normalizeStoryRows() {
   if (!section) return;
   section.dataset.mobileStoryRows = "true";
   const intro = section.querySelector("h2")?.parentElement?.querySelector("p");
-  if (intro) intro.textContent = "";
+  if (intro && intro.textContent) intro.textContent = "";
   if (!section.querySelector('[data-mobile-see-all="true"]')) {
     const header = section.firstElementChild;
     const link = document.createElement("button");
@@ -195,10 +202,14 @@ function normalizeStoryRows() {
     article.dataset.mobileStoryRow = "true";
     const title = article.querySelector("h3");
     const premise = title?.nextElementSibling;
-    if (title) title.textContent = copy.title;
-    if (premise) premise.textContent = copy.premise;
-    const tagRow = article.querySelector("div.flex");
-    if (tagRow) tagRow.innerHTML = copy.tags.map((tag) => `<span>${tag}</span>`).join("");
+    if (title && title.textContent !== copy.title) title.textContent = copy.title;
+    if (premise && premise.textContent !== copy.premise) premise.textContent = copy.premise;
+    const tagRow = article.querySelector<HTMLElement>("div.flex");
+    const nextTags = copy.tags.join("|");
+    if (tagRow && tagRow.dataset.mobileTags !== nextTags) {
+      tagRow.innerHTML = copy.tags.map((tag) => `<span>${tag}</span>`).join("");
+      tagRow.dataset.mobileTags = nextTags;
+    }
   });
 }
 
