@@ -1,0 +1,244 @@
+@media (max-width: 767px) {
+  body > button[style*="position: fixed"][style*="right"],
+  body > div[style*="position: fixed"][style*="right"]:not([role="dialog"]),
+  .project-lantern-shell [data-story-world-engine-continue-series="true"] {
+    display: none !important;
+  }
+
+  .project-lantern-shell main {
+    padding-bottom: calc(8rem + env(safe-area-inset-bottom)) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-card="true"] {
+    display: grid !important;
+    gap: 0.72rem !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-card="true"]::before {
+    content: "Continue Reading";
+    color: #171510;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.18rem;
+    font-weight: 500;
+    line-height: 1.18;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] {
+    position: relative !important;
+    display: block !important;
+    min-height: 15.5rem !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    border-radius: 1.05rem !important;
+    background-color: #d8d0c2 !important;
+    background-image: linear-gradient(180deg, rgba(8, 10, 12, 0.04), rgba(8, 10, 12, 0.86)), url("/artwork/half-life-of-magic.png") !important;
+    background-position: center !important;
+    background-size: cover !important;
+    box-shadow: 0 14px 34px rgba(29, 25, 18, 0.18) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] > div:first-child:not([data-mobile-continue-copy]),
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] [aria-label$="artwork"] {
+    display: none !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] > div:nth-child(2),
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-copy="true"] {
+    position: absolute !important;
+    left: 1rem !important;
+    right: 4.2rem !important;
+    bottom: 1rem !important;
+    z-index: 2 !important;
+    padding: 0 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] p,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-copy="true"] p {
+    display: block !important;
+    margin: 0 0 0.35rem !important;
+    color: rgba(255, 250, 242, 0.82) !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+    line-height: 1.15 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] h2,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-copy="true"] h2 {
+    margin: 0 !important;
+    color: #fffaf2 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 1.42rem !important;
+    font-weight: 600 !important;
+    line-height: 1.05 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] button[aria-label*="recap" i],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] button[aria-label*="last chapter" i] {
+    position: absolute !important;
+    right: 0.9rem !important;
+    bottom: 0.9rem !important;
+    z-index: 3 !important;
+    display: grid !important;
+    width: 2.65rem !important;
+    height: 2.65rem !important;
+    place-items: center !important;
+    border: 1px solid rgba(255, 250, 242, 0.46) !important;
+    border-radius: 999px !important;
+    background: rgba(0, 0, 0, 0.28) !important;
+    color: #fffaf2 !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(8px);
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-story-row="true"] {
+    display: grid !important;
+    grid-template-columns: 5.25rem minmax(0, 1fr) 1rem !important;
+    align-items: center !important;
+    gap: 0.68rem !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(27, 23, 16, 0.08) !important;
+    border-radius: 0.9rem !important;
+    background: #fffdf8 !important;
+    padding: 0.52rem !important;
+    box-shadow: 0 10px 24px rgba(40, 34, 24, 0.06) !important;
+  }
+
+  .project-lantern-shell [data-mobile-thumbnail="true"],
+  .project-lantern-shell [data-mobile-compact-card-thumb="true"] {
+    aspect-ratio: 1.36 / 1 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    border-radius: 0.7rem !important;
+    background-color: #e7e1d6 !important;
+    background-position: center !important;
+    background-size: cover !important;
+  }
+
+  .project-lantern-shell [data-mobile-thumbnail="true"] [aria-label$="artwork"],
+  .project-lantern-shell [data-mobile-compact-card-thumb="true"] [aria-label$="artwork"] {
+    display: none !important;
+  }
+
+  .project-lantern-shell [data-mobile-art="half-life-of-magic"] [data-mobile-thumbnail="true"],
+  .project-lantern-shell [data-mobile-art="half-life-of-magic"][data-mobile-compact-card="true"]::before {
+    background-image: url("/artwork/half-life-of-magic.png") !important;
+  }
+
+  .project-lantern-shell [data-mobile-art="whisper-in-the-static"] [data-mobile-thumbnail="true"],
+  .project-lantern-shell [data-mobile-art="whisper-in-the-static"][data-mobile-compact-card="true"]::before {
+    background-image: url("/artwork/whisper-in-the-static.png") !important;
+  }
+
+  .project-lantern-shell [data-mobile-art="under-lantern-light"] [data-mobile-thumbnail="true"],
+  .project-lantern-shell [data-mobile-art="under-lantern-light"][data-mobile-compact-card="true"]::before {
+    background-image: url("/artwork/under-lantern-light.png") !important;
+  }
+
+  .project-lantern-shell [data-mobile-art="stars-remember"] [data-mobile-thumbnail="true"],
+  .project-lantern-shell [data-mobile-art="stars-remember"][data-mobile-compact-card="true"]::before {
+    background-image: url("/artwork/stars-remember.png") !important;
+  }
+
+  .project-lantern-shell [data-mobile-art="orchard-of-borrowed-moons"] [data-mobile-thumbnail="true"],
+  .project-lantern-shell [data-mobile-art="orchard-of-borrowed-moons"][data-mobile-compact-card="true"]::before {
+    background-image: url("/artwork/orchard-of-borrowed-moons.png") !important;
+  }
+
+  .project-lantern-shell [data-mobile-art="quiet-engine"] [data-mobile-thumbnail="true"],
+  .project-lantern-shell [data-mobile-art="quiet-engine"][data-mobile-compact-card="true"]::before {
+    background-image: url("/artwork/quiet-engine.png") !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-story-row="true"] h3 {
+    overflow: hidden !important;
+    color: #171510 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 0.98rem !important;
+    font-weight: 500 !important;
+    line-height: 1.1 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-story-row="true"] p {
+    display: -webkit-box !important;
+    margin: 0.18rem 0 0 !important;
+    overflow: hidden !important;
+    color: #6d665d !important;
+    font-size: 0.72rem !important;
+    line-height: 1.2 !important;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-story-row="true"] span {
+    color: #6d665d !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="library"] [data-mobile-library-tools="true"] {
+    order: 5 !important;
+    margin-top: 0.6rem !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="library"] [data-mobile-library-tools="true"]::before {
+    content: "Manage Library";
+    display: block;
+    margin-bottom: 0.7rem;
+    color: #171510;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.05rem;
+    font-weight: 500;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="library"] [data-mobile-library-tools="true"] h2,
+  .project-lantern-shell main[data-mobile-active-view="library"] [data-mobile-library-tools="true"] > p:first-of-type {
+    display: none !important;
+  }
+
+  .project-lantern-shell main:not([data-mobile-active-view="home"]) [data-mobile-compact-card="true"] {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: 4.6rem minmax(0, 1fr) !important;
+    gap: 0.72rem !important;
+    align-items: start !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(27, 23, 16, 0.08) !important;
+    border-radius: 0.9rem !important;
+    background: #fffdf8 !important;
+    padding: 0.65rem !important;
+    box-shadow: 0 10px 24px rgba(40, 34, 24, 0.05) !important;
+  }
+
+  .project-lantern-shell main:not([data-mobile-active-view="home"]) [data-mobile-compact-card="true"]::before {
+    content: "";
+    display: block;
+    aspect-ratio: 1 / 1;
+    width: 4.6rem;
+    border-radius: 0.72rem;
+    background-color: #e7e1d6;
+    background-position: center;
+    background-size: cover;
+  }
+
+  .project-lantern-shell main:not([data-mobile-active-view="home"]) [data-mobile-compact-card="true"] > * {
+    min-width: 0 !important;
+  }
+
+  .project-lantern-shell main:not([data-mobile-active-view="home"]) [data-mobile-compact-card="true"] [aria-label$="artwork"],
+  .project-lantern-shell main:not([data-mobile-active-view="home"]) [data-mobile-compact-card="true"] [aria-label$="portrait artwork"] {
+    display: none !important;
+  }
+}
