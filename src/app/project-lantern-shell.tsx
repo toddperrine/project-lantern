@@ -158,7 +158,12 @@ function DevicePreviewModeScript() {
     button.addEventListener("click", () => applyMode(button.dataset.devicePreviewMode || "full"));
   });
 
-  mobileQuery.addEventListener("change", () => applyMode(readMode()));
+  const refreshPreviewMode = () => applyMode(readMode());
+  if (typeof mobileQuery.addEventListener === "function") {
+    mobileQuery.addEventListener("change", refreshPreviewMode);
+  } else if (typeof mobileQuery.addListener === "function") {
+    mobileQuery.addListener(refreshPreviewMode);
+  }
   applyMode(readMode());
 })();`;
 
