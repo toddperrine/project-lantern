@@ -3,6 +3,7 @@ import { Suspense, type ReactNode } from "react";
 import { ContinueSeriesEntry } from "./continue-series-entry";
 import { ProjectLanternShell } from "./project-lantern-shell";
 import "./globals.css";
+import "./mobile-shell.css";
 
 export const metadata: Metadata = {
   title: "Project Lantern",
