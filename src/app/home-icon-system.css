@@ -1,0 +1,87 @@
+@media (max-width: 767px) {
+  .project-lantern-shell [data-mobile-home-fallback="true"] > [data-mobile-fallback-continue="true"]::before {
+    content: "Continue Reading" !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-card="true"]:not([data-mobile-fallback-continue])::before {
+    content: none !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] {
+    min-height: 13.6rem !important;
+    background-image: linear-gradient(180deg, rgba(8, 10, 12, 0.02), rgba(8, 10, 12, 0.74)), url("/artwork/half-life-of-magic.png") !important;
+    background-size: cover !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"]::before {
+    background: linear-gradient(180deg, rgba(8, 10, 12, 0), rgba(8, 10, 12, 0.18) 48%, rgba(8, 10, 12, 0.72)) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-cta="true"] {
+    bottom: 3.65rem !important;
+    min-height: 1.72rem !important;
+    background: rgba(255, 250, 242, 0.82) !important;
+    padding: 0.32rem 0.62rem !important;
+    color: #171510 !important;
+    font-size: 0.66rem !important;
+    font-weight: 760 !important;
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.12) !important;
+  }
+
+  .project-lantern-shell [data-mobile-fallback-mood]::before {
+    content: none !important;
+  }
+
+  .project-lantern-shell [data-mobile-mood-icon="true"] {
+    display: grid !important;
+    width: 1.9rem !important;
+    height: 1.9rem !important;
+    place-items: center !important;
+    border-radius: 999px !important;
+    background: #f1eadc !important;
+  }
+
+  .project-lantern-shell [data-mobile-mood-icon="true"] img {
+    display: block !important;
+    width: 1.22rem !important;
+    height: 1.22rem !important;
+  }
+
+  .project-lantern-shell [data-mobile-fallback-mood][aria-pressed="true"] {
+    border-color: rgba(154, 115, 48, 0.58) !important;
+    background: #f3e3c3 !important;
+    box-shadow: 0 10px 24px rgba(154, 115, 48, 0.18) !important;
+  }
+
+  .project-lantern-shell [data-mobile-fallback-mood][aria-pressed="true"] [data-mobile-mood-icon="true"] {
+    background: #b2873e !important;
+  }
+
+  .project-lantern-shell [data-mobile-fallback-mood][aria-pressed="true"] [data-mobile-mood-icon="true"] img {
+    filter: brightness(0) invert(1) sepia(0.08) saturate(0.6) !important;
+  }
+
+  .project-lantern-shell nav[aria-label="Mobile primary"] button {
+    display: grid !important;
+    grid-template-rows: 1.35rem auto !important;
+    place-items: center !important;
+    gap: 0.16rem !important;
+  }
+
+  .project-lantern-shell nav[aria-label="Mobile primary"] button [data-lantern-nav-icon="true"] {
+    display: block !important;
+    width: 1.24rem !important;
+    height: 1.24rem !important;
+    color: currentColor !important;
+  }
+
+  .project-lantern-shell nav[aria-label="Mobile primary"] button span {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    color: inherit !important;
+    font-size: 0.58rem !important;
+    line-height: 1.02 !important;
+    text-align: center !important;
+    text-overflow: ellipsis !important;
+  }
+}
