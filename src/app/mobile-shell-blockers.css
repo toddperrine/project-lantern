@@ -323,25 +323,14 @@
   }
 
   .project-lantern-shell [data-mobile-check-in-welcome="true"] {
-    position: absolute !important;
-    inset: 50% 0.6rem auto !important;
-    z-index: 2 !important;
-    display: grid !important;
-    justify-items: center !important;
-    transform: translateY(-50%) !important;
-    animation: mobileCheckInWelcome 2.55s ease-in-out both !important;
-    pointer-events: none !important;
-  }
-
-  .project-lantern-shell [data-mobile-check-in-welcome="true"] p {
     max-width: 18rem !important;
-    margin: 0 auto !important;
+    margin: 0 auto -0.45rem !important;
     color: #20180d !important;
     font-family: Georgia, "Times New Roman", serif !important;
-    font-size: clamp(2.1rem, 10vw, 3rem) !important;
+    font-size: clamp(1.15rem, 5.2vw, 1.42rem) !important;
     font-weight: 500 !important;
-    letter-spacing: -0.03em !important;
-    line-height: 1.04 !important;
+    letter-spacing: -0.02em !important;
+    line-height: 1.1 !important;
     text-align: center !important;
   }
 
@@ -491,11 +480,6 @@
     backdrop-filter: none !important;
   }
 
-  @keyframes mobileCheckInWelcome {
-    0% { opacity: 0; transform: translateY(calc(-50% - 0.55rem)); }
-    22%, 100% { opacity: 1; transform: translateY(-50%); }
-  }
-
   @keyframes mobileCheckInLampShimmer {
     0%, 100% { transform: translateX(-14%) rotate(-5deg); opacity: 0.36; }
     50% { transform: translateX(14%) rotate(-5deg); opacity: 0.5; }
@@ -503,8 +487,7 @@
 }
 
 @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
-  .project-lantern-shell [data-mobile-check-in-light="true"],
-  .project-lantern-shell [data-mobile-check-in-welcome="true"] {
+  .project-lantern-shell [data-mobile-check-in-light="true"] {
     animation: none !important;
   }
 
