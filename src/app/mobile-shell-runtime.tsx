@@ -83,6 +83,16 @@ function replaceText(value: string) {
   return TEXT_REPLACEMENTS.reduce((nextValue, [pattern, replacement]) => nextValue.replace(pattern, replacement), value);
 }
 
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  })[character] ?? character);
+}
+
 function selectedMood() {
   return window.sessionStorage.getItem("projectLantern.mobileMood") || "Mystery";
 }
@@ -469,7 +479,22 @@ function moodIcon(mood: string) {
   return FALLBACK_MOOD_ICONS[mood] ?? "";
 }
 
-function buildFallbackHome(hasStory = false) {
+function latestStoryTitle(main?: HTMLElement) {
+  try {
+    const raw = window.localStorage.getItem(DEMO_LATEST_STORY_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { id?: string; title?: string };
+      if (parsed?.id === DEMO_LATEST_STORY_ID && typeof parsed.title === "string" && cleanText(parsed.title)) return cleanText(parsed.title);
+    }
+  } catch {
+    // Ignore malformed demo-story storage and fall back to visible story signals.
+  }
+  const sourceText = main ? sourceTextOutsideMobileFallback(main) : "";
+  const knownTitle = Object.keys(ART_BY_TITLE).find((title) => sourceText.includes(title));
+  return knownTitle || "The Half-Life of Magic";
+}
+
+function buildFallbackHome(hasStory = false, storyTitle = "The Half-Life of Magic") {
   const step = selectedCheckInStep();
   const answers = selectedCheckInAnswers();
   const selectedChoice = answers[step] || selectedCheckInChoice();
@@ -484,9 +509,9 @@ function buildFallbackHome(hasStory = false) {
         ${!showGate && (step > 0 || gateChoice === "new") ? `<button data-mobile-check-in-back="true" type="button" aria-label="Back to previous check-in question">Back</button>` : ""}
         ${showGate ? `
           <p data-mobile-check-in-welcome="true">Welcome back, Todd.</p>
-          <h1>${hasStory ? "Pick up where you left off,<br />or begin somewhere new." : "Begin somewhere new?"}</h1>
+          <h1>What would you like to read?</h1>
           <div data-mobile-check-in-actions="true">
-            ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue last story</button>` : ""}
+            ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue ${escapeHtml(storyTitle)}</button>` : ""}
             <button data-mobile-check-in-start="true" type="button">Start something new</button>
           </div>
         ` : isComplete ? `
@@ -502,7 +527,6 @@ function buildFallbackHome(hasStory = false) {
           </div>
         `}
       </div>
-      <p data-mobile-check-in-helper="true">Answer a few questions. Lantern will shape the story around where you are.</p>
     </section>
   `;
 }
@@ -519,8 +543,8 @@ function keepSelectedMoodVisible(fallback: HTMLElement, mood = selectedMood()) {
   });
 }
 
-function renderFallbackHome(fallback: HTMLElement, hasStory: boolean) {
-  fallback.innerHTML = buildFallbackHome(hasStory);
+function renderFallbackHome(fallback: HTMLElement, hasStory: boolean, storyTitle = "The Half-Life of Magic") {
+  fallback.innerHTML = buildFallbackHome(hasStory, storyTitle);
   fallback.dataset.mobileFallbackHasStory = String(hasStory);
   fallback.dataset.mobileFallbackMood = `${selectedCheckInGate()}:${selectedCheckInStep()}:${selectedCheckInChoice()}`;
 }
@@ -542,12 +566,12 @@ function bindFallbackHome(fallback: HTMLElement) {
     }
     if (target?.closest("[data-mobile-check-in-back='true']")) {
       goBackCheckInStep();
-      renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true");
+      renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true", fallback.dataset.mobileFallbackStoryTitle || "The Half-Life of Magic");
       return;
     }
     if (target?.closest("[data-mobile-check-in-start='true']")) {
       startNewCheckIn();
-      renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true");
+      renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true", fallback.dataset.mobileFallbackStoryTitle || "The Half-Life of Magic");
       return;
     }
     if (target?.closest("[data-mobile-check-in-final]")) {
@@ -557,7 +581,7 @@ function bindFallbackHome(fallback: HTMLElement) {
     const choice = target?.closest<HTMLElement>("[data-mobile-check-in-choice]")?.dataset.mobileCheckInChoice;
     if (choice) {
       setSelectedCheckInChoice(choice);
-      renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true");
+      renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true", fallback.dataset.mobileFallbackStoryTitle || "The Half-Life of Magic");
     }
   });
   fallback.addEventListener("keydown", (event) => {
@@ -595,8 +619,10 @@ function ensureMobileHomeFallback() {
     root.insertBefore(nextFallback, root.firstChild);
   }
   const hasStory = getHomeStorySignal(main);
+  const storyTitle = latestStoryTitle(main);
   const selectedChoice = `${selectedCheckInGate()}:${selectedCheckInStep()}:${selectedCheckInChoice()}`;
-  if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || nextFallback.dataset.mobileFallbackMood !== selectedChoice || cleanText(nextFallback.innerHTML) === "") renderFallbackHome(nextFallback, hasStory);
+  if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || nextFallback.dataset.mobileFallbackStoryTitle !== storyTitle || nextFallback.dataset.mobileFallbackMood !== selectedChoice || cleanText(nextFallback.innerHTML) === "") renderFallbackHome(nextFallback, hasStory, storyTitle);
+  nextFallback.dataset.mobileFallbackStoryTitle = storyTitle;
   bindFallbackHome(nextFallback);
   Array.from(root.children).forEach((child) => {
     const element = child as HTMLElement;
