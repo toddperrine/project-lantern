@@ -42,6 +42,7 @@ const FALLBACK_STARTS = [
   { title: "The Quiet Engine", premise: "A machine turns silence into possible futures.", tags: ["Emotional", "Sci-fi"], mood: "Emotional" }
 ];
 const FALLBACK_MOODS = ["Mystery", "Wonder", "Emotional", "Adventure", "Strange", "Hopeful", "Dark", "Reflective"];
+const CHECK_IN_CHOICES = ["Easy", "Long", "Strange", "Heavy", "Good", "I’m not sure"];
 const FALLBACK_MOOD_ICONS: Record<string, string> = {
   Mystery: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="10.5" cy="10.5" r="5.5" stroke-width="1.8"/><path d="m15 15 4.5 4.5" stroke-linecap="round" stroke-width="1.8"/></svg>`,
   Wonder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" stroke-linecap="round" stroke-width="1.8"/><path d="m12 8.5 1.05 2.15 2.35.35-1.7 1.65.4 2.35-2.1-1.1-2.1 1.1.4-2.35L8.6 11l2.35-.35L12 8.5Z" stroke-linejoin="round" stroke-width="1.5"/></svg>`,
@@ -80,6 +81,14 @@ function selectedMood() {
 
 function setSelectedMood(mood: string) {
   window.sessionStorage.setItem("projectLantern.mobileMood", mood);
+}
+
+function selectedCheckInChoice() {
+  return window.sessionStorage.getItem("projectLantern.mobileCheckInChoice") || "";
+}
+
+function setSelectedCheckInChoice(choice: string) {
+  window.sessionStorage.setItem("projectLantern.mobileCheckInChoice", choice);
 }
 
 function mappedArtKeyForTitle(title: string) {
@@ -410,31 +419,21 @@ function moodIcon(mood: string) {
   return FALLBACK_MOOD_ICONS[mood] ?? "";
 }
 
-function buildFallbackHome(hasStory: boolean) {
-  const mood = selectedMood();
+function buildFallbackHome() {
+  const selectedChoice = selectedCheckInChoice();
   return `
-    ${hasStory ? buildFallbackContinue() : ""}
-    <section data-mobile-fallback-moods="true">
-      <h2>What are you in the mood to read?</h2>
-      <p data-mobile-mood-subtext="true">${mood} picks for your next read.</p>
-      <div>${FALLBACK_MOODS.map((item) => `<button data-mobile-fallback-mood="${item}" aria-pressed="${String(item === mood)}" type="button"><span data-mobile-mood-icon="true" aria-hidden="true">${moodIcon(item)}</span><span data-mobile-mood-label="true">${item}</span></button>`).join("")}</div>
-    </section>
-    <section data-mobile-fallback-starts="true">
-      <div data-mobile-fallback-start-heading="true"><h2>Start Something New</h2></div>
-      <div data-mobile-fallback-start-list="true">
-        ${sortedStartsForMood(mood).map((story) => {
-          const artKey = artKeyForTitle(story.title);
-          return `<button data-mobile-story-row="true" data-mobile-fallback-start="${story.title}" data-mobile-art="${artKey}" type="button">
-            <span data-mobile-thumbnail="true" style="background-image:url('${artUrl(artKey)}');background-size:contain;background-repeat:no-repeat;background-position:center"></span>
-            <span data-mobile-row-copy="true">
-              <strong>${story.title}</strong>
-              <em>${story.premise}</em>
-              <span data-mobile-row-tags="true">${story.tags.slice(0, 2).map((tag) => `<span>${tag}</span>`).join("")}</span>
-            </span>
-            <span data-mobile-row-chevron="true">›</span>
-          </button>`;
-        }).join("")}
+    <section data-mobile-check-in="true" aria-label="Story check-in">
+      <div data-mobile-check-in-welcome="true">
+        <p>Welcome back, Todd.</p>
+        <p>Let’s find the story for this moment.</p>
       </div>
+      <div data-mobile-check-in-question="true">
+        <h1>How was today?</h1>
+        <div data-mobile-check-in-choices="true">
+          ${CHECK_IN_CHOICES.map((choice) => `<button data-mobile-check-in-choice="${choice}" aria-pressed="${String(choice === selectedChoice)}" type="button">${choice}</button>`).join("")}
+        </div>
+      </div>
+      <p data-mobile-check-in-helper="true">Answer a few questions. Lantern will shape the story around where you are.</p>
     </section>
   `;
 }
@@ -452,11 +451,9 @@ function keepSelectedMoodVisible(fallback: HTMLElement, mood = selectedMood()) {
 }
 
 function renderFallbackHome(fallback: HTMLElement, hasStory: boolean) {
-  fallback.innerHTML = buildFallbackHome(hasStory);
+  fallback.innerHTML = buildFallbackHome();
   fallback.dataset.mobileFallbackHasStory = String(hasStory);
-  fallback.dataset.mobileFallbackMood = selectedMood();
-  applyContinueArtwork(fallback.querySelector<HTMLElement>("[data-mobile-continue-image='true']"));
-  keepSelectedMoodVisible(fallback);
+  fallback.dataset.mobileFallbackMood = selectedCheckInChoice();
 }
 
 function bindFallbackHome(fallback: HTMLElement) {
@@ -474,19 +471,10 @@ function bindFallbackHome(fallback: HTMLElement) {
       continueLatestStory();
       return;
     }
-    const mood = target?.closest<HTMLElement>("[data-mobile-fallback-mood]")?.dataset.mobileFallbackMood;
-    if (mood) {
-      setSelectedMood(mood);
-      clickOriginalButtonByText(mood);
-      const main = document.querySelector<HTMLElement>(".project-lantern-shell main");
-      renderFallbackHome(fallback, main ? getHomeStorySignal(main) : false);
-      keepSelectedMoodVisible(fallback, mood);
-      return;
-    }
-    const start = target?.closest<HTMLElement>("[data-mobile-fallback-start]")?.dataset.mobileFallbackStart;
-    if (start) {
-      clickOriginalButtonByText(start);
-      clickMobileNav("Create");
+    const choice = target?.closest<HTMLElement>("[data-mobile-check-in-choice]")?.dataset.mobileCheckInChoice;
+    if (choice) {
+      setSelectedCheckInChoice(choice);
+      renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true");
     }
   });
   fallback.addEventListener("keydown", (event) => {
@@ -524,7 +512,7 @@ function ensureMobileHomeFallback() {
     root.insertBefore(nextFallback, root.firstChild);
   }
   const hasStory = getHomeStorySignal(main);
-  if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || nextFallback.dataset.mobileFallbackMood !== selectedMood() || cleanText(nextFallback.innerHTML) === "") renderFallbackHome(nextFallback, hasStory);
+  if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || nextFallback.dataset.mobileFallbackMood !== selectedCheckInChoice() || cleanText(nextFallback.innerHTML) === "") renderFallbackHome(nextFallback, hasStory);
   bindFallbackHome(nextFallback);
   Array.from(root.children).forEach((child) => {
     const element = child as HTMLElement;
