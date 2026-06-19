@@ -379,3 +379,171 @@
     line-height: 1.42 !important;
   }
 }
+
+@media (max-width: 767px) {
+  .project-lantern-shell [data-mobile-check-in="true"] {
+    position: relative !important;
+    isolation: isolate !important;
+    overflow: hidden !important;
+    min-height: min(31rem, calc(100svh - 12rem)) !important;
+    border-radius: 1.25rem !important;
+    padding: clamp(1.25rem, 6vw, 2rem) 0.15rem 5rem !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-light="true"] {
+    position: absolute !important;
+    inset: -18% -42% auto -42% !important;
+    z-index: -1 !important;
+    height: 22rem !important;
+    background: linear-gradient(105deg, transparent 12%, rgba(255, 244, 211, 0.18) 38%, rgba(255, 252, 244, 0.28) 50%, rgba(226, 172, 83, 0.1) 61%, transparent 84%) !important;
+    filter: blur(18px) !important;
+    opacity: 0.72 !important;
+    transform: translateX(-18%) rotate(-4deg) !important;
+    animation: mobileCheckInLampShimmer 12s ease-in-out infinite !important;
+    pointer-events: none !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-question="true"],
+  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-helper="true"] {
+    animation: mobileCheckInQuestionReveal 0.7s ease-out 2.35s both !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-welcome="true"] {
+    position: absolute !important;
+    inset: clamp(1.25rem, 7vw, 2rem) 0.2rem auto !important;
+    z-index: 2 !important;
+    animation: mobileCheckInWelcome 2.55s ease-in-out both !important;
+    pointer-events: none !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-welcome="true"] p:first-child {
+    max-width: 16rem !important;
+    font-size: clamp(2.05rem, 10vw, 3rem) !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-choices="true"] {
+    grid-template-columns: 1fr !important;
+    gap: 0.25rem !important;
+    margin-top: 0.2rem !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-choice] {
+    justify-content: flex-start !important;
+    min-height: 3.35rem !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding: 0.75rem 0.2rem !important;
+    color: #2b2113 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: clamp(1.22rem, 5.4vw, 1.52rem) !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.015em !important;
+    text-align: left !important;
+    box-shadow: none !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-choice]::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    margin-right: 0.75rem;
+    border-radius: 999px;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-choice][aria-pressed="true"] {
+    border: 0 !important;
+    background: transparent !important;
+    color: #8a5d19 !important;
+    text-decoration: underline !important;
+    text-decoration-thickness: 0.08em !important;
+    text-underline-offset: 0.28em !important;
+    box-shadow: none !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-choice][aria-pressed="true"]::before {
+    background: #d49a35;
+    box-shadow: 0 0 16px rgba(212, 154, 53, 0.62);
+  }
+
+  .project-lantern-shell [data-mobile-check-in-back="true"] {
+    justify-self: start !important;
+    min-height: 2.4rem !important;
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 0.1rem !important;
+    color: #7a6238 !important;
+    font-size: 0.9rem !important;
+    font-weight: 750 !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-actions="true"] {
+    display: grid !important;
+    gap: 0.45rem !important;
+    margin-top: 0.35rem !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-actions="true"] button {
+    min-height: 3rem !important;
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0.5rem 0.15rem !important;
+    color: #2b2113 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 1.2rem !important;
+    font-weight: 600 !important;
+    text-align: left !important;
+  }
+
+  .project-lantern-shell [data-mobile-quick-continue="true"] {
+    position: fixed !important;
+    left: 50% !important;
+    bottom: calc(4.85rem + env(safe-area-inset-bottom)) !important;
+    z-index: 48 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.38rem !important;
+    min-height: 2.35rem !important;
+    transform: translateX(-50%) !important;
+    border: 1px solid rgba(119, 83, 29, 0.14) !important;
+    border-radius: 999px !important;
+    background: rgba(255, 252, 244, 0.9) !important;
+    padding: 0.48rem 0.82rem !important;
+    color: #3a2a12 !important;
+    font-size: 0.82rem !important;
+    font-weight: 800 !important;
+    box-shadow: 0 12px 26px rgba(63, 46, 18, 0.12) !important;
+    backdrop-filter: blur(10px) !important;
+  }
+
+  @keyframes mobileCheckInWelcome {
+    0% { opacity: 0; transform: translateY(-0.55rem); }
+    18%, 68% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-0.25rem); }
+  }
+
+  @keyframes mobileCheckInQuestionReveal {
+    from { opacity: 0; transform: translateY(0.35rem); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes mobileCheckInLampShimmer {
+    0%, 100% { transform: translateX(-22%) rotate(-4deg); }
+    50% { transform: translateX(22%) rotate(-4deg); }
+  }
+}
+
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .project-lantern-shell [data-mobile-check-in-light="true"],
+  .project-lantern-shell [data-mobile-check-in-welcome="true"],
+  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-question="true"],
+  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-helper="true"] {
+    animation: none !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-light="true"] {
+    transform: none !important;
+  }
+}
