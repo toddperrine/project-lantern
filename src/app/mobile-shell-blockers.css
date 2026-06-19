@@ -330,6 +330,20 @@
     gap: 1rem !important;
   }
 
+
+  .project-lantern-shell [data-mobile-check-in-progress="true"] {
+    width: fit-content !important;
+    border-radius: 999px !important;
+    background: rgba(91, 66, 31, 0.1) !important;
+    padding: 0.34rem 0.66rem !important;
+    color: #705a35 !important;
+    font-size: 0.78rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.04em !important;
+    line-height: 1 !important;
+    text-transform: uppercase !important;
+  }
+
   .project-lantern-shell [data-mobile-check-in-question="true"] h1 {
     margin: 0 !important;
     color: #20180d !important;
@@ -368,6 +382,27 @@
     background: #f2d99d !important;
     color: #17120b !important;
     box-shadow: 0 12px 28px rgba(157, 106, 32, 0.18) !important;
+  }
+
+
+
+  .project-lantern-shell [data-mobile-check-in-actions="true"] {
+    min-height: 2.3rem !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-back="true"] {
+    display: inline-flex !important;
+    min-height: 2.3rem !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    padding: 0.4rem 0 !important;
+    color: #6d5d43 !important;
+    font-size: 0.96rem !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
   }
 
   .project-lantern-shell [data-mobile-check-in-helper="true"] {

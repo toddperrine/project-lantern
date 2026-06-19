@@ -42,7 +42,12 @@ const FALLBACK_STARTS = [
   { title: "The Quiet Engine", premise: "A machine turns silence into possible futures.", tags: ["Emotional", "Sci-fi"], mood: "Emotional" }
 ];
 const FALLBACK_MOODS = ["Mystery", "Wonder", "Emotional", "Adventure", "Strange", "Hopeful", "Dark", "Reflective"];
-const CHECK_IN_CHOICES = ["Easy", "Long", "Strange", "Heavy", "Good", "I’m not sure"];
+const CHECK_IN_STORAGE_KEY = "projectLantern.mobileCheckInAnswers.v1";
+const CHECK_IN_STEPS = [
+  { key: "today", question: "How was today?", choices: ["Easy", "Long", "Strange", "Heavy", "Good", "I’m not sure"] },
+  { key: "feeling", question: "How are you feeling now?", choices: ["Restless", "Tired", "Curious", "Hopeful", "Lonely", "Ready to escape"] },
+  { key: "help", question: "What kind of story would help?", choices: ["Something quiet", "Something mysterious", "Something beautiful", "Something funny", "Something tense", "Something that makes me feel less alone"] }
+];
 const FALLBACK_MOOD_ICONS: Record<string, string> = {
   Mystery: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="10.5" cy="10.5" r="5.5" stroke-width="1.8"/><path d="m15 15 4.5 4.5" stroke-linecap="round" stroke-width="1.8"/></svg>`,
   Wonder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" stroke-linecap="round" stroke-width="1.8"/><path d="m12 8.5 1.05 2.15 2.35.35-1.7 1.65.4 2.35-2.1-1.1-2.1 1.1.4-2.35L8.6 11l2.35-.35L12 8.5Z" stroke-linejoin="round" stroke-width="1.5"/></svg>`,
@@ -83,12 +88,35 @@ function setSelectedMood(mood: string) {
   window.sessionStorage.setItem("projectLantern.mobileMood", mood);
 }
 
-function selectedCheckInChoice() {
-  return window.sessionStorage.getItem("projectLantern.mobileCheckInChoice") || "";
+function selectedCheckInAnswers() {
+  try {
+    const parsed = JSON.parse(window.sessionStorage.getItem(CHECK_IN_STORAGE_KEY) || "{}");
+    return typeof parsed === "object" && parsed ? parsed as Record<string, string> : {};
+  } catch {
+    return {};
+  }
 }
 
-function setSelectedCheckInChoice(choice: string) {
-  window.sessionStorage.setItem("projectLantern.mobileCheckInChoice", choice);
+function selectedCheckInStepIndex(answers = selectedCheckInAnswers()) {
+  const nextIndex = CHECK_IN_STEPS.findIndex((step) => !answers[step.key]);
+  return nextIndex === -1 ? CHECK_IN_STEPS.length - 1 : nextIndex;
+}
+
+function setSelectedCheckInAnswer(stepIndex: number, choice: string) {
+  const step = CHECK_IN_STEPS[stepIndex];
+  if (!step) return;
+  const answers = selectedCheckInAnswers();
+  answers[step.key] = choice;
+  CHECK_IN_STEPS.slice(stepIndex + 1).forEach((nextStep) => delete answers[nextStep.key]);
+  window.sessionStorage.setItem(CHECK_IN_STORAGE_KEY, JSON.stringify(answers));
+}
+
+function goBackCheckInStep(stepIndex: number) {
+  if (stepIndex <= 0) return;
+  const answers = selectedCheckInAnswers();
+  delete answers[CHECK_IN_STEPS[stepIndex - 1].key];
+  CHECK_IN_STEPS.slice(stepIndex).forEach((nextStep) => delete answers[nextStep.key]);
+  window.sessionStorage.setItem(CHECK_IN_STORAGE_KEY, JSON.stringify(answers));
 }
 
 function mappedArtKeyForTitle(title: string) {
@@ -420,7 +448,10 @@ function moodIcon(mood: string) {
 }
 
 function buildFallbackHome() {
-  const selectedChoice = selectedCheckInChoice();
+  const answers = selectedCheckInAnswers();
+  const stepIndex = selectedCheckInStepIndex(answers);
+  const step = CHECK_IN_STEPS[stepIndex];
+  const selectedChoice = answers[step.key] || "";
   return `
     <section data-mobile-check-in="true" aria-label="Story check-in">
       <div data-mobile-check-in-welcome="true">
@@ -428,10 +459,14 @@ function buildFallbackHome() {
         <p>Let’s find the story for this moment.</p>
       </div>
       <div data-mobile-check-in-question="true">
-        <h1>How was today?</h1>
+        <div data-mobile-check-in-progress="true">${stepIndex + 1} of ${CHECK_IN_STEPS.length}</div>
+        <h1>${step.question}</h1>
         <div data-mobile-check-in-choices="true">
-          ${CHECK_IN_CHOICES.map((choice) => `<button data-mobile-check-in-choice="${choice}" aria-pressed="${String(choice === selectedChoice)}" type="button">${choice}</button>`).join("")}
+          ${step.choices.map((choice) => `<button data-mobile-check-in-choice="${choice}" data-mobile-check-in-step="${stepIndex}" aria-pressed="${String(choice === selectedChoice)}" type="button">${choice}</button>`).join("")}
         </div>
+      </div>
+      <div data-mobile-check-in-actions="true">
+        ${stepIndex > 0 ? `<button data-mobile-check-in-back="true" type="button">Back</button>` : ""}
       </div>
       <p data-mobile-check-in-helper="true">Answer a few questions. Lantern will shape the story around where you are.</p>
     </section>
@@ -453,7 +488,6 @@ function keepSelectedMoodVisible(fallback: HTMLElement, mood = selectedMood()) {
 function renderFallbackHome(fallback: HTMLElement, hasStory: boolean) {
   fallback.innerHTML = buildFallbackHome();
   fallback.dataset.mobileFallbackHasStory = String(hasStory);
-  fallback.dataset.mobileFallbackMood = selectedCheckInChoice();
 }
 
 function bindFallbackHome(fallback: HTMLElement) {
@@ -471,9 +505,16 @@ function bindFallbackHome(fallback: HTMLElement) {
       continueLatestStory();
       return;
     }
-    const choice = target?.closest<HTMLElement>("[data-mobile-check-in-choice]")?.dataset.mobileCheckInChoice;
+    if (target?.closest("[data-mobile-check-in-back='true']")) {
+      const stepIndex = selectedCheckInStepIndex();
+      goBackCheckInStep(stepIndex);
+      renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true");
+      return;
+    }
+    const choiceButton = target?.closest<HTMLElement>("[data-mobile-check-in-choice]");
+    const choice = choiceButton?.dataset.mobileCheckInChoice;
     if (choice) {
-      setSelectedCheckInChoice(choice);
+      setSelectedCheckInAnswer(Number(choiceButton.dataset.mobileCheckInStep || "0"), choice);
       renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true");
     }
   });
