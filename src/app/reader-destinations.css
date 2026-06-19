@@ -1,0 +1,196 @@
+.project-lantern-shell main > section > header p:first-child::after {
+  content: " v0.1.16";
+}
+
+.project-lantern-shell section:has(input[placeholder="My story project"]) {
+  gap: 1.5rem;
+}
+
+.project-lantern-shell section:has(input[placeholder="My story project"]) > div:nth-of-type(2) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.project-lantern-shell section:has(input[placeholder="My story project"]) > div:nth-of-type(2) > section:first-child {
+  order: 3;
+  border-color: rgba(246, 239, 226, 0.1);
+  background: rgba(246, 239, 226, 0.06);
+}
+
+.project-lantern-shell section:has(input[placeholder="My story project"]) > div:nth-of-type(2) > section:first-child h2 {
+  font-size: 1rem;
+  color: rgba(246, 239, 226, 0.72);
+}
+
+.project-lantern-shell section:has(input[placeholder="My story project"]) > div:nth-of-type(2) > section:nth-child(2) {
+  order: 1;
+  display: grid;
+  gap: 1rem;
+}
+
+.project-lantern-shell section:has(input[placeholder="My story project"]) > div:nth-of-type(2) > section:nth-child(2):has(article)::before {
+  content: "Continue Reading";
+  display: block;
+  color: #f6efe2;
+  font-size: clamp(1.35rem, 4vw, 2rem);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.project-lantern-shell section:has(input[placeholder="My story project"]) > div:nth-of-type(2) > section:nth-child(2):has(article)::after {
+  content: "Favorites shelf coming soon";
+  display: block;
+  min-width: 0;
+  border: 1px solid rgba(217, 164, 65, 0.2);
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, rgba(217, 164, 65, 0.12), rgba(47, 143, 139, 0.08));
+  padding: 1rem;
+  color: rgba(246, 239, 226, 0.68);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.project-lantern-shell section:has(input[placeholder="My story project"]) article {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(217, 164, 65, 0.24);
+  background:
+    linear-gradient(135deg, rgba(246, 239, 226, 0.13), rgba(246, 239, 226, 0.06)),
+    radial-gradient(circle at 88% 16%, rgba(217, 164, 65, 0.18), transparent 8rem),
+    rgba(11, 16, 32, 0.72);
+  box-shadow: 0 18px 50px rgba(5, 8, 18, 0.26);
+}
+
+.project-lantern-shell section:has(input[placeholder="My story project"]) article::before {
+  content: "";
+  display: block;
+  height: 8.5rem;
+  margin: -1rem -1rem 1rem;
+  background:
+    linear-gradient(90deg, rgba(12, 18, 31, 0.32) 0 0.55rem, transparent 0.55rem),
+    linear-gradient(145deg, #efe5cf 0%, #c9a46a 42%, #2f4f4f 100%);
+  border-bottom: 1px solid rgba(246, 239, 226, 0.16);
+}
+
+.project-lantern-shell section:has(input[placeholder="My story project"]) article h3 {
+  font-size: clamp(1.25rem, 5vw, 1.75rem);
+  line-height: 1.12;
+}
+
+.project-lantern-shell section:has(input[placeholder="My story project"]) article p:nth-of-type(2) {
+  color: rgba(246, 239, 226, 0.78);
+}
+
+.project-lantern-shell section:has(input[placeholder="My story project"]) article button:first-child {
+  background: #d9a441;
+  color: #0b1020;
+}
+
+.project-lantern-shell section:has(input[placeholder="My story project"]) article button + button {
+  border-color: rgba(246, 239, 226, 0.18);
+  color: rgba(246, 239, 226, 0.74);
+}
+
+.project-lantern-shell section:has([aria-label$="portrait artwork"]) > div:last-child > article {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(217, 164, 65, 0.2);
+  background:
+    linear-gradient(180deg, rgba(246, 239, 226, 0.13), rgba(246, 239, 226, 0.06)),
+    rgba(11, 16, 32, 0.72);
+  box-shadow: 0 18px 44px rgba(5, 8, 18, 0.22);
+}
+
+.project-lantern-shell section:has([aria-label$="portrait artwork"]) [aria-label$="portrait artwork"] {
+  width: 5.5rem;
+  height: 6.75rem;
+  border-radius: 0.9rem;
+  border-color: rgba(217, 164, 65, 0.45);
+  background:
+    radial-gradient(circle at 50% 24%, rgba(246, 239, 226, 0.28), transparent 1.6rem),
+    linear-gradient(160deg, #203246 0%, #2f8f8b 48%, #d9a441 100%);
+  color: #fff8ea;
+  box-shadow: inset 0 0 0 1px rgba(246, 239, 226, 0.12), 0 18px 36px rgba(5, 8, 18, 0.24);
+}
+
+.project-lantern-shell section:has([aria-label$="portrait artwork"]) [aria-label$="portrait artwork"] span:last-child {
+  font-size: 1.35rem;
+  text-shadow: 0 2px 12px rgba(5, 8, 18, 0.45);
+}
+
+.project-lantern-shell section:has([aria-label$="portrait artwork"]) article h3 {
+  font-size: 1.35rem;
+  line-height: 1.12;
+}
+
+.project-lantern-shell section:has([aria-label$="portrait artwork"]) article button {
+  width: fit-content;
+  border-radius: 999px;
+  border: 1px solid rgba(217, 164, 65, 0.38);
+  background: rgba(217, 164, 65, 0.12);
+  padding: 0.55rem 0.85rem;
+  text-decoration: none;
+}
+
+.project-lantern-shell section:has(> div > article [aria-label$="artwork"]):not(:has(input[placeholder="My story project"])) > div:last-child {
+  gap: 1rem;
+}
+
+.project-lantern-shell section:has(> div > article [aria-label$="artwork"]):not(:has(input[placeholder="My story project"])) article {
+  border-color: rgba(246, 239, 226, 0.16);
+  background:
+    linear-gradient(135deg, rgba(246, 239, 226, 0.12), rgba(246, 239, 226, 0.05)),
+    rgba(11, 16, 32, 0.7);
+  box-shadow: 0 18px 44px rgba(5, 8, 18, 0.22);
+}
+
+.project-lantern-shell section:has(> div > article [aria-label$="artwork"]):not(:has(input[placeholder="My story project"])) article h3 {
+  font-size: clamp(1.35rem, 4vw, 1.8rem);
+}
+
+.project-lantern-shell section:has(> div > article [aria-label$="artwork"]):not(:has(input[placeholder="My story project"])) article [aria-label$="artwork"] {
+  background:
+    linear-gradient(180deg, rgba(246, 239, 226, 0.12), transparent 52%),
+    linear-gradient(145deg, #d8ded5 0%, #2f8f8b 46%, #26364d 100%) !important;
+}
+
+.project-lantern-shell section:has(> div > article [aria-label$="artwork"]):not(:has(input[placeholder="My story project"])) article button {
+  border-radius: 999px;
+  border: 1px solid rgba(217, 164, 65, 0.38);
+  background: rgba(217, 164, 65, 0.12);
+  padding: 0.55rem 0.85rem;
+  text-decoration: none;
+}
+
+@media (min-width: 1024px) {
+  .project-lantern-shell section:has(input[placeholder="My story project"]) > div:nth-of-type(2) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(19rem, 24rem);
+    align-items: start;
+  }
+
+  .project-lantern-shell section:has(input[placeholder="My story project"]) > div:nth-of-type(2) > section:nth-child(2) {
+    order: 1;
+  }
+
+  .project-lantern-shell section:has(input[placeholder="My story project"]) > div:nth-of-type(2) > section:first-child {
+    order: 2;
+  }
+}
+
+@media (max-width: 639px) {
+  .project-lantern-shell section:has(input[placeholder="My story project"]) article::before {
+    height: 7.25rem;
+  }
+
+  .project-lantern-shell section:has(input[placeholder="My story project"]) article button,
+  .project-lantern-shell section:has([aria-label$="portrait artwork"]) article button,
+  .project-lantern-shell section:has(> div > article [aria-label$="artwork"]):not(:has(input[placeholder="My story project"])) article button {
+    width: 100%;
+    text-align: center;
+  }
+}
