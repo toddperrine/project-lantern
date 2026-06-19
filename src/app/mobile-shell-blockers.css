@@ -275,25 +275,25 @@
     overflow: hidden !important;
     min-height: 100svh !important;
     background:
-      radial-gradient(circle at 18% 44%, rgba(255, 232, 174, 0.34), transparent 18rem),
-      radial-gradient(circle at 88% 68%, rgba(120, 155, 148, 0.11), transparent 15rem),
-      radial-gradient(circle at 76% 82%, rgba(136, 103, 150, 0.09), transparent 14rem),
-      linear-gradient(180deg, #0f1115 0%, #11100e 28%, rgba(87, 73, 48, 0.72) 43%, #fff8ea 62%, #fbf7ef 100%) !important;
+      radial-gradient(ellipse at 18% 48%, rgba(255, 232, 174, 0.26), transparent 20rem),
+      radial-gradient(ellipse at 88% 70%, rgba(104, 144, 139, 0.12), transparent 17rem),
+      radial-gradient(ellipse at 74% 84%, rgba(128, 98, 145, 0.1), transparent 16rem),
+      linear-gradient(180deg, #0b0f16 0%, #11100e 26%, #252017 39%, #7f6b48 52%, #f4e7cf 66%, #fff8ea 82%, #fbf7ef 100%) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"]::before {
     content: "";
     position: absolute;
-    inset: 30% -42% calc(5.5rem + env(safe-area-inset-bottom)) -42%;
+    inset: 39% -46% calc(5.5rem + env(safe-area-inset-bottom)) -46%;
     z-index: 0;
     background:
-      linear-gradient(104deg, transparent 2%, rgba(255, 255, 244, 0.36) 14%, transparent 29%),
-      linear-gradient(112deg, transparent 22%, rgba(116, 153, 147, 0.16) 36%, rgba(255, 246, 216, 0.46) 50%, transparent 65%),
-      linear-gradient(72deg, transparent 48%, rgba(126, 98, 145, 0.12) 59%, rgba(255, 238, 190, 0.3) 71%, transparent 84%);
-    filter: blur(22px);
-    opacity: 0.72;
-    transform: translate3d(-7%, 0, 0) rotate(-3deg);
-    animation: mobileHomeLightDrift 16s ease-in-out infinite alternate;
+      linear-gradient(104deg, transparent 3%, rgba(255, 255, 244, 0.3) 15%, transparent 31%),
+      linear-gradient(112deg, transparent 24%, rgba(104, 144, 139, 0.13) 38%, rgba(255, 246, 216, 0.38) 52%, transparent 68%),
+      linear-gradient(72deg, transparent 50%, rgba(126, 98, 145, 0.1) 61%, rgba(255, 238, 190, 0.26) 74%, transparent 88%);
+    filter: blur(26px);
+    opacity: 0.58;
+    transform: translate3d(-9%, 0, 0) rotate(-3deg);
+    animation: mobileHomeLightDrift 18s ease-in-out infinite alternate;
     pointer-events: none;
   }
 
@@ -317,14 +317,15 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] {
     gap: 0 !important;
     min-height: calc(100svh - 12.25rem - env(safe-area-inset-bottom)) !important;
-    padding: clamp(1rem, 4vw, 1.6rem) 0 0 !important;
+    padding: clamp(0.6rem, 3vw, 1.1rem) 0 0 !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
     box-shadow: none !important;
+    outline: none !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in="true"] {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"] {
     position: relative !important;
     isolation: isolate !important;
     display: grid !important;
@@ -332,18 +333,20 @@
     justify-items: center !important;
     width: 100% !important;
     min-width: 0 !important;
-    min-height: min(34rem, calc(100svh - 14rem - env(safe-area-inset-bottom))) !important;
+    min-height: min(33rem, calc(100svh - 14rem - env(safe-area-inset-bottom))) !important;
     overflow: visible !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
-    padding: clamp(4.8rem, 20vw, 7.6rem) 0.35rem calc(3.2rem + env(safe-area-inset-bottom)) !important;
+    padding: clamp(5.4rem, 22vw, 8.2rem) 1rem calc(3.2rem + env(safe-area-inset-bottom)) !important;
     color: #18130c !important;
     text-align: center !important;
     box-shadow: none !important;
+    outline: none !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-light="true"] {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-light="true"] {
+    display: none !important;
     position: absolute !important;
     inset: 18% -24% 10% -24% !important;
     z-index: -1 !important;
@@ -357,41 +360,42 @@
     pointer-events: none !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-welcome="true"] {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-welcome="true"] {
     max-width: 20rem !important;
     margin: 0 auto -0.2rem !important;
-    color: #f4dfad !important;
+    color: rgba(33, 25, 13, 0.76) !important;
     font-family: Georgia, "Times New Roman", serif !important;
-    font-size: clamp(1.1rem, 4.5vw, 1.28rem) !important;
+    font-size: clamp(1rem, 4vw, 1.18rem) !important;
     font-weight: 500 !important;
     letter-spacing: -0.02em !important;
     line-height: 1.12 !important;
     text-align: center !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-question="true"] {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-question="true"] {
     display: grid !important;
     justify-items: center !important;
     gap: clamp(1.45rem, 6vw, 2.1rem) !important;
     width: min(100%, 23rem) !important;
+    padding-inline: 0.35rem !important;
     margin: auto !important;
     text-align: center !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-question="true"] h1 {
-    max-width: 21rem !important;
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-question="true"] h1 {
+    max-width: 22rem !important;
     margin: 0 auto !important;
     color: #1c150b !important;
     font-family: Georgia, "Times New Roman", serif !important;
-    font-size: clamp(2.2rem, 10.2vw, 2.75rem) !important;
+    font-size: clamp(2.25rem, 9.8vw, 2.8rem) !important;
     font-weight: 500 !important;
     letter-spacing: -0.045em !important;
-    line-height: 1.02 !important;
+    line-height: 1.08 !important;
     text-align: center !important;
   }
 
 
-  .project-lantern-shell [data-mobile-check-in-choices="true"] {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-choices="true"] {
     display: flex !important;
     flex-wrap: wrap !important;
     justify-content: center !important;
@@ -400,7 +404,7 @@
     margin: 0.2rem auto 0 !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-choice] {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-choice] {
     position: relative !important;
     display: inline-flex !important;
     align-items: center !important;
@@ -421,7 +425,7 @@
     box-shadow: none !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-choice]::before {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-choice]::before {
     content: "";
     position: absolute;
     bottom: 0.34rem;
@@ -434,7 +438,7 @@
     box-shadow: none;
   }
 
-  .project-lantern-shell [data-mobile-check-in-choice][aria-pressed="true"] {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-choice][aria-pressed="true"] {
     border: 0 !important;
     background: transparent !important;
     color: #8a5d19 !important;
@@ -445,12 +449,12 @@
     box-shadow: none !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-choice][aria-pressed="true"]::before {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-choice][aria-pressed="true"]::before {
     background: rgba(212, 154, 53, 0.86);
     box-shadow: 0 0 12px rgba(212, 154, 53, 0.46);
   }
 
-  .project-lantern-shell [data-mobile-check-in-helper="true"] {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-helper="true"] {
     max-width: 18rem !important;
     margin: 0 auto !important;
     color: rgba(40, 33, 24, 0.62) !important;
@@ -460,7 +464,7 @@
     text-align: center !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-back="true"] {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-back="true"] {
     justify-self: center !important;
     min-height: 2.35rem !important;
     border: 0 !important;
@@ -471,13 +475,13 @@
     font-weight: 650 !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-actions="true"] {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-actions="true"] {
     display: grid !important;
-    width: min(100%, 21rem) !important;
+    width: min(100%, 24rem) !important;
     margin-top: 0.1rem !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-actions="true"] button {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-actions="true"] button {
     position: relative !important;
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) auto !important;
@@ -491,18 +495,18 @@
     padding: 0.74rem 0.1rem !important;
     color: #1a140c !important;
     font-family: Georgia, "Times New Roman", serif !important;
-    font-size: clamp(1.22rem, 5.4vw, 1.46rem) !important;
+    font-size: clamp(1.25rem, 5vw, 1.5rem) !important;
     font-weight: 500 !important;
     line-height: 1.12 !important;
     text-align: left !important;
     box-shadow: none !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-actions="true"] button + button {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-actions="true"] button + button {
     border-top: 1px solid rgba(150, 106, 35, 0.24) !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-actions="true"] button::after {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-actions="true"] button::after {
     content: "›";
     color: #9a6b22;
     font-size: 1.45rem;
@@ -510,8 +514,8 @@
   }
 
   @keyframes mobileHomeLightDrift {
-    from { transform: translate3d(-8%, 0, 0) rotate(-2deg); }
-    to { transform: translate3d(8%, 0, 0) rotate(-2deg); }
+    from { transform: translate3d(-9%, 0, 0) rotate(-3deg); }
+    to { transform: translate3d(9%, 0, 0) rotate(-3deg); }
   }
 
   @keyframes mobileGateLightDrift {
@@ -523,12 +527,12 @@
 
 @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
   .project-lantern-shell main[data-mobile-active-view="home"]::before,
-  .project-lantern-shell [data-mobile-check-in-light="true"] {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-light="true"] {
     animation: none !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"]::before,
-  .project-lantern-shell [data-mobile-check-in-light="true"] {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-light="true"] {
     transform: none !important;
   }
 }
