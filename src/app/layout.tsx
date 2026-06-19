@@ -12,7 +12,7 @@ import "./reader-destinations.css";
 import "./characters-card-layout.css";
 
 export const metadata: Metadata = {
-  title: "Project Lantern",
+  title: "Lantyrn",
   description: "A personalized streaming home for Living Series, Episodes, and story worlds."
 };
 

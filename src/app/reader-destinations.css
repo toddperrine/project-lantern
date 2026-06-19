@@ -1,5 +1,5 @@
 .project-lantern-shell main > section > header p:first-child::after {
-  content: " v0.7.75";
+  content: " v0.7.76";
 }
 
 .project-lantern-shell section:has(input[placeholder="My story project"]) {

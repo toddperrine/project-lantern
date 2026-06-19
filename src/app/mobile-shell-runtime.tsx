@@ -413,7 +413,7 @@ function openMobileMenu() {
     menu.dataset.mobileMenu = "true";
     menu.setAttribute("role", "dialog");
     menu.setAttribute("aria-modal", "true");
-    menu.setAttribute("aria-label", "Project Lantern menu");
+    menu.setAttribute("aria-label", "Lantyrn menu");
     document.body.appendChild(menu);
     menu.addEventListener("click", (event) => {
       const target = event.target instanceof Element ? event.target : null;
@@ -443,7 +443,7 @@ function openMobileMenu() {
   menu.innerHTML = `
     <div data-mobile-menu-sheet="true">
       <div data-mobile-menu-header="true">
-        <p>Project Lantern</p>
+        <p>Lantyrn</p>
         <button data-mobile-menu-close="true" type="button" aria-label="Close menu">×</button>
       </div>
       <div data-mobile-menu-list="true">

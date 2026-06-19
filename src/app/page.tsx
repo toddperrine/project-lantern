@@ -410,7 +410,7 @@ export default function Home() {
         <MobileTopHeader />
         <header className="hidden min-w-0 flex-col gap-5 border-b border-paper/10 pb-6 md:flex md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold sm:tracking-[0.22em]">Project Lantern</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold sm:tracking-[0.22em]">Lantyrn</p>
             <h1 className="mt-2 max-w-4xl text-3xl font-semibold leading-tight tracking-tight text-paper md:text-5xl">Living stories, ready when you are</h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-paper/70">Open the latest episode, remember what mattered, and choose what kind of story should find you next.</p>
           </div>
@@ -516,7 +516,7 @@ function WorldsView({ onOpenStory }: { onOpenStory: (story: StoryStart) => void 
 }
 
 function MobileTopHeader() {
-  return <header className="flex min-w-0 items-center justify-between py-1 md:hidden"><button aria-label="Open menu" className="flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-xl text-paper" type="button">☰</button><p className="min-w-0 truncate text-center text-base font-semibold text-paper">Project Lantern</p><button aria-label="Open profile" className="flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-lg text-paper" type="button">♡</button></header>;
+  return <header className="flex min-w-0 items-center justify-between py-1 md:hidden"><button aria-label="Open menu" className="flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-xl text-paper" type="button">☰</button><p className="min-w-0 truncate text-center text-base font-semibold text-paper">Lantyrn</p><button aria-label="Open profile" className="flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-lg text-paper" type="button">♡</button></header>;
 }
 
 function MobileBottomNav({ activeView, onChange }: { activeView: AppView; onChange: (view: AppView) => void }) {

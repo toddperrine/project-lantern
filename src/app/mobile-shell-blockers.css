@@ -273,23 +273,27 @@
   .project-lantern-shell main[data-mobile-active-view="home"] {
     position: relative !important;
     overflow: hidden !important;
+    min-height: 100svh !important;
     background:
-      linear-gradient(180deg, #101419 0%, #15181c 31%, rgba(36, 33, 27, 0.92) 34%, rgba(249, 236, 205, 0.88) 37%, #fff6df 62%, #f3e5c4 100%) !important;
+      radial-gradient(circle at 18% 44%, rgba(255, 232, 174, 0.34), transparent 18rem),
+      radial-gradient(circle at 88% 68%, rgba(120, 155, 148, 0.11), transparent 15rem),
+      radial-gradient(circle at 76% 82%, rgba(136, 103, 150, 0.09), transparent 14rem),
+      linear-gradient(180deg, #0f1115 0%, #11100e 28%, rgba(87, 73, 48, 0.72) 43%, #fff8ea 62%, #fbf7ef 100%) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"]::before {
     content: "";
     position: absolute;
-    inset: 28% -34% calc(5.5rem + env(safe-area-inset-bottom)) -34%;
+    inset: 30% -42% calc(5.5rem + env(safe-area-inset-bottom)) -42%;
     z-index: 0;
     background:
-      linear-gradient(104deg, transparent 4%, rgba(255, 255, 244, 0.44) 15%, transparent 27%),
-      linear-gradient(112deg, transparent 21%, rgba(123, 153, 146, 0.18) 35%, rgba(255, 250, 226, 0.5) 47%, transparent 61%),
-      linear-gradient(72deg, transparent 48%, rgba(124, 94, 139, 0.14) 58%, rgba(255, 244, 205, 0.34) 69%, transparent 82%);
-    filter: blur(18px);
-    opacity: 0.64;
-    transform: translate3d(-5%, 0, 0) rotate(-2deg);
-    animation: mobileHomeLightDrift 14s ease-in-out infinite alternate;
+      linear-gradient(104deg, transparent 2%, rgba(255, 255, 244, 0.36) 14%, transparent 29%),
+      linear-gradient(112deg, transparent 22%, rgba(116, 153, 147, 0.16) 36%, rgba(255, 246, 216, 0.46) 50%, transparent 65%),
+      linear-gradient(72deg, transparent 48%, rgba(126, 98, 145, 0.12) 59%, rgba(255, 238, 190, 0.3) 71%, transparent 84%);
+    filter: blur(22px);
+    opacity: 0.72;
+    transform: translate3d(-7%, 0, 0) rotate(-3deg);
+    animation: mobileHomeLightDrift 16s ease-in-out infinite alternate;
     pointer-events: none;
   }
 
@@ -328,12 +332,12 @@
     justify-items: center !important;
     width: 100% !important;
     min-width: 0 !important;
-    min-height: min(32rem, calc(100svh - 15rem - env(safe-area-inset-bottom))) !important;
+    min-height: min(34rem, calc(100svh - 14rem - env(safe-area-inset-bottom))) !important;
     overflow: visible !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
-    padding: clamp(3.9rem, 18vw, 7rem) 0.35rem calc(3.2rem + env(safe-area-inset-bottom)) !important;
+    padding: clamp(4.8rem, 20vw, 7.6rem) 0.35rem calc(3.2rem + env(safe-area-inset-bottom)) !important;
     color: #18130c !important;
     text-align: center !important;
     box-shadow: none !important;
@@ -356,7 +360,7 @@
   .project-lantern-shell [data-mobile-check-in-welcome="true"] {
     max-width: 20rem !important;
     margin: 0 auto -0.2rem !important;
-    color: #21180c !important;
+    color: #f4dfad !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1.1rem, 4.5vw, 1.28rem) !important;
     font-weight: 500 !important;
