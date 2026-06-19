@@ -10,12 +10,13 @@
 
 ### Workflow
 
-- Use the connected GitHub repository workflow.
-- Do not use local shell commands unless explicitly requested.
-- Do not use local worktrees unless explicitly requested.
-- Do not use PowerShell unless explicitly requested.
-- Do not depend on local filesystem paths.
-- Inspect, edit, commit, push, and open PRs through GitHub-connected tools.
+- For Codex Web tasks, edit only the provided cloud checkout.
+- Do not access local Windows paths.
+- Do not add, replace, or modify Git remotes.
+- Do not run git push from the shell.
+- Make one focused change only.
+- Leave the completed diff ready for the Codex Create PR action.
+- Do not claim that a PR exists unless the platform confirms it.
 
 ### Product Rules
 
@@ -53,12 +54,11 @@ Do not modify unless explicitly requested:
 
 ### Validation
 
-Before marking a PR complete:
+- Run builds, typecheck, lint, or tests only when the task explicitly requests them.
+- Vercel preview validation occurs after the PR is created.
+- Mobile UI validation occurs on the production or preview deployment.
+- Preserve unrelated pages and existing functionality.
 
-- Confirm the app builds.
-- Confirm Vercel preview succeeds.
-- Confirm existing functionality remains intact.
-- Confirm version badge is visible and updated.
 
 ### Versioning
 
@@ -67,8 +67,9 @@ Before marking a PR complete:
 
 ### Build Discipline
 
-- Do not mark a task complete if Vercel deployment fails.
-- Fix build and type errors before requesting review.
+- Do not attempt to inspect Vercel before a PR exists.
+- Report files changed and version changes accurately.
+- The user will create the PR using the Codex Create PR button.
 
 ### Story System Direction
 
