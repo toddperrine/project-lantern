@@ -38,7 +38,7 @@ textarea {
 }
 
 .project-lantern-shell main > section > header p:first-child::after {
-  content: " v0.1.5";
+  content: " v0.1.6";
   margin-left: 0.65rem;
   color: rgba(246, 239, 226, 0.46);
   font-size: 0.72em;
@@ -375,6 +375,108 @@ textarea {
   .project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > p,
   .project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > button {
     margin-inline: 1rem;
+  }
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) {
+  display: block;
+  min-height: auto;
+  overflow: visible;
+  padding: 1rem;
+  border-color: rgba(246, 239, 226, 0.12);
+  background: rgba(246, 239, 226, 0.1);
+  box-shadow: none;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"])::before,
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"])::after {
+  content: none;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > div:first-child {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > div:first-child > div:not([aria-label$="portrait artwork"]) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) [aria-label$="portrait artwork"] {
+  width: 5rem !important;
+  height: 5rem !important;
+  min-height: 0 !important;
+  aspect-ratio: 1 / 1 !important;
+  flex: 0 0 5rem;
+  border-color: rgba(217, 164, 65, 0.35) !important;
+  background: #1B1A17 !important;
+  box-shadow: none;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) [aria-label$="portrait artwork"] > span:last-child {
+  align-self: auto;
+  margin-bottom: 0;
+  color: #D9A441;
+  font-size: 1.25rem;
+  letter-spacing: 0;
+  text-shadow: none;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) h3 {
+  font-size: 1.125rem;
+  line-height: 1.4;
+  color: #F6EFE2;
+  text-shadow: none;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) h3 + p {
+  color: #D9A441;
+  line-height: 1.45;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > p,
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > button {
+  position: static;
+  margin-inline: 0;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > p {
+  color: rgba(246, 239, 226, 0.7);
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > p:last-of-type {
+  margin-top: 1rem;
+  color: rgba(246, 239, 226, 0.45);
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > button {
+  display: inline-flex;
+  width: fit-content;
+  min-width: 0;
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+  align-items: center;
+  border: 1px solid rgba(217, 164, 65, 0.35);
+  border-radius: 999px;
+  background: rgba(217, 164, 65, 0.1);
+  padding: 0.35rem 0.7rem;
+  text-decoration: none;
+}
+
+@media (max-width: 639px) {
+  .project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) {
+    padding: 1rem;
+  }
+
+  .project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > div:first-child {
+    padding: 0;
+  }
+
+  .project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > button {
+    width: fit-content;
   }
 }
 
