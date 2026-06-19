@@ -49,6 +49,7 @@ const CHECK_IN_CHOICES = [
 ];
 const CHECK_IN_STEPS = ["How was today?", "How are you feeling now?", "What kind of story would help?"];
 const CHECK_IN_WELCOME_SEEN_KEY = "projectLantern.mobileCheckInWelcomeSeen";
+const CHECK_IN_WELCOME_DURATION_MS = 3000;
 let mobileCheckInWelcomeShownThisLoad = false;
 const CHECK_IN_STEP_KEY = "projectLantern.mobileCheckInStep";
 const CHECK_IN_ANSWERS_KEY = "projectLantern.mobileCheckInAnswers";
@@ -98,8 +99,8 @@ function selectedCheckInChoice() {
 
 function selectedCheckInStep() {
   const parsed = Number(window.sessionStorage.getItem(CHECK_IN_STEP_KEY) || "0");
-  if (!Number.isFinite(parsed)) return 0;
-  return Math.min(Math.max(parsed, 0), CHECK_IN_STEPS.length);
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > CHECK_IN_STEPS.length) return 0;
+  return parsed;
 }
 
 function selectedCheckInAnswers() {
@@ -126,9 +127,10 @@ function goBackCheckInStep() {
 
 function shouldShowCheckInWelcome() {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
-  window.sessionStorage.removeItem(CHECK_IN_WELCOME_SEEN_KEY);
+  if (window.sessionStorage.getItem(CHECK_IN_WELCOME_SEEN_KEY) === "true") return false;
   if (mobileCheckInWelcomeShownThisLoad) return false;
   mobileCheckInWelcomeShownThisLoad = true;
+  window.sessionStorage.setItem(CHECK_IN_WELCOME_SEEN_KEY, "true");
   return true;
 }
 
@@ -470,25 +472,26 @@ function buildFallbackHome(hasStory = false) {
   return `
     <section data-mobile-check-in="true" data-mobile-check-in-show-welcome="${String(showWelcome)}" aria-label="Story check-in">
       <div data-mobile-check-in-light="true" aria-hidden="true"></div>
-      ${showWelcome ? `<div data-mobile-check-in-welcome="true"><p>Welcome back, Todd.</p></div>` : ""}
-      <div data-mobile-check-in-question="true">
-        ${step > 0 ? `<button data-mobile-check-in-back="true" type="button" aria-label="Back to previous check-in question">Back</button>` : ""}
-        ${isComplete ? `
-          <h1>Ready when you are.</h1>
-          <div data-mobile-check-in-actions="true">
-            ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue</button>` : ""}
-            <button data-mobile-check-in-final="start" type="button">Start New</button>
-            <button data-mobile-check-in-final="surprise" type="button">Surprise</button>
-          </div>
-        ` : `
-          <h1>${CHECK_IN_STEPS[step]}</h1>
-          <div data-mobile-check-in-choices="true">
-            ${activeChoices.map((choice) => `<button data-mobile-check-in-choice="${choice}" aria-pressed="${String(choice === selectedChoice)}" type="button">${choice}</button>`).join("")}
-          </div>
-        `}
-      </div>
-      <p data-mobile-check-in-helper="true">Answer a few questions. Lantern will shape the story around where you are.</p>
-      ${hasStory ? `<button data-mobile-quick-continue="true" data-mobile-continue-action="true" type="button" aria-label="Continue last story"><span>Continue last story</span><span aria-hidden="true">→</span></button>` : ""}
+      ${showWelcome ? `<div data-mobile-check-in-welcome="true"><p>Welcome back, Todd.</p></div>` : `
+        <div data-mobile-check-in-question="true">
+          ${step > 0 ? `<button data-mobile-check-in-back="true" type="button" aria-label="Back to previous check-in question">Back</button>` : ""}
+          ${isComplete ? `
+            <h1>Ready when you are.</h1>
+            <div data-mobile-check-in-actions="true">
+              ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue</button>` : ""}
+              <button data-mobile-check-in-final="start" type="button">Start New</button>
+              <button data-mobile-check-in-final="surprise" type="button">Surprise</button>
+            </div>
+          ` : `
+            <h1>${CHECK_IN_STEPS[step]}</h1>
+            <div data-mobile-check-in-choices="true">
+              ${activeChoices.map((choice) => `<button data-mobile-check-in-choice="${choice}" aria-pressed="${String(choice === selectedChoice)}" type="button">${choice}</button>`).join("")}
+            </div>
+          `}
+        </div>
+        <p data-mobile-check-in-helper="true">Answer a few questions. Lantern will shape the story around where you are.</p>
+        ${hasStory ? `<button data-mobile-quick-continue="true" data-mobile-continue-action="true" type="button" aria-label="Continue last story"><span>Continue last story</span><span aria-hidden="true">→</span></button>` : ""}
+      `}
     </section>
   `;
 }
@@ -505,10 +508,21 @@ function keepSelectedMoodVisible(fallback: HTMLElement, mood = selectedMood()) {
   });
 }
 
+function scheduleCheckInWelcomeTransition(fallback: HTMLElement, hasStory: boolean) {
+  if (!fallback.querySelector("[data-mobile-check-in-welcome='true']")) return;
+  if (fallback.dataset.mobileCheckInWelcomeTimer === "true") return;
+  fallback.dataset.mobileCheckInWelcomeTimer = "true";
+  window.setTimeout(() => {
+    delete fallback.dataset.mobileCheckInWelcomeTimer;
+    renderFallbackHome(fallback, hasStory);
+  }, CHECK_IN_WELCOME_DURATION_MS);
+}
+
 function renderFallbackHome(fallback: HTMLElement, hasStory: boolean) {
   fallback.innerHTML = buildFallbackHome(hasStory);
   fallback.dataset.mobileFallbackHasStory = String(hasStory);
   fallback.dataset.mobileFallbackMood = `${selectedCheckInStep()}:${selectedCheckInChoice()}`;
+  scheduleCheckInWelcomeTransition(fallback, hasStory);
 }
 
 function bindFallbackHome(fallback: HTMLElement) {
