@@ -43,14 +43,14 @@ const FALLBACK_STARTS = [
 ];
 const FALLBACK_MOODS = ["Mystery", "Wonder", "Emotional", "Adventure", "Strange", "Hopeful", "Dark", "Reflective"];
 const FALLBACK_MOOD_ICONS: Record<string, string> = {
-  Mystery: "?",
-  Wonder: "*",
-  Emotional: "~",
-  Adventure: ">",
-  Strange: "!",
-  Hopeful: "+",
-  Dark: "-",
-  Reflective: "o"
+  Mystery: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="10.5" cy="10.5" r="5.5" stroke-width="1.8"/><path d="m15 15 4.5 4.5" stroke-linecap="round" stroke-width="1.8"/></svg>`,
+  Wonder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" stroke-linecap="round" stroke-width="1.8"/><path d="m12 8.5 1.05 2.15 2.35.35-1.7 1.65.4 2.35-2.1-1.1-2.1 1.1.4-2.35L8.6 11l2.35-.35L12 8.5Z" stroke-linejoin="round" stroke-width="1.5"/></svg>`,
+  Emotional: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 20.2s-7-4.1-8.6-8.6C2.3 8.4 4.2 5.5 7.3 5.5c1.8 0 3.1 1 4.7 2.8 1.6-1.8 2.9-2.8 4.7-2.8 3.1 0 5 2.9 3.9 6.1C19 16.1 12 20.2 12 20.2Z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg>`,
+  Adventure: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m3 18 6.2-10 4.3 6.7 2-3.1L21 18H3Z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/><path d="m8.7 11.4 1.7 1.2 1.2-1.7" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg>`,
+  Strange: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M3.2 12s3.2-5.2 8.8-5.2 8.8 5.2 8.8 5.2-3.2 5.2-8.8 5.2S3.2 12 3.2 12Z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/><circle cx="12" cy="12" r="2.4" stroke-width="1.8"/></svg>`,
+  Hopeful: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 20V9" stroke-linecap="round" stroke-width="1.8"/><path d="M12 12.2C9.1 12 6.8 10 6.2 6.2 10 6.5 12 8.6 12 12.2Z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/><path d="M12 14.2c2.9-.2 5.2-2.2 5.8-6-3.8.3-5.8 2.4-5.8 6Z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg>`,
+  Dark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M18.5 16.8A7.4 7.4 0 0 1 10.1 5a7.6 7.6 0 1 0 8.4 11.8Z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg>`,
+  Reflective: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><ellipse cx="12" cy="12" rx="3" ry="1.45" stroke-width="1.8"/><ellipse cx="12" cy="12" rx="6.4" ry="3.15" stroke-width="1.8"/><path d="M3 12c1.8-3.2 5.1-5.1 9-5.1s7.2 1.9 9 5.1c-1.8 3.2-5.1 5.1-9 5.1S4.8 15.2 3 12Z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg>`
 };
 const DEMO_STORY_TEXT = [
   "A forgotten talisman from an estate sale begins to hum with a magic that should have died years ago.",
@@ -389,6 +389,7 @@ function openMobileMenu() {
 function buildFallbackContinue() {
   return `
     <section data-mobile-fallback-continue="true" data-mobile-continue-card="true">
+      <h2 data-mobile-continue-heading="true">Continue Reading</h2>
       <div data-mobile-continue-image="true" data-mobile-continue-action="true" role="button" tabindex="0" aria-label="Continue The Half-Life of Magic">
         <div data-mobile-continue-copy="true">
           <p>Chapter 1 • 8 min read</p>
@@ -406,7 +407,7 @@ function sortedStartsForMood(mood: string) {
 }
 
 function moodIcon(mood: string) {
-  return FALLBACK_MOOD_ICONS[mood] ?? "*";
+  return FALLBACK_MOOD_ICONS[mood] ?? "";
 }
 
 function buildFallbackHome(hasStory: boolean) {
@@ -529,20 +530,6 @@ function ensureMobileHomeFallback() {
   });
 }
 
-function ensureReferenceContinueCard() {
-  const main = document.querySelector<HTMLElement>(".project-lantern-shell main[data-mobile-active-view='home']");
-  if (!main || !getHomeStorySignal(main) || main.querySelector("[data-mobile-continue-card='true']")) return;
-  const homeContent = main.querySelector<HTMLElement>(":scope > section > div > .md\\:hidden > div, :scope > section > div > div > div");
-  const moodSection = Array.from(main.querySelectorAll<HTMLElement>("section")).find((section) => section.textContent?.includes("What are you in the mood"));
-  const parent = homeContent ?? moodSection?.parentElement;
-  if (!parent) return;
-  const section = document.createElement("section");
-  section.dataset.mobileContinueCard = "true";
-  section.innerHTML = buildFallbackContinue();
-  parent.insertBefore(section, parent.firstElementChild);
-  applyContinueArtwork(section.querySelector<HTMLElement>("[data-mobile-continue-image='true']"));
-}
-
 function markHomeCards() {
   const main = document.querySelector<HTMLElement>(".project-lantern-shell main[data-mobile-active-view='home']");
   if (!main) return;
@@ -656,7 +643,6 @@ function applyMobileShell(mobileQuery: MediaQueryList) {
   normalizeMobileNav();
   markActiveMobileView();
   hideDemoMessages();
-  ensureReferenceContinueCard();
   markHomeCards();
   ensureMobileHomeFallback();
   markLibraryPage();

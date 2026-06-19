@@ -39,13 +39,13 @@
     box-shadow: none !important;
   }
 
-  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-card="true"]::before {
-    content: "Continue Reading";
-    color: #171510;
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 1.18rem;
-    font-weight: 500;
-    line-height: 1.18;
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-heading="true"] {
+    margin: 0 !important;
+    color: #171510 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 1.18rem !important;
+    font-weight: 500 !important;
+    line-height: 1.18 !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] {
@@ -235,6 +235,13 @@
     font-size: 0.95rem !important;
     font-weight: 850 !important;
     line-height: 1 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-mood-icon="true"] svg {
+    display: block !important;
+    width: 1.45rem !important;
+    height: 1.45rem !important;
+    margin: auto !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-mood-label="true"] {
