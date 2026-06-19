@@ -516,9 +516,12 @@ function ensureMobileHomeFallback() {
   if (!nextFallback) {
     nextFallback = document.createElement("section");
     nextFallback.dataset.mobileHomeFallback = "true";
-    const firstHeader = root.querySelector(":scope > header");
-    if (firstHeader?.nextSibling) root.insertBefore(nextFallback, firstHeader.nextSibling);
-    else root.insertBefore(nextFallback, root.firstChild);
+  }
+  const firstHeader = root.querySelector(":scope > header");
+  if (firstHeader) {
+    root.insertBefore(nextFallback, firstHeader.nextSibling);
+  } else {
+    root.insertBefore(nextFallback, root.firstChild);
   }
   const hasStory = getHomeStorySignal(main);
   if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || nextFallback.dataset.mobileFallbackMood !== selectedMood() || cleanText(nextFallback.innerHTML) === "") renderFallbackHome(nextFallback, hasStory);

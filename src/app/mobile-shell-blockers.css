@@ -15,8 +15,10 @@
   }
 
   .project-lantern-shell [data-mobile-home-fallback="true"] {
-    display: grid !important;
-    gap: 1.18rem !important;
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1rem !important;
     width: 100% !important;
     min-width: 0 !important;
     padding-top: 0.3rem !important;
