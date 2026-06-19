@@ -504,17 +504,19 @@ function buildFallbackHome(hasStory = false, storyTitle = "The Half-Life of Magi
   const isComplete = !showGate && step >= CHECK_IN_STEPS.length;
   return `
     <section data-mobile-check-in="true" aria-label="Story check-in">
-      <div data-mobile-check-in-light="true" aria-hidden="true"></div>
-      <div data-mobile-check-in-question="true">
-        ${!showGate && (step > 0 || gateChoice === "new") ? `<button data-mobile-check-in-back="true" type="button" aria-label="Back to previous check-in question">Back</button>` : ""}
-        ${showGate ? `
-          <p data-mobile-check-in-welcome="true">Welcome back, Todd.</p>
-          <h1>What would you like to read?</h1>
-          <div data-mobile-check-in-actions="true">
+      ${showGate ? `
+        <section data-mobile-home-gate="true">
+          <p data-mobile-gate-welcome="true">Welcome back, Todd.</p>
+          <h1 data-mobile-gate-question="true">What would you like to read?</h1>
+          <div data-mobile-gate-actions="true">
             ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue ${escapeHtml(storyTitle)}</button>` : ""}
             <button data-mobile-check-in-start="true" type="button">Start something new</button>
           </div>
-        ` : isComplete ? `
+        </section>
+      ` : `
+      <div data-mobile-check-in-question="true">
+        ${!showGate && (step > 0 || gateChoice === "new") ? `<button data-mobile-check-in-back="true" type="button" aria-label="Back to previous check-in question">Back</button>` : ""}
+        ${isComplete ? `
           <h1>Ready when you are.</h1>
           <div data-mobile-check-in-actions="true">
             <button data-mobile-check-in-final="start" type="button">Start New</button>
@@ -527,6 +529,7 @@ function buildFallbackHome(hasStory = false, storyTitle = "The Half-Life of Magi
           </div>
         `}
       </div>
+      `}
     </section>
   `;
 }
