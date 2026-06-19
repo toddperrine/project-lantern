@@ -73,13 +73,6 @@
     box-shadow: 0 8px 18px rgba(41, 35, 24, 0.04) !important;
   }
 
-  .project-lantern-shell [data-mobile-fallback-mood]::before {
-    content: "*";
-    display: block;
-    color: #b2873e;
-    font-size: 1.12rem;
-    line-height: 1;
-  }
 
   .project-lantern-shell [data-mobile-fallback-start-list="true"] {
     display: grid !important;
