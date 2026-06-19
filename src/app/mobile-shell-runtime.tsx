@@ -484,7 +484,7 @@ function buildFallbackHome(hasStory = false) {
         ${!showGate && (step > 0 || gateChoice === "new") ? `<button data-mobile-check-in-back="true" type="button" aria-label="Back to previous check-in question">Back</button>` : ""}
         ${showGate ? `
           <p data-mobile-check-in-welcome="true">Welcome back, Todd.</p>
-          <h1>Pick up where you left off, or begin somewhere new.</h1>
+          <h1>${hasStory ? "Pick up where you left off,<br />or begin somewhere new." : "Begin somewhere new?"}</h1>
           <div data-mobile-check-in-actions="true">
             ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue last story</button>` : ""}
             <button data-mobile-check-in-start="true" type="button">Start something new</button>
