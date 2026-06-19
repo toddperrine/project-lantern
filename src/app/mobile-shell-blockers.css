@@ -271,19 +271,53 @@
 
 @media (max-width: 767px) {
   .project-lantern-shell main[data-mobile-active-view="home"] {
+    position: relative !important;
+    overflow: hidden !important;
     background:
-      radial-gradient(circle at 50% 4%, rgba(255, 252, 244, 0.72), rgba(255, 252, 244, 0) 32%),
-      linear-gradient(180deg, #fffdf8 0%, #fbf7ef 58%, #f6efe4 100%) !important;
+      linear-gradient(180deg, #101419 0%, #15181c 31%, rgba(36, 33, 27, 0.92) 34%, rgba(249, 236, 205, 0.88) 37%, #fff6df 62%, #f3e5c4 100%) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"]::before {
+    content: "";
+    position: absolute;
+    inset: 28% -34% calc(5.5rem + env(safe-area-inset-bottom)) -34%;
+    z-index: 0;
+    background:
+      linear-gradient(104deg, transparent 4%, rgba(255, 255, 244, 0.44) 15%, transparent 27%),
+      linear-gradient(112deg, transparent 21%, rgba(123, 153, 146, 0.18) 35%, rgba(255, 250, 226, 0.5) 47%, transparent 61%),
+      linear-gradient(72deg, transparent 48%, rgba(124, 94, 139, 0.14) 58%, rgba(255, 244, 205, 0.34) 69%, transparent 82%);
+    filter: blur(18px);
+    opacity: 0.64;
+    transform: translate3d(-5%, 0, 0) rotate(-2deg);
+    animation: mobileHomeLightDrift 14s ease-in-out infinite alternate;
+    pointer-events: none;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section {
+    position: relative !important;
+    z-index: 1 !important;
     background: transparent !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child {
+    color: #fff9ec !important;
+    text-shadow: 0 1px 16px rgba(0, 0, 0, 0.28) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child button,
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child p,
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child span {
+    color: inherit !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] {
     gap: 0 !important;
     min-height: calc(100svh - 12.25rem - env(safe-area-inset-bottom)) !important;
-    padding: clamp(1.1rem, 5vw, 2rem) 0 0 !important;
+    padding: clamp(1rem, 4vw, 1.6rem) 0 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   .project-lantern-shell [data-mobile-check-in="true"] {
@@ -292,66 +326,66 @@
     display: grid !important;
     align-content: center !important;
     justify-items: center !important;
-    gap: clamp(1.35rem, 5.5vw, 2.1rem) !important;
     width: 100% !important;
     min-width: 0 !important;
-    min-height: min(30rem, calc(100svh - 15rem - env(safe-area-inset-bottom))) !important;
-    overflow: hidden !important;
+    min-height: min(32rem, calc(100svh - 15rem - env(safe-area-inset-bottom))) !important;
+    overflow: visible !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
-    padding: clamp(1.55rem, 7vw, 3rem) 0.4rem calc(3.6rem + env(safe-area-inset-bottom)) !important;
-    color: #17120b !important;
+    padding: clamp(3.9rem, 18vw, 7rem) 0.35rem calc(3.2rem + env(safe-area-inset-bottom)) !important;
+    color: #18130c !important;
     text-align: center !important;
     box-shadow: none !important;
   }
 
   .project-lantern-shell [data-mobile-check-in-light="true"] {
     position: absolute !important;
-    inset: 4% -38% auto -38% !important;
+    inset: 18% -24% 10% -24% !important;
     z-index: -1 !important;
-    height: 15rem !important;
-    background: linear-gradient(103deg, transparent 18%, rgba(255, 250, 239, 0.14) 43%, rgba(172, 127, 52, 0.025) 58%, transparent 82%) !important;
-    filter: blur(24px) !important;
-    opacity: 0.28 !important;
-    transform: translateX(-8%) rotate(-5deg) !important;
-    animation: none !important;
+    background:
+      linear-gradient(120deg, transparent 4%, rgba(255, 253, 234, 0.34) 19%, transparent 34%),
+      linear-gradient(78deg, transparent 42%, rgba(112, 139, 135, 0.13) 52%, rgba(255, 238, 190, 0.26) 63%, transparent 78%);
+    filter: blur(20px) !important;
+    opacity: 0.7 !important;
+    transform: translate3d(4%, 0, 0) rotate(1.5deg) !important;
+    animation: mobileGateLightDrift 16s ease-in-out infinite alternate !important;
     pointer-events: none !important;
   }
 
   .project-lantern-shell [data-mobile-check-in-welcome="true"] {
-    max-width: 19.5rem !important;
-    margin: 0 auto -0.25rem !important;
-    color: #20180d !important;
+    max-width: 20rem !important;
+    margin: 0 auto -0.2rem !important;
+    color: #21180c !important;
     font-family: Georgia, "Times New Roman", serif !important;
-    font-size: clamp(1.1rem, 4.4vw, 1.3rem) !important;
+    font-size: clamp(1.1rem, 4.5vw, 1.28rem) !important;
     font-weight: 500 !important;
     letter-spacing: -0.02em !important;
-    line-height: 1.1 !important;
+    line-height: 1.12 !important;
     text-align: center !important;
   }
 
   .project-lantern-shell [data-mobile-check-in-question="true"] {
     display: grid !important;
     justify-items: center !important;
-    gap: clamp(1.25rem, 6vw, 2rem) !important;
-    width: min(100%, 22rem) !important;
+    gap: clamp(1.45rem, 6vw, 2.1rem) !important;
+    width: min(100%, 23rem) !important;
     margin: auto !important;
     text-align: center !important;
   }
 
-
   .project-lantern-shell [data-mobile-check-in-question="true"] h1 {
-    max-width: 19.5rem !important;
+    max-width: 21rem !important;
     margin: 0 auto !important;
-    color: #20180d !important;
+    color: #1c150b !important;
     font-family: Georgia, "Times New Roman", serif !important;
-    font-size: clamp(2rem, 8.2vw, 2.35rem) !important;
+    font-size: clamp(2.2rem, 10.2vw, 2.75rem) !important;
     font-weight: 500 !important;
-    letter-spacing: -0.035em !important;
-    line-height: 1.08 !important;
+    letter-spacing: -0.045em !important;
+    line-height: 1.02 !important;
     text-align: center !important;
   }
+
 
   .project-lantern-shell [data-mobile-check-in-choices="true"] {
     display: flex !important;
@@ -434,32 +468,62 @@
   }
 
   .project-lantern-shell [data-mobile-check-in-actions="true"] {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    justify-content: center !important;
-    gap: 0.5rem 1rem !important;
-    margin-top: 0.25rem !important;
+    display: grid !important;
+    width: min(100%, 21rem) !important;
+    margin-top: 0.1rem !important;
   }
 
   .project-lantern-shell [data-mobile-check-in-actions="true"] button {
-    min-height: 2.9rem !important;
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    gap: 0.8rem !important;
+    width: 100% !important;
+    min-height: 3.35rem !important;
     border: 0 !important;
+    border-radius: 0 !important;
     background: transparent !important;
-    padding: 0.48rem 0.25rem !important;
-    color: #19140d !important;
+    padding: 0.74rem 0.1rem !important;
+    color: #1a140c !important;
     font-family: Georgia, "Times New Roman", serif !important;
-    font-size: clamp(1.2rem, 5.2vw, 1.42rem) !important;
+    font-size: clamp(1.22rem, 5.4vw, 1.46rem) !important;
     font-weight: 500 !important;
-    text-align: center !important;
+    line-height: 1.12 !important;
+    text-align: left !important;
+    box-shadow: none !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-actions="true"] button + button {
+    border-top: 1px solid rgba(150, 106, 35, 0.24) !important;
+  }
+
+  .project-lantern-shell [data-mobile-check-in-actions="true"] button::after {
+    content: "›";
+    color: #9a6b22;
+    font-size: 1.45rem;
+    line-height: 1;
+  }
+
+  @keyframes mobileHomeLightDrift {
+    from { transform: translate3d(-8%, 0, 0) rotate(-2deg); }
+    to { transform: translate3d(8%, 0, 0) rotate(-2deg); }
+  }
+
+  @keyframes mobileGateLightDrift {
+    from { transform: translate3d(5%, 0, 0) rotate(1.5deg); }
+    to { transform: translate3d(-5%, 0, 0) rotate(1.5deg); }
   }
 
 }
 
 @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .project-lantern-shell main[data-mobile-active-view="home"]::before,
   .project-lantern-shell [data-mobile-check-in-light="true"] {
     animation: none !important;
   }
 
+  .project-lantern-shell main[data-mobile-active-view="home"]::before,
   .project-lantern-shell [data-mobile-check-in-light="true"] {
     transform: none !important;
   }
