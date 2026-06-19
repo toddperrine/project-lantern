@@ -249,6 +249,18 @@
     content: none !important;
   }
 
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"]::after {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    outline: 0 !important;
+  }
+
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-card="true"] {
     gap: 0.52rem !important;
   }
