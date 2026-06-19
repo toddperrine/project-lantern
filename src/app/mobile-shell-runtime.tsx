@@ -49,6 +49,7 @@ const CHECK_IN_CHOICES = [
 ];
 const CHECK_IN_STEPS = ["How was today?", "How are you feeling now?", "What kind of story would help?"];
 const CHECK_IN_WELCOME_SEEN_KEY = "projectLantern.mobileCheckInWelcomeSeen";
+let mobileCheckInWelcomeShownThisLoad = false;
 const CHECK_IN_STEP_KEY = "projectLantern.mobileCheckInStep";
 const CHECK_IN_ANSWERS_KEY = "projectLantern.mobileCheckInAnswers";
 const FALLBACK_MOOD_ICONS: Record<string, string> = {
@@ -125,8 +126,9 @@ function goBackCheckInStep() {
 
 function shouldShowCheckInWelcome() {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
-  if (window.sessionStorage.getItem(CHECK_IN_WELCOME_SEEN_KEY) === "true") return false;
-  window.sessionStorage.setItem(CHECK_IN_WELCOME_SEEN_KEY, "true");
+  window.sessionStorage.removeItem(CHECK_IN_WELCOME_SEEN_KEY);
+  if (mobileCheckInWelcomeShownThisLoad) return false;
+  mobileCheckInWelcomeShownThisLoad = true;
   return true;
 }
 
@@ -486,7 +488,7 @@ function buildFallbackHome(hasStory = false) {
         `}
       </div>
       <p data-mobile-check-in-helper="true">Answer a few questions. Lantern will shape the story around where you are.</p>
-      ${hasStory ? `<button data-mobile-quick-continue="true" data-mobile-continue-action="true" type="button" aria-label="Continue latest story"><span aria-hidden="true">↗</span><span>Continue</span></button>` : ""}
+      ${hasStory ? `<button data-mobile-quick-continue="true" data-mobile-continue-action="true" type="button" aria-label="Continue last story"><span>Continue last story</span><span aria-hidden="true">→</span></button>` : ""}
     </section>
   `;
 }
