@@ -38,7 +38,7 @@ textarea {
 }
 
 .project-lantern-shell main > section > header p:first-child::after {
-  content: " v0.1.4";
+  content: " v0.1.5";
   margin-left: 0.65rem;
   color: rgba(246, 239, 226, 0.46);
   font-size: 0.72em;
@@ -218,6 +218,132 @@ textarea {
   margin-inline: auto;
 }
 
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) {
+  position: relative;
+  display: grid;
+  min-height: 19rem;
+  overflow: hidden;
+  padding: 0;
+  border-color: rgba(217, 164, 65, 0.24);
+  background:
+    linear-gradient(180deg, rgba(11, 16, 32, 0.08), rgba(11, 16, 32, 0.78)),
+    linear-gradient(135deg, #f0dfbf 0%, #9b6f54 48%, #1b2636 100%);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.22);
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"])::before,
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"])::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"])::before {
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(246, 239, 226, 0.16) 0 1px, transparent 1px 100%),
+    radial-gradient(circle at 72% 18%, rgba(246, 239, 226, 0.24), transparent 8rem),
+    linear-gradient(155deg, transparent 0 46%, rgba(11, 16, 32, 0.32) 46% 47%, transparent 47% 100%);
+  background-size: 1.75rem 100%, auto, auto;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"])::after {
+  left: 1.1rem;
+  right: 1.1rem;
+  top: 1.1rem;
+  bottom: 1.1rem;
+  border: 1px solid rgba(246, 239, 226, 0.16);
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > div:first-child {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem 1.25rem 0;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) [aria-label$="portrait artwork"] {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 10.5rem !important;
+  aspect-ratio: 4 / 5 !important;
+  border-color: rgba(246, 239, 226, 0.34) !important;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(246, 239, 226, 0.68) 0 11%, transparent 12%),
+    linear-gradient(180deg, transparent 0 49%, rgba(246, 239, 226, 0.18) 50% 67%, transparent 68%),
+    linear-gradient(145deg, #241826 0%, #593f4c 45%, #c59a5d 100%) !important;
+  box-shadow: inset 0 0 0 1px rgba(11, 16, 32, 0.34), 0 16px 45px rgba(0, 0, 0, 0.26);
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) [aria-label$="portrait artwork"] > span:last-child {
+  display: block;
+  align-self: end;
+  margin-bottom: 1rem;
+  color: rgba(246, 239, 226, 0.86);
+  font-size: clamp(1.4rem, 8vw, 2.6rem);
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.42);
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > div:first-child > div:not([aria-label$="portrait artwork"]) {
+  min-width: 0;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) h3 {
+  font-size: clamp(1.55rem, 9vw, 2.15rem);
+  line-height: 1;
+  color: #fff8ea;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.4);
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) h3 + p {
+  color: #f2c879;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > p,
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > button {
+  position: relative;
+  z-index: 1;
+  margin-inline: 1.25rem;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > p {
+  color: rgba(246, 239, 226, 0.76);
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > p:last-of-type {
+  margin-top: 1.25rem;
+  color: rgba(246, 239, 226, 0.48);
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > button {
+  margin-bottom: 1.25rem;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]):not(:has([aria-label$="portrait artwork"])) {
+  border-color: rgba(167, 199, 186, 0.2);
+  background:
+    linear-gradient(135deg, rgba(246, 239, 226, 0.1), rgba(167, 199, 186, 0.08)),
+    rgba(11, 16, 32, 0.76);
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]):not(:has([aria-label$="portrait artwork"])) > div > [aria-label$="artwork"] {
+  background:
+    radial-gradient(circle at 64% 24%, rgba(246, 239, 226, 0.36), transparent 5rem),
+    linear-gradient(170deg, rgba(11, 16, 32, 0.18) 0 36%, transparent 36% 100%),
+    linear-gradient(145deg, #c7d7c7 0%, #56716b 48%, #172233 100%) !important;
+}
+
+.project-lantern-shell article:has(> div > [aria-label$="artwork"]):not(:has([aria-label$="portrait artwork"])) > div > [aria-label$="artwork"] > .relative span:last-child {
+  display: block;
+  max-width: 9rem;
+  margin-top: auto;
+  color: rgba(16, 24, 32, 0.82);
+  font-size: 1.05rem;
+  line-height: 1.05;
+}
+
 @media (max-width: 639px) {
   .project-lantern-shell article:has(> div > [aria-label$="artwork"]) > div {
     grid-template-columns: minmax(0, 1fr);
@@ -240,6 +366,15 @@ textarea {
 
   .project-lantern-shell [aria-label$="artwork"] > .relative span:first-child {
     font-size: 0.56rem;
+  }
+
+  .project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > div:first-child {
+    padding: 1rem 1rem 0;
+  }
+
+  .project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > p,
+  .project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) > button {
+    margin-inline: 1rem;
   }
 }
 
