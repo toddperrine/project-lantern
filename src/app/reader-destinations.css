@@ -30,14 +30,6 @@
   gap: 1rem;
 }
 
-.project-lantern-shell section:has(input[placeholder="My story project"]) > div:nth-of-type(2) > section:nth-child(2):has(article)::before {
-  content: "Continue Reading";
-  display: block;
-  color: #f6efe2;
-  font-size: clamp(1.35rem, 4vw, 2rem);
-  font-weight: 700;
-  line-height: 1.1;
-}
 
 .project-lantern-shell section:has(input[placeholder="My story project"]) > div:nth-of-type(2) > section:nth-child(2):has(article)::after {
   content: "Favorites shelf coming soon";
@@ -261,16 +253,6 @@
     gap: 0.52rem !important;
   }
 
-  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-card="true"]::after {
-    content: "Continue Reading";
-    display: block;
-    order: -1;
-    color: #171510;
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 1.18rem;
-    font-weight: 500;
-    line-height: 1.18;
-  }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-image="true"] {
     min-height: 15.4rem !important;
@@ -319,7 +301,7 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-fallback-mood] {
     position: relative !important;
-    grid-template-rows: 2rem auto !important;
+    grid-template-rows: 1.75rem auto !important;
     min-width: 5.2rem !important;
     min-height: 5.25rem !important;
     overflow: hidden !important;

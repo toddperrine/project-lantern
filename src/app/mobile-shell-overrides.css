@@ -21,7 +21,10 @@
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] {
-    display: grid !important;
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
     gap: 1rem !important;
     padding: 0 0 0.35rem !important;
   }
@@ -209,7 +212,7 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-fallback-mood] {
     display: grid !important;
-    grid-template-rows: 1.8rem auto !important;
+    grid-template-rows: 1.75rem auto !important;
     min-width: 4.75rem !important;
     min-height: 4.7rem !important;
     flex: 0 0 auto !important;
@@ -456,5 +459,37 @@
   .project-lantern-shell main:not([data-mobile-active-view="home"]) [data-mobile-compact-card="true"] [aria-label$="artwork"],
   .project-lantern-shell main:not([data-mobile-active-view="home"]) [data-mobile-compact-card="true"] [aria-label$="portrait artwork"] {
     display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 1rem !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] > [data-mobile-fallback-continue="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] > [data-mobile-fallback-moods="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] > [data-mobile-fallback-starts="true"] {
+    position: relative !important;
+    display: grid !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] > [data-mobile-fallback-moods="true"] > div {
+    width: calc(100% + 2rem) !important;
+    margin: 0 0 0 -1rem !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-fallback-mood] {
+    grid-template-rows: 1.75rem auto !important;
+    gap: 0.3rem !important;
+    padding-top: 0.54rem !important;
   }
 }
