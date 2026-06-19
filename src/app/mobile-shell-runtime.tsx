@@ -47,7 +47,8 @@ const CHECK_IN_CHOICES = [
   ["Restless", "Tired", "Curious", "Hopeful", "Lonely", "Ready to escape"],
   ["Something quiet", "Something mysterious", "Something beautiful", "Something funny", "Something tense", "Something that makes me feel less alone"]
 ];
-const CHECK_IN_STEPS = ["How was today?", "How are you feeling now?", "What kind of story would help?"];
+const CHECK_IN_STEPS = ["What kind of moment are you in?", "How are you feeling now?", "What kind of story would help?"];
+const CHECK_IN_GATE_KEY = "projectLantern.mobileCheckInGate";
 const CHECK_IN_STEP_KEY = "projectLantern.mobileCheckInStep";
 const CHECK_IN_ANSWERS_KEY = "projectLantern.mobileCheckInAnswers";
 const FALLBACK_MOOD_ICONS: Record<string, string> = {
@@ -94,6 +95,19 @@ function selectedCheckInChoice() {
   return window.sessionStorage.getItem("projectLantern.mobileCheckInChoice") || "";
 }
 
+function selectedCheckInGate() {
+  return window.sessionStorage.getItem(CHECK_IN_GATE_KEY) || "";
+}
+
+function startNewCheckIn() {
+  window.sessionStorage.setItem(CHECK_IN_GATE_KEY, "new");
+  window.sessionStorage.setItem(CHECK_IN_STEP_KEY, "0");
+}
+
+function resetCheckInGate() {
+  window.sessionStorage.removeItem(CHECK_IN_GATE_KEY);
+}
+
 function selectedCheckInStep() {
   const parsed = Number(window.sessionStorage.getItem(CHECK_IN_STEP_KEY) || "0");
   if (!Number.isInteger(parsed) || parsed < 0 || parsed > CHECK_IN_STEPS.length) return 0;
@@ -119,7 +133,12 @@ function setSelectedCheckInChoice(choice: string) {
 }
 
 function goBackCheckInStep() {
-  window.sessionStorage.setItem(CHECK_IN_STEP_KEY, String(Math.max(selectedCheckInStep() - 1, 0)));
+  const step = selectedCheckInStep();
+  if (step <= 0) {
+    resetCheckInGate();
+    return;
+  }
+  window.sessionStorage.setItem(CHECK_IN_STEP_KEY, String(step - 1));
 }
 
 function mappedArtKeyForTitle(title: string) {
@@ -455,21 +474,28 @@ function buildFallbackHome(hasStory = false) {
   const answers = selectedCheckInAnswers();
   const selectedChoice = answers[step] || selectedCheckInChoice();
   const activeChoices = CHECK_IN_CHOICES[step] ?? CHECK_IN_CHOICES[0];
-  const isComplete = step >= CHECK_IN_STEPS.length;
+  const gateChoice = selectedCheckInGate();
+  const showGate = gateChoice !== "new";
+  const isComplete = !showGate && step >= CHECK_IN_STEPS.length;
   return `
     <section data-mobile-check-in="true" aria-label="Story check-in">
       <div data-mobile-check-in-light="true" aria-hidden="true"></div>
       <div data-mobile-check-in-question="true">
-        ${step > 0 ? `<button data-mobile-check-in-back="true" type="button" aria-label="Back to previous check-in question">Back</button>` : ""}
-        ${isComplete ? `
+        ${!showGate && (step > 0 || gateChoice === "new") ? `<button data-mobile-check-in-back="true" type="button" aria-label="Back to previous check-in question">Back</button>` : ""}
+        ${showGate ? `
+          <p data-mobile-check-in-welcome="true">Welcome back, Todd.</p>
+          <h1>Pick up where you left off, or begin somewhere new.</h1>
+          <div data-mobile-check-in-actions="true">
+            ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue last story</button>` : ""}
+            <button data-mobile-check-in-start="true" type="button">Start something new</button>
+          </div>
+        ` : isComplete ? `
           <h1>Ready when you are.</h1>
           <div data-mobile-check-in-actions="true">
-            ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue</button>` : ""}
             <button data-mobile-check-in-final="start" type="button">Start New</button>
             <button data-mobile-check-in-final="surprise" type="button">Surprise</button>
           </div>
         ` : `
-          ${step === 0 ? `<p data-mobile-check-in-welcome="true">Welcome back, Todd.</p>` : ""}
           <h1>${CHECK_IN_STEPS[step]}</h1>
           <div data-mobile-check-in-choices="true">
             ${activeChoices.map((choice) => `<button data-mobile-check-in-choice="${choice}" aria-pressed="${String(choice === selectedChoice)}" type="button">${choice}</button>`).join("")}
@@ -477,7 +503,6 @@ function buildFallbackHome(hasStory = false) {
         `}
       </div>
       <p data-mobile-check-in-helper="true">Answer a few questions. Lantern will shape the story around where you are.</p>
-      ${hasStory ? `<button data-mobile-quick-continue="true" data-mobile-continue-action="true" type="button" aria-label="Continue last story"><span>Continue last story</span><span aria-hidden="true">→</span></button>` : ""}
     </section>
   `;
 }
@@ -497,7 +522,7 @@ function keepSelectedMoodVisible(fallback: HTMLElement, mood = selectedMood()) {
 function renderFallbackHome(fallback: HTMLElement, hasStory: boolean) {
   fallback.innerHTML = buildFallbackHome(hasStory);
   fallback.dataset.mobileFallbackHasStory = String(hasStory);
-  fallback.dataset.mobileFallbackMood = `${selectedCheckInStep()}:${selectedCheckInChoice()}`;
+  fallback.dataset.mobileFallbackMood = `${selectedCheckInGate()}:${selectedCheckInStep()}:${selectedCheckInChoice()}`;
 }
 
 function bindFallbackHome(fallback: HTMLElement) {
@@ -517,6 +542,11 @@ function bindFallbackHome(fallback: HTMLElement) {
     }
     if (target?.closest("[data-mobile-check-in-back='true']")) {
       goBackCheckInStep();
+      renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true");
+      return;
+    }
+    if (target?.closest("[data-mobile-check-in-start='true']")) {
+      startNewCheckIn();
       renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true");
       return;
     }
@@ -565,7 +595,7 @@ function ensureMobileHomeFallback() {
     root.insertBefore(nextFallback, root.firstChild);
   }
   const hasStory = getHomeStorySignal(main);
-  const selectedChoice = `${selectedCheckInStep()}:${selectedCheckInChoice()}`;
+  const selectedChoice = `${selectedCheckInGate()}:${selectedCheckInStep()}:${selectedCheckInChoice()}`;
   if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || nextFallback.dataset.mobileFallbackMood !== selectedChoice || cleanText(nextFallback.innerHTML) === "") renderFallbackHome(nextFallback, hasStory);
   bindFallbackHome(nextFallback);
   Array.from(root.children).forEach((child) => {
