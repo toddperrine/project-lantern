@@ -568,6 +568,7 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section,
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"],
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"],
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"] {
     position: relative !important;
@@ -579,12 +580,29 @@
     outline: 0 !important;
   }
 
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"]::after,
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"],
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"]::before,
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"]::after {
     background: transparent !important;
+    background-color: transparent !important;
     border: 0 !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
+    outline: 0 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"] {
+    display: grid !important;
+    align-content: center !important;
+    justify-items: center !important;
+    width: 100% !important;
+    min-height: min(33rem, calc(100svh - 14rem - env(safe-area-inset-bottom))) !important;
+    padding: clamp(5.8rem, 23vw, 8.4rem) 1rem calc(3.25rem + env(safe-area-inset-bottom)) !important;
+    color: #1b1308 !important;
+    text-align: center !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"] {
