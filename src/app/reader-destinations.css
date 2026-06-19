@@ -1,5 +1,5 @@
 .project-lantern-shell main > section > header p:first-child::after {
-  content: " v0.1.17";
+  content: " v0.1.18";
 }
 
 .project-lantern-shell section:has(input[placeholder="My story project"]) {
@@ -136,6 +136,48 @@
   text-decoration: none;
 }
 
+.project-lantern-shell section:has(> div:last-child > article > div:first-child > [aria-label$="portrait artwork"]) > div:last-child {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+
+.project-lantern-shell section:has(> div:last-child > article > div:first-child > [aria-label$="portrait artwork"]) > div:last-child > article {
+  min-width: 0;
+  overflow: visible;
+  border-color: rgba(217, 164, 65, 0.24);
+  background:
+    linear-gradient(180deg, rgba(246, 239, 226, 0.13), rgba(246, 239, 226, 0.06)),
+    rgba(11, 16, 32, 0.72);
+}
+
+.project-lantern-shell section:has(> div:last-child > article > div:first-child > [aria-label$="portrait artwork"]) > div:last-child > article > div:first-child {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem;
+}
+
+.project-lantern-shell section:has(> div:last-child > article > div:first-child > [aria-label$="portrait artwork"]) > div:last-child > article > div:first-child > [aria-label$="portrait artwork"] {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 0.75rem;
+}
+
+.project-lantern-shell section:has(> div:last-child > article > div:first-child > [aria-label$="portrait artwork"]) > div:last-child > article h3,
+.project-lantern-shell section:has(> div:last-child > article > div:first-child > [aria-label$="portrait artwork"]) > div:last-child > article p {
+  min-width: 0;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.project-lantern-shell section:has(> div:last-child > article > div:first-child > [aria-label$="portrait artwork"]) > div:last-child > article button {
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 999px;
+  white-space: normal;
+}
+
 .project-lantern-shell section:has(> div > article [aria-label$="artwork"]):not(:has(input[placeholder="My story project"])) > div:last-child {
   gap: 1rem;
 }
@@ -192,6 +234,20 @@
   .project-lantern-shell section:has(> div > article [aria-label$="artwork"]):not(:has(input[placeholder="My story project"])) article button {
     width: 100%;
     text-align: center;
+  }
+
+  .project-lantern-shell section:has(> div:last-child > article > div:first-child > [aria-label$="portrait artwork"]) > div:last-child > article > div:first-child {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-lantern-shell section:has(> div:last-child > article > div:first-child > [aria-label$="portrait artwork"]) > div:last-child > article > div:first-child > [aria-label$="portrait artwork"] {
+    width: 5rem;
+    height: 5rem;
+  }
+
+  .project-lantern-shell section:has(> div:last-child > article > div:first-child > [aria-label$="portrait artwork"]) > div:last-child > article button {
+    width: fit-content;
+    text-align: left;
   }
 }
 
