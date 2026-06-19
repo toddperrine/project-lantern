@@ -550,16 +550,6 @@ textarea {
   display: none !important;
 }
 
-.project-lantern-shell main > section > div > div > div > section:has(> div > div [aria-label$="artwork"]) > div > div:nth-child(2) > div:first-child > p:first-child {
-  font-size: 0;
-  letter-spacing: 0;
-}
-
-.project-lantern-shell main > section > div > div > div > section:has(> div > div [aria-label$="artwork"]) > div > div:nth-child(2) > div:first-child > p:first-child::after {
-  content: "Continue Reading";
-  font-size: 0.75rem;
-  letter-spacing: 0.14em;
-}
 
 .project-lantern-shell main > section > div > div > div > section:has(> div > div [aria-label$="artwork"]) > div > div:nth-child(2) button {
   min-width: 0;
