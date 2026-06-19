@@ -4,10 +4,7 @@
   }
 
   .project-lantern-shell footer {
-    margin: 0 !important;
-    padding: 0.8rem 1rem calc(6.8rem + env(safe-area-inset-bottom)) !important;
-    font-size: 0.65rem !important;
-    line-height: 1 !important;
+    display: none !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-original-home-content="true"] {
@@ -285,8 +282,8 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] {
     gap: 0 !important;
-    min-height: calc(100svh - 10.75rem - env(safe-area-inset-bottom)) !important;
-    padding: clamp(1.5rem, 7vw, 2.6rem) 0 0 !important;
+    min-height: calc(100svh - 12.25rem - env(safe-area-inset-bottom)) !important;
+    padding: clamp(1.1rem, 5vw, 2rem) 0 0 !important;
   }
 
   .project-lantern-shell [data-mobile-check-in="true"] {
@@ -295,15 +292,15 @@
     display: grid !important;
     align-content: center !important;
     justify-items: center !important;
-    gap: clamp(1.6rem, 7vw, 2.55rem) !important;
+    gap: clamp(1.35rem, 5.5vw, 2.1rem) !important;
     width: 100% !important;
     min-width: 0 !important;
-    min-height: min(34rem, calc(100svh - 13.5rem - env(safe-area-inset-bottom))) !important;
+    min-height: min(30rem, calc(100svh - 15rem - env(safe-area-inset-bottom))) !important;
     overflow: hidden !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
-    padding: clamp(2rem, 9vw, 3.8rem) 0.4rem calc(4.8rem + env(safe-area-inset-bottom)) !important;
+    padding: clamp(1.55rem, 7vw, 3rem) 0.4rem calc(3.6rem + env(safe-area-inset-bottom)) !important;
     color: #17120b !important;
     text-align: center !important;
     box-shadow: none !important;
@@ -313,8 +310,8 @@
     position: absolute !important;
     inset: 4% -38% auto -38% !important;
     z-index: -1 !important;
-    height: 18rem !important;
-    background: linear-gradient(103deg, transparent 18%, rgba(255, 250, 239, 0.18) 43%, rgba(172, 127, 52, 0.035) 58%, transparent 82%) !important;
+    height: 15rem !important;
+    background: linear-gradient(103deg, transparent 18%, rgba(255, 250, 239, 0.14) 43%, rgba(172, 127, 52, 0.025) 58%, transparent 82%) !important;
     filter: blur(24px) !important;
     opacity: 0.28 !important;
     transform: translateX(-8%) rotate(-5deg) !important;
@@ -323,11 +320,11 @@
   }
 
   .project-lantern-shell [data-mobile-check-in-welcome="true"] {
-    max-width: 18rem !important;
-    margin: 0 auto -0.45rem !important;
+    max-width: 19.5rem !important;
+    margin: 0 auto -0.25rem !important;
     color: #20180d !important;
     font-family: Georgia, "Times New Roman", serif !important;
-    font-size: clamp(1.15rem, 5.2vw, 1.42rem) !important;
+    font-size: clamp(1.1rem, 4.4vw, 1.3rem) !important;
     font-weight: 500 !important;
     letter-spacing: -0.02em !important;
     line-height: 1.1 !important;
@@ -345,14 +342,14 @@
 
 
   .project-lantern-shell [data-mobile-check-in-question="true"] h1 {
-    max-width: 18rem !important;
+    max-width: 19.5rem !important;
     margin: 0 auto !important;
     color: #20180d !important;
     font-family: Georgia, "Times New Roman", serif !important;
-    font-size: clamp(2rem, 9.4vw, 2.85rem) !important;
+    font-size: clamp(2rem, 8.2vw, 2.35rem) !important;
     font-weight: 500 !important;
     letter-spacing: -0.035em !important;
-    line-height: 1.02 !important;
+    line-height: 1.08 !important;
     text-align: center !important;
   }
 
@@ -451,7 +448,7 @@
     padding: 0.48rem 0.25rem !important;
     color: #19140d !important;
     font-family: Georgia, "Times New Roman", serif !important;
-    font-size: 1.14rem !important;
+    font-size: clamp(1.2rem, 5.2vw, 1.42rem) !important;
     font-weight: 500 !important;
     text-align: center !important;
   }
