@@ -38,7 +38,7 @@ textarea {
 }
 
 .project-lantern-shell main > section > header p:first-child::after {
-  content: " v0.1.6";
+  content: " v0.1.7";
   margin-left: 0.65rem;
   color: rgba(246, 239, 226, 0.46);
   font-size: 0.72em;
@@ -525,4 +525,51 @@ textarea {
   .project-lantern-workspace main {
     padding: 1.75rem;
   }
+}
+
+.project-lantern-shell main > section > p:first-child:not([class*="rounded"]) {
+  display: none;
+}
+
+.project-lantern-shell main > section > div > div > div > section:has(> div > div [aria-label$="artwork"]) {
+  position: relative;
+}
+
+.project-lantern-shell main > section > div > div > div > section:has(> div > div [aria-label$="artwork"]) > div > div:first-child {
+  background: transparent !important;
+}
+
+.project-lantern-shell main > section > div > div > div > section:has(> div > div [aria-label$="artwork"]) > div > div [aria-label$="artwork"] {
+  background:
+    radial-gradient(circle at 58% 26%, rgba(246, 239, 226, 0.2), transparent 4.6rem),
+    linear-gradient(160deg, rgba(11, 16, 32, 0.18) 0 34%, transparent 34% 100%),
+    linear-gradient(145deg, #f2d7a4 0%, #c58b46 38%, #4f766f 68%, #172233 100%) !important;
+}
+
+.project-lantern-shell main > section > div > div > div > section:has(> div > div [aria-label$="artwork"]) > div > div [aria-label$="artwork"] > .absolute:nth-child(4) {
+  display: none !important;
+}
+
+.project-lantern-shell main > section > div > div > div > section:has(> div > div [aria-label$="artwork"]) > div > div:nth-child(2) > div:first-child > p:first-child {
+  font-size: 0;
+  letter-spacing: 0;
+}
+
+.project-lantern-shell main > section > div > div > div > section:has(> div > div [aria-label$="artwork"]) > div > div:nth-child(2) > div:first-child > p:first-child::after {
+  content: "Continue Reading";
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+}
+
+.project-lantern-shell main > section > div > div > div > section:has(> div > div [aria-label$="artwork"]) > div > div:nth-child(2) button {
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.project-lantern-shell main > section > div > div > div > section:has(> div > div [aria-label$="artwork"]) > div > div:nth-child(2) button:first-child,
+.project-lantern-shell main > section > div > div > div > section:has(> div > div [aria-label$="artwork"]) > div > div:nth-child(2) > div:last-child button {
+  border: 1px solid rgba(16, 24, 32, 0.2);
+  background: rgba(16, 24, 32, 0.05);
+  color: #101820;
 }
