@@ -42,7 +42,11 @@ const FALLBACK_STARTS = [
   { title: "The Quiet Engine", premise: "A machine turns silence into possible futures.", tags: ["Emotional", "Sci-fi"], mood: "Emotional" }
 ];
 const FALLBACK_MOODS = ["Mystery", "Wonder", "Emotional", "Adventure", "Strange", "Hopeful", "Dark", "Reflective"];
-const CHECK_IN_CHOICES = ["Easy", "Long", "Strange", "Heavy", "Good", "I’m not sure"];
+const CHECK_IN_CHOICES = [
+  ["Easy", "Long", "Strange", "Heavy", "Good", "I’m not sure"],
+  ["Restless", "Tired", "Curious", "Hopeful", "Lonely", "Ready to escape"],
+  ["Something quiet", "Something mysterious", "Something beautiful", "Something funny", "Something tense", "Something that makes me feel less alone"]
+];
 const CHECK_IN_STEPS = ["How was today?", "How are you feeling now?", "What kind of story would help?"];
 const CHECK_IN_WELCOME_SEEN_KEY = "projectLantern.mobileCheckInWelcomeSeen";
 const CHECK_IN_STEP_KEY = "projectLantern.mobileCheckInStep";
@@ -458,6 +462,7 @@ function buildFallbackHome(hasStory = false) {
   const step = selectedCheckInStep();
   const answers = selectedCheckInAnswers();
   const selectedChoice = answers[step] || selectedCheckInChoice();
+  const activeChoices = CHECK_IN_CHOICES[step] ?? CHECK_IN_CHOICES[0];
   const showWelcome = step === 0 && shouldShowCheckInWelcome();
   const isComplete = step >= CHECK_IN_STEPS.length;
   return `
@@ -476,7 +481,7 @@ function buildFallbackHome(hasStory = false) {
         ` : `
           <h1>${CHECK_IN_STEPS[step]}</h1>
           <div data-mobile-check-in-choices="true">
-            ${CHECK_IN_CHOICES.map((choice) => `<button data-mobile-check-in-choice="${choice}" aria-pressed="${String(choice === selectedChoice)}" type="button">${choice}</button>`).join("")}
+            ${activeChoices.map((choice) => `<button data-mobile-check-in-choice="${choice}" aria-pressed="${String(choice === selectedChoice)}" type="button">${choice}</button>`).join("")}
           </div>
         `}
       </div>
