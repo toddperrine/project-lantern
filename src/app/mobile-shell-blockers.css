@@ -322,11 +322,6 @@
     pointer-events: none !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-question="true"],
-  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-helper="true"] {
-    animation: mobileCheckInQuestionReveal 0.65s ease-out 2.45s both !important;
-  }
-
   .project-lantern-shell [data-mobile-check-in-welcome="true"] {
     position: absolute !important;
     inset: 50% 0.6rem auto !important;
@@ -472,15 +467,15 @@
   }
 
   .project-lantern-shell [data-mobile-quick-continue="true"] {
-    position: fixed !important;
-    left: 50% !important;
-    bottom: calc(4.95rem + env(safe-area-inset-bottom)) !important;
-    z-index: 48 !important;
+    position: relative !important;
+    left: auto !important;
+    bottom: auto !important;
+    z-index: 1 !important;
     display: inline-flex !important;
     align-items: center !important;
     gap: 0.32rem !important;
     min-height: 2.3rem !important;
-    transform: translateX(-50%) !important;
+    transform: none !important;
     border: 0 !important;
     border-radius: 999px !important;
     background: transparent !important;
@@ -512,9 +507,7 @@
 
 @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
   .project-lantern-shell [data-mobile-check-in-light="true"],
-  .project-lantern-shell [data-mobile-check-in-welcome="true"],
-  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-question="true"],
-  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-helper="true"] {
+  .project-lantern-shell [data-mobile-check-in-welcome="true"] {
     animation: none !important;
   }
 
