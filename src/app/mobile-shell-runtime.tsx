@@ -512,7 +512,8 @@ function ensureMobileHomeFallback() {
     root.insertBefore(nextFallback, root.firstChild);
   }
   const hasStory = getHomeStorySignal(main);
-  if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || nextFallback.dataset.mobileFallbackMood !== selectedCheckInChoice() || cleanText(nextFallback.innerHTML) === "") renderFallbackHome(nextFallback, hasStory);
+  const selectedChoice = selectedCheckInChoice();
+  if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || nextFallback.dataset.mobileFallbackMood !== selectedChoice || cleanText(nextFallback.innerHTML) === "") renderFallbackHome(nextFallback, hasStory);
   bindFallbackHome(nextFallback);
   Array.from(root.children).forEach((child) => {
     const element = child as HTMLElement;
