@@ -43,6 +43,10 @@ const FALLBACK_STARTS = [
 ];
 const FALLBACK_MOODS = ["Mystery", "Wonder", "Emotional", "Adventure", "Strange", "Hopeful", "Dark", "Reflective"];
 const CHECK_IN_CHOICES = ["Easy", "Long", "Strange", "Heavy", "Good", "I’m not sure"];
+const CHECK_IN_STEPS = ["How was today?", "How are you feeling now?", "What kind of story would help?"];
+const CHECK_IN_WELCOME_SEEN_KEY = "projectLantern.mobileCheckInWelcomeSeen";
+const CHECK_IN_STEP_KEY = "projectLantern.mobileCheckInStep";
+const CHECK_IN_ANSWERS_KEY = "projectLantern.mobileCheckInAnswers";
 const FALLBACK_MOOD_ICONS: Record<string, string> = {
   Mystery: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="10.5" cy="10.5" r="5.5" stroke-width="1.8"/><path d="m15 15 4.5 4.5" stroke-linecap="round" stroke-width="1.8"/></svg>`,
   Wonder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" stroke-linecap="round" stroke-width="1.8"/><path d="m12 8.5 1.05 2.15 2.35.35-1.7 1.65.4 2.35-2.1-1.1-2.1 1.1.4-2.35L8.6 11l2.35-.35L12 8.5Z" stroke-linejoin="round" stroke-width="1.5"/></svg>`,
@@ -87,8 +91,39 @@ function selectedCheckInChoice() {
   return window.sessionStorage.getItem("projectLantern.mobileCheckInChoice") || "";
 }
 
+function selectedCheckInStep() {
+  const parsed = Number(window.sessionStorage.getItem(CHECK_IN_STEP_KEY) || "0");
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.min(Math.max(parsed, 0), CHECK_IN_STEPS.length);
+}
+
+function selectedCheckInAnswers() {
+  try {
+    const parsed = JSON.parse(window.sessionStorage.getItem(CHECK_IN_ANSWERS_KEY) || "[]") as string[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function setSelectedCheckInChoice(choice: string) {
   window.sessionStorage.setItem("projectLantern.mobileCheckInChoice", choice);
+  const step = selectedCheckInStep();
+  const answers = selectedCheckInAnswers();
+  answers[step] = choice;
+  window.sessionStorage.setItem(CHECK_IN_ANSWERS_KEY, JSON.stringify(answers));
+  window.sessionStorage.setItem(CHECK_IN_STEP_KEY, String(Math.min(step + 1, CHECK_IN_STEPS.length)));
+}
+
+function goBackCheckInStep() {
+  window.sessionStorage.setItem(CHECK_IN_STEP_KEY, String(Math.max(selectedCheckInStep() - 1, 0)));
+}
+
+function shouldShowCheckInWelcome() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
+  if (window.sessionStorage.getItem(CHECK_IN_WELCOME_SEEN_KEY) === "true") return false;
+  window.sessionStorage.setItem(CHECK_IN_WELCOME_SEEN_KEY, "true");
+  return true;
 }
 
 function mappedArtKeyForTitle(title: string) {
@@ -419,21 +454,34 @@ function moodIcon(mood: string) {
   return FALLBACK_MOOD_ICONS[mood] ?? "";
 }
 
-function buildFallbackHome() {
-  const selectedChoice = selectedCheckInChoice();
+function buildFallbackHome(hasStory = false) {
+  const step = selectedCheckInStep();
+  const answers = selectedCheckInAnswers();
+  const selectedChoice = answers[step] || selectedCheckInChoice();
+  const showWelcome = step === 0 && shouldShowCheckInWelcome();
+  const isComplete = step >= CHECK_IN_STEPS.length;
   return `
-    <section data-mobile-check-in="true" aria-label="Story check-in">
-      <div data-mobile-check-in-welcome="true">
-        <p>Welcome back, Todd.</p>
-        <p>Let’s find the story for this moment.</p>
-      </div>
+    <section data-mobile-check-in="true" data-mobile-check-in-show-welcome="${String(showWelcome)}" aria-label="Story check-in">
+      <div data-mobile-check-in-light="true" aria-hidden="true"></div>
+      ${showWelcome ? `<div data-mobile-check-in-welcome="true"><p>Welcome back, Todd.</p></div>` : ""}
       <div data-mobile-check-in-question="true">
-        <h1>How was today?</h1>
-        <div data-mobile-check-in-choices="true">
-          ${CHECK_IN_CHOICES.map((choice) => `<button data-mobile-check-in-choice="${choice}" aria-pressed="${String(choice === selectedChoice)}" type="button">${choice}</button>`).join("")}
-        </div>
+        ${step > 0 ? `<button data-mobile-check-in-back="true" type="button" aria-label="Back to previous check-in question">Back</button>` : ""}
+        ${isComplete ? `
+          <h1>Ready when you are.</h1>
+          <div data-mobile-check-in-actions="true">
+            ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue</button>` : ""}
+            <button data-mobile-check-in-final="start" type="button">Start New</button>
+            <button data-mobile-check-in-final="surprise" type="button">Surprise</button>
+          </div>
+        ` : `
+          <h1>${CHECK_IN_STEPS[step]}</h1>
+          <div data-mobile-check-in-choices="true">
+            ${CHECK_IN_CHOICES.map((choice) => `<button data-mobile-check-in-choice="${choice}" aria-pressed="${String(choice === selectedChoice)}" type="button">${choice}</button>`).join("")}
+          </div>
+        `}
       </div>
       <p data-mobile-check-in-helper="true">Answer a few questions. Lantern will shape the story around where you are.</p>
+      ${hasStory ? `<button data-mobile-quick-continue="true" data-mobile-continue-action="true" type="button" aria-label="Continue latest story"><span aria-hidden="true">↗</span><span>Continue</span></button>` : ""}
     </section>
   `;
 }
@@ -451,9 +499,9 @@ function keepSelectedMoodVisible(fallback: HTMLElement, mood = selectedMood()) {
 }
 
 function renderFallbackHome(fallback: HTMLElement, hasStory: boolean) {
-  fallback.innerHTML = buildFallbackHome();
+  fallback.innerHTML = buildFallbackHome(hasStory);
   fallback.dataset.mobileFallbackHasStory = String(hasStory);
-  fallback.dataset.mobileFallbackMood = selectedCheckInChoice();
+  fallback.dataset.mobileFallbackMood = `${selectedCheckInStep()}:${selectedCheckInChoice()}`;
 }
 
 function bindFallbackHome(fallback: HTMLElement) {
@@ -469,6 +517,15 @@ function bindFallbackHome(fallback: HTMLElement) {
     }
     if (target?.closest("[data-mobile-continue-action='true']")) {
       continueLatestStory();
+      return;
+    }
+    if (target?.closest("[data-mobile-check-in-back='true']")) {
+      goBackCheckInStep();
+      renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true");
+      return;
+    }
+    if (target?.closest("[data-mobile-check-in-final]")) {
+      clickMobileNav("Create");
       return;
     }
     const choice = target?.closest<HTMLElement>("[data-mobile-check-in-choice]")?.dataset.mobileCheckInChoice;
@@ -512,7 +569,7 @@ function ensureMobileHomeFallback() {
     root.insertBefore(nextFallback, root.firstChild);
   }
   const hasStory = getHomeStorySignal(main);
-  const selectedChoice = selectedCheckInChoice();
+  const selectedChoice = `${selectedCheckInStep()}:${selectedCheckInChoice()}`;
   if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || nextFallback.dataset.mobileFallbackMood !== selectedChoice || cleanText(nextFallback.innerHTML) === "") renderFallbackHome(nextFallback, hasStory);
   bindFallbackHome(nextFallback);
   Array.from(root.children).forEach((child) => {
