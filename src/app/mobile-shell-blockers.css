@@ -354,12 +354,6 @@
     text-align: center !important;
   }
 
-  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-question="true"],
-  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-helper="true"],
-  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-quick-continue="true"] {
-    opacity: 0 !important;
-    animation: mobileCheckInQuestionReveal 0.45s ease-out 2.55s both !important;
-  }
 
   .project-lantern-shell [data-mobile-check-in-question="true"] h1 {
     max-width: 18rem !important;
@@ -499,13 +493,7 @@
 
   @keyframes mobileCheckInWelcome {
     0% { opacity: 0; transform: translateY(calc(-50% - 0.55rem)); }
-    22%, 68% { opacity: 1; transform: translateY(-50%); }
-    100% { opacity: 0; transform: translateY(calc(-50% - 0.22rem)); }
-  }
-
-  @keyframes mobileCheckInQuestionReveal {
-    from { opacity: 0; transform: translateY(0.32rem); }
-    to { opacity: 1; transform: translateY(0); }
+    22%, 100% { opacity: 1; transform: translateY(-50%); }
   }
 
   @keyframes mobileCheckInLampShimmer {
@@ -516,21 +504,8 @@
 
 @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
   .project-lantern-shell [data-mobile-check-in-light="true"],
-  .project-lantern-shell [data-mobile-check-in-welcome="true"],
-  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-question="true"],
-  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-helper="true"],
-  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-quick-continue="true"] {
-    animation: none !important;
-  }
-
   .project-lantern-shell [data-mobile-check-in-welcome="true"] {
-    display: none !important;
-  }
-
-  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-question="true"],
-  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-check-in-helper="true"],
-  .project-lantern-shell [data-mobile-check-in-show-welcome="true"] [data-mobile-quick-continue="true"] {
-    opacity: 1 !important;
+    animation: none !important;
   }
 
   .project-lantern-shell [data-mobile-check-in-light="true"] {
