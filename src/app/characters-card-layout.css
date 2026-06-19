@@ -1,0 +1,123 @@
+.project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) main > section > header p:first-child::after {
+  content: " v0.1.20";
+}
+
+@media (max-width: 767px) {
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) > div:last-child {
+    display: grid;
+    min-width: 0;
+    gap: 1rem;
+  }
+
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) > div:last-child > article {
+    display: block;
+    min-width: 0;
+    min-height: auto;
+    overflow: visible;
+    padding: 1rem;
+    border-color: rgba(246, 239, 226, 0.12);
+    background: rgba(246, 239, 226, 0.1);
+    box-shadow: none;
+  }
+
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) > div:last-child > article::before,
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) > div:last-child > article::after {
+    content: none;
+  }
+
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) article > div:first-child {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: 5rem minmax(0, 1fr);
+    align-items: start;
+    gap: 1rem;
+    padding: 0;
+  }
+
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) article [aria-label$="portrait artwork"] {
+    width: 5rem !important;
+    height: 5rem !important;
+    min-height: 0 !important;
+    aspect-ratio: 1 / 1 !important;
+    flex: none;
+    border-color: rgba(217, 164, 65, 0.35) !important;
+    border-radius: 0.375rem;
+    background: #1b1a17 !important;
+    box-shadow: none;
+  }
+
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) article [aria-label$="portrait artwork"] > span:last-child {
+    display: block;
+    align-self: auto;
+    margin-bottom: 0;
+    color: #d9a441;
+    font-size: 1.25rem;
+    letter-spacing: 0;
+    text-shadow: none;
+  }
+
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) article > div:first-child > div:not([aria-label$="portrait artwork"]) {
+    min-width: 0;
+    width: auto;
+  }
+
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) article h3 {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: normal;
+    font-size: 1.125rem;
+    line-height: 1.35;
+    color: #f6efe2;
+    text-shadow: none;
+  }
+
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) article h3 + p {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: normal;
+    color: #d9a441;
+    line-height: 1.45;
+  }
+
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) article > p,
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) article > button {
+    position: static;
+    margin-inline: 0;
+  }
+
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) article > p {
+    width: 100%;
+    color: rgba(246, 239, 226, 0.7);
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) article > p:last-of-type {
+    margin-top: 1rem;
+    color: rgba(246, 239, 226, 0.45);
+  }
+
+  .project-lantern-shell:has(nav[aria-label="Mobile primary"] button:nth-child(5)[aria-current="page"]) section:has([aria-label$="portrait artwork"]) article > button {
+    display: inline-flex;
+    width: fit-content;
+    min-width: 0;
+    max-width: 100%;
+    margin-top: 0.25rem;
+    margin-bottom: 0;
+    align-items: center;
+    border: 1px solid rgba(217, 164, 65, 0.35);
+    border-radius: 999px;
+    background: rgba(217, 164, 65, 0.1);
+    padding: 0.35rem 0.7rem;
+    text-align: left;
+    white-space: normal;
+    text-decoration: none;
+  }
+}
