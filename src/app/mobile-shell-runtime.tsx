@@ -510,8 +510,8 @@ function buildFallbackHome(hasStory = false, storyTitle = "The Half-Life of Magi
           <p data-mobile-gate-welcome="true">Welcome back, Todd.</p>
           <h1 data-mobile-gate-question="true"><span>What would you like</span><span>to read?</span></h1>
           <div data-mobile-gate-actions="true">
-            ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue ${escapeHtml(storyTitle)}</button>` : ""}
-            <button data-mobile-check-in-start="true" type="button">Start something new</button>
+            ${hasStory ? `<button data-mobile-continue-action="true" type="button"><span aria-hidden="true"></span><span data-mobile-action-label="true">Continue ${escapeHtml(storyTitle)}</span><span data-mobile-action-chevron="true" aria-hidden="true">›</span></button>` : ""}
+            <button data-mobile-check-in-start="true" type="button"><span aria-hidden="true"></span><span data-mobile-action-label="true">Start something new</span><span data-mobile-action-chevron="true" aria-hidden="true">›</span></button>
           </div>
         </section>
       </section>

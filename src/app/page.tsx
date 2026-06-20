@@ -407,7 +407,7 @@ export default function Home() {
   return (
     <main className="min-h-screen overflow-x-hidden px-3 pb-24 pt-3 text-paper sm:px-4 md:px-8 md:py-7">
       <section className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-5 md:gap-6">
-        <MobileTopHeader />
+        <MobileTopHeader onGoHome={() => navigateToView("home")} />
         <header className="hidden min-w-0 flex-col gap-5 border-b border-paper/10 pb-6 md:flex md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold sm:tracking-[0.22em]">Lantyrn</p>
@@ -515,8 +515,8 @@ function WorldsView({ onOpenStory }: { onOpenStory: (story: StoryStart) => void 
   return <section className="grid min-w-0 gap-5"><PageHeading eyebrow="Worlds" title="Worlds" body="Storyworld cards are reachable as their own app destination." />{worldStories.length === 0 ? <EmptyPanel title="No worlds yet" body="World cards will appear here once storyworld references are available." /> : <div className="grid min-w-0 gap-4 md:grid-cols-2">{worldStories.map((story) => <article className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4" key={story.worldName}><div className="grid min-w-0 gap-4 sm:grid-cols-[132px_minmax(0,1fr)]"><CoverArt label={story.mood} title={story.worldName} tone="cool" /><div className="min-w-0"><h3 className="text-lg font-semibold text-paper">{story.worldName}</h3><div className="mt-2 flex min-w-0 flex-wrap gap-2"><Tag>{story.genre}</Tag><Tag>{story.mood}</Tag></div><p className="mt-3 text-sm leading-6 text-paper/70">{story.world}</p><p className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">Appears in</p><button className="mt-1 text-left text-sm font-semibold text-lantern-gold underline decoration-lantern-gold/40 underline-offset-4" onClick={() => onOpenStory(story)} type="button">{story.title}</button></div></div></article>)}</div>}</section>;
 }
 
-function MobileTopHeader() {
-  return <header className="flex min-w-0 items-center justify-between py-1 md:hidden"><button aria-label="Open menu" className="flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-xl text-paper" type="button"><span aria-hidden="true">☰</span></button><img alt="Lantyrn" aria-label="Lantyrn" className="h-8 w-32 min-w-0 object-contain [filter:invert(96%)_sepia(9%)_saturate(363%)_hue-rotate(352deg)_brightness(102%)_contrast(93%)]" src="/artwork/lantyrn-wordmark.svg" /><button aria-label="Open profile" className="flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-lg text-paper" type="button"><span aria-hidden="true">♡</span></button></header>;
+function MobileTopHeader({ onGoHome }: { onGoHome: () => void }) {
+  return <header className="relative grid min-w-0 grid-cols-[72px_1fr_72px] items-center py-1 md:hidden"><button aria-label="Open menu" className="flex size-10 items-center justify-center justify-self-start rounded-full border border-paper/10 bg-paper/10 text-xl text-paper" type="button"><span aria-hidden="true">☰</span></button><button aria-label="Go home" className="absolute left-1/2 flex h-8 w-32 -translate-x-1/2 items-center justify-center border-0 bg-transparent p-0" onClick={onGoHome} type="button"><img alt="Lantyrn" className="h-8 w-32 min-w-0 object-contain [filter:invert(96%)_sepia(9%)_saturate(363%)_hue-rotate(352deg)_brightness(102%)_contrast(93%)]" src="/artwork/lantyrn-wordmark.svg" /></button><button aria-label="Open profile" className="flex size-10 items-center justify-center justify-self-end rounded-full border border-paper/10 bg-paper/10 text-lg text-paper" type="button"><span aria-hidden="true">♡</span></button></header>;
 }
 
 function MobileBottomNav({ activeView, onChange }: { activeView: AppView; onChange: (view: AppView) => void }) {

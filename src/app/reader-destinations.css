@@ -757,3 +757,81 @@
     z-index: 20 !important;
   }
 }
+
+@media (max-width: 767px) {
+  .project-lantern-shell main[data-mobile-active-view="home"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"]::after {
+    mask-image: linear-gradient(180deg, transparent 0%, transparent 30%, rgba(0, 0, 0, 0.45) 42%, black 58%, black 100%) !important;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, transparent 30%, rgba(0, 0, 0, 0.45) 42%, black 58%, black 100%) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child {
+    position: relative !important;
+    z-index: 6 !important;
+    display: grid !important;
+    grid-template-columns: 72px 1fr 72px !important;
+    align-items: center !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child button[aria-label="Go home"] {
+    position: absolute !important;
+    left: 50% !important;
+    justify-self: center !important;
+    width: 8rem !important;
+    height: 2rem !important;
+    transform: translateX(-50%) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"]::before {
+    content: "" !important;
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 3 !important;
+    pointer-events: none !important;
+    background: linear-gradient(180deg, rgba(3, 7, 17, 0.98) 0%, rgba(3, 7, 17, 0.96) 22%, rgba(3, 7, 17, 0.84) 36%, rgba(3, 7, 17, 0.35) 48%, transparent 60%) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"] {
+    top: clamp(190px, 28svh, 245px) !important;
+    z-index: 6 !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 24px !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"] {
+    color: #F7F2E8 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button {
+    grid-template-columns: 40px 1fr 40px !important;
+    width: 100% !important;
+    text-align: center !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button::after {
+    content: none !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-action-label="true"] {
+    grid-column: 2 !important;
+    justify-self: center !important;
+    text-align: center !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-action-chevron="true"] {
+    grid-column: 3 !important;
+    justify-self: end !important;
+    color: #9a6b22 !important;
+    font-size: 1.45rem !important;
+    line-height: 1 !important;
+  }
+}
