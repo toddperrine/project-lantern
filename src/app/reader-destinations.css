@@ -666,6 +666,10 @@
     isolation: isolate !important;
     overflow: hidden !important;
     min-height: 100svh !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
     background:
       radial-gradient(ellipse at 8% 74%, rgba(166, 224, 218, 0.72) 0%, rgba(166, 224, 218, 0.42) 24%, rgba(166, 224, 218, 0.12) 43%, transparent 62%),
       radial-gradient(ellipse at 54% 82%, rgba(247, 236, 202, 0.74) 0%, rgba(247, 236, 202, 0.42) 28%, rgba(247, 236, 202, 0.14) 50%, transparent 70%),
@@ -694,5 +698,25 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] {
     position: relative !important;
     z-index: 2 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"] {
+    box-sizing: border-box !important;
+    width: min(100%, calc(100vw - 48px)) !important;
+    max-width: calc(100vw - 48px) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    text-align: center !important;
+    overflow: visible !important;
+    font-size: clamp(2.35rem, 9.2vw, 3.55rem) !important;
+    line-height: 0.96 !important;
+    letter-spacing: -0.035em !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"] span {
+    display: block !important;
+    white-space: nowrap !important;
   }
 }
