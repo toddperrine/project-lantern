@@ -14,10 +14,25 @@
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"]::after,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"]::after,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"]::after,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"]::after,
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-fallback-continue="true"] {
     border: 0 !important;
+    border-radius: 0 !important;
     background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
     box-shadow: none !important;
+    outline: 0 !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] {

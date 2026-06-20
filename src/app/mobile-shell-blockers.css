@@ -316,13 +316,15 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] {
     gap: 0 !important;
-    min-height: calc(100svh - 12.25rem - env(safe-area-inset-bottom)) !important;
-    padding: clamp(0.6rem, 3vw, 1.1rem) 0 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
     box-shadow: none !important;
-    outline: none !important;
+    outline: 0 !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"] {
@@ -333,16 +335,18 @@
     justify-items: center !important;
     width: 100% !important;
     min-width: 0 !important;
-    min-height: min(33rem, calc(100svh - 14rem - env(safe-area-inset-bottom))) !important;
+    min-height: 0 !important;
     overflow: visible !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
-    padding: clamp(5.4rem, 22vw, 8.2rem) 1rem calc(3.2rem + env(safe-area-inset-bottom)) !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    padding: 0 !important;
     color: #18130c !important;
     text-align: center !important;
     box-shadow: none !important;
-    outline: none !important;
+    outline: 0 !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-light="true"] {
@@ -576,6 +580,8 @@
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
     box-shadow: none !important;
     outline: 0 !important;
   }
@@ -597,10 +603,22 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] {
     background: transparent !important;
     background-color: transparent !important;
+    background-image: none !important;
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     outline: 0 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"]::after,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"]::after,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"]::after,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"]::after {
+    content: none !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"] {
@@ -608,14 +626,14 @@
     align-content: center !important;
     justify-items: center !important;
     width: 100% !important;
-    min-height: min(33rem, calc(100svh - 14rem - env(safe-area-inset-bottom))) !important;
+    min-height: calc(100svh - 12.25rem - env(safe-area-inset-bottom)) !important;
     padding: clamp(5.8rem, 23vw, 8.4rem) 1rem calc(3.25rem + env(safe-area-inset-bottom)) !important;
     color: #1b1308 !important;
     text-align: center !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"] {
-    min-height: min(33rem, calc(100svh - 14rem - env(safe-area-inset-bottom))) !important;
+    min-height: calc(100svh - 12.25rem - env(safe-area-inset-bottom)) !important;
     padding: clamp(5.8rem, 23vw, 8.4rem) 1rem calc(3.25rem + env(safe-area-inset-bottom)) !important;
     display: grid !important;
     align-content: center !important;
