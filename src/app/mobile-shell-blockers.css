@@ -544,24 +544,18 @@
     overflow: hidden !important;
     min-height: 100svh !important;
     background:
-      radial-gradient(ellipse at 50% 57%, rgba(255, 250, 226, 0.9) 0%, rgba(248, 231, 190, 0.72) 24%, rgba(214, 171, 100, 0.36) 45%, transparent 68%),
-      radial-gradient(ellipse at 50% 49%, rgba(255, 246, 215, 0.42), transparent 20rem),
-      radial-gradient(ellipse at 82% 76%, rgba(73, 132, 126, 0.14), transparent 18rem),
-      radial-gradient(ellipse at 18% 86%, rgba(111, 83, 139, 0.1), transparent 16rem),
-      linear-gradient(180deg, #070b12 0%, #0b1018 20%, #211a12 35%, #8d6c3d 52%, #ead09a 70%, #fff5dc 86%, #fff9ec 100%) !important;
+      radial-gradient(ellipse at 50% 66%, rgba(255, 252, 235, 0.88) 0%, rgba(251, 234, 190, 0.62) 28%, transparent 58%),
+      linear-gradient(180deg, #060a12 0%, #090e17 25%, #3c3222 35%, #f2dcaa 35.5%, #fff4d8 68%, #fff9ec 100%) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"]::before {
     content: "" !important;
     position: absolute !important;
-    inset: 28% -42% calc(5.75rem + env(safe-area-inset-bottom)) -42% !important;
+    inset: 35% 0 calc(5.75rem + env(safe-area-inset-bottom)) 0 !important;
     z-index: 0 !important;
-    background:
-      linear-gradient(103deg, transparent 7%, rgba(255, 252, 229, 0.34) 18%, transparent 31%),
-      linear-gradient(116deg, transparent 27%, rgba(82, 138, 132, 0.13) 42%, rgba(255, 240, 190, 0.4) 55%, transparent 70%),
-      linear-gradient(74deg, transparent 48%, rgba(112, 85, 141, 0.11) 61%, rgba(255, 244, 208, 0.24) 75%, transparent 90%) !important;
-    filter: blur(28px) !important;
-    opacity: 0.62 !important;
+    background: linear-gradient(180deg, rgba(255, 245, 216, 0.72), rgba(255, 251, 238, 0.86)) !important;
+    filter: none !important;
+    opacity: 0.7 !important;
     transform: translate3d(-8%, 0, 0) rotate(-3deg) !important;
     animation: mobileHomeLightDrift 16s ease-in-out infinite alternate !important;
     pointer-events: none !important;
@@ -606,11 +600,11 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"] {
     display: grid !important;
-    align-content: center !important;
+    align-content: start !important;
     justify-items: center !important;
     width: 100% !important;
-    min-height: min(33rem, calc(100svh - 14rem - env(safe-area-inset-bottom))) !important;
-    padding: clamp(7rem, 27vw, 9.7rem) 1rem calc(2.4rem + env(safe-area-inset-bottom)) !important;
+    min-height: calc(100svh - 5.5rem - env(safe-area-inset-bottom)) !important;
+    padding: max(14rem, 40svh) 1rem calc(7.75rem + env(safe-area-inset-bottom)) !important;
     color: #1b1308 !important;
     text-align: center !important;
   }
@@ -636,7 +630,7 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-welcome="true"] {
     margin: 0 !important;
-    color: rgba(32, 22, 9, 0.9) !important;
+    color: rgba(80, 55, 24, 0.92) !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1rem, 4vw, 1.18rem) !important;
     font-weight: 500 !important;
@@ -647,7 +641,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"] {
     max-width: 22rem !important;
     margin: 0 !important;
-    color: #150f07 !important;
+    color: #1b1308 !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(2.25rem, 9.8vw, 2.8rem) !important;
     font-weight: 500 !important;
@@ -673,7 +667,7 @@
     border-radius: 0 !important;
     background: transparent !important;
     padding: 0.74rem 0.1rem !important;
-    color: #171007 !important;
+    color: #2a1b09 !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1.25rem, 5vw, 1.5rem) !important;
     font-weight: 500 !important;
@@ -688,7 +682,7 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button::after {
     content: "›";
-    color: #8a611f;
+    color: #8b6423;
     font-size: 1.45rem;
     line-height: 1;
   }

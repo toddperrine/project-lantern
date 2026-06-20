@@ -404,23 +404,18 @@
     padding-left: 0 !important;
     padding-right: 0 !important;
     background:
-      radial-gradient(ellipse at 50% 70%, rgba(255, 248, 222, 0.84) 0%, rgba(246, 224, 177, 0.62) 22%, rgba(190, 142, 69, 0.28) 42%, transparent 62%),
-      radial-gradient(ellipse at 82% 76%, rgba(73, 132, 126, 0.16), transparent 18rem),
-      radial-gradient(ellipse at 18% 86%, rgba(111, 83, 139, 0.12), transparent 16rem),
-      linear-gradient(180deg, #070b12 0%, #0b1018 24%, #17140f 40%, #5f4a2f 55%, #dec28a 69%, #fff5dc 86%, #fff9ec 100%) !important;
+      radial-gradient(ellipse at 50% 66%, rgba(255, 252, 235, 0.88) 0%, rgba(251, 234, 190, 0.62) 28%, transparent 58%),
+      linear-gradient(180deg, #060a12 0%, #090e17 25%, #3c3222 35%, #f2dcaa 35.5%, #fff4d8 68%, #fff9ec 100%) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"]::before {
     content: "" !important;
     position: absolute !important;
-    inset: 34% -42% calc(5.75rem + env(safe-area-inset-bottom)) -42% !important;
+    inset: 35% 0 calc(5.75rem + env(safe-area-inset-bottom)) 0 !important;
     z-index: 0 !important;
-    background:
-      linear-gradient(103deg, transparent 7%, rgba(255, 252, 229, 0.28) 18%, transparent 31%),
-      linear-gradient(116deg, transparent 27%, rgba(82, 138, 132, 0.13) 42%, rgba(255, 240, 190, 0.34) 55%, transparent 70%),
-      linear-gradient(74deg, transparent 48%, rgba(112, 85, 141, 0.11) 61%, rgba(255, 244, 208, 0.24) 75%, transparent 90%) !important;
-    filter: blur(28px) !important;
-    opacity: 0.56 !important;
+    background: linear-gradient(180deg, rgba(255, 245, 216, 0.72), rgba(255, 251, 238, 0.86)) !important;
+    filter: none !important;
+    opacity: 0.7 !important;
     transform: translate3d(-8%, 0, 0) rotate(-3deg) !important;
     animation: mobileHomeLightDrift 16s ease-in-out infinite alternate !important;
     pointer-events: none !important;
