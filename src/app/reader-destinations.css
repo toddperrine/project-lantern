@@ -835,3 +835,65 @@
     line-height: 1 !important;
   }
 }
+
+@media (max-width: 767px) {
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child button[aria-label="Open profile"] {
+    grid-column: 3 !important;
+    justify-self: end !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"]::before {
+    background: linear-gradient(180deg, rgba(3, 7, 17, 0.98) 0%, rgba(3, 7, 17, 0.96) 22%, rgba(3, 7, 17, 0.80) 34%, rgba(3, 7, 17, 0.32) 43%, rgba(3, 7, 17, 0.08) 50%, rgba(3, 7, 17, 0.00) 56%, transparent 100%) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"] {
+    max-width: calc(100vw - 48px) !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    color: #F7F2E8 !important;
+    -webkit-text-fill-color: #F7F2E8 !important;
+    font-size: clamp(3.05rem, 9.4vw, 3.55rem) !important;
+    line-height: 0.98 !important;
+    letter-spacing: -0.035em !important;
+    text-align: center !important;
+    text-wrap: auto !important;
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.58), 0 0 24px rgba(255, 244, 214, 0.16) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"] span {
+    display: block !important;
+    white-space: nowrap !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] {
+    position: relative !important;
+    z-index: 9 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button {
+    position: relative !important;
+    z-index: 9 !important;
+    display: grid !important;
+    grid-template-columns: 40px 1fr 40px !important;
+    align-items: center !important;
+    width: 100% !important;
+    opacity: 1 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-action-label="true"] {
+    grid-column: 2 !important;
+    justify-self: center !important;
+    color: #1E1710 !important;
+    -webkit-text-fill-color: #1E1710 !important;
+    opacity: 1 !important;
+    text-align: center !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-action-chevron="true"] {
+    grid-column: 3 !important;
+    justify-self: end !important;
+    color: #9A6A19 !important;
+    -webkit-text-fill-color: #9A6A19 !important;
+    opacity: 1 !important;
+  }
+}
