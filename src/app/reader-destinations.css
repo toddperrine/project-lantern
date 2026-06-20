@@ -700,23 +700,36 @@
     z-index: 2 !important;
   }
 
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"] {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+    overflow: visible !important;
+  }
+
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"] {
     box-sizing: border-box !important;
-    width: min(100%, calc(100vw - 48px)) !important;
-    max-width: calc(100vw - 48px) !important;
+    width: 100% !important;
+    max-width: 100% !important;
     margin-left: auto !important;
     margin-right: auto !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
     text-align: center !important;
     overflow: visible !important;
-    font-size: clamp(2.35rem, 9.2vw, 3.55rem) !important;
-    line-height: 0.96 !important;
-    letter-spacing: -0.035em !important;
+    font-size: clamp(2.05rem, 8.25vw, 3.05rem) !important;
+    line-height: 0.98 !important;
+    letter-spacing: -0.04em !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"] span {
     display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
     white-space: nowrap !important;
+    overflow: visible !important;
+    text-align: center !important;
   }
 }
