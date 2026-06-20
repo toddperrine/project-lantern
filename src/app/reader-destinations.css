@@ -403,7 +403,7 @@
     max-width: none !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
-    background: linear-gradient(180deg, #070b12 0%, #0b1018 24%, #17140f 40%, #5f4a2f 56%, #dec28a 72%, #fff5dc 88%, #fff9ec 100%) !important;
+    background: linear-gradient(180deg, #070b12 0%, #0b1018 22%, #17140f 32%, #5f4a2f 42%, #dec28a 52%, #fff3d3 64%, #fff8e8 100%) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section {

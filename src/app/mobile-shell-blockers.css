@@ -274,7 +274,7 @@
     position: relative !important;
     overflow: hidden !important;
     min-height: 100svh !important;
-    background: linear-gradient(180deg, #070b12 0%, #0b1018 24%, #17140f 40%, #5f4a2f 56%, #dec28a 72%, #fff5dc 88%, #fff9ec 100%) !important;
+    background: linear-gradient(180deg, #070b12 0%, #0b1018 22%, #17140f 32%, #5f4a2f 42%, #dec28a 52%, #fff3d3 64%, #fff8e8 100%) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section {
@@ -318,7 +318,7 @@
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
-    padding: clamp(5.4rem, 22vw, 8.2rem) 1rem calc(3.2rem + env(safe-area-inset-bottom)) !important;
+    padding: clamp(7.4rem, 30vw, 10.4rem) 1rem calc(2.6rem + env(safe-area-inset-bottom)) !important;
     color: #18130c !important;
     text-align: center !important;
     box-shadow: none !important;
@@ -327,23 +327,16 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-light="true"] {
     display: none !important;
-    position: absolute !important;
-    inset: 18% -24% 10% -24% !important;
-    z-index: -1 !important;
-    background:
-      linear-gradient(120deg, transparent 4%, rgba(255, 253, 234, 0.34) 19%, transparent 34%),
-      linear-gradient(78deg, transparent 42%, rgba(112, 139, 135, 0.13) 52%, rgba(255, 238, 190, 0.26) 63%, transparent 78%);
-    filter: blur(20px) !important;
-    opacity: 0.7 !important;
-    transform: translate3d(4%, 0, 0) rotate(1.5deg) !important;
-    animation: mobileGateLightDrift 16s ease-in-out infinite alternate !important;
+    background: transparent !important;
+    background-image: none !important;
+    animation: none !important;
     pointer-events: none !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-welcome="true"] {
     max-width: 20rem !important;
     margin: 0 auto -0.2rem !important;
-    color: rgba(33, 25, 13, 0.76) !important;
+    color: rgba(74, 53, 27, 0.88) !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1rem, 4vw, 1.18rem) !important;
     font-weight: 500 !important;
@@ -365,7 +358,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-question="true"] h1 {
     max-width: 22rem !important;
     margin: 0 auto !important;
-    color: #1c150b !important;
+    color: #1b1207 !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(2.25rem, 9.8vw, 2.8rem) !important;
     font-weight: 500 !important;
@@ -395,7 +388,7 @@
     border-radius: 999px !important;
     background: transparent !important;
     padding: 0.55rem 0.42rem !important;
-    color: rgba(43, 33, 19, 0.78) !important;
+    color: #2a1d0e !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1.1rem, 4.9vw, 1.34rem) !important;
     font-weight: 500 !important;
@@ -421,11 +414,10 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-choice][aria-pressed="true"] {
     border: 0 !important;
     background: transparent !important;
-    color: #8a5d19 !important;
+    color: #6f4812 !important;
     text-decoration: underline !important;
     text-decoration-thickness: 0.055em !important;
     text-underline-offset: 0.34em !important;
-    text-shadow: 0 0 18px rgba(212, 154, 53, 0.16) !important;
     box-shadow: none !important;
   }
 
@@ -493,11 +485,6 @@
     line-height: 1;
   }
 
-  @keyframes mobileGateLightDrift {
-    from { transform: translate3d(5%, 0, 0) rotate(1.5deg); }
-    to { transform: translate3d(-5%, 0, 0) rotate(1.5deg); }
-  }
-
 }
 
 @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
@@ -513,7 +500,7 @@
     isolation: isolate !important;
     overflow: hidden !important;
     min-height: 100svh !important;
-    background: linear-gradient(180deg, #070b12 0%, #0b1018 24%, #17140f 40%, #5f4a2f 56%, #dec28a 72%, #fff5dc 88%, #fff9ec 100%) !important;
+    background: linear-gradient(180deg, #070b12 0%, #0b1018 22%, #17140f 32%, #5f4a2f 42%, #dec28a 52%, #fff3d3 64%, #fff8e8 100%) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section,
@@ -560,14 +547,14 @@
     justify-items: center !important;
     width: 100% !important;
     min-height: min(33rem, calc(100svh - 14rem - env(safe-area-inset-bottom))) !important;
-    padding: clamp(7rem, 27vw, 9.7rem) 1rem calc(2.4rem + env(safe-area-inset-bottom)) !important;
+    padding: clamp(9rem, 34vw, 12rem) 1rem calc(1.8rem + env(safe-area-inset-bottom)) !important;
     color: #1b1308 !important;
     text-align: center !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"] {
     min-height: min(33rem, calc(100svh - 14rem - env(safe-area-inset-bottom))) !important;
-    padding: clamp(5.8rem, 23vw, 8.4rem) 1rem calc(3.25rem + env(safe-area-inset-bottom)) !important;
+    padding: clamp(8rem, 31vw, 10.8rem) 1rem calc(2.4rem + env(safe-area-inset-bottom)) !important;
     display: grid !important;
     align-content: center !important;
     justify-items: center !important;
@@ -577,7 +564,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"] {
     display: grid !important;
     justify-items: center !important;
-    gap: clamp(1.2rem, 5.5vw, 1.9rem) !important;
+    gap: clamp(1.45rem, 6vw, 2.1rem) !important;
     width: min(100%, 23rem) !important;
     margin: auto !important;
     padding: 0 0.35rem !important;
@@ -586,7 +573,7 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-welcome="true"] {
     margin: 0 !important;
-    color: rgba(32, 22, 9, 0.9) !important;
+    color: rgba(74, 53, 27, 0.88) !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1rem, 4vw, 1.18rem) !important;
     font-weight: 500 !important;
@@ -597,7 +584,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"] {
     max-width: 22rem !important;
     margin: 0 !important;
-    color: #150f07 !important;
+    color: #1b1207 !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(2.25rem, 9.8vw, 2.8rem) !important;
     font-weight: 500 !important;
@@ -608,7 +595,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] {
     display: grid !important;
     width: min(100%, 24rem) !important;
-    margin-top: 0.35rem !important;
+    margin-top: 0.55rem !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button {
@@ -623,7 +610,7 @@
     border-radius: 0 !important;
     background: transparent !important;
     padding: 0.74rem 0.1rem !important;
-    color: #171007 !important;
+    color: #2a1d0e !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1.25rem, 5vw, 1.5rem) !important;
     font-weight: 500 !important;
@@ -638,7 +625,7 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button::after {
     content: "›";
-    color: #8a611f;
+    color: #9a6b22;
     font-size: 1.45rem;
     line-height: 1;
   }
