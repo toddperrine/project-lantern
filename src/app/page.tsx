@@ -524,10 +524,10 @@ function WorldsView({ onOpenStory }: { onOpenStory: (story: StoryStart) => void 
 
 function MobileTopHeader({ onGoHome }: { onGoHome: () => void }) {
   return (
-    <header className="relative flex min-w-0 items-center justify-between py-1 md:hidden">
+    <header className="relative h-12 w-full min-w-0 py-1 md:hidden">
       <button
         aria-label="Open menu"
-        className="relative z-10 flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-xl text-paper"
+        className="absolute left-0 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-xl text-paper"
         type="button"
       >
         <span aria-hidden="true">☰</span>
@@ -551,7 +551,7 @@ function MobileTopHeader({ onGoHome }: { onGoHome: () => void }) {
 
       <button
         aria-label="Open profile"
-        className="relative z-10 flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-lg text-paper"
+        className="absolute right-0 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-lg text-paper"
         type="button"
       >
         <span aria-hidden="true">♡</span>
