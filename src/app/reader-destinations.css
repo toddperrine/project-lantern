@@ -1,5 +1,5 @@
 .project-lantern-shell main > section > header p:first-child::after {
-  content: " v0.7.89";
+  content: " v0.7.90";
 }
 
 .project-lantern-shell section:has(input[placeholder="My story project"]) {
@@ -725,5 +725,35 @@
     max-height: 30px !important;
     transform: none !important;
     font-size: 0.62rem !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"] {
+    transform: translateY(-140px) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"] span {
+    color: #F7F2E8 !important;
+    -webkit-text-fill-color: #F7F2E8 !important;
+    text-shadow:
+      0 2px 18px rgba(0, 0, 0, 0.58),
+      0 0 24px rgba(255, 244, 214, 0.16) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-welcome="true"] {
+    color: #E6C177 !important;
+    -webkit-text-fill-color: #E6C177 !important;
+  }
+
+  body > button[style*="position: fixed"],
+  body > button[style*="position:fixed"],
+  body > div[style*="position: fixed"][style*="right"]:not([role="dialog"]),
+  body > div[style*="position:fixed"][style*="right"]:not([role="dialog"]) {
+    top: auto !important;
+    right: 12px !important;
+    bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+    z-index: 20 !important;
   }
 }
