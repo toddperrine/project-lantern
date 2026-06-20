@@ -699,3 +699,114 @@
     transform: translate3d(0, 0, 0) rotate(-3deg) !important;
   }
 }
+
+
+@media (max-width: 767px) {
+  .project-lantern-shell main[data-mobile-active-view="home"],
+  .project-lantern-shell main[data-mobile-active-view="home"] > section,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] {
+    position: relative !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] {
+    outline: 3px solid #ff2d55 !important;
+    outline-offset: -3px !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section {
+    outline: 3px dashed #0a84ff !important;
+    outline-offset: -6px !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] {
+    outline: 3px solid #34c759 !important;
+    outline-offset: -9px !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"] {
+    outline: 3px solid #ff9500 !important;
+    outline-offset: -12px !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"] {
+    outline: 3px solid #af52de !important;
+    outline-offset: -15px !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"] {
+    outline: 3px solid #00c7be !important;
+    outline-offset: -18px !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] {
+    outline: 3px solid #ffcc00 !important;
+    outline-offset: -21px !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"]::after,
+  .project-lantern-shell main[data-mobile-active-view="home"] > section::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"]::before {
+    position: absolute !important;
+    top: 0.25rem !important;
+    left: 0.25rem !important;
+    z-index: 9999 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    min-height: 1rem !important;
+    border-radius: 0.2rem !important;
+    padding: 0.1rem 0.28rem !important;
+    color: #050505 !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+    font-size: 0.62rem !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+    letter-spacing: 0.02em !important;
+    text-transform: uppercase !important;
+    pointer-events: none !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"]::after {
+    content: "MAIN" !important;
+    background: #ff2d55 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section::before {
+    content: "ROOT SECTION" !important;
+    background: #0a84ff !important;
+    color: #fff !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"]::before {
+    content: "FALLBACK" !important;
+    background: #34c759 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"]::before {
+    content: "CHECK-IN" !important;
+    background: #ff9500 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"]::before {
+    content: "SURFACE" !important;
+    background: #af52de !important;
+    color: #fff !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"]::before {
+    content: "GATE" !important;
+    background: #00c7be !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"]::before {
+    content: "ACTIONS" !important;
+    background: #ffcc00 !important;
+  }
+}
