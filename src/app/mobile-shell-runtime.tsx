@@ -42,12 +42,6 @@ const FALLBACK_STARTS = [
   { title: "The Quiet Engine", premise: "A machine turns silence into possible futures.", tags: ["Emotional", "Sci-fi"], mood: "Emotional" }
 ];
 const FALLBACK_MOODS = ["Mystery", "Wonder", "Emotional", "Adventure", "Strange", "Hopeful", "Dark", "Reflective"];
-const CHECK_IN_CHOICES = [
-  ["Easy", "Long", "Strange", "Heavy", "Good", "I’m not sure"],
-  ["Restless", "Tired", "Curious", "Hopeful", "Lonely", "Ready to escape"],
-  ["Something quiet", "Something mysterious", "Something beautiful", "Something funny", "Something tense", "Something that makes me feel less alone"]
-];
-const CHECK_IN_STEPS = ["What kind of moment are you in?", "How are you feeling now?", "What kind of story would help?"];
 const CHECK_IN_GATE_KEY = "projectLantern.mobileCheckInGate";
 const CHECK_IN_STEP_KEY = "projectLantern.mobileCheckInStep";
 const CHECK_IN_ANSWERS_KEY = "projectLantern.mobileCheckInAnswers";
@@ -103,61 +97,11 @@ function setSelectedMood(mood: string) {
   window.sessionStorage.setItem("projectLantern.mobileMood", mood);
 }
 
-function selectedCheckInChoice() {
-  return window.sessionStorage.getItem("projectLantern.mobileCheckInChoice") || "";
-}
-
-function selectedCheckInGate() {
-  return window.sessionStorage.getItem(CHECK_IN_GATE_KEY) || "";
-}
-
-function startNewCheckIn() {
-  window.sessionStorage.setItem(CHECK_IN_GATE_KEY, "new");
-  window.sessionStorage.setItem(CHECK_IN_STEP_KEY, "0");
-}
-
 function resetMobileHomeGateState() {
   window.sessionStorage.removeItem(CHECK_IN_GATE_KEY);
   window.sessionStorage.removeItem(CHECK_IN_STEP_KEY);
   window.sessionStorage.removeItem(CHECK_IN_ANSWERS_KEY);
   window.sessionStorage.removeItem("projectLantern.mobileCheckInChoice");
-}
-
-function resetCheckInGate() {
-  resetMobileHomeGateState();
-}
-
-function selectedCheckInStep() {
-  const parsed = Number(window.sessionStorage.getItem(CHECK_IN_STEP_KEY) || "0");
-  if (!Number.isInteger(parsed) || parsed < 0 || parsed > CHECK_IN_STEPS.length) return 0;
-  return parsed;
-}
-
-function selectedCheckInAnswers() {
-  try {
-    const parsed = JSON.parse(window.sessionStorage.getItem(CHECK_IN_ANSWERS_KEY) || "[]") as string[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function setSelectedCheckInChoice(choice: string) {
-  window.sessionStorage.setItem("projectLantern.mobileCheckInChoice", choice);
-  const step = selectedCheckInStep();
-  const answers = selectedCheckInAnswers();
-  answers[step] = choice;
-  window.sessionStorage.setItem(CHECK_IN_ANSWERS_KEY, JSON.stringify(answers));
-  window.sessionStorage.setItem(CHECK_IN_STEP_KEY, String(Math.min(step + 1, CHECK_IN_STEPS.length)));
-}
-
-function goBackCheckInStep() {
-  const step = selectedCheckInStep();
-  if (step <= 0) {
-    resetCheckInGate();
-    return;
-  }
-  window.sessionStorage.setItem(CHECK_IN_STEP_KEY, String(step - 1));
 }
 
 function mappedArtKeyForTitle(title: string) {
@@ -504,45 +448,16 @@ function latestStoryTitle(main?: HTMLElement) {
 }
 
 function buildFallbackHome(hasStory = false, storyTitle = "The Half-Life of Magic") {
-  const step = selectedCheckInStep();
-  const answers = selectedCheckInAnswers();
-  const selectedChoice = answers[step] || selectedCheckInChoice();
-  const activeChoices = CHECK_IN_CHOICES[step] ?? CHECK_IN_CHOICES[0];
-  const gateChoice = selectedCheckInGate();
-  const showGate = gateChoice !== "new";
-  const isComplete = !showGate && step >= CHECK_IN_STEPS.length;
-  if (showGate) {
-    return `
-      <section data-mobile-home-surface="true" aria-label="Lantyrn home">
-        <section data-mobile-home-gate="true">
-          <p data-mobile-gate-welcome="true">Welcome back, Todd.</p>
-          <h1 data-mobile-gate-question="true"><span>What would you like</span><span>to read?</span></h1>
-          <div data-mobile-gate-actions="true">
-            ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue ${escapeHtml(storyTitle)}</button>` : ""}
-            <button data-mobile-check-in-start="true" type="button">Start something new</button>
-          </div>
-        </section>
-      </section>
-    `;
-  }
-
   return `
-    <section data-mobile-check-in="true" aria-label="Story check-in">
-      <div data-mobile-check-in-question="true">
-        ${step > 0 || gateChoice === "new" ? `<button data-mobile-check-in-back="true" type="button" aria-label="Back to previous check-in question">Back</button>` : ""}
-        ${isComplete ? `
-          <h1>Ready when you are.</h1>
-          <div data-mobile-check-in-actions="true">
-            <button data-mobile-check-in-final="start" type="button">Start New</button>
-            <button data-mobile-check-in-final="surprise" type="button">Surprise</button>
-          </div>
-        ` : `
-          <h1>${CHECK_IN_STEPS[step]}</h1>
-          <div data-mobile-check-in-choices="true">
-            ${activeChoices.map((choice) => `<button data-mobile-check-in-choice="${choice}" aria-pressed="${String(choice === selectedChoice)}" type="button">${choice}</button>`).join("")}
-          </div>
-        `}
-      </div>
+    <section data-mobile-home-surface="true" aria-label="Lantyrn home">
+      <section data-mobile-home-gate="true">
+        <p data-mobile-gate-welcome="true">Welcome back, Todd.</p>
+        <h1 data-mobile-gate-question="true"><span>What would you like</span><span>to read?</span></h1>
+        <div data-mobile-gate-actions="true">
+          ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue ${escapeHtml(storyTitle)}</button>` : ""}
+          <button data-mobile-check-in-start="true" type="button">Start something new</button>
+        </div>
+      </section>
     </section>
   `;
 }
@@ -562,44 +477,36 @@ function keepSelectedMoodVisible(fallback: HTMLElement, mood = selectedMood()) {
 function renderFallbackHome(fallback: HTMLElement, hasStory: boolean, storyTitle = "The Half-Life of Magic") {
   fallback.innerHTML = buildFallbackHome(hasStory, storyTitle);
   fallback.dataset.mobileFallbackHasStory = String(hasStory);
-  fallback.dataset.mobileFallbackMood = `${selectedCheckInGate()}:${selectedCheckInStep()}:${selectedCheckInChoice()}`;
+  fallback.dataset.mobileFallbackMood = "gate";
 }
 
 function bindFallbackHome(fallback: HTMLElement) {
   if (fallback.dataset.mobileFallbackBound === "true") return;
   fallback.dataset.mobileFallbackBound = "true";
+
   fallback.addEventListener("click", (event) => {
     const target = event.target instanceof Element ? event.target : null;
+
     if (target?.closest("[aria-label='Open last chapter recap']")) {
       event.preventDefault();
       event.stopPropagation();
       openRecapModal();
       return;
     }
+
     if (target?.closest("[data-mobile-continue-action='true']")) {
       continueLatestStory();
       return;
     }
-    if (target?.closest("[data-mobile-check-in-back='true']")) {
-      goBackCheckInStep();
-      renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true", fallback.dataset.mobileFallbackStoryTitle || "The Half-Life of Magic");
-      return;
-    }
+
     if (target?.closest("[data-mobile-check-in-start='true']")) {
-      startNewCheckIn();
-      renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true", fallback.dataset.mobileFallbackStoryTitle || "The Half-Life of Magic");
-      return;
-    }
-    if (target?.closest("[data-mobile-check-in-final]")) {
+      event.preventDefault();
+      resetMobileHomeGateState();
       clickMobileNav("Create");
       return;
     }
-    const choice = target?.closest<HTMLElement>("[data-mobile-check-in-choice]")?.dataset.mobileCheckInChoice;
-    if (choice) {
-      setSelectedCheckInChoice(choice);
-      renderFallbackHome(fallback, fallback.dataset.mobileFallbackHasStory === "true", fallback.dataset.mobileFallbackStoryTitle || "The Half-Life of Magic");
-    }
   });
+
   fallback.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     const target = event.target instanceof Element ? event.target : null;
@@ -636,8 +543,8 @@ function ensureMobileHomeFallback() {
   }
   const hasStory = getHomeStorySignal(main);
   const storyTitle = latestStoryTitle(main);
-  const selectedChoice = `${selectedCheckInGate()}:${selectedCheckInStep()}:${selectedCheckInChoice()}`;
-  if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || nextFallback.dataset.mobileFallbackStoryTitle !== storyTitle || nextFallback.dataset.mobileFallbackMood !== selectedChoice || cleanText(nextFallback.innerHTML) === "") renderFallbackHome(nextFallback, hasStory, storyTitle);
+  const fallbackState = "gate";
+  if (nextFallback.dataset.mobileFallbackHasStory !== String(hasStory) || nextFallback.dataset.mobileFallbackStoryTitle !== storyTitle || nextFallback.dataset.mobileFallbackMood !== fallbackState || cleanText(nextFallback.innerHTML) === "") renderFallbackHome(nextFallback, hasStory, storyTitle);
   nextFallback.dataset.mobileFallbackStoryTitle = storyTitle;
   bindFallbackHome(nextFallback);
   Array.from(root.children).forEach((child) => {
