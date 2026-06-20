@@ -51,6 +51,7 @@ const CHECK_IN_STEPS = ["What kind of moment are you in?", "How are you feeling 
 const CHECK_IN_GATE_KEY = "projectLantern.mobileCheckInGate";
 const CHECK_IN_STEP_KEY = "projectLantern.mobileCheckInStep";
 const CHECK_IN_ANSWERS_KEY = "projectLantern.mobileCheckInAnswers";
+const RESET_MOBILE_HOME_GATE_EVENT = "lantern:reset-mobile-home-gate";
 const FALLBACK_MOOD_ICONS: Record<string, string> = {
   Mystery: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="10.5" cy="10.5" r="5.5" stroke-width="1.8"/><path d="m15 15 4.5 4.5" stroke-linecap="round" stroke-width="1.8"/></svg>`,
   Wonder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" stroke-linecap="round" stroke-width="1.8"/><path d="m12 8.5 1.05 2.15 2.35.35-1.7 1.65.4 2.35-2.1-1.1-2.1 1.1.4-2.35L8.6 11l2.35-.35L12 8.5Z" stroke-linejoin="round" stroke-width="1.5"/></svg>`,
@@ -115,8 +116,15 @@ function startNewCheckIn() {
   window.sessionStorage.setItem(CHECK_IN_STEP_KEY, "0");
 }
 
-function resetCheckInGate() {
+function resetMobileHomeGateState() {
   window.sessionStorage.removeItem(CHECK_IN_GATE_KEY);
+  window.sessionStorage.removeItem(CHECK_IN_STEP_KEY);
+  window.sessionStorage.removeItem(CHECK_IN_ANSWERS_KEY);
+  window.sessionStorage.removeItem("projectLantern.mobileCheckInChoice");
+}
+
+function resetCheckInGate() {
+  resetMobileHomeGateState();
 }
 
 function selectedCheckInStep() {
@@ -778,11 +786,20 @@ export function MobileShellRuntime() {
       closeAccountModal();
       closeRecapModal();
     };
+    const resetHomeGate = () => {
+      resetMobileHomeGateState();
+      closeMobileMenu();
+      closeAccountModal();
+      closeRecapModal();
+      clickMobileNav("Home");
+      apply();
+    };
     apply();
     const observer = new MutationObserver(apply);
     observer.observe(document.body, { childList: true, characterData: true, subtree: true });
     window.addEventListener("popstate", apply);
     window.addEventListener("keydown", closeSheets);
+    window.addEventListener(RESET_MOBILE_HOME_GATE_EVENT, resetHomeGate);
     if (typeof mobileQuery.addEventListener === "function") mobileQuery.addEventListener("change", apply);
     else if (typeof mobileQuery.addListener === "function") mobileQuery.addListener(apply);
     return () => {
@@ -790,6 +807,7 @@ export function MobileShellRuntime() {
       observer.disconnect();
       window.removeEventListener("popstate", apply);
       window.removeEventListener("keydown", closeSheets);
+      window.removeEventListener(RESET_MOBILE_HOME_GATE_EVENT, resetHomeGate);
       if (typeof mobileQuery.removeEventListener === "function") mobileQuery.removeEventListener("change", apply);
       else if (typeof mobileQuery.removeListener === "function") mobileQuery.removeListener(apply);
     };
