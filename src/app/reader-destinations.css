@@ -732,4 +732,46 @@
     overflow: visible !important;
     text-align: center !important;
   }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] {
+    box-sizing: border-box !important;
+    display: grid !important;
+    width: 100% !important;
+    max-width: min(100%, calc(100vw - 96px)) !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    justify-items: stretch !important;
+    gap: 0 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button {
+    box-sizing: border-box !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 2rem !important;
+    align-items: center !important;
+    column-gap: 1rem !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    color: #1E1710 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: clamp(1.65rem, 6.6vw, 2rem) !important;
+    font-weight: 500 !important;
+    line-height: 1.05 !important;
+    text-align: left !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button::after {
+    content: "›" !important;
+    grid-column: 2 !important;
+    justify-self: end !important;
+    color: #9A6A19 !important;
+    font-size: 1.35em !important;
+    line-height: 1 !important;
+  }
 }
