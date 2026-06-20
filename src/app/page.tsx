@@ -527,28 +527,31 @@ function MobileTopHeader({ onGoHome }: { onGoHome: () => void }) {
     <header className="relative flex min-w-0 items-center justify-between py-1 md:hidden">
       <button
         aria-label="Open menu"
-        className="flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-xl text-paper"
+        className="relative z-10 flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-xl text-paper"
         type="button"
       >
         <span aria-hidden="true">☰</span>
       </button>
 
-      <button
+      <a
         aria-label="Go home"
-        className="absolute left-1/2 flex h-8 w-32 -translate-x-1/2 items-center justify-center border-0 bg-transparent p-0"
-        onClick={onGoHome}
-        type="button"
+        className="absolute left-1/2 top-1/2 z-0 flex h-8 w-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center border-0 bg-transparent p-0 no-underline"
+        href="/"
+        onClick={(event) => {
+          event.preventDefault();
+          onGoHome();
+        }}
       >
         <img
           alt="Lantyrn"
-          className="h-8 w-32 min-w-0 object-contain [filter:invert(96%)_sepia(9%)_saturate(363%)_hue-rotate(352deg)_brightness(102%)_contrast(93%)]"
+          className="block h-8 w-32 min-w-0 object-contain [filter:invert(96%)_sepia(9%)_saturate(363%)_hue-rotate(352deg)_brightness(102%)_contrast(93%)]"
           src="/artwork/lantyrn-wordmark.svg"
         />
-      </button>
+      </a>
 
       <button
         aria-label="Open profile"
-        className="flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-lg text-paper"
+        className="relative z-10 flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-lg text-paper"
         type="button"
       >
         <span aria-hidden="true">♡</span>
