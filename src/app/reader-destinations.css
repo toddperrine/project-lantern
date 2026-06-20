@@ -671,12 +671,32 @@
     padding-left: 0 !important;
     padding-right: 0 !important;
     background:
-      radial-gradient(ellipse at 8% 74%, rgba(166, 224, 218, 0.72) 0%, rgba(166, 224, 218, 0.42) 24%, rgba(166, 224, 218, 0.12) 43%, transparent 62%),
-      radial-gradient(ellipse at 54% 82%, rgba(247, 236, 202, 0.74) 0%, rgba(247, 236, 202, 0.42) 28%, rgba(247, 236, 202, 0.14) 50%, transparent 70%),
-      radial-gradient(ellipse at 88% 78%, rgba(226, 196, 132, 0.72) 0%, rgba(226, 196, 132, 0.38) 28%, rgba(226, 196, 132, 0.12) 52%, transparent 72%),
+      linear-gradient(104deg, transparent 0% 11%, rgba(194, 250, 247, 0.20) 15%, rgba(255, 255, 244, 0.08) 17%, transparent 23%),
+      linear-gradient(100deg, transparent 0% 39%, rgba(255, 246, 218, 0.18) 44%, rgba(255, 255, 250, 0.08) 47%, transparent 53%),
+      linear-gradient(107deg, transparent 0% 70%, rgba(255, 215, 135, 0.22) 75%, rgba(255, 255, 235, 0.10) 78%, transparent 84%),
+      radial-gradient(ellipse at 8% 76%, rgba(166, 224, 218, 0.74) 0%, rgba(166, 224, 218, 0.42) 24%, rgba(166, 224, 218, 0.12) 44%, transparent 64%),
+      radial-gradient(ellipse at 54% 84%, rgba(247, 236, 202, 0.76) 0%, rgba(247, 236, 202, 0.44) 30%, rgba(247, 236, 202, 0.14) 54%, transparent 74%),
+      radial-gradient(ellipse at 88% 80%, rgba(226, 196, 132, 0.74) 0%, rgba(226, 196, 132, 0.40) 30%, rgba(226, 196, 132, 0.12) 54%, transparent 74%),
       linear-gradient(180deg, #040812 0%, #050914 28%, #101923 48%, #746246 72%, #F6E8C6 100%) !important;
     background-repeat: no-repeat !important;
-    background-size: 100% 100% !important;
+    background-size:
+      130% 115%,
+      125% 110%,
+      128% 114%,
+      120% 105%,
+      120% 105%,
+      120% 105%,
+      100% 100% !important;
+    background-position:
+      42% 46%,
+      50% 48%,
+      58% 48%,
+      0% 100%,
+      50% 100%,
+      100% 100%,
+      center !important;
+    animation: lantyrn-mobile-home-light-motion 30s ease-in-out infinite alternate !important;
+    will-change: background-position;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"]::before,
@@ -781,5 +801,43 @@
     color: #9A6A19 !important;
     font-size: 1.35em !important;
     line-height: 1 !important;
+  }
+}
+
+@keyframes lantyrn-mobile-home-light-motion {
+  from {
+    background-position:
+      42% 46%,
+      50% 48%,
+      58% 48%,
+      0% 100%,
+      50% 100%,
+      100% 100%,
+      center;
+  }
+
+  to {
+    background-position:
+      38% 48%,
+      53% 46%,
+      61% 49%,
+      4% 100%,
+      51% 99%,
+      96% 100%,
+      center;
+  }
+}
+
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .project-lantern-shell main[data-mobile-active-view="home"] {
+    animation: none !important;
+    background-position:
+      42% 46%,
+      50% 48%,
+      58% 48%,
+      0% 100%,
+      50% 100%,
+      100% 100%,
+      center !important;
   }
 }
