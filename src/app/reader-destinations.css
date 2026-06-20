@@ -392,3 +392,101 @@
     color: #496d42 !important;
   }
 }
+
+@media (max-width: 767px) {
+  .project-lantern-shell main[data-mobile-active-view="home"] {
+    position: relative !important;
+    isolation: isolate !important;
+    overflow: hidden !important;
+    min-height: 100svh !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    background:
+      radial-gradient(ellipse at 50% 70%, rgba(255, 248, 222, 0.84) 0%, rgba(246, 224, 177, 0.62) 22%, rgba(190, 142, 69, 0.28) 42%, transparent 62%),
+      radial-gradient(ellipse at 82% 76%, rgba(73, 132, 126, 0.16), transparent 18rem),
+      radial-gradient(ellipse at 18% 86%, rgba(111, 83, 139, 0.12), transparent 16rem),
+      linear-gradient(180deg, #070b12 0%, #0b1018 24%, #17140f 40%, #5f4a2f 55%, #dec28a 69%, #fff5dc 86%, #fff9ec 100%) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"]::before {
+    content: "" !important;
+    position: absolute !important;
+    inset: 34% -42% calc(5.75rem + env(safe-area-inset-bottom)) -42% !important;
+    z-index: 0 !important;
+    background:
+      linear-gradient(103deg, transparent 7%, rgba(255, 252, 229, 0.28) 18%, transparent 31%),
+      linear-gradient(116deg, transparent 27%, rgba(82, 138, 132, 0.13) 42%, rgba(255, 240, 190, 0.34) 55%, transparent 70%),
+      linear-gradient(74deg, transparent 48%, rgba(112, 85, 141, 0.11) 61%, rgba(255, 244, 208, 0.24) 75%, transparent 90%) !important;
+    filter: blur(28px) !important;
+    opacity: 0.56 !important;
+    transform: translate3d(-8%, 0, 0) rotate(-3deg) !important;
+    animation: mobileHomeLightDrift 16s ease-in-out infinite alternate !important;
+    pointer-events: none !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section {
+    position: relative !important;
+    z-index: 1 !important;
+    width: 100% !important;
+    max-width: none !important;
+    background: transparent !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child {
+    padding-left: max(1rem, env(safe-area-inset-left)) !important;
+    padding-right: max(1rem, env(safe-area-inset-right)) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"] {
+    position: relative !important;
+    z-index: 1 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"]::after,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"]::after,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"]::after {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    outline: 0 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"] {
+    padding-left: max(1rem, env(safe-area-inset-left)) !important;
+    padding-right: max(1rem, env(safe-area-inset-right)) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"] {
+    width: min(100%, 23rem) !important;
+    max-width: 23rem !important;
+    padding-left: 0.35rem !important;
+    padding-right: 0.35rem !important;
+  }
+}
+
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .project-lantern-shell main[data-mobile-active-view="home"]::before {
+    animation: none !important;
+    transform: translate3d(0, 0, 0) rotate(-3deg) !important;
+  }
+}
