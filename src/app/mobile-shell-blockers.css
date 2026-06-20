@@ -308,7 +308,19 @@
     text-shadow: 0 1px 16px rgba(0, 0, 0, 0.28) !important;
   }
 
-  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child button,
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child button {
+    border-color: rgba(21, 17, 10, 0.24) !important;
+    background: rgba(255, 248, 231, 0.84) !important;
+    color: #17120a !important;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16) !important;
+    text-shadow: none !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child button svg {
+    color: #17120a !important;
+    stroke: currentColor !important;
+  }
+
   .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child p,
   .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child span {
     color: inherit !important;
@@ -544,10 +556,10 @@
     overflow: hidden !important;
     min-height: 100svh !important;
     background:
-      radial-gradient(ellipse at 50% 70%, rgba(255, 248, 222, 0.84) 0%, rgba(246, 224, 177, 0.62) 22%, rgba(190, 142, 69, 0.28) 42%, transparent 62%),
+      radial-gradient(ellipse at 50% 68%, rgba(255, 249, 224, 0.88) 0%, rgba(248, 228, 183, 0.68) 24%, rgba(190, 142, 69, 0.3) 43%, transparent 63%),
       radial-gradient(ellipse at 82% 76%, rgba(73, 132, 126, 0.16), transparent 18rem),
       radial-gradient(ellipse at 18% 86%, rgba(111, 83, 139, 0.12), transparent 16rem),
-      linear-gradient(180deg, #070b12 0%, #0b1018 24%, #17140f 40%, #5f4a2f 55%, #dec28a 69%, #fff5dc 86%, #fff9ec 100%) !important;
+      linear-gradient(180deg, #070b12 0%, #0b1018 23%, #17140f 38%, #5f4a2f 52%, #dec28a 66%, #fff5dc 84%, #fff9ec 100%) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"]::before {
@@ -609,7 +621,7 @@
     justify-items: center !important;
     width: 100% !important;
     min-height: min(33rem, calc(100svh - 14rem - env(safe-area-inset-bottom))) !important;
-    padding: clamp(5.8rem, 23vw, 8.4rem) 1rem calc(3.25rem + env(safe-area-inset-bottom)) !important;
+    padding: clamp(6.6rem, 26vw, 9.25rem) 1rem calc(3rem + env(safe-area-inset-bottom)) !important;
     color: #1b1308 !important;
     text-align: center !important;
   }
@@ -631,11 +643,12 @@
     margin: auto !important;
     padding: 0 0.35rem !important;
     text-align: center !important;
+    transform: translateY(clamp(1.15rem, 5.5vw, 2.4rem)) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-welcome="true"] {
     margin: 0 !important;
-    color: rgba(41, 29, 12, 0.78) !important;
+    color: rgba(36, 25, 10, 0.88) !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1rem, 4vw, 1.18rem) !important;
     font-weight: 500 !important;
@@ -646,7 +659,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"] {
     max-width: 22rem !important;
     margin: 0 !important;
-    color: #1a1207 !important;
+    color: #171006 !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(2.25rem, 9.8vw, 2.8rem) !important;
     font-weight: 500 !important;
@@ -657,7 +670,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] {
     display: grid !important;
     width: min(100%, 24rem) !important;
-    margin-top: 0.1rem !important;
+    margin-top: clamp(0.35rem, 2.2vw, 0.75rem) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button {
@@ -672,7 +685,7 @@
     border-radius: 0 !important;
     background: transparent !important;
     padding: 0.74rem 0.1rem !important;
-    color: #1a140c !important;
+    color: #171108 !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1.25rem, 5vw, 1.5rem) !important;
     font-weight: 500 !important;
