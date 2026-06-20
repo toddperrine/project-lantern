@@ -448,9 +448,18 @@ function latestStoryTitle(main?: HTMLElement) {
 }
 
 function buildFallbackHome(hasStory = false, storyTitle = "The Half-Life of Magic") {
-  return `    <section data-mobile-home-surface="true" aria-label="Lantyrn home">       <section data-mobile-home-gate="true">         <p data-mobile-gate-welcome="true">Welcome back, Todd.</p>         <h1 data-mobile-gate-question="true"><span>What would you like</span><span>to read?</span></h1>         <div data-mobile-gate-actions="true">
-          ${hasStory ?`<button data-mobile-continue-action="true" type="button">Continue ${escapeHtml(storyTitle)}</button>`: ""}           <button data-mobile-check-in-start="true" type="button">Start something new</button>         </div>       </section>     </section>
- `;
+  return `
+    <section data-mobile-home-surface="true" aria-label="Lantyrn home">
+      <section data-mobile-home-gate="true">
+        <p data-mobile-gate-welcome="true">Welcome back, Todd.</p>
+        <h1 data-mobile-gate-question="true"><span>What would you like</span><span>to read?</span></h1>
+        <div data-mobile-gate-actions="true">
+          ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue ${escapeHtml(storyTitle)}</button>` : ""}
+          <button data-mobile-check-in-start="true" type="button">Start something new</button>
+        </div>
+      </section>
+    </section>
+  `;
 }
 
 function keepSelectedMoodVisible(fallback: HTMLElement, mood = selectedMood()) {
