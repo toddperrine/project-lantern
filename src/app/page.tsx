@@ -407,7 +407,14 @@ export default function Home() {
   return (
     <main className="min-h-screen overflow-x-hidden px-3 pb-24 pt-3 text-paper sm:px-4 md:px-8 md:py-7">
       <section className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-5 md:gap-6">
-        <MobileTopHeader onGoHome={() => navigateToView("home")} />
+        <MobileTopHeader
+          onGoHome={() => {
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("lantern:reset-mobile-home-gate"));
+            }
+            navigateToView("home");
+          }}
+        />
         <header className="hidden min-w-0 flex-col gap-5 border-b border-paper/10 pb-6 md:flex md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold sm:tracking-[0.22em]">Lantyrn</p>
