@@ -1,5 +1,5 @@
 .project-lantern-shell main > section > header p:first-child::after {
-  content: " v0.7.77";
+  content: " v0.7.87";
 }
 
 .project-lantern-shell section:has(input[placeholder="My story project"]) {
@@ -528,5 +528,103 @@
   .project-lantern-shell main[data-mobile-active-view="home"]::before {
     animation: none !important;
     transform: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .project-lantern-shell main[data-mobile-active-view="home"] {
+    position: relative !important;
+    isolation: isolate !important;
+    overflow: hidden !important;
+    min-height: 100svh !important;
+    background:
+      radial-gradient(circle at 8% 62%, rgba(54, 213, 221, 0.50) 0%, rgba(54, 213, 221, 0.24) 18%, transparent 38%),
+      radial-gradient(circle at 48% 78%, rgba(255, 239, 190, 0.62) 0%, rgba(255, 239, 190, 0.34) 22%, transparent 48%),
+      radial-gradient(circle at 82% 70%, rgba(246, 177, 72, 0.56) 0%, rgba(246, 177, 72, 0.28) 24%, transparent 48%),
+      linear-gradient(180deg, #030711 0%, #070B14 24%, #111922 43%, #665A43 66%, #F4E7B8 100%) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"]::after {
+    content: "" !important;
+    position: absolute !important;
+    pointer-events: none !important;
+    mix-blend-mode: screen !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"]::before {
+    inset: -12% -18% !important;
+    z-index: 1 !important;
+    background:
+      linear-gradient(104deg, transparent 0 13%, rgba(92, 231, 230, 0.18) 18%, transparent 27%),
+      linear-gradient(101deg, transparent 0 38%, rgba(255, 245, 205, 0.20) 45%, transparent 53%),
+      linear-gradient(106deg, transparent 0 68%, rgba(255, 190, 84, 0.26) 76%, transparent 86%) !important;
+    filter: blur(24px) !important;
+    opacity: 0.9 !important;
+    animation: lantern-home-light-drift 22s ease-in-out infinite alternate !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"]::after {
+    inset: -24% -10% -18% -10% !important;
+    z-index: 2 !important;
+    background:
+      linear-gradient(104deg, transparent 0 8%, rgba(190, 255, 252, 0.42) 9%, rgba(255, 255, 238, 0.16) 10%, transparent 12%),
+      linear-gradient(101deg, transparent 0 31%, rgba(255, 235, 174, 0.34) 32%, rgba(255, 255, 245, 0.18) 33%, transparent 35%),
+      linear-gradient(106deg, transparent 0 52%, rgba(255, 246, 213, 0.30) 53%, rgba(255, 255, 255, 0.18) 54%, transparent 56%),
+      linear-gradient(103deg, transparent 0 73%, rgba(255, 206, 106, 0.58) 74%, rgba(255, 255, 240, 0.28) 75%, transparent 77%),
+      linear-gradient(107deg, transparent 0 86%, rgba(255, 185, 72, 0.26) 87%, transparent 90%) !important;
+    filter: blur(1.4px) !important;
+    opacity: 0.78 !important;
+    animation: lantern-home-light-drift 18s ease-in-out infinite alternate-reverse !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] {
+    position: relative !important;
+    z-index: 3 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"] {
+    display: block !important;
+    min-height: calc(100svh - 8rem - env(safe-area-inset-bottom)) !important;
+    padding: 0 max(1rem, env(safe-area-inset-right)) calc(1.8rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)) !important;
+    color: #F7F2E8 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"] {
+    position: absolute !important;
+    top: clamp(220px, 29svh, 260px) !important;
+    left: 0 !important;
+    right: 0 !important;
+    display: grid !important;
+    justify-items: center !important;
+    gap: clamp(0.9rem, 3.8vw, 1.35rem) !important;
+    width: min(100%, 23rem) !important;
+    max-width: 23rem !important;
+    margin: 0 auto !important;
+    padding: 0 0.35rem !important;
+    text-align: center !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-welcome="true"] {
+    color: #E6C177 !important;
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"] {
+    color: #FFFFFF !important;
+    text-shadow:
+      0 2px 18px rgba(0, 0, 0, 0.55),
+      0 0 24px rgba(255, 244, 214, 0.14) !important;
+  }
+}
+
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .project-lantern-shell main[data-mobile-active-view="home"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"]::after {
+    animation: none !important;
   }
 }
