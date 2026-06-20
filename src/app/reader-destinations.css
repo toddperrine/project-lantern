@@ -732,59 +732,46 @@
     overflow: visible !important;
     text-align: center !important;
   }
-}
 
-@media (max-width: 767px) {
-  /*
-    Canonical mobile Home primary action alignment.
-    Centers the Start action label while preserving a right-side chevron.
-  */
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] {
     box-sizing: border-box !important;
     display: grid !important;
     width: 100% !important;
-    max-width: 100% !important;
-    margin: clamp(0.6rem, 2.6svh, 1.25rem) auto 0 !important;
-    padding: 0 48px !important;
+    max-width: min(100%, calc(100vw - 96px)) !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    justify-items: stretch !important;
     gap: 0 !important;
   }
 
-  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button[data-mobile-check-in-start="true"] {
-    position: relative !important;
-    display: block !important;
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button {
+    box-sizing: border-box !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 2rem !important;
+    align-items: center !important;
+    column-gap: 1rem !important;
     width: 100% !important;
-    min-height: 44px !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
     border: 0 !important;
     background: transparent !important;
-    padding: 0 44px !important;
-    box-shadow: none !important;
+    padding: 0 !important;
     color: #1E1710 !important;
     font-family: Georgia, "Times New Roman", serif !important;
-    font-size: clamp(1.45rem, 5.6vw, 1.9rem) !important;
+    font-size: clamp(1.65rem, 6.6vw, 2rem) !important;
     font-weight: 500 !important;
-    line-height: 1.2 !important;
-    text-align: center !important;
-    text-decoration: none !important;
-    opacity: 1 !important;
+    line-height: 1.05 !important;
+    text-align: left !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
   }
 
-  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button[data-mobile-check-in-start="true"]::before {
-    content: none !important;
-    display: none !important;
-  }
-
-  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button[data-mobile-check-in-start="true"]::after {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button::after {
     content: "›" !important;
-    position: absolute !important;
-    right: 0 !important;
-    top: 50% !important;
-    display: block !important;
-    transform: translateY(-50%) !important;
+    grid-column: 2 !important;
+    justify-self: end !important;
     color: #9A6A19 !important;
-    font-family: Georgia, "Times New Roman", serif !important;
-    font-size: 1.75rem !important;
-    font-weight: 500 !important;
+    font-size: 1.35em !important;
     line-height: 1 !important;
-    opacity: 1 !important;
   }
 }
