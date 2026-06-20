@@ -244,8 +244,7 @@
 }
 
 @media (max-width: 767px) {
-  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-card="true"]::before,
-  .project-lantern-shell main[data-mobile-active-view="home"] > section > div > div.md\:hidden section:first-child::before {
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-card="true"]::before {
     content: none !important;
   }
 
