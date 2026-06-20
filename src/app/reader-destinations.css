@@ -941,3 +941,83 @@
     justify-self: end !important;
   }
 }
+
+@media (max-width: 767px) {
+  .project-lantern-shell main[data-mobile-active-view="home"] .home-actions {
+    position: relative !important;
+    z-index: 12 !important;
+    opacity: 1 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] .home-action-row {
+    position: relative !important;
+    z-index: 12 !important;
+    opacity: 1 !important;
+    display: grid !important;
+    grid-template-columns: 40px minmax(0, 1fr) 40px !important;
+    align-items: center !important;
+    width: 100% !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] .home-action-label {
+    grid-column: 2 !important;
+    justify-self: center !important;
+    text-align: center !important;
+    color: #1E1710 !important;
+    opacity: 1 !important;
+    text-shadow: 0 1px 10px rgba(255, 244, 214, 0.24) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] .home-action-chevron {
+    grid-column: 3 !important;
+    justify-self: end !important;
+    color: #9A6A19 !important;
+    opacity: 1 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] .story-start-screen {
+    position: relative !important;
+    min-height: 100svh !important;
+    overflow: hidden !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] .story-start-main {
+    position: relative !important;
+    z-index: 12 !important;
+    min-height: 100svh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-left: 28px !important;
+    padding-right: 28px !important;
+    padding-bottom: calc(156px + env(safe-area-inset-bottom)) !important;
+    box-sizing: border-box !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] .story-start-back {
+    color: #E6C177 !important;
+    opacity: 1 !important;
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] .story-start-title {
+    color: #F7F2E8 !important;
+    opacity: 1 !important;
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.58), 0 0 24px rgba(255, 244, 214, 0.16) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] .story-start-options {
+    position: relative !important;
+    z-index: 12 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] .story-start-option {
+    color: #1E1710 !important;
+    opacity: 1 !important;
+    text-shadow: 0 1px 10px rgba(255, 244, 214, 0.20) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] .story-start-option--dark-bg {
+    color: #F7F2E8 !important;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.58), 0 0 18px rgba(255, 244, 214, 0.12) !important;
+  }
+}

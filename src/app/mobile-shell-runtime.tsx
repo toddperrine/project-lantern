@@ -519,19 +519,19 @@ function buildFallbackHome(hasStory = false, storyTitle = "The Half-Life of Magi
   }
 
   return `
-    <section data-mobile-check-in="true" aria-label="Story check-in">
-      <div data-mobile-check-in-question="true">
-        ${step > 0 || gateChoice === "new" ? `<button data-mobile-check-in-back="true" type="button" aria-label="Back to previous check-in question">Back</button>` : ""}
+    <section class="story-start-screen" data-mobile-check-in="true" aria-label="Story check-in">
+      <div class="story-start-main" data-mobile-check-in-question="true">
+        ${step > 0 || gateChoice === "new" ? `<button class="story-start-back" data-mobile-check-in-back="true" type="button" aria-label="Back to previous check-in question">Back</button>` : ""}
         ${isComplete ? `
-          <h1>Ready when you are.</h1>
-          <div data-mobile-check-in-actions="true">
-            <button data-mobile-check-in-final="start" type="button">Start New</button>
-            <button data-mobile-check-in-final="surprise" type="button">Surprise</button>
+          <h1 class="story-start-title">Ready when you are.</h1>
+          <div class="story-start-options" data-mobile-check-in-actions="true">
+            <button class="story-start-option" data-mobile-check-in-final="start" type="button">Start New</button>
+            <button class="story-start-option" data-mobile-check-in-final="surprise" type="button">Surprise</button>
           </div>
         ` : `
-          <h1>${CHECK_IN_STEPS[step]}</h1>
-          <div data-mobile-check-in-choices="true">
-            ${activeChoices.map((choice) => `<button data-mobile-check-in-choice="${choice}" aria-pressed="${String(choice === selectedChoice)}" type="button">${choice}</button>`).join("")}
+          <h1 class="story-start-title">${CHECK_IN_STEPS[step]}</h1>
+          <div class="story-start-options" data-mobile-check-in-choices="true">
+            ${activeChoices.map((choice) => `<button class="story-start-option" data-mobile-check-in-choice="${choice}" aria-pressed="${String(choice === selectedChoice)}" type="button">${choice}</button>`).join("")}
           </div>
         `}
       </div>
