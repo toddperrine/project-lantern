@@ -1,5 +1,5 @@
 .project-lantern-shell main > section > header p:first-child::after {
-  content: " v0.7.76";
+  content: " v0.7.77";
 }
 
 .project-lantern-shell section:has(input[placeholder="My story project"]) {
@@ -403,7 +403,39 @@
     max-width: none !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
-    background: linear-gradient(180deg, #070b12 0%, #0b1018 22%, #17140f 32%, #5f4a2f 42%, #dec28a 52%, #fff3d3 64%, #fff8e8 100%) !important;
+    background:
+      radial-gradient(ellipse at 50% -10%, rgba(255, 249, 229, 0.2) 0%, transparent 34%),
+      radial-gradient(ellipse at 78% 42%, rgba(226, 186, 116, 0.22) 0%, transparent 36%),
+      radial-gradient(ellipse at 22% 62%, rgba(255, 246, 222, 0.24) 0%, transparent 34%),
+      linear-gradient(180deg, #070b12 0%, #0b1018 25%, #17140f 39%, #665137 54%, #d7b87e 70%, #fff1cf 86%, #fff8e8 100%) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"]::after {
+    content: "";
+    position: absolute;
+    inset: -18% -24% -10%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"]::before {
+    background:
+      linear-gradient(104deg, transparent 8%, rgba(255, 246, 220, 0.14) 18%, transparent 32%),
+      linear-gradient(82deg, transparent 44%, rgba(234, 190, 111, 0.13) 53%, transparent 66%),
+      linear-gradient(116deg, transparent 58%, rgba(255, 251, 235, 0.16) 67%, transparent 78%);
+    filter: blur(18px);
+    opacity: 0.82;
+    transform: translate3d(-2%, 0, 0);
+    animation: lantern-home-light-drift 18s ease-in-out infinite alternate;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"]::after {
+    background:
+      radial-gradient(ellipse at 50% 38%, rgba(255, 238, 188, 0.2), transparent 38%),
+      radial-gradient(ellipse at 50% 72%, rgba(255, 250, 235, 0.34), transparent 48%);
+    filter: blur(24px);
+    opacity: 0.68;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section {
@@ -418,6 +450,23 @@
     padding-left: max(1rem, env(safe-area-inset-left)) !important;
     padding-right: max(1rem, env(safe-area-inset-right)) !important;
   }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child button {
+    border-color: rgba(255, 250, 238, 0.62) !important;
+    background: rgba(255, 250, 238, 0.88) !important;
+    color: #1b1308 !important;
+    box-shadow: 0 10px 30px rgba(7, 11, 18, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.42) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child button svg {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+    display: block !important;
+    color: currentColor !important;
+  }
+
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"],
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in="true"],
@@ -461,5 +510,23 @@
     max-width: 23rem !important;
     padding-left: 0.35rem !important;
     padding-right: 0.35rem !important;
+  }
+}
+
+
+@keyframes lantern-home-light-drift {
+  from {
+    transform: translate3d(-3%, -1%, 0) skewX(-2deg);
+  }
+
+  to {
+    transform: translate3d(3%, 1%, 0) skewX(2deg);
+  }
+}
+
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .project-lantern-shell main[data-mobile-active-view="home"]::before {
+    animation: none !important;
+    transform: none !important;
   }
 }

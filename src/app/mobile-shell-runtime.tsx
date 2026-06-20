@@ -69,6 +69,7 @@ const DEMO_STORY_TEXT = [
   "Someone else knows the talisman has awakened, and they are already looking for it."
 ].join("\n\n");
 const DEMO_RECAP = "Mara found the first talisman inside a box of ordinary estate-sale objects. When she touched it, the room shifted, a hidden mark appeared on an old receipt, and somewhere far away an ancient wanderer felt the signal return.";
+const MENU_ICON = `<svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-linecap="round" stroke-width="1.9"/></svg>`;
 const PROFILE_ICON = `<svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="3.25" stroke="currentColor" stroke-width="1.8"/><path d="M5.75 19.25c.85-3.15 3.15-5 6.25-5s5.4 1.85 6.25 5" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"/></svg>`;
 
 function currentView() {
@@ -705,6 +706,10 @@ function bindHeaderActions() {
   const menuButton = document.querySelector<HTMLButtonElement>('.project-lantern-shell button[aria-label="Open menu"]') ?? headerButtons[0];
   if (menuButton) {
     menuButton.setAttribute("aria-label", "Open menu");
+    if (menuButton.dataset.mobileMenuIcon !== "true") {
+      menuButton.dataset.mobileMenuIcon = "true";
+      menuButton.innerHTML = MENU_ICON;
+    }
     if (menuButton.dataset.mobileMenuBound !== "true") {
       menuButton.dataset.mobileMenuBound = "true";
       menuButton.addEventListener("click", (event) => {
