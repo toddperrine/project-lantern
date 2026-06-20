@@ -757,3 +757,46 @@
     z-index: 20 !important;
   }
 }
+
+@media (max-width: 767px) {
+  /*
+    Canonical mobile Home background containment.
+    This intentionally overrides earlier experimental Home background layers so
+    normal iPhone Safari and full-screen/standalone mobile use the same stable
+    background composition.
+  */
+  .project-lantern-shell main[data-mobile-active-view="home"] {
+    position: relative !important;
+    isolation: isolate !important;
+    overflow: hidden !important;
+    min-height: 100svh !important;
+    background:
+      radial-gradient(ellipse at 8% 74%, rgba(166, 224, 218, 0.72) 0%, rgba(166, 224, 218, 0.42) 24%, rgba(166, 224, 218, 0.12) 43%, transparent 62%),
+      radial-gradient(ellipse at 54% 82%, rgba(247, 236, 202, 0.74) 0%, rgba(247, 236, 202, 0.42) 28%, rgba(247, 236, 202, 0.14) 50%, transparent 70%),
+      radial-gradient(ellipse at 88% 78%, rgba(226, 196, 132, 0.72) 0%, rgba(226, 196, 132, 0.38) 28%, rgba(226, 196, 132, 0.12) 52%, transparent 72%),
+      linear-gradient(180deg, #040812 0%, #050914 28%, #101923 48%, #746246 72%, #F6E8C6 100%) !important;
+    background-repeat: no-repeat !important;
+    background-size: 100% 100% !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"]::before,
+  .project-lantern-shell main[data-mobile-active-view="home"]::after {
+    content: none !important;
+    display: none !important;
+    background: none !important;
+    animation: none !important;
+    transform: none !important;
+    filter: none !important;
+    opacity: 0 !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="home"] > section,
+  .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child,
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-fallback="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-surface="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"],
+  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] {
+    position: relative !important;
+    z-index: 2 !important;
+  }
+}
