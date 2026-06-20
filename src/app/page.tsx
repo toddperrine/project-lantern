@@ -516,7 +516,7 @@ function WorldsView({ onOpenStory }: { onOpenStory: (story: StoryStart) => void 
 }
 
 function MobileTopHeader() {
-  return <header className="flex min-w-0 items-center justify-between py-1 md:hidden"><button aria-label="Open menu" className="flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-xl text-paper" type="button">☰</button><img alt="Lantyrn" aria-label="Lantyrn" className="h-8 w-32 min-w-0 object-contain [filter:invert(96%)_sepia(9%)_saturate(363%)_hue-rotate(352deg)_brightness(102%)_contrast(93%)]" src="/artwork/lantyrn-wordmark.svg" /><button aria-label="Open profile" className="flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-lg text-paper" type="button">♡</button></header>;
+  return <header className="flex min-w-0 items-center justify-between py-1 md:hidden"><button aria-label="Open menu" className="flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-xl text-paper" type="button"><span aria-hidden="true">☰</span></button><img alt="Lantyrn" aria-label="Lantyrn" className="h-8 w-32 min-w-0 object-contain [filter:invert(96%)_sepia(9%)_saturate(363%)_hue-rotate(352deg)_brightness(102%)_contrast(93%)]" src="/artwork/lantyrn-wordmark.svg" /><button aria-label="Open profile" className="flex size-10 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-lg text-paper" type="button"><span aria-hidden="true">♡</span></button></header>;
 }
 
 function MobileBottomNav({ activeView, onChange }: { activeView: AppView; onChange: (view: AppView) => void }) {
