@@ -274,27 +274,7 @@
     position: relative !important;
     overflow: hidden !important;
     min-height: 100svh !important;
-    background:
-      radial-gradient(ellipse at 18% 48%, rgba(255, 232, 174, 0.26), transparent 20rem),
-      radial-gradient(ellipse at 88% 70%, rgba(104, 144, 139, 0.12), transparent 17rem),
-      radial-gradient(ellipse at 74% 84%, rgba(128, 98, 145, 0.1), transparent 16rem),
-      linear-gradient(180deg, #0b0f16 0%, #11100e 26%, #252017 39%, #7f6b48 52%, #f4e7cf 66%, #fff8ea 82%, #fbf7ef 100%) !important;
-  }
-
-  .project-lantern-shell main[data-mobile-active-view="home"]::before {
-    content: "";
-    position: absolute;
-    inset: 39% -46% calc(5.5rem + env(safe-area-inset-bottom)) -46%;
-    z-index: 0;
-    background:
-      linear-gradient(104deg, transparent 3%, rgba(255, 255, 244, 0.3) 15%, transparent 31%),
-      linear-gradient(112deg, transparent 24%, rgba(104, 144, 139, 0.13) 38%, rgba(255, 246, 216, 0.38) 52%, transparent 68%),
-      linear-gradient(72deg, transparent 50%, rgba(126, 98, 145, 0.1) 61%, rgba(255, 238, 190, 0.26) 74%, transparent 88%);
-    filter: blur(26px);
-    opacity: 0.58;
-    transform: translate3d(-9%, 0, 0) rotate(-3deg);
-    animation: mobileHomeLightDrift 18s ease-in-out infinite alternate;
-    pointer-events: none;
+    background: linear-gradient(180deg, #070b12 0%, #0b1018 24%, #17140f 40%, #5f4a2f 56%, #dec28a 72%, #fff5dc 88%, #fff9ec 100%) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section {
@@ -513,11 +493,6 @@
     line-height: 1;
   }
 
-  @keyframes mobileHomeLightDrift {
-    from { transform: translate3d(-9%, 0, 0) rotate(-3deg); }
-    to { transform: translate3d(9%, 0, 0) rotate(-3deg); }
-  }
-
   @keyframes mobileGateLightDrift {
     from { transform: translate3d(5%, 0, 0) rotate(1.5deg); }
     to { transform: translate3d(-5%, 0, 0) rotate(1.5deg); }
@@ -526,13 +501,8 @@
 }
 
 @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
-  .project-lantern-shell main[data-mobile-active-view="home"]::before,
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-light="true"] {
     animation: none !important;
-  }
-
-  .project-lantern-shell main[data-mobile-active-view="home"]::before,
-  .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-light="true"] {
     transform: none !important;
   }
 }
@@ -543,28 +513,7 @@
     isolation: isolate !important;
     overflow: hidden !important;
     min-height: 100svh !important;
-    background:
-      radial-gradient(ellipse at 50% 57%, rgba(255, 250, 226, 0.9) 0%, rgba(248, 231, 190, 0.72) 24%, rgba(214, 171, 100, 0.36) 45%, transparent 68%),
-      radial-gradient(ellipse at 50% 49%, rgba(255, 246, 215, 0.42), transparent 20rem),
-      radial-gradient(ellipse at 82% 76%, rgba(73, 132, 126, 0.14), transparent 18rem),
-      radial-gradient(ellipse at 18% 86%, rgba(111, 83, 139, 0.1), transparent 16rem),
-      linear-gradient(180deg, #070b12 0%, #0b1018 20%, #211a12 35%, #8d6c3d 52%, #ead09a 70%, #fff5dc 86%, #fff9ec 100%) !important;
-  }
-
-  .project-lantern-shell main[data-mobile-active-view="home"]::before {
-    content: "" !important;
-    position: absolute !important;
-    inset: 28% -42% calc(5.75rem + env(safe-area-inset-bottom)) -42% !important;
-    z-index: 0 !important;
-    background:
-      linear-gradient(103deg, transparent 7%, rgba(255, 252, 229, 0.34) 18%, transparent 31%),
-      linear-gradient(116deg, transparent 27%, rgba(82, 138, 132, 0.13) 42%, rgba(255, 240, 190, 0.4) 55%, transparent 70%),
-      linear-gradient(74deg, transparent 48%, rgba(112, 85, 141, 0.11) 61%, rgba(255, 244, 208, 0.24) 75%, transparent 90%) !important;
-    filter: blur(28px) !important;
-    opacity: 0.62 !important;
-    transform: translate3d(-8%, 0, 0) rotate(-3deg) !important;
-    animation: mobileHomeLightDrift 16s ease-in-out infinite alternate !important;
-    pointer-events: none !important;
+    background: linear-gradient(180deg, #070b12 0%, #0b1018 24%, #17140f 40%, #5f4a2f 56%, #dec28a 72%, #fff5dc 88%, #fff9ec 100%) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section,
@@ -598,6 +547,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] {
     background: transparent !important;
     background-color: transparent !important;
+    background-image: none !important;
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
@@ -691,12 +641,5 @@
     color: #8a611f;
     font-size: 1.45rem;
     line-height: 1;
-  }
-}
-
-@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
-  .project-lantern-shell main[data-mobile-active-view="home"]::before {
-    animation: none !important;
-    transform: translate3d(0, 0, 0) rotate(-3deg) !important;
   }
 }
