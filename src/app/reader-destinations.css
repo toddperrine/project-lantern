@@ -719,7 +719,7 @@
     padding-right: 0 !important;
     text-align: center !important;
     overflow: visible !important;
-    font-size: clamp(2.05rem, 8.25vw, 3.05rem) !important;
+    font-size: clamp(2.15rem, 8.8vw, 3.25rem) !important;
     line-height: 0.98 !important;
     letter-spacing: -0.04em !important;
   }

@@ -1,28 +1,29 @@
 "use client";
 
 /*
- * MOBILE SHELL RUNTIME OWNERSHIP RULES
- *
- * This file is a temporary mobile compatibility layer.
- *
- * Allowed responsibilities:
- * - normalize existing mobile DOM labels/classes
- * - bind temporary menu/profile/recap interactions
- * - keep the fallback mobile Home gate stable until React fully owns mobile Home
- * - preserve legacy mobile behavior while the app is being refactored
- *
- * Forbidden responsibilities:
- * - do not add new product flows here
- * - do not add onboarding here
- * - do not add mood intake here
- * - do not add story-start questionnaires here
- * - do not add personalization/profile logic here
- * - do not add recommendation logic here
- * - do not add generation behavior here
- *
- * New product UX must be implemented in React components, not by injecting
- * runtime HTML strings or DOM-mutating workflow screens from this file.
- */
+
+* MOBILE SHELL RUNTIME OWNERSHIP RULES
+*
+* This file is a temporary mobile compatibility layer.
+*
+* Allowed responsibilities:
+* * normalize existing mobile DOM labels/classes
+* * bind temporary menu/profile/recap interactions
+* * keep the fallback mobile Home gate stable until React fully owns mobile Home
+* * preserve legacy mobile behavior while the app is being refactored
+*
+* Forbidden responsibilities:
+* * do not add new product flows here
+* * do not add onboarding here
+* * do not add mood intake here
+* * do not add story-start questionnaires here
+* * do not add personalization/profile logic here
+* * do not add recommendation logic here
+* * do not add generation behavior here
+*
+* New product UX must be implemented in React components, not by injecting
+* runtime HTML strings or DOM-mutating workflow screens from this file.
+  */
 
 import { useEffect } from "react";
 
@@ -476,7 +477,7 @@ function buildFallbackHome(hasStory = false, storyTitle = "The Half-Life of Magi
     <section data-mobile-home-surface="true" aria-label="Lantyrn home">
       <section data-mobile-home-gate="true">
         <p data-mobile-gate-welcome="true">Welcome back, Todd.</p>
-        <h1 data-mobile-gate-question="true"><span>What would you like</span><span>to read?</span></h1>
+        <h1 data-mobile-gate-question="true"><span>What would you</span><span>like to read?</span></h1>
         <div data-mobile-gate-actions="true">
           ${hasStory ? `<button data-mobile-continue-action="true" type="button">Continue ${escapeHtml(storyTitle)}</button>` : ""}
           <button data-mobile-check-in-start="true" type="button">Start something new</button>
