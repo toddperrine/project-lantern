@@ -696,7 +696,6 @@ function applyMobileShell(mobileQuery: MediaQueryList) {
   markActiveMobileView();
   hideDemoMessages();
   markHomeCards();
-  ensureMobileHomeFallback();
   markLibraryPage();
   markCompactDestinationCards();
   bindHeaderActions();

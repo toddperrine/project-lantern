@@ -158,9 +158,9 @@ export default function Home() {
     window.history.pushState(null, "", nextUrl);
   }
 
-  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null; presentation: Exclude<GeneratedStoryPresentation, null> }>) {
+  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null; presentation: Exclude<GeneratedStoryPresentation, null>; loadingMessage: string }>) {
     setError("");
-    setStatusMessage("");
+    setStatusMessage(overrides?.loadingMessage ?? "");
     setIsGenerating(true);
     try {
       const response = await fetch("/api/generate", {
@@ -252,14 +252,32 @@ export default function Home() {
   }
 
   function handleStartSomethingNew() {
+    if (isGenerating) return;
+
+    const storyStart = suggestedStarts[0] ?? SUGGESTED_STORY_STARTS[0];
+    applyStoryStart(storyStart);
     setStoryResponse(null);
     setCurrentStoryId("");
     setGeneratedStoryPresentation(null);
     setIsStoryStartSelectionOpen(false);
     setPendingStoryStart(null);
-    setMoodIntakeMode("story-start");
-    setStatusMessage("Tell Lantyrn what you need before choosing a story.");
-    navigateToView("mood-intake");
+    setMoodIntakeMode(null);
+    navigateToView("home");
+
+    void handleGenerate({
+      worldBible: storyStart.world,
+      characterProfiles: storyStart.cast,
+      storySeed: storyStart.seed,
+      storyRules: storyStart.rules,
+      genrePreset: storyStart.genre,
+      narrativeArchitecture,
+      characterArc,
+      endingType,
+      lengthTarget: "Standard",
+      readerMood: readerProfile.latestMood ?? null,
+      presentation: "first-episode",
+      loadingMessage: "Finding a story for you…"
+    });
   }
 
   function handleCreateGenerateClick() {
@@ -623,7 +641,7 @@ export default function Home() {
             pendingStoryTitle={pendingStoryStart?.title ?? null}
           />
         ) : null}
-        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader isGenerating={isGenerating} onContinue={() => handleContinueLatest()} onExport={handleExportLatestStory} onStartDifferent={handleStartSomethingNew} eyebrow={generatedStoryPresentation === "first-episode" ? "First Page Test" : "Next Episode"} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
+        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader isGenerating={isGenerating} onContinue={() => handleContinueLatest()} onExport={handleExportLatestStory} onStartDifferent={handleStartSomethingNew} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
         {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={setActiveMood} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
@@ -674,7 +692,7 @@ function MobileMoodPicker({ activeMood, onSelect }: { activeMood: Mood; onSelect
 }
 
 function StartSomethingNewPanel({ canUseDemoStory, hasDemoStory, onClearDemoStory, onLoadDemoStory, onStartNewStory }: { canUseDemoStory: boolean; hasDemoStory: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStartNewStory: () => void }) {
-  return <section className="min-w-0 rounded-md border border-lantern-gold/25 bg-paper/10 p-5"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">Start Something New</p><h2 className="mt-2 text-2xl font-semibold text-paper md:text-3xl">Tell Lantyrn what kind of story moment you need.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-paper/65">Share your reader pulse first, then choose from story starts shaped around that reading mood.</p><div className="mt-4 flex flex-wrap gap-2"><button className="rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink" onClick={onStartNewStory} type="button">Start Something New</button>{canUseDemoStory ? (hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo story</SmallButton> : <SmallButton onClick={onLoadDemoStory}>Load demo story</SmallButton>) : null}</div></section>;
+  return <section className="min-w-0 rounded-md border border-lantern-gold/25 bg-paper/10 p-5"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">Start Something New</p><h2 className="mt-2 text-2xl font-semibold text-paper md:text-3xl">Let Lantyrn find your next story.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-paper/65">Tap once and Lantern will generate a new story for you automatically.</p><div className="mt-4 flex flex-wrap gap-2"><button className="rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink" onClick={onStartNewStory} type="button">Start Something New</button>{canUseDemoStory ? (hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo story</SmallButton> : <SmallButton onClick={onLoadDemoStory}>Load demo story</SmallButton>) : null}</div></section>;
 }
 
 function MobileSuggestedStoryStarts({ activeMood, canUseDemoStory, hasDemoStory, onClearDemoStory, onLoadDemoStory, onStart, stories }: { activeMood: Mood; canUseDemoStory: boolean; hasDemoStory: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStart: (story: StoryStart) => void; stories: StoryStart[] }) {
