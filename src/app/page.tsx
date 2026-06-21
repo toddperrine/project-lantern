@@ -14,7 +14,7 @@ type CloudProjectSummary = Pick<SavedProject, "id" | "name" | "createdAt" | "upd
 type StoryStart = { title: string; premise: string; genre: GenrePreset; mood: Mood; heroName: string; heroRole: string; heroBio: string; worldName: string; world: string; seed: string; cast: string; rules: string };
 type LibraryStory = SavedStory | { id: string; title: string; story: string; wordCount: number; createdAt: string; genrePreset: GenrePreset; charactersUsed: string[]; rulesReferenced: string[] };
 type StoryBrief = { hook: string; recap: string; changed: string; tension: string; nextHook: string; heroName: string; heroRole: string; struggle: string };
-type FirstPageTestState = { sourceStory: StoryStart; openings: FirstPageOpening[]; selectedIndex: number | null; isLoading: boolean; regenerationAttempt: number; error?: string };
+type FirstPageTestState = { sourceStory: StoryStart; openings: FirstPageOpening[]; selectedIndex: number | null; isLoading: boolean; regenerationAttempt: number; error?: string; continuingFullStory?: boolean };
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
 const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
@@ -127,9 +127,9 @@ export default function Home() {
   }, [activeMood, suggestedStarts]);
 
   useEffect(() => {
-    if (typeof document === "undefined" || firstPageTest) return;
+    if (typeof document === "undefined" || firstPageTest || storyResponse) return;
     document.querySelector<HTMLElement>(".project-lantern-shell main")?.removeAttribute("data-mobile-first-page-test-starting");
-  }, [firstPageTest]);
+  }, [firstPageTest, storyResponse]);
 
   function navigateToView(view: AppView) {
     setActiveView(view);
@@ -229,22 +229,51 @@ export default function Home() {
     setFirstPageTest((current) => current ? { ...current, selectedIndex: index } : current);
   }
 
-  function handleContinueSelectedOpening() {
+  async function handleContinueSelectedOpening() {
     if (!firstPageTest || firstPageTest.selectedIndex === null) return;
     const selectedOpening = firstPageTest.openings[firstPageTest.selectedIndex];
     if (!selectedOpening) return;
-    void handleGenerate({
-      generationMode: "fullStoryFromOpening",
-      selectedOpening,
-      selectedOpeningIndex: firstPageTest.selectedIndex,
-      openingCount: firstPageTest.openings.length,
-      worldBible: firstPageTest.sourceStory.world,
-      characterProfiles: firstPageTest.sourceStory.cast,
-      storySeed: firstPageTest.sourceStory.seed,
-      storyRules: firstPageTest.sourceStory.rules,
-      genrePreset: firstPageTest.sourceStory.genre
-    });
-    setFirstPageTest(null);
+    setError("");
+    setStatusMessage("Continuing your selected opening...");
+    setIsGenerating(true);
+    setFirstPageTest((current) => current ? { ...current, continuingFullStory: true, error: undefined } : current);
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          generationMode: "fullStoryFromOpening",
+          selectedOpening,
+          selectedOpeningIndex: firstPageTest.selectedIndex,
+          openingCount: firstPageTest.openings.length,
+          worldBible: firstPageTest.sourceStory.world,
+          characterProfiles: firstPageTest.sourceStory.cast,
+          storySeed: firstPageTest.sourceStory.seed,
+          storyRules: firstPageTest.sourceStory.rules,
+          genrePreset: firstPageTest.sourceStory.genre,
+          narrativeArchitecture,
+          characterArc,
+          endingType,
+          lengthTarget
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Story generation failed.");
+      const normalizedResponse = normalizeGenerateStoryResponse(payload);
+      setStoryResponse(normalizedResponse);
+      setCurrentStoryId(createStoryId(normalizedResponse.story));
+      clearDemoLatestStory();
+      setDemoStory(null);
+      setFirstPageTest(null);
+      navigateToView("home");
+      setStatusMessage("Story ready.");
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "Story generation failed.";
+      setFirstPageTest((current) => current ? { ...current, continuingFullStory: false, error: message } : current);
+      setError(message);
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
   function handleLoadDemoStory() {
@@ -537,7 +566,8 @@ function FirstPageTestPanel({ onContinue, onRegenerate, onSelect, state }: { onC
     <section data-first-page-test-panel="true" className="relative z-[1] min-h-[calc(100dvh-160px)] min-w-0 overflow-y-auto rounded-[1.25rem] border border-lantern-gold/35 bg-paper/10 px-4 py-6 pb-[calc(120px+env(safe-area-inset-bottom))] shadow-soft sm:px-5">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">First Page Test</p>
       <h2 className="mt-2 text-2xl font-semibold leading-tight text-paper">Which opening has a pulse?</h2>
-      <p className="mt-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-paper/45">FirstPageTest active • loading: {String(state.isLoading)} • openings: {state.openings.length}</p>
+      <p className="mt-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-paper/45">FirstPageTest active • loading: {String(state.isLoading || state.continuingFullStory)} • openings: {state.openings.length}</p>
+      {state.continuingFullStory ? <p className="mt-4 rounded-md border border-paper/12 bg-night-ink/35 px-3 py-3 text-sm leading-6 text-paper/70">Continuing your selected opening...</p> : null}
       {state.isLoading ? <p className="mt-4 rounded-md border border-paper/12 bg-night-ink/35 px-3 py-3 text-sm leading-6 text-paper/70">Finding three possible openings...</p> : null}
       {!state.isLoading && hasOpenings ? (
         <>
@@ -551,8 +581,8 @@ function FirstPageTestPanel({ onContinue, onRegenerate, onSelect, state }: { onC
             ))}
           </div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <button className="rounded-md border border-lantern-gold/45 bg-paper/10 px-5 py-3 text-sm font-semibold text-lantern-gold" onClick={onRegenerate} type="button">Show me different openings</button>
-            {selectedOpening ? <button className="rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink" onClick={onContinue} type="button">Continue this story</button> : null}
+            <button className="rounded-md border border-lantern-gold/45 bg-paper/10 px-5 py-3 text-sm font-semibold text-lantern-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={state.continuingFullStory} onClick={onRegenerate} type="button">Show me different openings</button>
+            {selectedOpening ? <button className="rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={state.continuingFullStory} onClick={onContinue} type="button">{state.continuingFullStory ? "Continuing..." : "Continue this story"}</button> : null}
           </div>
         </>
       ) : null}
