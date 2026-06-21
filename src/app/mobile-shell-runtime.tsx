@@ -504,12 +504,18 @@ function renderFallbackHome(fallback: HTMLElement, hasStory: boolean, storyTitle
   fallback.dataset.mobileFallbackMood = "gate";
 }
 
-function revealReactHomeContent() {
-  const main = document.querySelector<HTMLElement>(".project-lantern-shell main[data-mobile-active-view='home']");
-  if (!main) return;
+function revealReactHomeContent(main: HTMLElement) {
   main.querySelector<HTMLElement>("[data-mobile-home-fallback='true']")?.remove();
   const root = findHomeRoot(main);
   Array.from(root.children).forEach((child) => delete (child as HTMLElement).dataset.mobileOriginalHomeContent);
+}
+
+function clickFirstReactStoryStart() {
+  const main = document.querySelector<HTMLElement>(".project-lantern-shell main[data-mobile-active-view='home']");
+  if (!main) return;
+  const storyStart = Array.from(main.querySelectorAll<HTMLButtonElement>("button")).find((button) => !button.closest("[data-mobile-home-fallback='true']") && button.querySelector("h3") && button.closest("section")?.textContent?.includes("Start Something New"));
+  revealReactHomeContent(main);
+  storyStart?.click();
 }
 
 function bindFallbackHome(fallback: HTMLElement) {
@@ -534,7 +540,7 @@ function bindFallbackHome(fallback: HTMLElement) {
     if (target?.closest("[data-mobile-check-in-start='true']")) {
       event.preventDefault();
       resetMobileHomeGateState();
-      revealReactHomeContent();
+      clickFirstReactStoryStart();
       return;
     }
   });
