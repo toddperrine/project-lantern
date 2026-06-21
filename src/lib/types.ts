@@ -24,6 +24,7 @@ export const ENDING_TYPES = [
 ] as const;
 
 export const LENGTH_TARGETS = [
+  { value: "First Page Test", label: "First Page Test: 600-1000 words", minWords: 600, maxWords: 1000 },
   { value: "Compact", label: "Compact: 1500-2500 words", minWords: 1500, maxWords: 2500 },
   { value: "Standard", label: "Standard: 2500-3500 words", minWords: 2500, maxWords: 3500 },
   { value: "Long", label: "Long: 3500-5000 words - Experimental / may take longer", minWords: 3500, maxWords: 5000 }
