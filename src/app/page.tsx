@@ -3,6 +3,13 @@
 import { type ChangeEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
+  EERIE_READER_PROFILE_STORAGE_KEY,
+  clearEerieReaderProfile,
+  createDefaultEerieReaderProfile,
+  formatEerieReaderProfileForDiagnostics,
+  readEerieReaderProfile
+} from "@/lib/eerie-reader-profile";
+import {
   READER_PROFILE_STORAGE_KEY,
   clearReaderProfile,
   createEmptyReaderProfile,
@@ -11,6 +18,7 @@ import {
 } from "@/lib/reader-profile";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
+import type { EerieReaderProfile } from "@/lib/eerie-reader-profile";
 import type { ReaderEnergyLevel, ReaderIntensityLevel, ReaderMoodDraft, ReaderMoodSnapshot, ReaderProfile } from "@/lib/reader-profile";
 import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture } from "@/lib/types";
 import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
@@ -105,6 +113,7 @@ export default function Home() {
   const [continueDirection, setContinueDirection] = useState("");
   const [isDirectionOpen, setIsDirectionOpen] = useState(false);
   const [readerProfile, setReaderProfile] = useState<ReaderProfile>(createEmptyReaderProfile());
+  const [eerieReaderProfile, setEerieReaderProfile] = useState<EerieReaderProfile>(createDefaultEerieReaderProfile());
   const [pendingStoryStart, setPendingStoryStart] = useState<StoryStart | null>(null);
   const [moodIntakeMode, setMoodIntakeMode] = useState<MoodIntakeMode>(null);
   const [generationApprovedMoodSnapshotId, setGenerationApprovedMoodSnapshotId] = useState<string | null>(null);
@@ -129,6 +138,7 @@ export default function Home() {
     setSavedProjects(readSavedProjects());
     setDemoStory(browserSavedStories.length === 0 ? readDemoLatestStory() : null);
     setReaderProfile(readReaderProfile());
+    setEerieReaderProfile(readEerieReaderProfile());
     void handleRefreshCloudProjects();
   }, []);
 
@@ -333,6 +343,12 @@ export default function Home() {
     setGenerationApprovedMoodSnapshotId(null);
     setIsStoryStartSelectionOpen(false);
     setStatusMessage("Reader profile cleared from this browser.");
+  }
+
+  function handleClearEerieReaderProfile() {
+    const defaultProfile = clearEerieReaderProfile();
+    setEerieReaderProfile(defaultProfile);
+    setStatusMessage("Eerie reader profile cleared from this browser.");
   }
 
   function handleLoadDemoStory() {
@@ -598,6 +614,7 @@ export default function Home() {
         {error ? <Status tone="error">{error}</Status> : null}
 
         <ReaderProfileDiagnostics profile={readerProfile} onClear={handleClearReaderProfile} />
+        <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
         {activeView === "mood-intake" ? (
           <MoodIntakeView
@@ -793,6 +810,53 @@ function ReaderProfileDiagnostics({ onClear, profile }: { onClear: () => void; p
       </div>
     </details>
   );
+}
+
+function EerieReaderProfileDiagnostics({ onClear, profile }: { onClear: () => void; profile: EerieReaderProfile }) {
+  const profileExists = typeof window !== "undefined" && window.localStorage.getItem(EERIE_READER_PROFILE_STORAGE_KEY) !== null;
+  const diagnostics = formatEerieReaderProfileForDiagnostics(profile);
+  const topAffinities = Object.entries(profile.affinities)
+    .sort(([, left], [, right]) => right.value - left.value)
+    .slice(0, 8);
+
+  return (
+    <details className="min-w-0 rounded-md border border-lantern-gold/15 bg-paper/5 p-3 text-xs text-paper/65">
+      <summary className="cursor-pointer font-semibold text-paper/75">Eerie reader profile diagnostics</summary>
+      <div className="mt-3 grid gap-3">
+        <div className="grid gap-1 sm:grid-cols-2">
+          <p><span className="font-semibold text-paper/80">Profile exists in local storage:</span> {profileExists ? "yes" : "no"}</p>
+          <p><span className="font-semibold text-paper/80">Storage key:</span> {EERIE_READER_PROFILE_STORAGE_KEY}</p>
+          <p><span className="font-semibold text-paper/80">Onboarding mode:</span> {profile.onboardingMode}</p>
+          <p><span className="font-semibold text-paper/80">Profile confidence:</span> {profile.profileConfidence}</p>
+          <p><span className="font-semibold text-paper/80">Fear intensity:</span> {formatPreferencePair(profile.fearIntensity)}</p>
+          <p><span className="font-semibold text-paper/80">Weirdness tolerance:</span> {formatPreferencePair(profile.weirdnessTolerance)}</p>
+          <p><span className="font-semibold text-paper/80">Supernatural affinity:</span> {formatPreferencePair(profile.supernaturalAffinity)}</p>
+          <p><span className="font-semibold text-paper/80">Ambiguity tolerance:</span> {formatPreferencePair(profile.ambiguityTolerance)}</p>
+          <p><span className="font-semibold text-paper/80">Gore tolerance:</span> {formatPreferencePair(profile.goreTolerance)}</p>
+          <p><span className="font-semibold text-paper/80">Sleep-safe preference:</span> {formatPreferencePair(profile.sleepSafePreference)}</p>
+          <p><span className="font-semibold text-paper/80">Preferred format:</span> {profile.preferredFormat}</p>
+          <p><span className="font-semibold text-paper/80">Preferred duration:</span> {profile.preferredDurationMinutes} minutes</p>
+          <p><span className="font-semibold text-paper/80">Hard avoidances:</span> {profile.hardAvoidances.join(", ")}</p>
+          <p><span className="font-semibold text-paper/80">Story card signal count:</span> {profile.storyCardSignals.length}</p>
+          <p><span className="font-semibold text-paper/80">Updated:</span> {profile.updatedAt}</p>
+        </div>
+        <div>
+          <p className="font-semibold text-paper/80">Top affinities by value</p>
+          <ul className="mt-1 grid gap-1 sm:grid-cols-2">
+            {topAffinities.map(([key, preference]) => <li key={key}>{key}: {formatPreferencePair(preference)}</li>)}
+          </ul>
+        </div>
+        <pre className="max-h-72 overflow-auto rounded-md border border-paper/10 bg-night-ink p-3 text-[0.7rem] leading-5 text-paper/70">
+          {JSON.stringify({ profileExists, ...diagnostics }, null, 2)}
+        </pre>
+        <button className="w-fit rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper hover:border-lantern-gold/50" onClick={onClear} type="button">Clear eerie reader profile</button>
+      </div>
+    </details>
+  );
+}
+
+function formatPreferencePair(preference: { value: number; confidence: number }): string {
+  return `${preference.value.toFixed(2)} / ${preference.confidence.toFixed(2)}`;
 }
 
 function MobileTopHeader({ onGoHome }: { onGoHome: () => void }) {
