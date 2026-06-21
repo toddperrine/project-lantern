@@ -27,6 +27,7 @@
 import { useEffect } from "react";
 
 const MOBILE_QUERY = "(max-width: 767px)";
+const START_SOMETHING_NEW_EVENT = "lantern:start-something-new";
 const DEMO_LATEST_STORY_STORAGE_KEY = "projectLantern.demoLatestStory.v1";
 const DEMO_LATEST_STORY_ID = "demo-the-half-life-of-magic";
 const NAV_ORDER = ["Home", "Story Library", "Characters", "Worlds", "Create"];
@@ -504,18 +505,24 @@ function renderFallbackHome(fallback: HTMLElement, hasStory: boolean, storyTitle
   fallback.dataset.mobileFallbackMood = "gate";
 }
 
-function revealReactHomeContent(main: HTMLElement) {
+function restoreReactHomeContent(main: HTMLElement) {
   main.querySelector<HTMLElement>("[data-mobile-home-fallback='true']")?.remove();
   const root = findHomeRoot(main);
-  Array.from(root.children).forEach((child) => delete (child as HTMLElement).dataset.mobileOriginalHomeContent);
+  Array.from(root.children).forEach((child) => {
+    const element = child as HTMLElement;
+    delete element.dataset.mobileOriginalHomeContent;
+    element.style.removeProperty("display");
+    element.style.removeProperty("visibility");
+    element.style.removeProperty("opacity");
+  });
 }
 
-function clickFirstReactStoryStart() {
+function startSomethingNewFromMobileFallback() {
   const main = document.querySelector<HTMLElement>(".project-lantern-shell main[data-mobile-active-view='home']");
   if (!main) return;
-  const storyStart = Array.from(main.querySelectorAll<HTMLButtonElement>("button")).find((button) => !button.closest("[data-mobile-home-fallback='true']") && button.querySelector("h3") && button.closest("section")?.textContent?.includes("Start Something New"));
-  revealReactHomeContent(main);
-  storyStart?.click();
+  restoreReactHomeContent(main);
+  main.dataset.mobileFirstPageTestStarting = "true";
+  window.dispatchEvent(new CustomEvent(START_SOMETHING_NEW_EVENT));
 }
 
 function bindFallbackHome(fallback: HTMLElement) {
@@ -540,7 +547,7 @@ function bindFallbackHome(fallback: HTMLElement) {
     if (target?.closest("[data-mobile-check-in-start='true']")) {
       event.preventDefault();
       resetMobileHomeGateState();
-      clickFirstReactStoryStart();
+      startSomethingNewFromMobileFallback();
       return;
     }
   });
@@ -563,9 +570,13 @@ function ensureMobileHomeFallback() {
   if (!main) return;
   const fallback = main.querySelector<HTMLElement>("[data-mobile-home-fallback='true']");
   const root = findHomeRoot(main);
-  if (currentView() !== "home" || main.querySelector("[data-first-page-test-panel='true']")) {
+  if (currentView() !== "home") {
     fallback?.remove();
     Array.from(root.children).forEach((child) => delete (child as HTMLElement).dataset.mobileOriginalHomeContent);
+    return;
+  }
+  if (main.dataset.mobileFirstPageTestStarting === "true" || main.dataset.firstPageTestActive === "true" || main.querySelector("[data-first-page-test-panel='true']")) {
+    restoreReactHomeContent(main);
     return;
   }
   let nextFallback = fallback;

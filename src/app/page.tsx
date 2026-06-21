@@ -21,6 +21,7 @@ const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
 const INPUT_LABELS: Record<InputArtifactType, string> = { worldBible: "Storyworld", characterProfiles: "Cast", storySeed: "Story Spark", storyRules: "Craft Rules" };
 const MOODS: Mood[] = ["Mystery", "Wonder", "Emotional", "Adventure", "Strange", "Hopeful", "Dark", "Reflective"];
 const DEFAULT_STORY_RULES_NOTICE = "Default craft rules are used automatically when this is empty.";
+const START_SOMETHING_NEW_EVENT = "lantern:start-something-new";
 const DEMO_LATEST_STORY_STORAGE_KEY = "projectLantern.demoLatestStory.v1";
 const DEMO_LATEST_STORY_ID = "demo-the-half-life-of-magic";
 const NAV_ITEMS: { label: string; view: AppView }[] = [
@@ -115,6 +116,20 @@ export default function Home() {
   const suggestedStarts = useMemo(() => sortStoryStartsByMood(activeMood), [activeMood]);
   const currentGeneratedStory = useMemo(() => storyResponse ? responseToLibraryStory(storyResponse, currentStoryId || createStoryId(storyResponse.story)) : null, [currentStoryId, storyResponse]);
   const canGenerate = Boolean(worldBible.content.trim() && characterProfiles.content.trim() && storySeed.content.trim() && !isGenerating);
+
+  useEffect(() => {
+    const handleStartSomethingNew = () => {
+      const selectedStart = suggestedStarts.find((story) => story.mood === activeMood) ?? suggestedStarts[0];
+      if (selectedStart) void handleStartRecommendation(selectedStart);
+    };
+    window.addEventListener(START_SOMETHING_NEW_EVENT, handleStartSomethingNew);
+    return () => window.removeEventListener(START_SOMETHING_NEW_EVENT, handleStartSomethingNew);
+  }, [activeMood, suggestedStarts]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || firstPageTest) return;
+    document.querySelector<HTMLElement>(".project-lantern-shell main")?.removeAttribute("data-mobile-first-page-test-starting");
+  }, [firstPageTest]);
 
   function navigateToView(view: AppView) {
     setActiveView(view);
@@ -465,7 +480,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden px-3 pb-24 pt-3 text-paper sm:px-4 md:px-8 md:py-7">
+    <main className="min-h-screen overflow-x-hidden px-3 pb-24 pt-3 text-paper sm:px-4 md:px-8 md:py-7" data-first-page-test-active={firstPageTest ? "true" : "false"}>
       <section className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-5 md:gap-6">
         <MobileTopHeader
           onGoHome={() => {
@@ -518,6 +533,7 @@ function FirstPageTestPanel({ onContinue, onRegenerate, onSelect, state }: { onC
     <section data-first-page-test-panel="true" className="relative z-[1] min-h-[calc(100dvh-160px)] min-w-0 overflow-y-auto rounded-[1.25rem] border border-lantern-gold/35 bg-paper/10 px-4 py-6 pb-[calc(120px+env(safe-area-inset-bottom))] shadow-soft sm:px-5">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">First Page Test</p>
       <h2 className="mt-2 text-2xl font-semibold leading-tight text-paper">Which opening has a pulse?</h2>
+      <p className="mt-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-paper/45">FirstPageTest active • loading: {String(state.isLoading)} • openings: {state.openings.length}</p>
       {state.isLoading ? <p className="mt-4 rounded-md border border-paper/12 bg-night-ink/35 px-3 py-3 text-sm leading-6 text-paper/70">Finding three possible openings...</p> : null}
       {!state.isLoading && hasOpenings ? (
         <>
