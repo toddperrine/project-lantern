@@ -47,6 +47,8 @@ export type GenerateStoryRequest = {
   selectedOpening?: FirstPageOpening;
   selectedOpeningIndex?: number;
   openingCount?: number;
+  previousOpenings?: FirstPageOpening[];
+  regenerationAttempt?: number;
   worldBible: string;
   characterProfiles: string;
   storySeed: string;

@@ -14,7 +14,7 @@ type CloudProjectSummary = Pick<SavedProject, "id" | "name" | "createdAt" | "upd
 type StoryStart = { title: string; premise: string; genre: GenrePreset; mood: Mood; heroName: string; heroRole: string; heroBio: string; worldName: string; world: string; seed: string; cast: string; rules: string };
 type LibraryStory = SavedStory | { id: string; title: string; story: string; wordCount: number; createdAt: string; genrePreset: GenrePreset; charactersUsed: string[]; rulesReferenced: string[] };
 type StoryBrief = { hook: string; recap: string; changed: string; tension: string; nextHook: string; heroName: string; heroRole: string; struggle: string };
-type FirstPageTestState = { sourceStory: StoryStart; openings: FirstPageOpening[]; selectedIndex: number | null; isLoading: boolean };
+type FirstPageTestState = { sourceStory: StoryStart; openings: FirstPageOpening[]; selectedIndex: number | null; isLoading: boolean; regenerationAttempt: number; error?: string };
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
 const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
@@ -189,16 +189,19 @@ export default function Home() {
     await handleGenerateFirstPageOpenings(story);
   }
 
-  async function handleGenerateFirstPageOpenings(story: StoryStart) {
+  async function handleGenerateFirstPageOpenings(story: StoryStart, previousOpenings: FirstPageOpening[] = [], regenerationAttempt = 0) {
     setError("");
     setStatusMessage("");
-    setFirstPageTest({ sourceStory: story, openings: [], selectedIndex: null, isLoading: true });
+    setFirstPageTest({ sourceStory: story, openings: [], selectedIndex: null, isLoading: true, regenerationAttempt });
     try {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           generationMode: "firstPageOpenings",
+          previousOpenings,
+          regenerationAttempt,
+          requestNonce: `${Date.now()}-${regenerationAttempt}`,
           worldBible: story.world,
           characterProfiles: story.cast,
           storySeed: story.seed,
@@ -213,11 +216,12 @@ export default function Home() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "First-page opening generation failed.");
       const openings = normalizeFirstPageOpenings(payload.openings);
-      setFirstPageTest({ sourceStory: story, openings, selectedIndex: null, isLoading: false });
+      setFirstPageTest({ sourceStory: story, openings, selectedIndex: null, isLoading: false, regenerationAttempt });
       setStatusMessage(openings.length ? "First-page openings ready." : "First-page openings need another try.");
     } catch (caughtError) {
-      setFirstPageTest(null);
-      setError(caughtError instanceof Error ? caughtError.message : "First-page opening generation failed.");
+      const message = caughtError instanceof Error ? caughtError.message : "First-page opening generation failed.";
+      setFirstPageTest({ sourceStory: story, openings: [], selectedIndex: null, isLoading: false, regenerationAttempt, error: message });
+      setError(message);
     }
   }
 
@@ -502,7 +506,7 @@ export default function Home() {
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        {activeView === "home" && firstPageTest ? <FirstPageTestPanel state={firstPageTest} onContinue={handleContinueSelectedOpening} onRegenerate={() => void handleGenerateFirstPageOpenings(firstPageTest.sourceStory)} onSelect={handleSelectOpening} /> : null}
+        {activeView === "home" && firstPageTest ? <FirstPageTestPanel state={firstPageTest} onContinue={handleContinueSelectedOpening} onRegenerate={() => void handleGenerateFirstPageOpenings(firstPageTest.sourceStory, firstPageTest.openings, firstPageTest.regenerationAttempt + 1)} onSelect={handleSelectOpening} /> : null}
         {activeView === "home" && !firstPageTest ? <HomeView firstPageTest={null} onContinueOpening={handleContinueSelectedOpening} onRegenerateOpenings={() => undefined} onSelectOpening={handleSelectOpening} activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={setActiveMood} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
@@ -554,7 +558,7 @@ function FirstPageTestPanel({ onContinue, onRegenerate, onSelect, state }: { onC
       ) : null}
       {!state.isLoading && !hasOpenings ? (
         <div className="mt-4 rounded-md border border-paper/12 bg-night-ink/35 p-4">
-          <p className="text-sm leading-6 text-paper/75">Something went wrong loading openings.</p>
+          <p className="text-sm leading-6 text-paper/75">{state.error ?? "Something went wrong loading openings."}</p>
           <button className="mt-3 rounded-md border border-lantern-gold/45 bg-paper/10 px-5 py-3 text-sm font-semibold text-lantern-gold" onClick={onRegenerate} type="button">Try again</button>
         </div>
       ) : null}

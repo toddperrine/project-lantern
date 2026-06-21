@@ -51,6 +51,8 @@ export async function POST(request: Request) {
     selectedOpening: normalizeSelectedOpening(body.selectedOpening),
     selectedOpeningIndex: typeof body.selectedOpeningIndex === "number" ? body.selectedOpeningIndex : undefined,
     openingCount: typeof body.openingCount === "number" ? body.openingCount : undefined,
+    previousOpenings: normalizeOpeningList(body.previousOpenings),
+    regenerationAttempt: typeof body.regenerationAttempt === "number" ? body.regenerationAttempt : 0,
     worldBible: body.worldBible!.trim(),
     characterProfiles: body.characterProfiles!.trim(),
     storySeed: body.storySeed!.trim(),
@@ -139,21 +141,37 @@ function normalizeSelectedOpening(value: unknown): FirstPageOpening | undefined 
   return title && openingText ? { title, toneLabel: toneLabel || "Selected opening", openingText } : undefined;
 }
 
+function normalizeOpeningList(value: unknown): FirstPageOpening[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.map(normalizeSelectedOpening).filter((opening): opening is FirstPageOpening => Boolean(opening)).slice(0, 6);
+}
+
 function buildFallbackFirstPageOpenings(input: GenerateStoryRequest): FirstPageOpening[] {
   const seed = input.storySeed.replace(/\s+/g, " ").trim();
   const world = input.worldBible.split(/[.\n]/).find(Boolean)?.trim() || "a place that has started keeping secrets";
   const cast = input.characterProfiles.split(/[.\n-]/).map((part) => part.trim()).filter(Boolean);
   const hero = cast[0]?.replace(/[:].*$/, "") || "the reader's next hero";
+  const previousTitles = new Set((input.previousOpenings ?? []).map((opening) => opening.title.toLowerCase()));
+  const attempt = input.regenerationAttempt ?? 0;
   const vectors = [
     { title: "A Door That Waited", toneLabel: "Quiet wonder / mystery", image: `${hero} noticed the impossible detail first: ${world.toLowerCase()} had left one door unlocked that had never been a door before.` },
     { title: "Someone Saved a Seat", toneLabel: "Warmth / companionship", image: `By sunset, ${hero} found a handwritten place card beside a cup still warm enough to fog the window, though no one in ${world.toLowerCase()} admitted setting the table.` },
-    { title: "The Map Moved First", toneLabel: "Adventure / discovery", image: `The map buckled in ${hero}'s hands and redrew the road away from safety, toward the one landmark the old stories warned everyone to avoid.` }
+    { title: "The Map Moved First", toneLabel: "Adventure / discovery", image: `The map buckled in ${hero}'s hands and redrew the road away from safety, toward the one landmark the old stories warned everyone to avoid.` },
+    { title: "The Bell Under the Floor", toneLabel: "Strange / uncanny", image: `The floorboards rang once beneath ${hero}'s feet, not like wood under weight but like a bell answering from the wrong side of the room.` },
+    { title: "A Name Left in the Rain", toneLabel: "Emotional / reflective", image: `${hero} found the name written in rainwater on the step, and every drop moved uphill when they tried to wipe it away.` },
+    { title: "The Lantern That Chose", toneLabel: "Hopeful / discovery", image: `At the hour when every other light failed, one lantern crossed ${world.toLowerCase()} by itself and stopped at ${hero}'s shadow.` },
+    { title: "The Friend Nobody Remembered", toneLabel: "Warm mystery", image: `Everyone greeted ${hero} with relief for bringing their old friend home, but the person walking beside them was a stranger with familiar hands.` },
+    { title: "The Road Opened Sideways", toneLabel: "Adventure / wonder", image: `The road did not stretch forward; it opened sideways, folding ${world.toLowerCase()} like a letter addressed only to ${hero}.` },
+    { title: "The Quiet Debt", toneLabel: "Reflective / uncanny", image: `Before breakfast, three people thanked ${hero} for a rescue they had not performed yet, and each gratitude came with a different scar.` }
   ];
+  const rotated = vectors.slice(attempt % vectors.length).concat(vectors.slice(0, attempt % vectors.length));
+  const selectedVectors = rotated.filter((vector) => !previousTitles.has(vector.title.toLowerCase())).slice(0, 3);
+  const fallbackVectors = selectedVectors.length === 3 ? selectedVectors : rotated.slice(0, 3).map((vector, index) => ({ ...vector, title: `${vector.title} ${attempt + index + 1}` }));
 
-  return vectors.map((vector, index) => ({
+  return fallbackVectors.map((vector) => ({
     title: vector.title,
     toneLabel: vector.toneLabel,
-    openingText: `${vector.image}\n\n${seed ? `The story spark kept pressing at the edge of the moment: ${seed}` : "Something in the air wanted a choice before it would explain itself."}\n\nThis version asks whether ${hero} will follow the feeling before the facts are ready.`
+    openingText: `${vector.image}\n\n${seed ? `The story spark kept pressing at the edge of the moment: ${seed}` : "Something in the air wanted a choice before it would explain itself."}\n\nThis version asks whether ${hero} will follow a different pulse than the openings already shown.`
   }));
 }
 
