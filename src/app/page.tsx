@@ -4,7 +4,7 @@ import { type ChangeEvent, type ReactNode, useEffect, useMemo, useState } from "
 import { useSearchParams } from "next/navigation";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
-import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture } from "@/lib/types";
+import type { CharacterArc, EndingType, FirstPageOpening, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture } from "@/lib/types";
 import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
 import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
 
@@ -14,6 +14,7 @@ type CloudProjectSummary = Pick<SavedProject, "id" | "name" | "createdAt" | "upd
 type StoryStart = { title: string; premise: string; genre: GenrePreset; mood: Mood; heroName: string; heroRole: string; heroBio: string; worldName: string; world: string; seed: string; cast: string; rules: string };
 type LibraryStory = SavedStory | { id: string; title: string; story: string; wordCount: number; createdAt: string; genrePreset: GenrePreset; charactersUsed: string[]; rulesReferenced: string[] };
 type StoryBrief = { hook: string; recap: string; changed: string; tension: string; nextHook: string; heroName: string; heroRole: string; struggle: string };
+type FirstPageTestState = { sourceStory: StoryStart; openings: FirstPageOpening[]; selectedIndex: number | null; isLoading: boolean };
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
 const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
@@ -82,6 +83,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [isCloudProjectsLoading, setIsCloudProjectsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [firstPageTest, setFirstPageTest] = useState<FirstPageTestState | null>(null);
   const [continueDirection, setContinueDirection] = useState("");
   const [isDirectionOpen, setIsDirectionOpen] = useState(false);
 
@@ -121,7 +123,7 @@ export default function Home() {
     window.history.pushState(null, "", nextUrl);
   }
 
-  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget }>) {
+  async function handleGenerate(overrides?: Partial<{ generationMode: "story" | "fullStoryFromOpening"; selectedOpening: FirstPageOpening; selectedOpeningIndex: number; openingCount: number; worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget }>) {
     setError("");
     setStatusMessage("");
     setIsGenerating(true);
@@ -130,6 +132,10 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          generationMode: overrides?.generationMode ?? "story",
+          selectedOpening: overrides?.selectedOpening,
+          selectedOpeningIndex: overrides?.selectedOpeningIndex,
+          openingCount: overrides?.openingCount,
           worldBible: overrides?.worldBible ?? worldBible.content,
           characterProfiles: overrides?.characterProfiles ?? characterProfiles.content,
           storySeed: overrides?.storySeed ?? storySeed.content,
@@ -157,15 +163,69 @@ export default function Home() {
     }
   }
 
-  function handleStartRecommendation(story: StoryStart) {
+  async function handleStartRecommendation(story: StoryStart) {
     setWorldBible({ name: `${slugify(story.title)}-world.txt`, content: story.world });
     setCharacterProfiles({ name: `${slugify(story.title)}-cast.txt`, content: story.cast });
     setStorySeed({ name: `${slugify(story.title)}-spark.txt`, content: story.seed });
     setStoryRules({ name: `${slugify(story.title)}-rules.txt`, content: story.rules });
     setGenrePreset(story.genre);
     setActiveMood(story.mood);
-    navigateToView("create");
-    setStatusMessage(`${story.title} is ready to begin.`);
+    navigateToView("home");
+    await handleGenerateFirstPageOpenings(story);
+  }
+
+  async function handleGenerateFirstPageOpenings(story: StoryStart) {
+    setError("");
+    setStatusMessage("");
+    setFirstPageTest({ sourceStory: story, openings: [], selectedIndex: null, isLoading: true });
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          generationMode: "firstPageOpenings",
+          worldBible: story.world,
+          characterProfiles: story.cast,
+          storySeed: story.seed,
+          storyRules: story.rules,
+          genrePreset: story.genre,
+          narrativeArchitecture,
+          characterArc,
+          endingType,
+          lengthTarget
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "First-page opening generation failed.");
+      const openings = normalizeFirstPageOpenings(payload.openings);
+      setFirstPageTest({ sourceStory: story, openings, selectedIndex: null, isLoading: false });
+      setStatusMessage("First-page openings ready.");
+    } catch (caughtError) {
+      setFirstPageTest(null);
+      setError(caughtError instanceof Error ? caughtError.message : "First-page opening generation failed.");
+    }
+  }
+
+  function handleSelectOpening(index: number) {
+    setFirstPageTest((current) => current ? { ...current, selectedIndex: index } : current);
+  }
+
+  function handleContinueSelectedOpening() {
+    if (!firstPageTest || firstPageTest.selectedIndex === null) return;
+    const selectedOpening = firstPageTest.openings[firstPageTest.selectedIndex];
+    if (!selectedOpening) return;
+    void handleGenerate({
+      generationMode: "fullStoryFromOpening",
+      selectedOpening,
+      selectedOpeningIndex: firstPageTest.selectedIndex,
+      openingCount: firstPageTest.openings.length,
+      worldBible: firstPageTest.sourceStory.world,
+      characterProfiles: firstPageTest.sourceStory.cast,
+      storySeed: firstPageTest.sourceStory.seed,
+      storyRules: firstPageTest.sourceStory.rules,
+      genrePreset: firstPageTest.sourceStory.genre
+    });
+    setFirstPageTest(null);
   }
 
   function handleLoadDemoStory() {
@@ -427,7 +487,7 @@ export default function Home() {
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        {activeView === "home" ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={setActiveMood} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} suggestedStarts={suggestedStarts} /> : null}
+        {activeView === "home" ? <HomeView firstPageTest={firstPageTest} onContinueOpening={handleContinueSelectedOpening} onRegenerateOpenings={() => firstPageTest ? void handleGenerateFirstPageOpenings(firstPageTest.sourceStory) : undefined} onSelectOpening={handleSelectOpening} activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={setActiveMood} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={() => void handleGenerate()} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
@@ -438,16 +498,21 @@ export default function Home() {
   );
 }
 
-function HomeView(props: { activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; suggestedStarts: StoryStart[] }) {
-  const { activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onStartRecommendation, onToggleDirection, suggestedStarts } = props;
+function HomeView(props: { firstPageTest: FirstPageTestState | null; onContinueOpening: () => void; onRegenerateOpenings: () => void; onSelectOpening: (index: number) => void; activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; suggestedStarts: StoryStart[] }) {
+  const { firstPageTest, onContinueOpening, onRegenerateOpenings, onSelectOpening, activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onStartRecommendation, onToggleDirection, suggestedStarts } = props;
   const [isRecapOpen, setIsRecapOpen] = useState(false);
   const storyBrief = latestStory ? createStoryBrief(latestStory) : null;
 
-  return <div className="grid min-w-0 gap-6 md:gap-8"><div className="md:hidden"><MobileHomeView activeMood={activeMood} brief={storyBrief} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isGenerating={isGenerating} isRecapOpen={isRecapOpen} latestStory={latestStory} onClearDemoStory={onClearDemoStory} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onLoadDemoStory={onLoadDemoStory} onMoodSelect={onMoodSelect} onOpenRecap={() => setIsRecapOpen(true)} onStartRecommendation={onStartRecommendation} suggestedStarts={suggestedStarts} /></div><div className="hidden md:grid md:min-w-0 md:gap-8">{latestStory && storyBrief ? <CurrentStoryCard brief={storyBrief} direction={continueDirection} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onDirectionChange={onDirectionChange} onExportStory={onExportStory} onOpenRecap={() => setIsRecapOpen(true)} onToggleDirection={onToggleDirection} story={latestStory} /> : null}<MoodPicker activeMood={activeMood} hasCurrentStory={Boolean(latestStory)} onSelect={onMoodSelect} /><SuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} stories={suggestedStarts} onStart={onStartRecommendation} /></div></div>;
+  return <div className="grid min-w-0 gap-6 md:gap-8"><div className="md:hidden"><MobileHomeView firstPageTest={firstPageTest} onContinueOpening={onContinueOpening} onRegenerateOpenings={onRegenerateOpenings} onSelectOpening={onSelectOpening} activeMood={activeMood} brief={storyBrief} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isGenerating={isGenerating} isRecapOpen={isRecapOpen} latestStory={latestStory} onClearDemoStory={onClearDemoStory} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onLoadDemoStory={onLoadDemoStory} onMoodSelect={onMoodSelect} onOpenRecap={() => setIsRecapOpen(true)} onStartRecommendation={onStartRecommendation} suggestedStarts={suggestedStarts} /></div><div className="hidden md:grid md:min-w-0 md:gap-8">{latestStory && storyBrief ? <CurrentStoryCard brief={storyBrief} direction={continueDirection} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onDirectionChange={onDirectionChange} onExportStory={onExportStory} onOpenRecap={() => setIsRecapOpen(true)} onToggleDirection={onToggleDirection} story={latestStory} /> : null}{firstPageTest ? <FirstPageTestPanel state={firstPageTest} onContinue={onContinueOpening} onRegenerate={onRegenerateOpenings} onSelect={onSelectOpening} /> : null}<MoodPicker activeMood={activeMood} hasCurrentStory={Boolean(latestStory)} onSelect={onMoodSelect} /><SuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} stories={suggestedStarts} onStart={onStartRecommendation} /></div></div>;
 }
 
-function MobileHomeView({ activeMood, brief, canUseDemoStory, hasDemoStory, isGenerating, isRecapOpen, latestStory, onClearDemoStory, onCloseRecap, onContinue, onLoadDemoStory, onMoodSelect, onOpenRecap, onStartRecommendation, suggestedStarts }: { activeMood: Mood; brief: StoryBrief | null; canUseDemoStory: boolean; hasDemoStory: boolean; isGenerating: boolean; isRecapOpen: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onCloseRecap: () => void; onContinue: (direction?: string) => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onOpenRecap: () => void; onStartRecommendation: (story: StoryStart) => void; suggestedStarts: StoryStart[] }) {
-  return <div className="grid min-w-0 gap-5">{latestStory && brief ? <div className="grid min-w-0 gap-3" data-mobile-react-current-story="true"><MobileCurrentStoryCard brief={brief} isGenerating={isGenerating} isRecapOpen={isRecapOpen} onCloseRecap={onCloseRecap} onContinue={onContinue} onOpenRecap={onOpenRecap} story={latestStory} /></div> : null}<MobileMoodPicker activeMood={activeMood} onSelect={onMoodSelect} /><MobileSuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStart={onStartRecommendation} stories={suggestedStarts} /></div>;
+function MobileHomeView({ firstPageTest, onContinueOpening, onRegenerateOpenings, onSelectOpening, activeMood, brief, canUseDemoStory, hasDemoStory, isGenerating, isRecapOpen, latestStory, onClearDemoStory, onCloseRecap, onContinue, onLoadDemoStory, onMoodSelect, onOpenRecap, onStartRecommendation, suggestedStarts }: { firstPageTest: FirstPageTestState | null; onContinueOpening: () => void; onRegenerateOpenings: () => void; onSelectOpening: (index: number) => void; activeMood: Mood; brief: StoryBrief | null; canUseDemoStory: boolean; hasDemoStory: boolean; isGenerating: boolean; isRecapOpen: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onCloseRecap: () => void; onContinue: (direction?: string) => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onOpenRecap: () => void; onStartRecommendation: (story: StoryStart) => void; suggestedStarts: StoryStart[] }) {
+  return <div className="grid min-w-0 gap-5">{latestStory && brief ? <div className="grid min-w-0 gap-3" data-mobile-react-current-story="true"><MobileCurrentStoryCard brief={brief} isGenerating={isGenerating} isRecapOpen={isRecapOpen} onCloseRecap={onCloseRecap} onContinue={onContinue} onOpenRecap={onOpenRecap} story={latestStory} /></div> : null}{firstPageTest ? <FirstPageTestPanel state={firstPageTest} onContinue={onContinueOpening} onRegenerate={onRegenerateOpenings} onSelect={onSelectOpening} /> : null}<MobileMoodPicker activeMood={activeMood} onSelect={onMoodSelect} /><MobileSuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStart={onStartRecommendation} stories={suggestedStarts} /></div>;
+}
+
+function FirstPageTestPanel({ onContinue, onRegenerate, onSelect, state }: { onContinue: () => void; onRegenerate: () => void; onSelect: (index: number) => void; state: FirstPageTestState }) {
+  const selectedOpening = state.selectedIndex === null ? null : state.openings[state.selectedIndex];
+  return <section className="min-w-0 rounded-[1.25rem] border border-lantern-gold/35 bg-paper/10 p-4 shadow-soft"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">First Page Test</p><h2 className="mt-2 text-2xl font-semibold leading-tight text-paper">Which opening has a pulse?</h2>{state.isLoading ? <p className="mt-4 rounded-md border border-paper/12 bg-night-ink/35 px-3 py-3 text-sm leading-6 text-paper/70">Lantern is generating first-page openings...</p> : <><div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">{state.openings.map((opening, index) => <button aria-pressed={state.selectedIndex === index} className={`min-w-0 rounded-lg border p-3 text-left transition ${state.selectedIndex === index ? "border-lantern-gold bg-lantern-gold/15 shadow-soft" : "border-paper/12 bg-night-ink/35 hover:border-lantern-gold/45"}`} key={`${opening.title}-${index}`} onClick={() => onSelect(index)} type="button"><span className="block text-xs font-semibold uppercase tracking-[0.12em] text-lantern-gold">{opening.toneLabel}</span><span className="mt-2 block text-lg font-semibold leading-tight text-paper">{opening.title}</span><span className="mt-3 block whitespace-pre-line text-sm leading-6 text-paper/72">{opening.openingText}</span></button>)}</div><div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap"><button className="rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={!selectedOpening} onClick={onContinue} type="button">Continue this story</button><button className="rounded-md border border-lantern-gold/45 bg-paper/10 px-5 py-3 text-sm font-semibold text-lantern-gold" onClick={onRegenerate} type="button">Show me different openings</button></div></>}</section>;
 }
 
 function MobileCurrentStoryCard({ brief, isGenerating, isRecapOpen, onCloseRecap, onContinue, onOpenRecap, story }: { brief: StoryBrief; isGenerating: boolean; isRecapOpen: boolean; onCloseRecap: () => void; onContinue: (direction?: string) => void; onOpenRecap: () => void; story: LibraryStory }) {
@@ -579,6 +644,7 @@ function SelectControl({ label, value, options, onChange }: { label: string; val
 function SelectLibrary({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: { label: string; value: string }[]; value: string }) { return <label className="mt-4 flex min-w-0 flex-col gap-2"><span className="text-sm font-semibold text-paper">{label}</span><select className="rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper" onChange={(event) => onChange(event.target.value)} value={value}><option value="">Choose one</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>; }
 
 function responseToLibraryStory(response: GenerateStoryResponse, id: string): LibraryStory { return { id, title: createStoryTitle(response.story), story: response.story, wordCount: response.metadata.wordCount, createdAt: new Date().toISOString(), genrePreset: response.metadata.diagnostics.genrePreset, charactersUsed: response.metadata.charactersUsed, rulesReferenced: response.metadata.rulesReferenced }; }
+function normalizeFirstPageOpenings(value: unknown): FirstPageOpening[] { const items = Array.isArray(value) ? value : []; const normalized = items.map((item, index) => { const candidate = item as Partial<FirstPageOpening>; return { title: typeof candidate.title === "string" && candidate.title.trim() ? candidate.title.trim() : `Opening ${index + 1}`, toneLabel: typeof candidate.toneLabel === "string" && candidate.toneLabel.trim() ? candidate.toneLabel.trim() : "Story opening", openingText: typeof candidate.openingText === "string" && candidate.openingText.trim() ? candidate.openingText.trim() : "Lantern found a quiet beginning, but the prose arrived incomplete. Try different openings if this one does not have a pulse." }; }).slice(0, 3); while (normalized.length < 3) normalized.push({ title: `Opening ${normalized.length + 1}`, toneLabel: "Story opening", openingText: "A small impossible detail appears, asking the reader to lean closer before the larger story begins." }); return normalized; }
 function normalizeGenerateStoryResponse(payload: unknown): GenerateStoryResponse { const normalizedPayload = normalizeStoryPayload(payload) as Partial<GenerateStoryResponse>; const story = normalizeStoryText(normalizedPayload.story); if (!story || !normalizedPayload.metadata) throw new Error("Story generation returned an invalid response."); return { ...normalizedPayload, story, metadata: { ...normalizedPayload.metadata, wordCount: countWords(story) } } as GenerateStoryResponse; }
 async function fetchCloudJson<T>(input: string, init?: RequestInit): Promise<T> { const response = await fetch(input, { ...init, cache: "no-store" }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(typeof payload?.error === "string" ? payload.error : "Cloud project request failed."); return payload as T; }
 function countWords(text: string): number { return text.trim().split(/\s+/).filter(Boolean).length; }
