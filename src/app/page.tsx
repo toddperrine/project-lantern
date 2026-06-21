@@ -24,6 +24,7 @@ type LibraryStory = SavedStory | { id: string; title: string; story: string; wor
 type StoryBrief = { hook: string; recap: string; changed: string; tension: string; nextHook: string; heroName: string; heroRole: string; struggle: string };
 type MoodIntakeMode = "story-start" | "generate" | null;
 type MoodIntakeFormState = ReaderMoodDraft;
+type GeneratedStoryPresentation = "first-episode" | "continuation" | null;
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
 const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
@@ -106,6 +107,7 @@ export default function Home() {
   const [pendingStoryStart, setPendingStoryStart] = useState<StoryStart | null>(null);
   const [moodIntakeMode, setMoodIntakeMode] = useState<MoodIntakeMode>(null);
   const [generationApprovedMoodSnapshotId, setGenerationApprovedMoodSnapshotId] = useState<string | null>(null);
+  const [generatedStoryPresentation, setGeneratedStoryPresentation] = useState<GeneratedStoryPresentation>(null);
 
   useEffect(() => {
     const requestedView = readAppView(searchParams.get("view")) ?? "home";
@@ -144,7 +146,7 @@ export default function Home() {
     window.history.pushState(null, "", nextUrl);
   }
 
-  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null }>) {
+  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null; presentation: Exclude<GeneratedStoryPresentation, null> }>) {
     setError("");
     setStatusMessage("");
     setIsGenerating(true);
@@ -168,8 +170,14 @@ export default function Home() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Story generation failed.");
       const normalizedResponse = normalizeGenerateStoryResponse(payload);
+      const generatedStoryId = createStoryId(normalizedResponse.story);
+      const savedStory = createSavedStory(normalizedResponse, generatedStoryId);
+      const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
+      persistSavedStories(nextSavedStories);
+      setSavedStories(nextSavedStories);
       setStoryResponse(normalizedResponse);
-      setCurrentStoryId(createStoryId(normalizedResponse.story));
+      setCurrentStoryId(generatedStoryId);
+      setGeneratedStoryPresentation(overrides?.presentation ?? "first-episode");
       clearDemoLatestStory();
       setDemoStory(null);
       navigateToView("home");
@@ -288,7 +296,8 @@ export default function Home() {
       narrativeArchitecture,
       characterArc,
       endingType,
-      lengthTarget
+      lengthTarget,
+      presentation: "continuation"
     });
   }
 
@@ -304,6 +313,7 @@ export default function Home() {
   function handleRestoreStory(story: SavedStory) {
     setStoryResponse(savedStoryToResponse(story));
     setCurrentStoryId(story.id);
+    setGeneratedStoryPresentation(null);
     clearDemoLatestStory();
     setDemoStory(null);
     navigateToView("home");
@@ -491,6 +501,7 @@ export default function Home() {
     setStoryRules({ ...EMPTY_UPLOAD });
     setStoryResponse(null);
     setCurrentStoryId("");
+    setGeneratedStoryPresentation(null);
     setStatusMessage("Current inputs cleared. Saved library items were not changed.");
   }
 
@@ -526,7 +537,8 @@ export default function Home() {
             pendingStoryTitle={pendingStoryStart?.title ?? null}
           />
         ) : null}
-        {activeView === "home" ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={setActiveMood} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} suggestedStarts={suggestedStarts} /> : null}
+        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation === "first-episode" ? <FirstEpisodeReader isGenerating={isGenerating} onContinue={() => handleContinueLatest()} onExport={handleExportLatestStory} onSave={handleSaveStory} onStartDifferent={() => navigateToView("create")} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
+        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation === "first-episode") ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={setActiveMood} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
@@ -534,6 +546,25 @@ export default function Home() {
       </section>
       <MobileBottomNav activeView={activeView} onChange={navigateToView} />
     </main>
+  );
+}
+
+function FirstEpisodeReader({ isGenerating, onContinue, onExport, onSave, onStartDifferent, source, story }: { isGenerating: boolean; onContinue: () => void; onExport: () => void; onSave: () => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
+  return (
+    <article className="grid min-w-0 gap-5 rounded-md border border-lantern-gold/25 bg-paper/10 p-4 shadow-soft sm:p-6">
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">First Page Test</p>
+        <h2 className="mt-2 text-3xl font-semibold leading-tight text-paper md:text-5xl">{story.title}</h2>
+        <p className="mt-3 text-sm leading-6 text-paper/60">{story.wordCount.toLocaleString()} words | {story.genrePreset} | {source}</p>
+      </div>
+      <div className="min-w-0 whitespace-pre-wrap rounded-md border border-paper/10 bg-night-ink/70 p-4 text-base leading-8 text-paper/85 sm:p-5">{story.story}</div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <button className="rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={onContinue} type="button">{isGenerating ? "Working..." : "Continue this story"}</button>
+        <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-lantern-gold/50" onClick={onSave} type="button">Save</button>
+        <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-lantern-gold/50" onClick={onExport} type="button">Export</button>
+        <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-lantern-gold/50" onClick={onStartDifferent} type="button">Start something different</button>
+      </div>
+    </article>
   );
 }
 
