@@ -34,6 +34,11 @@ export type SavedStory = {
   endingType: EndingType;
   lengthTarget: string;
   diagnosticsNotice: string | null;
+  firstPageTest?: boolean;
+  selectedOpeningIndex?: number;
+  openingCount?: number;
+  selectedOpeningTitle?: string;
+  selectedOpeningToneLabel?: string;
   coverImageUrl?: string;
   coverImage?: string;
   heroImageUrl?: string;
@@ -208,6 +213,11 @@ export function createSavedStory(response: GenerateStoryResponse, storyId = crea
     endingType: diagnostics.endingType,
     lengthTarget: diagnostics.lengthTarget,
     diagnosticsNotice: diagnostics.notice ?? diagnostics.underTargetNotice,
+    firstPageTest: diagnostics.firstPageTest,
+    selectedOpeningIndex: diagnostics.selectedOpeningIndex,
+    openingCount: diagnostics.openingCount,
+    selectedOpeningTitle: diagnostics.selectedOpeningTitle,
+    selectedOpeningToneLabel: diagnostics.selectedOpeningToneLabel,
     feedback
   };
 }

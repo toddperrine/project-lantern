@@ -11,7 +11,7 @@ import {
   LENGTH_TARGETS,
   NARRATIVE_ARCHITECTURES
 } from "@/lib/types";
-import type { GenerateStoryRequest, GenerateStoryResponse } from "@/lib/types";
+import type { FirstPageOpening, GenerateStoryRequest, GenerateStoryResponse } from "@/lib/types";
 
 const MAX_CONTEXT_CHARS = 120_000;
 const DEFAULT_STORY_RULES = `Every story must obey these rules:
@@ -45,7 +45,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
+  const generationMode = body.generationMode ?? "story";
   const input = {
+    generationMode,
+    selectedOpening: normalizeSelectedOpening(body.selectedOpening),
+    selectedOpeningIndex: typeof body.selectedOpeningIndex === "number" ? body.selectedOpeningIndex : undefined,
+    openingCount: typeof body.openingCount === "number" ? body.openingCount : undefined,
     worldBible: body.worldBible!.trim(),
     characterProfiles: body.characterProfiles!.trim(),
     storySeed: body.storySeed!.trim(),
@@ -57,18 +62,33 @@ export async function POST(request: Request) {
     lengthTarget: body.lengthTarget!
   } satisfies GenerateStoryRequest;
 
+  if (generationMode === "firstPageOpenings") {
+    return NextResponse.json({
+      openings: buildFallbackFirstPageOpenings(input),
+      diagnostics: {
+        firstPageTest: true,
+        openingCount: 3,
+        generationPath: "firstPageOpenings",
+        usedSelectedOpeningSeed: false
+      }
+    });
+  }
+
+  const storyInput = generationMode === "fullStoryFromOpening" ? buildFullStoryFromOpeningInput(input) : input;
+
   if (!hasOpenAIKey()) {
     return NextResponse.json(
       withServerGenerationDuration(
         generateFallbackStory(
-          input,
+          storyInput,
           getOpenAIDiagnostics({
             fallbackReason: "OPENAI_API_KEY is missing or empty in this deployment environment.",
-            genrePreset: input.genrePreset,
-            narrativeArchitecture: input.narrativeArchitecture,
-            characterArc: input.characterArc,
-            endingType: input.endingType,
-            lengthTarget: formatLengthTarget(input.lengthTarget)
+            genrePreset: storyInput.genrePreset,
+            narrativeArchitecture: storyInput.narrativeArchitecture,
+            characterArc: storyInput.characterArc,
+            endingType: storyInput.endingType,
+            lengthTarget: formatLengthTarget(storyInput.lengthTarget),
+            ...buildFirstPageDiagnostics(input, generationMode)
           })
         ),
         generationStartedAt
@@ -77,16 +97,16 @@ export async function POST(request: Request) {
   }
 
   try {
-    return NextResponse.json(withServerGenerationDuration(await generateOpenAIStoryWithLongFloor(input), generationStartedAt));
+    return NextResponse.json(withServerGenerationDuration(withFirstPageDiagnostics(await generateOpenAIStoryWithLongFloor(storyInput), input, generationMode), generationStartedAt));
   } catch (error) {
     const errorSummary = summarizeOpenAIError(error);
 
     if (isBlueprintGenerationFailure(errorSummary)) {
       try {
-        const repairedResponse = await generateOpenAIStoryWithLongFloor(buildBlueprintRepairRetryInput(input, errorSummary));
+        const repairedResponse = await generateOpenAIStoryWithLongFloor(buildBlueprintRepairRetryInput(storyInput, errorSummary));
         return NextResponse.json(
           withServerGenerationDuration(
-            withBlueprintRepairSuccessDiagnostics(repairedResponse, errorSummary),
+            withFirstPageDiagnostics(withBlueprintRepairSuccessDiagnostics(repairedResponse, errorSummary), input, generationMode),
             generationStartedAt
           )
         );
@@ -94,7 +114,7 @@ export async function POST(request: Request) {
         const repairSummary = summarizeOpenAIError(repairError);
         return NextResponse.json(
           withServerGenerationDuration(
-            buildOpenAIFallbackResponse(input, `OpenAI request failed: ${errorSummary}. Blueprint repair retry failed: ${repairSummary}`, `${errorSummary}; repair retry: ${repairSummary}`),
+            withFirstPageDiagnostics(buildOpenAIFallbackResponse(storyInput, `OpenAI request failed: ${errorSummary}. Blueprint repair retry failed: ${repairSummary}`, `${errorSummary}; repair retry: ${repairSummary}`), input, generationMode),
             generationStartedAt
           )
         );
@@ -103,11 +123,73 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       withServerGenerationDuration(
-        buildOpenAIFallbackResponse(input, `OpenAI request failed: ${errorSummary}`, errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null),
+        withFirstPageDiagnostics(buildOpenAIFallbackResponse(storyInput, `OpenAI request failed: ${errorSummary}`, errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null), input, generationMode),
         generationStartedAt
       )
     );
   }
+}
+
+function normalizeSelectedOpening(value: unknown): FirstPageOpening | undefined {
+  const candidate = value as Partial<FirstPageOpening> | undefined;
+  if (!candidate || typeof candidate !== "object") return undefined;
+  const title = typeof candidate.title === "string" ? candidate.title.trim() : "";
+  const toneLabel = typeof candidate.toneLabel === "string" ? candidate.toneLabel.trim() : "";
+  const openingText = typeof candidate.openingText === "string" ? candidate.openingText.trim() : "";
+  return title && openingText ? { title, toneLabel: toneLabel || "Selected opening", openingText } : undefined;
+}
+
+function buildFallbackFirstPageOpenings(input: GenerateStoryRequest): FirstPageOpening[] {
+  const seed = input.storySeed.replace(/\s+/g, " ").trim();
+  const world = input.worldBible.split(/[.\n]/).find(Boolean)?.trim() || "a place that has started keeping secrets";
+  const cast = input.characterProfiles.split(/[.\n-]/).map((part) => part.trim()).filter(Boolean);
+  const hero = cast[0]?.replace(/[:].*$/, "") || "the reader's next hero";
+  const vectors = [
+    { title: "A Door That Waited", toneLabel: "Quiet wonder / mystery", image: `${hero} noticed the impossible detail first: ${world.toLowerCase()} had left one door unlocked that had never been a door before.` },
+    { title: "Someone Saved a Seat", toneLabel: "Warmth / companionship", image: `By sunset, ${hero} found a handwritten place card beside a cup still warm enough to fog the window, though no one in ${world.toLowerCase()} admitted setting the table.` },
+    { title: "The Map Moved First", toneLabel: "Adventure / discovery", image: `The map buckled in ${hero}'s hands and redrew the road away from safety, toward the one landmark the old stories warned everyone to avoid.` }
+  ];
+
+  return vectors.map((vector, index) => ({
+    title: vector.title,
+    toneLabel: vector.toneLabel,
+    openingText: `${vector.image}\n\n${seed ? `The story spark kept pressing at the edge of the moment: ${seed}` : "Something in the air wanted a choice before it would explain itself."}\n\nThis version asks whether ${hero} will follow the feeling before the facts are ready.`
+  }));
+}
+
+function buildFullStoryFromOpeningInput(input: GenerateStoryRequest): GenerateStoryRequest {
+  if (!input.selectedOpening) return input;
+  return {
+    ...input,
+    storySeed: `Required starting seed: Continue naturally from this selected First Page Test opening. Do not restart, contradict, or replace it.\n\nTitle/hook: ${input.selectedOpening.title}\nTone/fit: ${input.selectedOpening.toneLabel}\nOpening prose to preserve and continue from:\n${input.selectedOpening.openingText}\n\nOriginal story spark/context:\n${input.storySeed}`,
+    storyRules: `${input.storyRules}\n\nFirst Page Test continuation rule: The final story must begin from and continue the selected opening above as the seed. It may lightly smooth transitions, but it must not ignore, restart, or contradict that opening.`
+  };
+}
+
+function buildFirstPageDiagnostics(input: GenerateStoryRequest, generationMode: GenerateStoryRequest["generationMode"]) {
+  const isFirstPageFinal = generationMode === "fullStoryFromOpening";
+  return {
+    firstPageTest: isFirstPageFinal,
+    openingCount: input.openingCount ?? (isFirstPageFinal ? 3 : undefined),
+    selectedOpeningIndex: input.selectedOpeningIndex,
+    selectedOpeningToneLabel: input.selectedOpening?.toneLabel,
+    selectedOpeningTitle: input.selectedOpening?.title,
+    generationPath: generationMode ?? "story",
+    usedSelectedOpeningSeed: Boolean(isFirstPageFinal && input.selectedOpening?.openingText)
+  };
+}
+
+function withFirstPageDiagnostics(response: GenerateStoryResponse, input: GenerateStoryRequest, generationMode: GenerateStoryRequest["generationMode"]): GenerateStoryResponse {
+  return {
+    ...response,
+    metadata: {
+      ...response.metadata,
+      diagnostics: {
+        ...response.metadata.diagnostics,
+        ...buildFirstPageDiagnostics(input, generationMode)
+      }
+    }
+  };
 }
 
 function withServerGenerationDuration(

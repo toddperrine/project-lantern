@@ -34,7 +34,19 @@ export type CharacterArc = (typeof CHARACTER_ARCS)[number];
 export type EndingType = (typeof ENDING_TYPES)[number];
 export type LengthTarget = (typeof LENGTH_TARGETS)[number]["value"];
 
+export type FirstPageOpening = {
+  title: string;
+  toneLabel: string;
+  openingText: string;
+};
+
+export type GenerationMode = "story" | "firstPageOpenings" | "fullStoryFromOpening";
+
 export type GenerateStoryRequest = {
+  generationMode?: GenerationMode;
+  selectedOpening?: FirstPageOpening;
+  selectedOpeningIndex?: number;
+  openingCount?: number;
   worldBible: string;
   characterProfiles: string;
   storySeed: string;
@@ -113,4 +125,11 @@ export type StoryDiagnostics = {
   partialBeatNormalizationUsed?: boolean;
   missingBeatRepairAttempted?: boolean;
   finalAcceptedBlueprintSceneCount?: number;
+  firstPageTest?: boolean;
+  openingCount?: number;
+  selectedOpeningIndex?: number;
+  selectedOpeningToneLabel?: string;
+  selectedOpeningTitle?: string;
+  generationPath?: GenerationMode;
+  usedSelectedOpeningSeed?: boolean;
 };
