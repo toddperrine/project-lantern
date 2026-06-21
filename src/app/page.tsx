@@ -202,10 +202,14 @@ export default function Home() {
     setActiveMood(story.mood);
   }
 
-  function generateFirstPageTestFromStoryStart(story: StoryStart, readerMood: ReaderMoodSnapshot | null = readerProfile.latestMood ?? null) {
+  function generateFirstPageTestFromStoryStart(story: StoryStart) {
     applyStoryStart(story);
     setIsStoryStartSelectionOpen(false);
-    setStatusMessage(`Generating ${story.title} as a first-page test.`);
+    setPendingStoryStart(null);
+    setMoodIntakeMode(null);
+    setGeneratedStoryPresentation("first-episode");
+    setStatusMessage(`Generating ${story.title} from your reader pulse.`);
+
     void handleGenerate({
       worldBible: story.world,
       characterProfiles: story.cast,
@@ -216,7 +220,7 @@ export default function Home() {
       characterArc,
       endingType,
       lengthTarget: "First Page Test",
-      readerMood,
+      readerMood: readerProfile.latestMood ?? null,
       presentation: "first-episode"
     });
   }
@@ -278,7 +282,23 @@ export default function Home() {
     setMoodIntakeMode(null);
 
     if (storyStartToApply) {
-      generateFirstPageTestFromStoryStart(storyStartToApply, latestMood);
+      applyStoryStart(storyStartToApply);
+      setIsStoryStartSelectionOpen(false);
+      setGeneratedStoryPresentation("first-episode");
+      setStatusMessage(`Generating ${storyStartToApply.title} from your reader pulse.`);
+      void handleGenerate({
+        worldBible: storyStartToApply.world,
+        characterProfiles: storyStartToApply.cast,
+        storySeed: storyStartToApply.seed,
+        storyRules: [storyStartToApply.rules, FIRST_PAGE_TEST_STORY_RULES].filter(Boolean).join("\n\n"),
+        genrePreset: storyStartToApply.genre,
+        narrativeArchitecture,
+        characterArc,
+        endingType,
+        lengthTarget: "First Page Test",
+        readerMood: latestMood,
+        presentation: "first-episode"
+      });
       return;
     }
 
