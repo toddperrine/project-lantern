@@ -8,7 +8,7 @@ import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, Leng
 import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
 import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
 
-type AppView = "home" | "library" | "worlds" | "create" | "characters";
+type AppView = "home" | "library" | "worlds" | "create" | "characters" | "reader";
 type Mood = "Mystery" | "Wonder" | "Emotional" | "Adventure" | "Strange" | "Hopeful" | "Dark" | "Reflective";
 type CloudProjectSummary = Pick<SavedProject, "id" | "name" | "createdAt" | "updatedAt">;
 type StoryStart = { title: string; premise: string; genre: GenrePreset; mood: Mood; heroName: string; heroRole: string; heroBio: string; worldName: string; world: string; seed: string; cast: string; rules: string };
@@ -148,7 +148,7 @@ export default function Home() {
       setCurrentStoryId(createStoryId(normalizedResponse.story));
       clearDemoLatestStory();
       setDemoStory(null);
-      navigateToView("home");
+      navigateToView("reader");
       setStatusMessage("Story ready.");
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Story generation failed.");
@@ -216,7 +216,7 @@ export default function Home() {
     setCurrentStoryId(story.id);
     clearDemoLatestStory();
     setDemoStory(null);
-    navigateToView("home");
+    navigateToView("reader");
     setStatusMessage(`Restored ${story.title}.`);
   }
 
@@ -228,7 +228,7 @@ export default function Home() {
   }
 
   function handleOpenCurrentStory() {
-    navigateToView("home");
+    navigateToView("reader");
   }
 
   function handleExportLatestStory() {
@@ -428,6 +428,7 @@ export default function Home() {
         {error ? <Status tone="error">{error}</Status> : null}
 
         {activeView === "home" ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={setActiveMood} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} suggestedStarts={suggestedStarts} /> : null}
+        {activeView === "reader" && latestStory ? <StoryReaderView isGenerating={isGenerating} onBack={() => navigateToView("home")} onContinue={handleContinueLatest} onExport={handleExportLatestStory} story={latestStory} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={() => void handleGenerate()} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
@@ -522,6 +523,10 @@ function WorldsView({ onOpenStory }: { onOpenStory: (story: StoryStart) => void 
   return <section className="grid min-w-0 gap-5"><PageHeading eyebrow="Worlds" title="Worlds" body="Storyworld cards are reachable as their own app destination." />{worldStories.length === 0 ? <EmptyPanel title="No worlds yet" body="World cards will appear here once storyworld references are available." /> : <div className="grid min-w-0 gap-4 md:grid-cols-2">{worldStories.map((story) => <article className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4" key={story.worldName}><div className="grid min-w-0 gap-4 sm:grid-cols-[132px_minmax(0,1fr)]"><CoverArt label={story.mood} title={story.worldName} tone="cool" /><div className="min-w-0"><h3 className="text-lg font-semibold text-paper">{story.worldName}</h3><div className="mt-2 flex min-w-0 flex-wrap gap-2"><Tag>{story.genre}</Tag><Tag>{story.mood}</Tag></div><p className="mt-3 text-sm leading-6 text-paper/70">{story.world}</p><p className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">Appears in</p><button className="mt-1 text-left text-sm font-semibold text-lantern-gold underline decoration-lantern-gold/40 underline-offset-4" onClick={() => onOpenStory(story)} type="button">{story.title}</button></div></div></article>)}</div>}</section>;
 }
 
+function StoryReaderView({ isGenerating, onBack, onContinue, onExport, story }: { isGenerating: boolean; onBack: () => void; onContinue: () => void; onExport: () => void; story: LibraryStory }) {
+  return <section className="mx-auto grid w-full max-w-3xl min-w-0 gap-5 rounded-md border border-lantern-gold/25 bg-soft-card p-4 text-primary-dark shadow-soft sm:p-6 md:p-8" data-story-reader="true"><div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-aged-brass">Story Reader</p><h2 className="mt-2 text-3xl font-semibold leading-tight md:text-5xl">{story.title}</h2><p className="mt-2 text-sm leading-6 text-primary-dark/60">{story.wordCount.toLocaleString()} words | {story.genrePreset}</p></div><div className="flex shrink-0 flex-wrap gap-2"><button className="rounded-md border border-primary-dark/20 bg-primary-dark/5 px-4 py-2 text-sm font-semibold text-primary-dark transition hover:bg-primary-dark/10" onClick={onBack} type="button">Back to Home</button><button className="rounded-md border border-primary-dark/20 bg-primary-dark/5 px-4 py-2 text-sm font-semibold text-primary-dark transition hover:bg-primary-dark/10" onClick={onExport} type="button">Export</button></div></div><article className="min-w-0 whitespace-pre-wrap rounded-md border border-aged-brass/20 bg-white/75 p-4 text-lg leading-8 text-primary-dark/86 sm:p-6" data-story-body="true">{story.story}</article><div className="flex min-w-0 flex-wrap gap-3"><button className="rounded-md bg-primary-dark px-5 py-3 text-sm font-semibold text-primary-light transition hover:bg-primary-dark/90 disabled:cursor-not-allowed disabled:opacity-55" disabled={isGenerating} onClick={onContinue} type="button">{isGenerating ? "Continuing…" : "Continue this story"}</button></div></section>;
+}
+
 function MobileTopHeader({ onGoHome }: { onGoHome: () => void }) {
   return (
     <header className="relative h-12 w-full min-w-0 py-1 md:hidden">
@@ -592,7 +597,7 @@ function createStoryBrief(story: LibraryStory): StoryBrief { if (story.id === DE
 function extractSentences(text: string): string[] { return (text.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? []).map((sentence) => sentence.trim()).filter(Boolean); }
 function sortStoryStartsByMood(activeMood: Mood): StoryStart[] { return [...SUGGESTED_STORY_STARTS].sort((a, b) => Number(b.mood === activeMood) - Number(a.mood === activeMood)); }
 function moodDescription(mood: Mood): string { const descriptions: Record<Mood, string> = { Mystery: "Secrets, clues, and a door left open.", Wonder: "Luminous worlds with a human ache.", Emotional: "Intimate choices and unfinished goodbyes.", Adventure: "Momentum, thresholds, and daring turns.", Strange: "Uncanny turns and beautiful wrongness.", Hopeful: "Warm light after difficult choices.", Dark: "Danger, dread, and costly secrets.", Reflective: "Quiet consequences and inner change." }; return descriptions[mood]; }
-function readAppView(value: string | null): AppView | null { return value === "library" || value === "worlds" || value === "create" || value === "characters" || value === "home" ? value : null; }
+function readAppView(value: string | null): AppView | null { return value === "library" || value === "worlds" || value === "create" || value === "characters" || value === "reader" || value === "home" ? value : null; }
 function truncateText(text: string, maxLength: number): string { const compact = text.replace(/\s+/g, " ").trim(); return compact.length <= maxLength ? compact : `${compact.slice(0, maxLength).replace(/[\s,.;:]+$/, "")}...`; }
 function slugify(value: string): string { return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "story-world-engine-story"; }
 function formatDateTime(value: string): string { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
