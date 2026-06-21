@@ -1087,6 +1087,9 @@ function getLengthTargetSpec(lengthTarget: LengthTarget) {
 }
 
 function getBlueprintBeatRange(lengthTarget: LengthTarget): { min: number; max: number } {
+  if (lengthTarget === "First Page Test") {
+    return { min: 3, max: 4 };
+  }
   if (lengthTarget === "Compact") {
     return { min: 5, max: 7 };
   }
