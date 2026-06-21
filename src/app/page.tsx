@@ -202,28 +202,32 @@ export default function Home() {
     setActiveMood(story.mood);
   }
 
+  function generateFirstPageTestFromStoryStart(story: StoryStart, readerMood: ReaderMoodSnapshot | null = readerProfile.latestMood ?? null) {
+    applyStoryStart(story);
+    setIsStoryStartSelectionOpen(false);
+    setStatusMessage(`Generating ${story.title} as a first-page test.`);
+    void handleGenerate({
+      worldBible: story.world,
+      characterProfiles: story.cast,
+      storySeed: story.seed,
+      storyRules: [story.rules, FIRST_PAGE_TEST_STORY_RULES].filter(Boolean).join("\n\n"),
+      genrePreset: story.genre,
+      narrativeArchitecture,
+      characterArc,
+      endingType,
+      lengthTarget: "First Page Test",
+      readerMood,
+      presentation: "first-episode"
+    });
+  }
+
   function handleStartRecommendation(story: StoryStart) {
     const approvedCurrentMood = Boolean(
       readerProfile.latestMood?.id && generationApprovedMoodSnapshotId === readerProfile.latestMood.id
     );
 
     if (isStoryStartSelectionOpen && approvedCurrentMood) {
-      applyStoryStart(story);
-      setIsStoryStartSelectionOpen(false);
-      setStatusMessage(`Generating ${story.title} as a first-page test.`);
-      void handleGenerate({
-        worldBible: story.world,
-        characterProfiles: story.cast,
-        storySeed: story.seed,
-        storyRules: [story.rules, FIRST_PAGE_TEST_STORY_RULES].filter(Boolean).join("\n\n"),
-        genrePreset: story.genre,
-        narrativeArchitecture,
-        characterArc,
-        endingType,
-        lengthTarget: "First Page Test",
-        readerMood: readerProfile.latestMood ?? null,
-        presentation: "first-episode"
-      });
+      generateFirstPageTestFromStoryStart(story);
       return;
     }
 
@@ -274,10 +278,7 @@ export default function Home() {
     setMoodIntakeMode(null);
 
     if (storyStartToApply) {
-      applyStoryStart(storyStartToApply);
-      setIsStoryStartSelectionOpen(false);
-      navigateToView("create");
-      setStatusMessage(`${storyStartToApply.title} is ready. Your reader pulse was saved.`);
+      generateFirstPageTestFromStoryStart(storyStartToApply, latestMood);
       return;
     }
 
