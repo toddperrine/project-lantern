@@ -1,3 +1,4 @@
+import type { ReaderMoodSnapshot } from "@/lib/reader-profile";
 export const GENRE_PRESETS = [
   "Speculative Mystery",
   "Literary Science Fiction",
@@ -44,6 +45,7 @@ export type GenerateStoryRequest = {
   characterArc: CharacterArc;
   endingType: EndingType;
   lengthTarget: LengthTarget;
+  readerMood?: ReaderMoodSnapshot | null;
 };
 
 export type StoryMetadata = {

@@ -3,6 +3,7 @@ import { getBuildInfo } from "@/lib/build-info";
 import { generateFallbackStory } from "@/lib/fallback-generator";
 import { generateOpenAIStoryWithLongFloor } from "@/lib/long-floor-generator";
 import { getOpenAIDiagnostics, hasOpenAIKey } from "@/lib/openai-generator";
+import { formatReaderMoodForPrompt, isReaderMoodSnapshot } from "@/lib/reader-profile";
 import { formatStoryCraftGuidance } from "@/lib/story-craft";
 import {
   CHARACTER_ARCS,
@@ -45,16 +46,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
+  const readerMood = isReaderMoodSnapshot(body.readerMood) ? body.readerMood : null;
+
   const input = {
     worldBible: body.worldBible!.trim(),
     characterProfiles: body.characterProfiles!.trim(),
     storySeed: body.storySeed!.trim(),
-    storyRules: buildStoryRules(body.storyRules),
+    storyRules: buildStoryRules(body.storyRules, readerMood),
     genrePreset: body.genrePreset!,
     narrativeArchitecture: body.narrativeArchitecture!,
     characterArc: body.characterArc!,
     endingType: body.endingType!,
-    lengthTarget: body.lengthTarget!
+    lengthTarget: body.lengthTarget!,
+    readerMood
   } satisfies GenerateStoryRequest;
 
   if (!hasOpenAIKey()) {
@@ -224,8 +228,14 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
     return "Choose a valid length target.";
   }
 
+  const readerMoodPrompt = formatReaderMoodForPrompt(body.readerMood);
   const contextLength =
-    body.worldBible.length + body.characterProfiles.length + body.storySeed.length + (body.storyRules?.length ?? 0) + formatStoryCraftGuidance().length;
+    body.worldBible.length +
+    body.characterProfiles.length +
+    body.storySeed.length +
+    (body.storyRules?.length ?? 0) +
+    formatStoryCraftGuidance().length +
+    readerMoodPrompt.length;
   if (contextLength > MAX_CONTEXT_CHARS) {
     return "The uploaded context is too large for this local MVP. Please shorten the files and try again.";
   }
@@ -233,11 +243,12 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
   return null;
 }
 
-function buildStoryRules(storyRules: string | undefined): string {
+function buildStoryRules(storyRules: string | undefined, readerMood: GenerateStoryRequest["readerMood"] = null): string {
   const baseRules = storyRules?.trim() || DEFAULT_STORY_RULES;
-  return `${baseRules}\n\n${formatStoryCraftGuidance()}`;
-}
+  const readerMoodGuidance = formatReaderMoodForPrompt(readerMood);
 
+  return [baseRules, formatStoryCraftGuidance(), readerMoodGuidance].filter(Boolean).join("\n\n");
+}
 function summarizeOpenAIError(error: unknown): string {
   if (error instanceof Error) {
     return redactSecretLikeText(error.message);
