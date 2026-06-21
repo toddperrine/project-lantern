@@ -14,12 +14,13 @@ import {
   clearReaderProfile,
   createEmptyReaderProfile,
   readReaderProfile,
+  recordReaderProfileEvent,
   saveReaderMoodSnapshot
 } from "@/lib/reader-profile";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
 import type { EerieReaderProfile } from "@/lib/eerie-reader-profile";
-import type { ReaderEnergyLevel, ReaderIntensityLevel, ReaderMoodDraft, ReaderMoodSnapshot, ReaderProfile } from "@/lib/reader-profile";
+import type { ReaderEnergyLevel, ReaderIntensityLevel, ReaderMoodDraft, ReaderMoodSnapshot, ReaderProfile, ReaderProfileEventInput, ReaderProfileEventSource } from "@/lib/reader-profile";
 import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture } from "@/lib/types";
 import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
 import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
@@ -165,7 +166,7 @@ export default function Home() {
     window.history.pushState(null, "", nextUrl);
   }
 
-  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null; presentation: Exclude<GeneratedStoryPresentation, null>; loadingMessage: string }>) {
+  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null; presentation: Exclude<GeneratedStoryPresentation, null>; loadingMessage: string; signalSource: ReaderProfileEventSource }>) {
     const requestId = activeGenerationRequestId.current + 1;
     activeGenerationRequestId.current = requestId;
     setError("");
@@ -200,6 +201,8 @@ export default function Home() {
       setStoryResponse(normalizedResponse);
       setCurrentStoryId(generatedStoryId);
       setGeneratedStoryPresentation(overrides?.presentation ?? "first-episode");
+      recordReaderSignal({ eventType: "storyGenerated", source: overrides?.signalSource ?? "create", storyId: generatedStoryId, title: savedStory.title, genre: savedStory.genrePreset, wordCount: savedStory.wordCount });
+      recordReaderSignal({ eventType: "storyOpened", source: overrides?.signalSource ?? "create", storyId: generatedStoryId, title: savedStory.title, genre: savedStory.genrePreset, wordCount: savedStory.wordCount });
       setIsStoryStartSelectionOpen(false);
       clearDemoLatestStory();
       setDemoStory(null);
@@ -242,7 +245,8 @@ export default function Home() {
       endingType,
       lengthTarget: "First Page Test",
       readerMood: readerProfile.latestMood ?? null,
-      presentation: "first-episode"
+      presentation: "first-episode",
+      signalSource: "startSomethingNew"
     });
   }
 
@@ -287,8 +291,15 @@ export default function Home() {
       lengthTarget: "Standard",
       readerMood: readerProfile.latestMood ?? null,
       presentation: "first-episode",
-      loadingMessage: "Finding a story for you…"
+      loadingMessage: "Finding a story for you…",
+      signalSource: "startSomethingNew"
     });
+  }
+
+
+  function handleMoodSelect(mood: Mood) {
+    setActiveMood(mood);
+    recordReaderSignal({ eventType: "moodSelected", mood });
   }
 
   function handleCreateGenerateClick() {
@@ -299,7 +310,7 @@ export default function Home() {
     );
 
     if (approvedCurrentMood) {
-      void handleGenerate({ readerMood: readerProfile.latestMood ?? null });
+      void handleGenerate({ readerMood: readerProfile.latestMood ?? null, signalSource: "create" });
       return;
     }
 
@@ -312,10 +323,11 @@ export default function Home() {
   function handleMoodIntakeSubmit(draft: ReaderMoodDraft) {
     const nextProfile = saveReaderMoodSnapshot(draft);
     const latestMood = nextProfile.latestMood ?? null;
+    const signaledProfile = recordReaderProfileEvent({ eventType: "moodSelected", mood: latestMood?.mood || draft.mood });
     const storyStartToApply = pendingStoryStart;
     const modeToComplete = moodIntakeMode;
 
-    setReaderProfile(nextProfile);
+    setReaderProfile(signaledProfile);
     setGenerationApprovedMoodSnapshotId(latestMood?.id ?? null);
     setPendingStoryStart(null);
     setMoodIntakeMode(null);
@@ -336,7 +348,8 @@ export default function Home() {
         endingType,
         lengthTarget: "First Page Test",
         readerMood: latestMood,
-        presentation: "first-episode"
+        presentation: "first-episode",
+        signalSource: "startSomethingNew"
       });
       return;
     }
@@ -350,7 +363,7 @@ export default function Home() {
 
     if (modeToComplete === "generate") {
       setStatusMessage("Reader pulse saved. Generating story.");
-      void handleGenerate({ readerMood: latestMood });
+      void handleGenerate({ readerMood: latestMood, signalSource: "create" });
       return;
     }
 
@@ -388,6 +401,8 @@ export default function Home() {
     setGeneratedStoryPresentation(null);
     const nextDemoStory = createDemoLatestStory();
     persistDemoLatestStory(nextDemoStory);
+    recordReaderSignal({ eventType: "demoStoryLoaded", source: "demo", storyId: nextDemoStory.id, title: nextDemoStory.title, genre: nextDemoStory.genrePreset, wordCount: nextDemoStory.wordCount });
+    recordReaderSignal({ eventType: "storyOpened", source: "demo", storyId: nextDemoStory.id, title: nextDemoStory.title, genre: nextDemoStory.genrePreset, wordCount: nextDemoStory.wordCount });
     setDemoStory(nextDemoStory);
     navigateToView("home");
     setStatusMessage("Demo story loaded for review. Your saved history was not changed.");
@@ -402,6 +417,7 @@ export default function Home() {
 
   function handleContinueLatest(direction?: string) {
     if (!latestStory) return;
+    recordReaderSignal({ eventType: "storyContinued", source: "continueSeries", storyId: latestStory.id, title: latestStory.title, genre: latestStory.genrePreset, wordCount: latestStory.wordCount });
     const continuationSeed = [
       `Continue the latest story as the next chapter. Keep continuity with this prior chapter: ${truncateText(latestStory.story, 7000)}`,
       direction?.trim() ? `Reader direction for the next chapter: ${direction.trim()}` : "Continue directly from the strongest unresolved story pressure."
@@ -416,7 +432,8 @@ export default function Home() {
       characterArc,
       endingType,
       lengthTarget,
-      presentation: "continuation"
+      presentation: "continuation",
+      signalSource: "continueSeries"
     });
   }
 
@@ -436,6 +453,7 @@ export default function Home() {
     setGeneratedStoryPresentation(null);
     clearDemoLatestStory();
     setDemoStory(null);
+    recordReaderSignal({ eventType: "storyOpened", storyId: story.id, title: story.title, genre: story.genrePreset, wordCount: story.wordCount });
     navigateToView("home");
     setStatusMessage(`Restored ${story.title}.`);
   }
@@ -448,11 +466,13 @@ export default function Home() {
   }
 
   function handleOpenCurrentStory() {
+    if (currentGeneratedStory) recordReaderSignal({ eventType: "storyOpened", storyId: currentGeneratedStory.id, title: currentGeneratedStory.title, genre: currentGeneratedStory.genrePreset, wordCount: currentGeneratedStory.wordCount });
     navigateToView("home");
   }
 
   function handleExportLatestStory() {
     if (!latestStory) return;
+    recordReaderSignal({ eventType: "storyExported", storyId: latestStory.id, title: latestStory.title, genre: latestStory.genrePreset, wordCount: latestStory.wordCount });
     downloadTextFile(`${slugify(latestStory.title)}.txt`, latestStory.story);
   }
 
@@ -614,6 +634,19 @@ export default function Home() {
     else setStoryRules(value);
   }
 
+  function recordReaderSignal(event: ReaderProfileEventInput) {
+    setReaderProfile(recordReaderProfileEvent(event));
+  }
+
+  function handleStartSomethingDifferent() {
+    if (currentGeneratedStory) {
+      recordReaderSignal({ eventType: "startSomethingDifferentClicked", source: "startSomethingNew", storyId: currentGeneratedStory.id, title: currentGeneratedStory.title, genre: currentGeneratedStory.genrePreset, wordCount: currentGeneratedStory.wordCount });
+    } else {
+      recordReaderSignal({ eventType: "startSomethingDifferentClicked", source: "startSomethingNew" });
+    }
+    handleStartSomethingNew();
+  }
+
   function clearCurrentInputs() {
     cancelActiveGeneration();
     setWorldBible({ ...EMPTY_UPLOAD });
@@ -659,8 +692,8 @@ export default function Home() {
             pendingStoryTitle={pendingStoryStart?.title ?? null}
           />
         ) : null}
-        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader isGenerating={isGenerating} onContinue={() => handleContinueLatest()} onExport={handleExportLatestStory} onStartDifferent={handleStartSomethingNew} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
-        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={setActiveMood} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} suggestedStarts={suggestedStarts} /> : null}
+        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader isGenerating={isGenerating} onContinue={() => handleContinueLatest()} onExport={handleExportLatestStory} onStartDifferent={handleStartSomethingDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
+        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
@@ -827,25 +860,42 @@ function SegmentedChoice({ label, onChange, options, value }: { label: string; o
 }
 
 function ReaderProfileDiagnostics({ onClear, profile }: { onClear: () => void; profile: ReaderProfile }) {
-  const profileExists = Boolean(profile.latestMood || profile.moodHistory.length);
+  const topMood = getTopCount(profile.moodCounts);
+  const topGenre = getTopCount(profile.genreCounts);
 
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">Reader profile diagnostics</summary>
       <div className="mt-3 grid gap-3">
         <div className="grid gap-1 sm:grid-cols-2">
-          <p><span className="font-semibold text-paper/80">Profile exists:</span> {profileExists ? "yes" : "no"}</p>
-          <p><span className="font-semibold text-paper/80">Mood history count:</span> {profile.moodHistory.length}</p>
+          <p><span className="font-semibold text-paper/80">Profile exists:</span> {profile.profileExists ? "yes" : "no"}</p>
+          <p><span className="font-semibold text-paper/80">Total generated:</span> {profile.counters.totalStoriesGenerated}</p>
+          <p><span className="font-semibold text-paper/80">Total opened:</span> {profile.counters.totalStoriesOpened}</p>
+          <p><span className="font-semibold text-paper/80">Total continued:</span> {profile.counters.totalContinues}</p>
+          <p><span className="font-semibold text-paper/80">Total exported:</span> {profile.counters.totalExports}</p>
+          <p><span className="font-semibold text-paper/80">Total demo loaded:</span> {profile.counters.totalDemoStoriesLoaded}</p>
+          <p><span className="font-semibold text-paper/80">Total start something different:</span> {profile.counters.totalStartSomethingDifferent}</p>
+          <p><span className="font-semibold text-paper/80">Total mood selections:</span> {profile.counters.totalMoodSelections}</p>
+          <p><span className="font-semibold text-paper/80">Top mood:</span> {topMood ?? "none"}</p>
+          <p><span className="font-semibold text-paper/80">Top genre:</span> {topGenre ?? "none"}</p>
           <p><span className="font-semibold text-paper/80">Storage key:</span> {READER_PROFILE_STORAGE_KEY}</p>
           <p><span className="font-semibold text-paper/80">Updated:</span> {profile.updatedAt || "never"}</p>
         </div>
-        <pre className="max-h-72 overflow-auto rounded-md border border-paper/10 bg-night-ink p-3 text-[0.7rem] leading-5 text-paper/70">
-          {JSON.stringify({ storageKey: READER_PROFILE_STORAGE_KEY, profileExists, latestMood: profile.latestMood ?? null, moodHistoryCount: profile.moodHistory.length, updatedAt: profile.updatedAt || null }, null, 2)}
-        </pre>
+        <details className="rounded-md border border-paper/10 bg-night-ink p-3">
+          <summary className="cursor-pointer font-semibold text-paper/75">Raw JSON</summary>
+          <pre className="mt-3 max-h-72 overflow-auto text-[0.7rem] leading-5 text-paper/70">
+            {JSON.stringify({ storageKey: READER_PROFILE_STORAGE_KEY, ...profile }, null, 2)}
+          </pre>
+        </details>
         <button className="w-fit rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper hover:border-lantern-gold/50" onClick={onClear} type="button">Clear reader profile</button>
       </div>
     </details>
   );
+}
+
+function getTopCount(counts: Record<string, number>): string | null {
+  const [topKey, topCount] = Object.entries(counts).sort(([, left], [, right]) => right - left)[0] ?? [];
+  return topKey ? `${topKey} (${topCount})` : null;
 }
 
 function EerieReaderProfileDiagnostics({ onClear, profile }: { onClear: () => void; profile: EerieReaderProfile }) {
