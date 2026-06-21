@@ -108,6 +108,7 @@ export default function Home() {
   const [moodIntakeMode, setMoodIntakeMode] = useState<MoodIntakeMode>(null);
   const [generationApprovedMoodSnapshotId, setGenerationApprovedMoodSnapshotId] = useState<string | null>(null);
   const [generatedStoryPresentation, setGeneratedStoryPresentation] = useState<GeneratedStoryPresentation>(null);
+  const [isStoryStartSelectionOpen, setIsStoryStartSelectionOpen] = useState(false);
 
   useEffect(() => {
     const requestedView = readAppView(searchParams.get("view")) ?? "home";
@@ -178,6 +179,7 @@ export default function Home() {
       setStoryResponse(normalizedResponse);
       setCurrentStoryId(generatedStoryId);
       setGeneratedStoryPresentation(overrides?.presentation ?? "first-episode");
+      setIsStoryStartSelectionOpen(false);
       clearDemoLatestStory();
       setDemoStory(null);
       navigateToView("home");
@@ -200,9 +202,28 @@ export default function Home() {
   }
 
   function handleStartRecommendation(story: StoryStart) {
+    const approvedCurrentMood = Boolean(
+      readerProfile.latestMood?.id && generationApprovedMoodSnapshotId === readerProfile.latestMood.id
+    );
+
+    if (isStoryStartSelectionOpen && approvedCurrentMood) {
+      applyStoryStart(story);
+      setIsStoryStartSelectionOpen(false);
+      navigateToView("create");
+      setStatusMessage(`${story.title} is ready. Your reader pulse will guide generation.`);
+      return;
+    }
+
     setPendingStoryStart(story);
     setMoodIntakeMode("story-start");
     setStatusMessage("Tell Lantyrn what you need from this story.");
+    navigateToView("mood-intake");
+  }
+
+  function handleStartSomethingNew() {
+    setPendingStoryStart(null);
+    setMoodIntakeMode("story-start");
+    setStatusMessage("Tell Lantyrn what you need before choosing a story.");
     navigateToView("mood-intake");
   }
 
@@ -237,8 +258,16 @@ export default function Home() {
 
     if (storyStartToApply) {
       applyStoryStart(storyStartToApply);
+      setIsStoryStartSelectionOpen(false);
       navigateToView("create");
       setStatusMessage(`${storyStartToApply.title} is ready. Your reader pulse was saved.`);
+      return;
+    }
+
+    if (modeToComplete === "story-start") {
+      setIsStoryStartSelectionOpen(true);
+      navigateToView("home");
+      setStatusMessage("Reader pulse saved. Choose a story based on your reader pulse.");
       return;
     }
 
@@ -255,6 +284,7 @@ export default function Home() {
   function handleMoodIntakeCancel() {
     setPendingStoryStart(null);
     setMoodIntakeMode(null);
+    setIsStoryStartSelectionOpen(false);
     navigateToView("home");
     setStatusMessage("Reader pulse skipped. No new story started.");
   }
@@ -263,6 +293,7 @@ export default function Home() {
     const emptyProfile = clearReaderProfile();
     setReaderProfile(emptyProfile);
     setGenerationApprovedMoodSnapshotId(null);
+    setIsStoryStartSelectionOpen(false);
     setStatusMessage("Reader profile cleared from this browser.");
   }
 
@@ -537,8 +568,8 @@ export default function Home() {
             pendingStoryTitle={pendingStoryStart?.title ?? null}
           />
         ) : null}
-        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation === "first-episode" ? <FirstEpisodeReader isGenerating={isGenerating} onContinue={() => handleContinueLatest()} onExport={handleExportLatestStory} onSave={handleSaveStory} onStartDifferent={() => navigateToView("create")} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
-        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation === "first-episode") ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={setActiveMood} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} suggestedStarts={suggestedStarts} /> : null}
+        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader isGenerating={isGenerating} onContinue={() => handleContinueLatest()} onExport={handleExportLatestStory} onSave={handleSaveStory} onStartDifferent={() => navigateToView("create")} eyebrow={generatedStoryPresentation === "first-episode" ? "Episode 1" : "Next Episode"} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
+        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={setActiveMood} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
@@ -549,11 +580,11 @@ export default function Home() {
   );
 }
 
-function FirstEpisodeReader({ isGenerating, onContinue, onExport, onSave, onStartDifferent, source, story }: { isGenerating: boolean; onContinue: () => void; onExport: () => void; onSave: () => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
+function EpisodeReader({ eyebrow, isGenerating, onContinue, onExport, onSave, onStartDifferent, source, story }: { eyebrow: string; isGenerating: boolean; onContinue: () => void; onExport: () => void; onSave: () => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
   return (
     <article className="grid min-w-0 gap-5 rounded-md border border-lantern-gold/25 bg-paper/10 p-4 shadow-soft sm:p-6">
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">First Page Test</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">{eyebrow}</p>
         <h2 className="mt-2 text-3xl font-semibold leading-tight text-paper md:text-5xl">{story.title}</h2>
         <p className="mt-3 text-sm leading-6 text-paper/60">{story.wordCount.toLocaleString()} words | {story.genrePreset} | {source}</p>
       </div>
@@ -568,16 +599,16 @@ function FirstEpisodeReader({ isGenerating, onContinue, onExport, onSave, onStar
   );
 }
 
-function HomeView(props: { activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; suggestedStarts: StoryStart[] }) {
-  const { activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onStartRecommendation, onToggleDirection, suggestedStarts } = props;
+function HomeView(props: { activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
+  const { activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onStartNewStory, onStartRecommendation, onToggleDirection, showStoryStartOptions, suggestedStarts } = props;
   const [isRecapOpen, setIsRecapOpen] = useState(false);
   const storyBrief = latestStory ? createStoryBrief(latestStory) : null;
 
-  return <div className="grid min-w-0 gap-6 md:gap-8"><div className="md:hidden"><MobileHomeView activeMood={activeMood} brief={storyBrief} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isGenerating={isGenerating} isRecapOpen={isRecapOpen} latestStory={latestStory} onClearDemoStory={onClearDemoStory} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onLoadDemoStory={onLoadDemoStory} onMoodSelect={onMoodSelect} onOpenRecap={() => setIsRecapOpen(true)} onStartRecommendation={onStartRecommendation} suggestedStarts={suggestedStarts} /></div><div className="hidden md:grid md:min-w-0 md:gap-8">{latestStory && storyBrief ? <CurrentStoryCard brief={storyBrief} direction={continueDirection} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onDirectionChange={onDirectionChange} onExportStory={onExportStory} onOpenRecap={() => setIsRecapOpen(true)} onToggleDirection={onToggleDirection} story={latestStory} /> : null}<MoodPicker activeMood={activeMood} hasCurrentStory={Boolean(latestStory)} onSelect={onMoodSelect} /><SuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} stories={suggestedStarts} onStart={onStartRecommendation} /></div></div>;
+  return <div className="grid min-w-0 gap-6 md:gap-8"><div className="md:hidden"><MobileHomeView activeMood={activeMood} brief={storyBrief} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isGenerating={isGenerating} isRecapOpen={isRecapOpen} latestStory={latestStory} onClearDemoStory={onClearDemoStory} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onLoadDemoStory={onLoadDemoStory} onMoodSelect={onMoodSelect} onOpenRecap={() => setIsRecapOpen(true)} onStartNewStory={onStartNewStory} onStartRecommendation={onStartRecommendation} showStoryStartOptions={showStoryStartOptions} suggestedStarts={suggestedStarts} /></div><div className="hidden md:grid md:min-w-0 md:gap-8">{latestStory && storyBrief ? <CurrentStoryCard brief={storyBrief} direction={continueDirection} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onDirectionChange={onDirectionChange} onExportStory={onExportStory} onOpenRecap={() => setIsRecapOpen(true)} onToggleDirection={onToggleDirection} story={latestStory} /> : null}<MoodPicker activeMood={activeMood} hasCurrentStory={Boolean(latestStory)} onSelect={onMoodSelect} />{showStoryStartOptions ? <SuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} stories={suggestedStarts} onStart={onStartRecommendation} /> : <StartSomethingNewPanel canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStartNewStory={onStartNewStory} />}</div></div>;
 }
 
-function MobileHomeView({ activeMood, brief, canUseDemoStory, hasDemoStory, isGenerating, isRecapOpen, latestStory, onClearDemoStory, onCloseRecap, onContinue, onLoadDemoStory, onMoodSelect, onOpenRecap, onStartRecommendation, suggestedStarts }: { activeMood: Mood; brief: StoryBrief | null; canUseDemoStory: boolean; hasDemoStory: boolean; isGenerating: boolean; isRecapOpen: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onCloseRecap: () => void; onContinue: (direction?: string) => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onOpenRecap: () => void; onStartRecommendation: (story: StoryStart) => void; suggestedStarts: StoryStart[] }) {
-  return <div className="grid min-w-0 gap-5">{latestStory && brief ? <div className="grid min-w-0 gap-3" data-mobile-react-current-story="true"><MobileCurrentStoryCard brief={brief} isGenerating={isGenerating} isRecapOpen={isRecapOpen} onCloseRecap={onCloseRecap} onContinue={onContinue} onOpenRecap={onOpenRecap} story={latestStory} /></div> : null}<MobileMoodPicker activeMood={activeMood} onSelect={onMoodSelect} /><MobileSuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStart={onStartRecommendation} stories={suggestedStarts} /></div>;
+function MobileHomeView({ activeMood, brief, canUseDemoStory, hasDemoStory, isGenerating, isRecapOpen, latestStory, onClearDemoStory, onCloseRecap, onContinue, onLoadDemoStory, onMoodSelect, onOpenRecap, onStartNewStory, onStartRecommendation, showStoryStartOptions, suggestedStarts }: { activeMood: Mood; brief: StoryBrief | null; canUseDemoStory: boolean; hasDemoStory: boolean; isGenerating: boolean; isRecapOpen: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onCloseRecap: () => void; onContinue: (direction?: string) => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onOpenRecap: () => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
+  return <div className="grid min-w-0 gap-5">{latestStory && brief ? <div className="grid min-w-0 gap-3" data-mobile-react-current-story="true"><MobileCurrentStoryCard brief={brief} isGenerating={isGenerating} isRecapOpen={isRecapOpen} onCloseRecap={onCloseRecap} onContinue={onContinue} onOpenRecap={onOpenRecap} story={latestStory} /></div> : null}<MobileMoodPicker activeMood={activeMood} onSelect={onMoodSelect} />{showStoryStartOptions ? <MobileSuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStart={onStartRecommendation} stories={suggestedStarts} /> : <StartSomethingNewPanel canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStartNewStory={onStartNewStory} />}</div>;
 }
 
 function MobileCurrentStoryCard({ brief, isGenerating, isRecapOpen, onCloseRecap, onContinue, onOpenRecap, story }: { brief: StoryBrief; isGenerating: boolean; isRecapOpen: boolean; onCloseRecap: () => void; onContinue: (direction?: string) => void; onOpenRecap: () => void; story: LibraryStory }) {
@@ -588,8 +619,12 @@ function MobileMoodPicker({ activeMood, onSelect }: { activeMood: Mood; onSelect
   return <section className="min-w-0"><h2 className="text-xl font-semibold leading-tight text-paper">What are you in the mood to read?</h2><div className="-mx-3 mt-3 flex min-w-0 gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none]">{MOODS.map((mood) => <button className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition ${activeMood === mood ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper"}`} key={mood} onClick={() => onSelect(mood)} type="button">{mood}</button>)}</div></section>;
 }
 
+function StartSomethingNewPanel({ canUseDemoStory, hasDemoStory, onClearDemoStory, onLoadDemoStory, onStartNewStory }: { canUseDemoStory: boolean; hasDemoStory: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStartNewStory: () => void }) {
+  return <section className="min-w-0 rounded-md border border-lantern-gold/25 bg-paper/10 p-5"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">Start Something New</p><h2 className="mt-2 text-2xl font-semibold text-paper md:text-3xl">Tell Lantyrn what kind of story moment you need.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-paper/65">Share your reader pulse first, then choose from story starts shaped around that reading mood.</p><div className="mt-4 flex flex-wrap gap-2"><button className="rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink" onClick={onStartNewStory} type="button">Start Something New</button>{canUseDemoStory ? (hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo story</SmallButton> : <SmallButton onClick={onLoadDemoStory}>Load demo story</SmallButton>) : null}</div></section>;
+}
+
 function MobileSuggestedStoryStarts({ activeMood, canUseDemoStory, hasDemoStory, onClearDemoStory, onLoadDemoStory, onStart, stories }: { activeMood: Mood; canUseDemoStory: boolean; hasDemoStory: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStart: (story: StoryStart) => void; stories: StoryStart[] }) {
-  return <section className="min-w-0"><div className="flex items-end justify-between gap-3"><div><h2 className="text-xl font-semibold text-paper">Start Something New</h2><p className="mt-1 text-xs leading-5 text-paper/55">{activeMood} picks for your next read.</p></div>{canUseDemoStory ? <div className="flex shrink-0 gap-2">{hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo</SmallButton> : <SmallButton onClick={onLoadDemoStory}>Demo</SmallButton>}</div> : null}</div><div className="mt-3 grid min-w-0 gap-3">{stories.map((story) => <MobileStoryStartRow key={story.title} onStart={onStart} story={story} />)}</div></section>;
+  return <section className="min-w-0"><div className="flex items-end justify-between gap-3"><div><h2 className="text-xl font-semibold text-paper">Based on your reader pulse</h2><p className="mt-1 text-xs leading-5 text-paper/55">{activeMood} picks for your next read.</p></div>{canUseDemoStory ? <div className="flex shrink-0 gap-2">{hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo</SmallButton> : <SmallButton onClick={onLoadDemoStory}>Demo</SmallButton>}</div> : null}</div><div className="mt-3 grid min-w-0 gap-3">{stories.map((story) => <MobileStoryStartRow key={story.title} onStart={onStart} story={story} />)}</div></section>;
 }
 
 function MobileStoryStartRow({ onStart, story }: { onStart: (story: StoryStart) => void; story: StoryStart }) {
@@ -611,7 +646,7 @@ function MoodPicker({ activeMood, hasCurrentStory, onSelect }: { activeMood: Moo
 }
 
 function SuggestedStoryStarts({ activeMood, canUseDemoStory, hasDemoStory, onClearDemoStory, onLoadDemoStory, onStart, stories }: { activeMood: Mood; canUseDemoStory: boolean; hasDemoStory: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStart: (story: StoryStart) => void; stories: StoryStart[] }) {
-  return <section className="min-w-0"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-2xl font-semibold text-paper md:text-3xl">Start Something New</h2><p className="mt-2 text-sm leading-6 text-paper/62">A small shelf of premieres, with {activeMood.toLowerCase()} closest to the front.</p></div>{canUseDemoStory ? <div className="flex flex-wrap gap-2"><SmallButton disabled={hasDemoStory} onClick={onLoadDemoStory}>Load demo story</SmallButton>{hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo story</SmallButton> : null}</div> : null}</div><div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">{stories.map((story) => <StoryStartCard isFeatured={story.mood === activeMood} key={story.title} onStart={onStart} story={story} />)}</div></section>;
+  return <section className="min-w-0"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-2xl font-semibold text-paper md:text-3xl">Based on your reader pulse</h2><p className="mt-2 text-sm leading-6 text-paper/62">A small shelf of premieres, with {activeMood.toLowerCase()} closest to the front.</p></div>{canUseDemoStory ? <div className="flex flex-wrap gap-2"><SmallButton disabled={hasDemoStory} onClick={onLoadDemoStory}>Load demo story</SmallButton>{hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo story</SmallButton> : null}</div> : null}</div><div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">{stories.map((story) => <StoryStartCard isFeatured={story.mood === activeMood} key={story.title} onStart={onStart} story={story} />)}</div></section>;
 }
 
 function StoryStartCard({ isFeatured, onStart, story }: { isFeatured: boolean; onStart: (story: StoryStart) => void; story: StoryStart }) { return <article className={`min-w-0 rounded-md border p-4 transition ${isFeatured ? "border-lantern-gold/65 bg-paper/15" : "border-paper/12 bg-paper/10"}`}><div className="grid min-w-0 gap-4 sm:grid-cols-[132px_minmax(0,1fr)]"><CoverArt label={story.mood} title={story.title} tone={isFeatured ? "warm" : "cool"} /><div className="min-w-0"><div className="flex min-w-0 flex-wrap gap-2"><Tag>{story.genre}</Tag><Tag>{story.mood}</Tag></div><h3 className="mt-3 text-xl font-semibold leading-tight text-paper">{story.title}</h3><p className="mt-2 text-sm leading-6 text-paper/70">{story.premise}</p><div className="mt-4 flex min-w-0 items-center gap-3 rounded-md border border-paper/10 bg-night-ink/35 p-3"><HeroPortrait name={story.heroName} /><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">Hero / heroine</p><p className="mt-1 text-sm font-semibold text-paper">{story.heroName}</p><p className="mt-1 text-xs leading-5 text-paper/55">{story.heroRole}</p></div></div><button className="mt-4 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink transition hover:bg-lantern-gold/90" onClick={() => onStart(story)} type="button">Start</button></div></div></article>; }
