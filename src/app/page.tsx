@@ -159,7 +159,10 @@ export default function Home() {
   }
 
   function navigateToView(view: AppView, options?: { preserveGeneration?: boolean }) {
-    if (!options?.preserveGeneration) cancelActiveGeneration();
+    if (!options?.preserveGeneration) {
+      cancelActiveGeneration();
+      if (view === "home") setGeneratedStoryPresentation(null);
+    }
     setActiveView(view);
     if (typeof window === "undefined") return;
     const nextUrl = view === "home" ? window.location.pathname : `${window.location.pathname}?view=${view}`;
