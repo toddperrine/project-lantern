@@ -1,4 +1,5 @@
 export const READER_PROFILE_STORAGE_KEY = "projectLantern.readerProfile.v1";
+export const READER_PROFILE_ID_STORAGE_KEY = "projectLantern.readerProfileId.v1";
 export const READER_PROFILE_SCHEMA_VERSION = 1;
 export const MAX_READER_MOOD_HISTORY = 10;
 export const MAX_READER_PROFILE_EVENTS = 50;
@@ -103,6 +104,31 @@ export function readReaderProfile(): ReaderProfile {
     return normalizeReaderProfile(JSON.parse(raw));
   } catch {
     return createEmptyReaderProfile();
+  }
+}
+
+export function readOrCreateReaderProfileId(): string {
+  if (typeof window === "undefined") return "";
+
+  try {
+    const storedProfileId = window.localStorage.getItem(READER_PROFILE_ID_STORAGE_KEY);
+    if (isReaderProfileId(storedProfileId)) return storedProfileId;
+
+    const profileId = createReaderProfileId();
+    window.localStorage.setItem(READER_PROFILE_ID_STORAGE_KEY, profileId);
+    return profileId;
+  } catch {
+    return createReaderProfileId();
+  }
+}
+
+export function readerProfileExistsInLocalStorage(): boolean {
+  if (typeof window === "undefined") return false;
+
+  try {
+    return window.localStorage.getItem(READER_PROFILE_STORAGE_KEY) !== null;
+  } catch {
+    return false;
   }
 }
 
@@ -232,6 +258,18 @@ export function normalizeReaderProfile(value: unknown): ReaderProfile {
     ...(latestMood ? { latestMood } : {}),
     moodHistory,
   };
+}
+
+export function isReaderProfileId(value: unknown): value is string {
+  return typeof value === "string" && /^reader-profile-[A-Za-z0-9._:-]+$/.test(value) && value.length <= 120;
+}
+
+function createReaderProfileId(): string {
+  const randomUUID = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+  return `reader-profile-${randomUUID}`;
 }
 
 export function isReaderMoodSnapshot(
