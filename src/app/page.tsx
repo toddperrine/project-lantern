@@ -11,9 +11,14 @@ import {
 } from "@/lib/eerie-reader-profile";
 import {
   READER_PROFILE_STORAGE_KEY,
+  READER_PROFILE_ID_STORAGE_KEY,
   clearReaderProfile,
   createEmptyReaderProfile,
+  persistReaderProfile,
+  normalizeReaderProfile,
+  readOrCreateReaderProfileId,
   readReaderProfile,
+  readerProfileExistsInLocalStorage,
   recordReaderProfileEvent,
   saveReaderMoodSnapshot
 } from "@/lib/reader-profile";
@@ -34,6 +39,16 @@ type StoryBrief = { hook: string; recap: string; changed: string; tension: strin
 type MoodIntakeMode = "story-start" | "generate" | null;
 type MoodIntakeFormState = ReaderMoodDraft;
 type GeneratedStoryPresentation = "first-episode" | "continuation" | null;
+type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" | "not found";
+type CloudReaderProfileSyncState = {
+  profileId: string;
+  status: CloudReaderProfileStatus;
+  lastSyncAt: string;
+  lastError: string;
+  localUpdatedAt: string;
+  cloudUpdatedAt: string;
+  localProfileExists: boolean;
+};
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
 const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
@@ -75,6 +90,15 @@ const DEMO_STORY_BRIEF: StoryBrief = {
   heroRole: "The Seeker",
   struggle: "Mara must decide whether to follow the talisman's signal before she understands what it is waking."
 };
+const EMPTY_CLOUD_READER_PROFILE_SYNC: CloudReaderProfileSyncState = {
+  profileId: "",
+  status: "pending",
+  lastSyncAt: "",
+  lastError: "",
+  localUpdatedAt: "",
+  cloudUpdatedAt: "",
+  localProfileExists: false
+};
 
 const SUGGESTED_STORY_STARTS: StoryStart[] = [
   { title: "The Lighthouse Under Main Street", premise: "A night-shift archivist finds a working lighthouse buried beneath a landlocked town.", genre: "Speculative Mystery", mood: "Mystery", heroName: "Mara Venn", heroRole: "Archivist investigator", heroBio: "A careful town archivist who notices when public records change after midnight and cannot leave an impossible civic mystery alone.", worldName: "Bellwether Courthouse Archive", world: "A rain-polished mill town where civic records sometimes rewrite themselves after midnight.", seed: "Mara Venn discovers a salt-stained lighthouse staircase below the courthouse archive and hears a foghorn answering from the town square.", cast: "Mara Venn - careful town archivist with a talent for noticing altered records. Jules Ardent - former surveyor who remembers streets no map admits.", rules: "Keep the mystery concrete, civic, and emotional. Let the lighthouse reveal one cost before it offers any answer." },
@@ -114,6 +138,7 @@ export default function Home() {
   const [continueDirection, setContinueDirection] = useState("");
   const [isDirectionOpen, setIsDirectionOpen] = useState(false);
   const [readerProfile, setReaderProfile] = useState<ReaderProfile>(createEmptyReaderProfile());
+  const [cloudReaderProfileSync, setCloudReaderProfileSync] = useState<CloudReaderProfileSyncState>(EMPTY_CLOUD_READER_PROFILE_SYNC);
   const [eerieReaderProfile, setEerieReaderProfile] = useState<EerieReaderProfile>(createDefaultEerieReaderProfile());
   const [pendingStoryStart, setPendingStoryStart] = useState<StoryStart | null>(null);
   const [moodIntakeMode, setMoodIntakeMode] = useState<MoodIntakeMode>(null);
@@ -139,7 +164,11 @@ export default function Home() {
     setSavedStories(browserSavedStories);
     setSavedProjects(readSavedProjects());
     setDemoStory(browserSavedStories.length === 0 ? readDemoLatestStory() : null);
-    setReaderProfile(readReaderProfile());
+    const profileId = readOrCreateReaderProfileId();
+    const localProfile = readReaderProfile();
+    setReaderProfile(localProfile);
+    setCloudReaderProfileSync((current) => ({ ...current, profileId, localUpdatedAt: localProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage(), status: "pending" }));
+    void reconcileReaderProfileWithCloud(profileId, localProfile);
     setEerieReaderProfile(readEerieReaderProfile());
     void handleRefreshCloudProjects();
   }, []);
@@ -341,6 +370,7 @@ export default function Home() {
     const modeToComplete = moodIntakeMode;
 
     setReaderProfile(signaledProfile);
+    void syncReaderProfileToCloud(signaledProfile);
     setGenerationApprovedMoodSnapshotId(latestMood?.id ?? null);
     setPendingStoryStart(null);
     setMoodIntakeMode(null);
@@ -395,6 +425,9 @@ export default function Home() {
   function handleClearReaderProfile() {
     const emptyProfile = clearReaderProfile();
     setReaderProfile(emptyProfile);
+    const profileId = cloudReaderProfileSync.profileId || readOrCreateReaderProfileId();
+    setCloudReaderProfileSync((current) => ({ ...current, profileId, status: "pending", localUpdatedAt: "", localProfileExists: false }));
+    void deleteCloudReaderProfile(profileId);
     setGenerationApprovedMoodSnapshotId(null);
     setIsStoryStartSelectionOpen(false);
     setStatusMessage("Reader profile cleared from this browser.");
@@ -404,6 +437,87 @@ export default function Home() {
     const defaultProfile = clearEerieReaderProfile();
     setEerieReaderProfile(defaultProfile);
     setStatusMessage("Eerie reader profile cleared from this browser.");
+  }
+
+  async function reconcileReaderProfileWithCloud(profileId: string, localProfile: ReaderProfile) {
+    try {
+      const response = await fetch(`/api/reader-profile?profileId=${encodeURIComponent(profileId)}`, { cache: "no-store" });
+      const payload = await response.json().catch(() => ({}));
+
+      if (response.status === 503) {
+        updateCloudReaderProfileSync({ profileId, status: "unavailable", lastError: payload.error ?? "Reader profile cloud persistence is unavailable.", localUpdatedAt: localProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+        return;
+      }
+
+      if (!response.ok) throw new Error(payload.error ?? "Reader profile cloud sync failed.");
+
+      const cloudProfile = normalizeCloudReaderProfile(payload.profile);
+      const cloudUpdatedAt = cloudProfile?.updatedAt ?? "";
+      if (cloudProfile && cloudUpdatedAt > localProfile.updatedAt) {
+        persistReaderProfile(cloudProfile);
+        setReaderProfile(cloudProfile);
+        updateCloudReaderProfileSync({ profileId, status: "synced", cloudUpdatedAt, localUpdatedAt: cloudProfile.updatedAt, localProfileExists: true, lastError: "" });
+        return;
+      }
+
+      if (localProfile.profileExists) {
+        await saveReaderProfileToCloud(profileId, localProfile);
+        return;
+      }
+
+      updateCloudReaderProfileSync({ profileId, status: "not found", cloudUpdatedAt, localUpdatedAt: localProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage(), lastError: "" });
+    } catch (caughtError) {
+      updateCloudReaderProfileSync({ profileId, status: "error", lastError: formatErrorMessage(caughtError), localUpdatedAt: localProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+    }
+  }
+
+  async function syncReaderProfileToCloud(profile: ReaderProfile) {
+    const profileId = cloudReaderProfileSync.profileId || readOrCreateReaderProfileId();
+    updateCloudReaderProfileSync({ profileId, status: "pending", localUpdatedAt: profile.updatedAt, localProfileExists: true });
+
+    try {
+      await saveReaderProfileToCloud(profileId, profile);
+    } catch (caughtError) {
+      updateCloudReaderProfileSync({ profileId, status: "error", lastError: formatErrorMessage(caughtError), localUpdatedAt: profile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+    }
+  }
+
+  async function saveReaderProfileToCloud(profileId: string, profile: ReaderProfile) {
+    const response = await fetch("/api/reader-profile", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profileId, profile })
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (response.status === 503) {
+      updateCloudReaderProfileSync({ profileId, status: "unavailable", lastError: payload.error ?? "Reader profile cloud persistence is unavailable.", localUpdatedAt: profile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+      return;
+    }
+
+    if (!response.ok) throw new Error(payload.error ?? "Reader profile cloud save failed.");
+
+    const savedProfile = normalizeCloudReaderProfile(payload.profile) ?? profile;
+    updateCloudReaderProfileSync({ profileId, status: "synced", lastSyncAt: new Date().toISOString(), lastError: "", localUpdatedAt: savedProfile.updatedAt, cloudUpdatedAt: savedProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+  }
+
+  async function deleteCloudReaderProfile(profileId: string) {
+    try {
+      const response = await fetch(`/api/reader-profile?profileId=${encodeURIComponent(profileId)}`, { method: "DELETE" });
+      const payload = await response.json().catch(() => ({}));
+      if (response.status === 503) {
+        updateCloudReaderProfileSync({ profileId, status: "unavailable", lastError: payload.error ?? "Reader profile cloud persistence is unavailable.", localUpdatedAt: "", cloudUpdatedAt: "", localProfileExists: false });
+        return;
+      }
+      if (!response.ok) throw new Error(payload.error ?? "Reader profile cloud delete failed.");
+      updateCloudReaderProfileSync({ profileId, status: "not found", lastSyncAt: new Date().toISOString(), lastError: "", localUpdatedAt: "", cloudUpdatedAt: "", localProfileExists: false });
+    } catch (caughtError) {
+      updateCloudReaderProfileSync({ profileId, status: "error", lastError: formatErrorMessage(caughtError), localUpdatedAt: "", localProfileExists: false });
+    }
+  }
+
+  function updateCloudReaderProfileSync(update: Partial<CloudReaderProfileSyncState>) {
+    setCloudReaderProfileSync((current) => ({ ...current, ...update }));
   }
 
   function handleLoadDemoStory() {
@@ -649,7 +763,9 @@ export default function Home() {
   }
 
   function recordReaderSignal(event: ReaderProfileEventInput) {
-    setReaderProfile(recordReaderProfileEvent(event));
+    const nextProfile = recordReaderProfileEvent(event);
+    setReaderProfile(nextProfile);
+    void syncReaderProfileToCloud(nextProfile);
   }
 
   function handleStartSomethingDifferent() {
@@ -696,7 +812,7 @@ export default function Home() {
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        <ReaderProfileDiagnostics profile={readerProfile} onClear={handleClearReaderProfile} />
+        <ReaderProfileDiagnostics cloudSync={cloudReaderProfileSync} profile={readerProfile} onClear={handleClearReaderProfile} />
         <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
         {activeView === "mood-intake" ? (
@@ -873,7 +989,7 @@ function SegmentedChoice({ label, onChange, options, value }: { label: string; o
   return <div className="grid gap-2"><p className="text-sm font-semibold text-paper">{label}</p><div className="grid grid-cols-3 gap-2">{options.map((option) => <button className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${value === option.value ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper"}`} key={option.value} onClick={() => onChange(option.value)} type="button">{option.label}</button>)}</div></div>;
 }
 
-function ReaderProfileDiagnostics({ onClear, profile }: { onClear: () => void; profile: ReaderProfile }) {
+function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: CloudReaderProfileSyncState; onClear: () => void; profile: ReaderProfile }) {
   const topMood = getTopCount(profile.moodCounts);
   const topGenre = getTopCount(profile.genreCounts);
 
@@ -883,6 +999,13 @@ function ReaderProfileDiagnostics({ onClear, profile }: { onClear: () => void; p
       <div className="mt-3 grid gap-3">
         <div className="grid gap-1 sm:grid-cols-2">
           <p><span className="font-semibold text-paper/80">Profile exists:</span> {profile.profileExists ? "yes" : "no"}</p>
+          <p><span className="font-semibold text-paper/80">Profile ID:</span> {cloudSync.profileId || "pending"}</p>
+          <p><span className="font-semibold text-paper/80">Local profile exists:</span> {cloudSync.localProfileExists ? "yes" : "no"}</p>
+          <p><span className="font-semibold text-paper/80">Cloud profile status:</span> {cloudSync.status}</p>
+          <p><span className="font-semibold text-paper/80">Last cloud sync:</span> {cloudSync.lastSyncAt || "never"}</p>
+          <p><span className="font-semibold text-paper/80">Last cloud error:</span> {cloudSync.lastError || "none"}</p>
+          <p><span className="font-semibold text-paper/80">Local updated:</span> {cloudSync.localUpdatedAt || profile.updatedAt || "never"}</p>
+          <p><span className="font-semibold text-paper/80">Cloud updated:</span> {cloudSync.cloudUpdatedAt || "unknown"}</p>
           <p><span className="font-semibold text-paper/80">Total generated:</span> {profile.counters.totalStoriesGenerated}</p>
           <p><span className="font-semibold text-paper/80">Total opened:</span> {profile.counters.totalStoriesOpened}</p>
           <p><span className="font-semibold text-paper/80">Total continued:</span> {profile.counters.totalContinues}</p>
@@ -893,12 +1016,13 @@ function ReaderProfileDiagnostics({ onClear, profile }: { onClear: () => void; p
           <p><span className="font-semibold text-paper/80">Top mood:</span> {topMood ?? "none"}</p>
           <p><span className="font-semibold text-paper/80">Top genre:</span> {topGenre ?? "none"}</p>
           <p><span className="font-semibold text-paper/80">Storage key:</span> {READER_PROFILE_STORAGE_KEY}</p>
+          <p><span className="font-semibold text-paper/80">Profile ID key:</span> {READER_PROFILE_ID_STORAGE_KEY}</p>
           <p><span className="font-semibold text-paper/80">Updated:</span> {profile.updatedAt || "never"}</p>
         </div>
         <details className="rounded-md border border-paper/10 bg-night-ink p-3">
           <summary className="cursor-pointer font-semibold text-paper/75">Raw JSON</summary>
           <pre className="mt-3 max-h-72 overflow-auto text-[0.7rem] leading-5 text-paper/70">
-            {JSON.stringify({ storageKey: READER_PROFILE_STORAGE_KEY, ...profile }, null, 2)}
+            {JSON.stringify({ storageKey: READER_PROFILE_STORAGE_KEY, profileIdStorageKey: READER_PROFILE_ID_STORAGE_KEY, cloudSync, ...profile }, null, 2)}
           </pre>
         </details>
         <button className="w-fit rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper hover:border-lantern-gold/50" onClick={onClear} type="button">Clear reader profile</button>
@@ -910,6 +1034,16 @@ function ReaderProfileDiagnostics({ onClear, profile }: { onClear: () => void; p
 function getTopCount(counts: Record<string, number>): string | null {
   const [topKey, topCount] = Object.entries(counts).sort(([, left], [, right]) => right - left)[0] ?? [];
   return topKey ? `${topKey} (${topCount})` : null;
+}
+
+function normalizeCloudReaderProfile(value: unknown): ReaderProfile | null {
+  if (!value) return null;
+  const profile = normalizeReaderProfile(value);
+  return profile.profileExists ? profile : null;
+}
+
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Reader profile cloud sync failed.";
 }
 
 function EerieReaderProfileDiagnostics({ onClear, profile }: { onClear: () => void; profile: EerieReaderProfile }) {
