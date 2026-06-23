@@ -36,7 +36,6 @@ import {
   readReadyStoryQueue,
   readSavedForLaterStoryQueue,
   removeReadyStoryQueueItem,
-  updateReadyStoryQueueItem,
   upsertSavedForLaterStoryQueueItem,
   type ReadyStoryQueueItem,
   type ReadyStoryQueueSignal
@@ -260,7 +259,6 @@ export default function Home() {
   const [lastReadyStoryPreparationOutcome, setLastReadyStoryPreparationOutcome] = useState("none");
   const [isStoryStartSelectionOpen, setIsStoryStartSelectionOpen] = useState(false);
   const activeGenerationRequestId = useRef(0);
-  const activeReadyStoryPreparationId = useRef("");
 
   useEffect(() => {
     const requestedView = readAppView(searchParams.get("view")) ?? "home";
@@ -523,107 +521,6 @@ export default function Home() {
       rules: item.rules
     };
   }
-
-  async function prepareReadyStoryQueueItem(item: ReadyStoryQueueItem) {
-    if (activeReadyStoryPreparationId.current) return;
-
-    const preparationId = `${item.id}:${Date.now()}`;
-    activeReadyStoryPreparationId.current = preparationId;
-    setReadyStoryPreparationStatus(`preparing: ${item.title}`);
-
-    const markQueue = (update: Partial<ReadyStoryQueueItem>) => {
-      setReadyStoryQueue((currentQueue) => {
-        const nextQueue = persistReadyStoryQueue(updateReadyStoryQueueItem(currentQueue, item.id, update));
-        return nextQueue;
-      });
-    };
-
-    markQueue({ generationStatus: "generating", generationError: "" });
-
-    try {
-      const storyStart = readyStoryQueueItemToStoryStart(item);
-      const personalization = buildNewStoryPersonalization({
-        eerieProfile: eerieReaderProfile,
-        genre: storyStart.genre,
-        mode: "new-story",
-        profile: readReaderProfile(),
-        source: getReaderProfileSource(cloudReaderProfileSync),
-        trigger: "startSomethingNew",
-        continuationStoryId: ""
-      });
-
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          worldBible: storyStart.world,
-          characterProfiles: storyStart.cast,
-          storySeed: storyStart.seed,
-          storyRules: storyStart.rules,
-          genrePreset: storyStart.genre,
-          narrativeArchitecture,
-          characterArc,
-          endingType,
-          lengthTarget: "Standard",
-          readerMood: readerProfile.latestMood ?? null,
-          ...(personalization.prompt ? { personalizationContext: personalization.prompt } : {}),
-          readerProfileSnapshot: personalization.snapshot,
-          readerProfileGenerationSnapshot: personalization.snapshot
-        })
-      });
-
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Ready story preparation failed.");
-
-      const normalizedResponse = normalizeGenerateStoryResponse(payload);
-      const generatedStoryId = createStoryId(normalizedResponse.story);
-      const generatedAt = new Date().toISOString();
-
-      markQueue({
-        generationStatus: "ready",
-        generatedStory: normalizedResponse,
-        generatedStoryId,
-        generatedAt,
-        generationError: ""
-      });
-
-      recordReaderSignal({
-        eventType: "storyGenerated",
-        source: "startSomethingNew",
-        storyId: generatedStoryId,
-        title: createStoryTitle(normalizedResponse.story),
-        genre: storyStart.genre,
-        wordCount: normalizedResponse.metadata.wordCount
-      });
-
-      setLastReadyStoryPreparationOutcome(`ready: ${item.title}`);
-    } catch (caughtError) {
-      markQueue({
-        generationStatus: "failed",
-        generationError: formatCaughtError(caughtError)
-      });
-      setLastReadyStoryPreparationOutcome(`failed: ${item.title}`);
-    } finally {
-      if (activeReadyStoryPreparationId.current === preparationId) {
-        activeReadyStoryPreparationId.current = "";
-        setReadyStoryPreparationStatus("idle");
-      }
-    }
-  }
-
-  useEffect(() => {
-    const nextItem = readyStoryQueue[0];
-    if (!nextItem) return;
-    if (activeView !== "home") return;
-    if (typeof window !== "undefined" && !window.matchMedia("(min-width: 768px)").matches) return;
-    if (isGenerating) return;
-    if (readyStoryQueue.some((item) => item.generationStatus === "generating")) return;
-    if (nextItem.generationStatus === "ready" && nextItem.generatedStory) return;
-    if (nextItem.generationStatus === "failed") return;
-    if (activeReadyStoryPreparationId.current) return;
-
-    void prepareReadyStoryQueueItem(nextItem);
-  }, [activeView, isGenerating, readyStoryQueue]);
 
   function handleReadReadyStory(item: ReadyStoryQueueItem) {
     if (isGenerating || item.generationStatus === "generating") return;
