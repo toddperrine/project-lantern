@@ -44,7 +44,7 @@ export function readReadyStoryQueue(): ReadyStoryQueueItem[] {
 }
 
 export function persistReadyStoryQueue(items: ReadyStoryQueueItem[]): ReadyStoryQueueItem[] {
-  const normalized = items.map(normalizeReadyStoryQueueItem).filter(isReadyStoryQueueItem).slice(0, MAX_READY_STORY_QUEUE_ITEMS);
+  const normalized = items.map((item) => normalizeReadyStoryQueueItem(item)).filter(isReadyStoryQueueItem).slice(0, MAX_READY_STORY_QUEUE_ITEMS);
   writeQueueItems(READY_STORY_QUEUE_STORAGE_KEY, normalized);
   return normalized;
 }
@@ -54,7 +54,7 @@ export function readSavedForLaterStoryQueue(): ReadyStoryQueueItem[] {
 }
 
 export function persistSavedForLaterStoryQueue(items: ReadyStoryQueueItem[]): ReadyStoryQueueItem[] {
-  const normalized = items.map(normalizeReadyStoryQueueItem).filter(isReadyStoryQueueItem).slice(0, MAX_SAVED_FOR_LATER_STORY_ITEMS);
+  const normalized = items.map((item) => normalizeReadyStoryQueueItem(item)).filter(isReadyStoryQueueItem).slice(0, MAX_SAVED_FOR_LATER_STORY_ITEMS);
   writeQueueItems(SAVED_FOR_LATER_STORY_QUEUE_STORAGE_KEY, normalized);
   return normalized;
 }
@@ -91,7 +91,7 @@ function readQueueItems(storageKey: string): ReadyStoryQueueItem[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.map(normalizeReadyStoryQueueItem).filter(isReadyStoryQueueItem);
+    return parsed.map((item) => normalizeReadyStoryQueueItem(item, { resetGenerating: true })).filter(isReadyStoryQueueItem);
   } catch {
     return [];
   }
@@ -107,7 +107,7 @@ function writeQueueItems(storageKey: string, items: ReadyStoryQueueItem[]) {
   }
 }
 
-function normalizeReadyStoryQueueItem(value: unknown): ReadyStoryQueueItem {
+function normalizeReadyStoryQueueItem(value: unknown, options?: { resetGenerating?: boolean }): ReadyStoryQueueItem {
   const candidate = value as Partial<ReadyStoryQueueItem>;
   const generatedStory = normalizeGeneratedStory(candidate?.generatedStory);
   const candidateStatus = candidate?.generationStatus;
@@ -115,7 +115,9 @@ function normalizeReadyStoryQueueItem(value: unknown): ReadyStoryQueueItem {
     ? "ready"
     : candidateStatus === "failed"
       ? "failed"
-      : "not_started";
+      : candidateStatus === "generating" && !options?.resetGenerating
+        ? "generating"
+        : "not_started";
 
   return {
     id: normalizeQueueText(candidate?.id, 180),
