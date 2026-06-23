@@ -40,6 +40,20 @@ type MoodIntakeMode = "story-start" | "generate" | null;
 type MoodIntakeFormState = ReaderMoodDraft;
 type GeneratedStoryPresentation = "first-episode" | "continuation" | null;
 type GenerationSource = "new-story" | "continue-story" | null;
+type ProfileSourceUsed = "local" | "cloud" | "default" | "none";
+type LastNewStoryPersonalization = {
+  profileUsed: boolean;
+  profileSourceUsed: ProfileSourceUsed;
+  profileConfidence: "low" | "medium" | "high" | "unavailable";
+  lastGenerationMode: "new-story" | "continue-story" | "none";
+  lastGenerationTrigger: string;
+  moodSignal: string;
+  genreSignal: string;
+  hardAvoidancesIncluded: boolean;
+  eerieSignalsIncluded: boolean;
+  continuationStoryIdIncludedInLastNewStoryRequest: boolean;
+  summary: string;
+};
 type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" | "not found";
 type CloudReaderProfileSyncState = {
   profileId: string;
@@ -148,6 +162,7 @@ export default function Home() {
   const [lastGenerationTrigger, setLastGenerationTrigger] = useState("none");
   const [generationSource, setGenerationSource] = useState<GenerationSource>(null);
   const [lastRequestIncludedContinuationStoryId, setLastRequestIncludedContinuationStoryId] = useState(false);
+  const [lastNewStoryPersonalization, setLastNewStoryPersonalization] = useState<LastNewStoryPersonalization>(createEmptyLastNewStoryPersonalization());
   const [isStoryStartSelectionOpen, setIsStoryStartSelectionOpen] = useState(false);
   const activeGenerationRequestId = useRef(0);
 
@@ -237,6 +252,16 @@ export default function Home() {
     setLastGenerationTrigger(overrides?.signalSource ?? "create");
     setGenerationSource(nextGenerationSource);
     setLastRequestIncludedContinuationStoryId(Boolean(continuationStoryId));
+    const personalization = buildNewStoryPersonalization({
+      eerieProfile: eerieReaderProfile,
+      genre: overrides?.genrePreset ?? genrePreset,
+      mode: nextGenerationSource,
+      profile: readReaderProfile(),
+      source: getReaderProfileSource(cloudReaderProfileSync),
+      trigger: overrides?.signalSource ?? "create",
+      continuationStoryId
+    });
+    setLastNewStoryPersonalization(personalization.diagnostics);
     setIsGenerating(true);
     try {
       const response = await fetch("/api/generate", {
@@ -253,6 +278,7 @@ export default function Home() {
           endingType: overrides?.endingType ?? endingType,
           lengthTarget: overrides?.lengthTarget ?? lengthTarget,
           readerMood: overrides?.readerMood ?? readerProfile.latestMood ?? null,
+          ...(personalization.prompt ? { personalizationContext: personalization.prompt } : {}),
           ...(continuationStoryId ? { continuationStoryId } : {})
         })
       });
@@ -849,7 +875,7 @@ export default function Home() {
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        <AppStateDiagnostics activeView={activeView} currentStoryId={currentStoryId} generationSource={generationSource} isGenerating={isGenerating} lastGenerationTrigger={lastGenerationTrigger} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} />
+        <AppStateDiagnostics activeView={activeView} currentStoryId={currentStoryId} generationSource={generationSource} isGenerating={isGenerating} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} />
         <ReaderProfileDiagnostics cloudSync={cloudReaderProfileSync} profile={readerProfile} onClear={handleClearReaderProfile} />
         <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
@@ -1027,7 +1053,80 @@ function SegmentedChoice({ label, onChange, options, value }: { label: string; o
   return <div className="grid gap-2"><p className="text-sm font-semibold text-paper">{label}</p><div className="grid grid-cols-3 gap-2">{options.map((option) => <button className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${value === option.value ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper"}`} key={option.value} onClick={() => onChange(option.value)} type="button">{option.label}</button>)}</div></div>;
 }
 
-function AppStateDiagnostics({ activeView, currentStoryId, generationSource, isGenerating, lastGenerationTrigger, lastRequestIncludedContinuationStoryId }: { activeView: AppView; currentStoryId: string; generationSource: GenerationSource; isGenerating: boolean; lastGenerationTrigger: string; lastRequestIncludedContinuationStoryId: boolean }) {
+function createEmptyLastNewStoryPersonalization(): LastNewStoryPersonalization {
+  return {
+    profileUsed: false,
+    profileSourceUsed: "none",
+    profileConfidence: "unavailable",
+    lastGenerationMode: "none",
+    lastGenerationTrigger: "none",
+    moodSignal: "none",
+    genreSignal: "none",
+    hardAvoidancesIncluded: false,
+    eerieSignalsIncluded: false,
+    continuationStoryIdIncludedInLastNewStoryRequest: false,
+    summary: "No new-story generation personalization has been applied yet."
+  };
+}
+
+function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre, mode, profile, source, trigger }: { continuationStoryId: string; eerieProfile: EerieReaderProfile; genre: GenrePreset; mode: Exclude<GenerationSource, null>; profile: ReaderProfile; source: ProfileSourceUsed; trigger: ReaderProfileEventSource; }): { diagnostics: LastNewStoryPersonalization; prompt: string } {
+  if (mode === "continue-story") {
+    return {
+      diagnostics: {
+        ...createEmptyLastNewStoryPersonalization(),
+        lastGenerationMode: "continue-story",
+        lastGenerationTrigger: trigger,
+        profileSourceUsed: "none",
+        continuationStoryIdIncludedInLastNewStoryRequest: false,
+        summary: "Continuation generation did not use new-story reader profile personalization."
+      },
+      prompt: ""
+    };
+  }
+
+  const topMood = getTopCount(profile.moodCounts);
+  const topGenre = getTopCount(profile.genreCounts);
+  const confidence = getReaderProfileConfidence(profile);
+  const hardAvoidances = [...splitAvoidances(profile.latestMood?.avoidances), ...eerieProfile.hardAvoidances].filter(Boolean);
+  const profileUsed = profile.profileExists;
+  const profileSource = profileUsed && source === "none" ? "local" : source;
+  const includeEerieSignals = shouldUseEerieSignalsForGenre(genre);
+  const weakly = confidence === "low" ? "Treat these as weak preferences, not hard rules." : "Treat these as preferences, not hard rules.";
+  const prompt = profileUsed ? [
+    "Controlled reader-profile personalization for this brand-new story only:",
+    `- Profile source: ${profileSource}. Profile confidence: ${confidence}. ${weakly}`,
+    `- Top mood signal: ${topMood ?? profile.latestMood?.mood ?? "none"}.`,
+    `- Top genre signal: ${topGenre ?? "none"}. Current selected genre: ${genre}.`,
+    `- Preferred format: ${eerieProfile.preferredFormat}. Preferred duration: ${eerieProfile.preferredDurationMinutes} minutes.`,
+    `- Engagement totals: generated ${profile.counters.totalStoriesGenerated}, opened ${profile.counters.totalStoriesOpened}, continued ${profile.counters.totalContinues}.`,
+    `- Mood selection counts: ${formatCounts(profile.moodCounts)}.`,
+    `- Genre counts: ${formatCounts(profile.genreCounts)}.`,
+    hardAvoidances.length ? `- Hard avoidances, as hard constraints: ${dedupe(hardAvoidances).join(", ")}.` : "- Hard avoidances: none recorded.",
+    includeEerieSignals
+      ? `- Eerie taste/safety guidance: fear intensity ${formatWeightedPreference(eerieProfile.fearIntensity)}, weirdness tolerance ${formatWeightedPreference(eerieProfile.weirdnessTolerance)}, supernatural affinity ${formatWeightedPreference(eerieProfile.supernaturalAffinity)}, ambiguity tolerance ${formatWeightedPreference(eerieProfile.ambiguityTolerance)}, gore tolerance ${formatWeightedPreference(eerieProfile.goreTolerance)} as a safety constraint, sleep-safe preference ${formatWeightedPreference(eerieProfile.sleepSafePreference)}.`
+      : "- Eerie profile signals are present but should be used only lightly because the selected genre is not primarily eerie/horror/dark-adjacent. Do not let horror preferences dominate.",
+    "Do not mention personalization or the reader profile in the story."
+  ].join("\n") : "";
+
+  return {
+    diagnostics: {
+      profileUsed,
+      profileSourceUsed: profileUsed ? profileSource : "none",
+      profileConfidence: profileUsed ? confidence : "unavailable",
+      lastGenerationMode: "new-story",
+      lastGenerationTrigger: trigger,
+      moodSignal: topMood ?? profile.latestMood?.mood ?? "none",
+      genreSignal: topGenre ?? genre,
+      hardAvoidancesIncluded: profileUsed && hardAvoidances.length > 0,
+      eerieSignalsIncluded: profileUsed,
+      continuationStoryIdIncludedInLastNewStoryRequest: Boolean(continuationStoryId),
+      summary: profileUsed ? `Used ${confidence}-confidence reader profile ${confidence === "low" ? "lightly" : "as preference guidance"}: favored ${topGenre ?? genre} and ${topMood ?? profile.latestMood?.mood ?? "available mood"} mood; ${hardAvoidances.length ? "included hard avoidances" : "no hard avoidances found"}; ${includeEerieSignals ? "included eerie taste/safety guidance without forcing horror." : "did not force eerie preferences."}` : "No persisted reader profile was available; generated with the existing new-story inputs only."
+    },
+    prompt
+  };
+}
+
+function AppStateDiagnostics({ activeView, currentStoryId, generationSource, isGenerating, lastGenerationTrigger, lastNewStoryPersonalization, lastRequestIncludedContinuationStoryId }: { activeView: AppView; currentStoryId: string; generationSource: GenerationSource; isGenerating: boolean; lastGenerationTrigger: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastRequestIncludedContinuationStoryId: boolean }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
@@ -1038,6 +1137,16 @@ function AppStateDiagnostics({ activeView, currentStoryId, generationSource, isG
         <p><span className="font-semibold text-paper/80">Active generation source:</span> {generationSource ?? "none"}</p>
         <p><span className="font-semibold text-paper/80">Current story ID:</span> {currentStoryId || "none"}</p>
         <p><span className="font-semibold text-paper/80">Last request included continuation story ID:</span> {lastRequestIncludedContinuationStoryId ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">Profile used in last new-story generation:</span> {lastNewStoryPersonalization.profileUsed ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">Profile source used:</span> {lastNewStoryPersonalization.profileSourceUsed}</p>
+        <p><span className="font-semibold text-paper/80">Profile confidence:</span> {lastNewStoryPersonalization.profileConfidence}</p>
+        <p><span className="font-semibold text-paper/80">Last generation mode:</span> {lastNewStoryPersonalization.lastGenerationMode}</p>
+        <p><span className="font-semibold text-paper/80">Last generation mood signal:</span> {lastNewStoryPersonalization.moodSignal}</p>
+        <p><span className="font-semibold text-paper/80">Last generation genre signal:</span> {lastNewStoryPersonalization.genreSignal}</p>
+        <p><span className="font-semibold text-paper/80">Hard avoidances included:</span> {lastNewStoryPersonalization.hardAvoidancesIncluded ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">Eerie signals included:</span> {lastNewStoryPersonalization.eerieSignalsIncluded ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">Continuation story id included in last new-story request:</span> {lastNewStoryPersonalization.continuationStoryIdIncludedInLastNewStoryRequest ? "yes" : "no"}</p>
+        <p className="sm:col-span-2"><span className="font-semibold text-paper/80">Personalization summary:</span> {lastNewStoryPersonalization.summary}</p>
       </div>
     </details>
   );
@@ -1088,6 +1197,40 @@ function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: 
 function getTopCount(counts: Record<string, number>): string | null {
   const [topKey, topCount] = Object.entries(counts).sort(([, left], [, right]) => right - left)[0] ?? [];
   return topKey ? `${topKey} (${topCount})` : null;
+}
+
+function getReaderProfileSource(sync: CloudReaderProfileSyncState): ProfileSourceUsed {
+  if (sync.status === "synced" && sync.cloudUpdatedAt && sync.cloudUpdatedAt >= sync.localUpdatedAt) return "cloud";
+  if (sync.localProfileExists) return "local";
+  return "none";
+}
+
+function getReaderProfileConfidence(profile: ReaderProfile): "low" | "medium" | "high" {
+  const signalCount = profile.counters.totalStoriesGenerated + profile.counters.totalStoriesOpened + profile.counters.totalContinues + profile.counters.totalMoodSelections;
+  if (signalCount >= 12) return "high";
+  if (signalCount >= 4) return "medium";
+  return "low";
+}
+
+function formatCounts(counts: Record<string, number>): string {
+  const entries = Object.entries(counts).sort(([, left], [, right]) => right - left).slice(0, 6);
+  return entries.length ? entries.map(([key, count]) => `${key}: ${count}`).join("; ") : "none";
+}
+
+function splitAvoidances(value: string | undefined): string[] {
+  return (value ?? "").split(/[,;\n]/).map((item) => item.trim()).filter(Boolean);
+}
+
+function dedupe(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function formatWeightedPreference(preference: { value: number; confidence: number }): string {
+  return `${preference.value.toFixed(2)} confidence ${preference.confidence.toFixed(2)}`;
+}
+
+function shouldUseEerieSignalsForGenre(genre: GenrePreset): boolean {
+  return /eerie|horror|strange|mystery|dark|supernatural|speculative/i.test(genre);
 }
 
 function normalizeCloudReaderProfile(value: unknown): ReaderProfile | null {

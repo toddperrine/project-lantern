@@ -52,13 +52,14 @@ export async function POST(request: Request) {
     worldBible: body.worldBible!.trim(),
     characterProfiles: body.characterProfiles!.trim(),
     storySeed: body.storySeed!.trim(),
-    storyRules: buildStoryRules(body.storyRules, readerMood),
+    storyRules: buildStoryRules(body.storyRules, readerMood, body.personalizationContext),
     genrePreset: body.genrePreset!,
     narrativeArchitecture: body.narrativeArchitecture!,
     characterArc: body.characterArc!,
     endingType: body.endingType!,
     lengthTarget: body.lengthTarget!,
-    readerMood
+    readerMood,
+    personalizationContext: body.personalizationContext?.trim() || undefined
   } satisfies GenerateStoryRequest;
 
   if (!hasOpenAIKey()) {
@@ -234,6 +235,7 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
     body.characterProfiles.length +
     body.storySeed.length +
     (body.storyRules?.length ?? 0) +
+    (body.personalizationContext?.length ?? 0) +
     formatStoryCraftGuidance().length +
     readerMoodPrompt.length;
   if (contextLength > MAX_CONTEXT_CHARS) {
@@ -243,11 +245,12 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
   return null;
 }
 
-function buildStoryRules(storyRules: string | undefined, readerMood: GenerateStoryRequest["readerMood"] = null): string {
+function buildStoryRules(storyRules: string | undefined, readerMood: GenerateStoryRequest["readerMood"] = null, personalizationContext?: string): string {
   const baseRules = storyRules?.trim() || DEFAULT_STORY_RULES;
   const readerMoodGuidance = formatReaderMoodForPrompt(readerMood);
+  const controlledPersonalization = personalizationContext?.trim() || "";
 
-  return [baseRules, formatStoryCraftGuidance(), readerMoodGuidance].filter(Boolean).join("\n\n");
+  return [baseRules, formatStoryCraftGuidance(), readerMoodGuidance, controlledPersonalization].filter(Boolean).join("\n\n");
 }
 function summarizeOpenAIError(error: unknown): string {
   if (error instanceof Error) {
