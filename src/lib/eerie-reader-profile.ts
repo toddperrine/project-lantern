@@ -56,7 +56,11 @@ export interface EerieReaderProfile {
   storyCardSignals: EerieStoryCardSignal[];
 }
 
-const DEFAULT_HARD_AVOIDANCES = ["sexual violence", "explicit harm to children", "extreme gore"];
+export const DEFAULT_EERIE_SAFETY_GUARDRAILS = [
+  "sexual violence",
+  "explicit harm to children",
+  "extreme gore"
+];
 const DEFAULT_AFFINITIES: Record<string, number> = {
   uncannyMysteryAffinity: 0.6,
   atmosphericDreadAffinity: 0.6,
@@ -99,7 +103,7 @@ export function createDefaultEerieReaderProfile(mode?: EerieOnboardingMode): Eer
     sleepSafePreference: weighted(0.7),
     preferredFormat: "both",
     preferredDurationMinutes: 10,
-    hardAvoidances: [...DEFAULT_HARD_AVOIDANCES],
+    hardAvoidances: [...DEFAULT_EERIE_SAFETY_GUARDRAILS],
     affinities: Object.fromEntries(Object.entries(DEFAULT_AFFINITIES).map(([key, value]) => [key, weighted(value)])),
     storyCardSignals: []
   };
@@ -192,7 +196,8 @@ export function formatEerieReaderProfileForDiagnostics(profile: EerieReaderProfi
     sleepSafePreference: summarizeWeightedPreference(profile.sleepSafePreference),
     preferredFormat: profile.preferredFormat,
     preferredDurationMinutes: profile.preferredDurationMinutes,
-    hardAvoidances: profile.hardAvoidances,
+    defaultEerieSafetyGuardrails: DEFAULT_EERIE_SAFETY_GUARDRAILS,
+    localEerieProfileHardAvoidances: profile.hardAvoidances,
     topAffinities: sortedAffinities,
     storyCardSignalCount: profile.storyCardSignals.length,
     updatedAt: profile.updatedAt
