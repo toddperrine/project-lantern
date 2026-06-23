@@ -39,6 +39,7 @@ type StoryBrief = { hook: string; recap: string; changed: string; tension: strin
 type MoodIntakeMode = "story-start" | "generate" | null;
 type MoodIntakeFormState = ReaderMoodDraft;
 type GeneratedStoryPresentation = "first-episode" | "continuation" | null;
+type GenerationSource = "new-story" | "continue-story" | null;
 type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" | "not found";
 type CloudReaderProfileSyncState = {
   profileId: string;
@@ -144,6 +145,9 @@ export default function Home() {
   const [moodIntakeMode, setMoodIntakeMode] = useState<MoodIntakeMode>(null);
   const [generationApprovedMoodSnapshotId, setGenerationApprovedMoodSnapshotId] = useState<string | null>(null);
   const [generatedStoryPresentation, setGeneratedStoryPresentation] = useState<GeneratedStoryPresentation>(null);
+  const [lastGenerationTrigger, setLastGenerationTrigger] = useState("none");
+  const [generationSource, setGenerationSource] = useState<GenerationSource>(null);
+  const [lastRequestIncludedContinuationStoryId, setLastRequestIncludedContinuationStoryId] = useState(false);
   const [isStoryStartSelectionOpen, setIsStoryStartSelectionOpen] = useState(false);
   const activeGenerationRequestId = useRef(0);
 
@@ -185,6 +189,7 @@ export default function Home() {
   function cancelActiveGeneration() {
     activeGenerationRequestId.current += 1;
     setIsGenerating(false);
+    setGenerationSource(null);
   }
 
   function exitStoryReaderForHome() {
@@ -197,22 +202,41 @@ export default function Home() {
     setIsDirectionOpen(false);
   }
 
-  function navigateToView(view: AppView, options?: { preserveGeneration?: boolean }) {
+  function navigateHome(options?: { preserveGeneration?: boolean }) {
     if (!options?.preserveGeneration) {
       cancelActiveGeneration();
-      if (view === "home") exitStoryReaderForHome();
+      exitStoryReaderForHome();
+    }
+    setActiveView("home");
+    if (typeof window !== "undefined") window.history.pushState(null, "", window.location.pathname);
+  }
+
+  function navigateToView(view: AppView, options?: { preserveGeneration?: boolean }) {
+    if (view === "home") {
+      navigateHome(options);
+      return;
     }
     setActiveView(view);
     if (typeof window === "undefined") return;
-    const nextUrl = view === "home" ? window.location.pathname : `${window.location.pathname}?view=${view}`;
-    window.history.pushState(null, "", nextUrl);
+    window.history.pushState(null, "", `${window.location.pathname}?view=${view}`);
   }
 
-  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null; presentation: Exclude<GeneratedStoryPresentation, null>; loadingMessage: string; signalSource: ReaderProfileEventSource }>) {
+  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null; presentation: Exclude<GeneratedStoryPresentation, null>; loadingMessage: string; signalSource: ReaderProfileEventSource; generationSource: Exclude<GenerationSource, null>; continuationStoryId: string }>) {
+    const nextGenerationSource = overrides?.generationSource ?? "new-story";
+    const continuationStoryId = nextGenerationSource === "continue-story" ? overrides?.continuationStoryId?.trim() ?? "" : "";
+
+    if (nextGenerationSource === "continue-story" && !continuationStoryId) {
+      setError("Choose an active story before continuing it.");
+      return;
+    }
+
     const requestId = activeGenerationRequestId.current + 1;
     activeGenerationRequestId.current = requestId;
     setError("");
     setStatusMessage(overrides?.loadingMessage ?? "");
+    setLastGenerationTrigger(overrides?.signalSource ?? "create");
+    setGenerationSource(nextGenerationSource);
+    setLastRequestIncludedContinuationStoryId(Boolean(continuationStoryId));
     setIsGenerating(true);
     try {
       const response = await fetch("/api/generate", {
@@ -228,7 +252,8 @@ export default function Home() {
           characterArc: overrides?.characterArc ?? characterArc,
           endingType: overrides?.endingType ?? endingType,
           lengthTarget: overrides?.lengthTarget ?? lengthTarget,
-          readerMood: overrides?.readerMood ?? readerProfile.latestMood ?? null
+          readerMood: overrides?.readerMood ?? readerProfile.latestMood ?? null,
+          ...(continuationStoryId ? { continuationStoryId } : {})
         })
       });
       const payload = await response.json();
@@ -248,14 +273,17 @@ export default function Home() {
       setIsStoryStartSelectionOpen(false);
       clearDemoLatestStory();
       setDemoStory(null);
-      navigateToView("home", { preserveGeneration: true });
+      navigateHome({ preserveGeneration: true });
       setGenerationApprovedMoodSnapshotId(null);
       setStatusMessage("Story ready.");
     } catch (caughtError) {
       if (activeGenerationRequestId.current !== requestId) return;
       setError(caughtError instanceof Error ? caughtError.message : "Story generation failed.");
     } finally {
-      if (activeGenerationRequestId.current === requestId) setIsGenerating(false);
+      if (activeGenerationRequestId.current === requestId) {
+        setIsGenerating(false);
+        setGenerationSource(null);
+      }
     }
   }
 
@@ -288,7 +316,8 @@ export default function Home() {
       lengthTarget: "First Page Test",
       readerMood: readerProfile.latestMood ?? null,
       presentation: "first-episode",
-      signalSource: "startSomethingNew"
+      signalSource: "startSomethingNew",
+      generationSource: "new-story"
     });
   }
 
@@ -334,7 +363,8 @@ export default function Home() {
       readerMood: readerProfile.latestMood ?? null,
       presentation: "first-episode",
       loadingMessage: "Writing the perfect story for you…",
-      signalSource: "startSomethingNew"
+      signalSource: "startSomethingNew",
+      generationSource: "new-story"
     });
   }
 
@@ -352,7 +382,7 @@ export default function Home() {
     );
 
     if (approvedCurrentMood) {
-      void handleGenerate({ readerMood: readerProfile.latestMood ?? null, signalSource: "create" });
+      void handleGenerate({ readerMood: readerProfile.latestMood ?? null, signalSource: "create", generationSource: "new-story" });
       return;
     }
 
@@ -392,21 +422,22 @@ export default function Home() {
         lengthTarget: "First Page Test",
         readerMood: latestMood,
         presentation: "first-episode",
-        signalSource: "startSomethingNew"
+        signalSource: "startSomethingNew",
+        generationSource: "new-story"
       });
       return;
     }
 
     if (modeToComplete === "story-start") {
       setIsStoryStartSelectionOpen(true);
-      navigateToView("home");
+      navigateHome({ preserveGeneration: true });
       setStatusMessage("Reader pulse saved. Choose a story based on your reader pulse.");
       return;
     }
 
     if (modeToComplete === "generate") {
       setStatusMessage("Reader pulse saved. Generating story.");
-      void handleGenerate({ readerMood: latestMood, signalSource: "create" });
+      void handleGenerate({ readerMood: latestMood, signalSource: "create", generationSource: "new-story" });
       return;
     }
 
@@ -531,7 +562,7 @@ export default function Home() {
     recordReaderSignal({ eventType: "demoStoryLoaded", source: "demo", storyId: nextDemoStory.id, title: nextDemoStory.title, genre: nextDemoStory.genrePreset, wordCount: nextDemoStory.wordCount });
     recordReaderSignal({ eventType: "storyOpened", source: "demo", storyId: nextDemoStory.id, title: nextDemoStory.title, genre: nextDemoStory.genrePreset, wordCount: nextDemoStory.wordCount });
     setDemoStory(nextDemoStory);
-    navigateToView("home");
+    navigateHome({ preserveGeneration: true });
     setStatusMessage("Demo story loaded for review. Your saved history was not changed.");
   }
 
@@ -561,7 +592,9 @@ export default function Home() {
       lengthTarget,
       presentation: "continuation",
       loadingMessage: "Writing the next chapter…",
-      signalSource: "continueSeries"
+      signalSource: "continueSeries",
+      generationSource: "continue-story",
+      continuationStoryId: latestStory.id
     });
   }
 
@@ -582,7 +615,7 @@ export default function Home() {
     clearDemoLatestStory();
     setDemoStory(null);
     recordReaderSignal({ eventType: "storyOpened", storyId: story.id, title: story.title, genre: story.genrePreset, wordCount: story.wordCount });
-    navigateToView("home");
+    navigateHome({ preserveGeneration: true });
     setStatusMessage(`Restored ${story.title}.`);
   }
 
@@ -595,7 +628,7 @@ export default function Home() {
 
   function handleOpenCurrentStory() {
     if (currentGeneratedStory) recordReaderSignal({ eventType: "storyOpened", storyId: currentGeneratedStory.id, title: currentGeneratedStory.title, genre: currentGeneratedStory.genrePreset, wordCount: currentGeneratedStory.wordCount });
-    navigateToView("home");
+    navigateHome({ preserveGeneration: true });
   }
 
   function handleExportLatestStory() {
@@ -774,7 +807,8 @@ export default function Home() {
     } else {
       recordReaderSignal({ eventType: "startSomethingDifferentClicked", source: "startSomethingNew" });
     }
-    handleStartSomethingNew();
+    navigateHome();
+    setStatusMessage("Choose what kind of story should find you next.");
   }
 
   function clearCurrentInputs() {
@@ -789,6 +823,9 @@ export default function Home() {
     setStatusMessage("Current inputs cleared. Saved library items were not changed.");
   }
 
+  const isNewStoryGenerating = isGenerating && generationSource === "new-story";
+  const isContinuationGenerating = isGenerating && generationSource === "continue-story";
+
   return (
     <main className="min-h-screen overflow-x-hidden px-3 pb-24 pt-3 text-paper sm:px-4 md:px-8 md:py-7">
       <section className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-5 md:gap-6">
@@ -797,7 +834,7 @@ export default function Home() {
             if (typeof window !== "undefined") {
               window.dispatchEvent(new CustomEvent("lantern:reset-mobile-home-gate"));
             }
-            navigateToView("home");
+            navigateHome();
           }}
         />
         <header className="hidden min-w-0 flex-col gap-5 border-b border-paper/10 pb-6 md:flex md:flex-row md:items-end md:justify-between">
@@ -812,6 +849,7 @@ export default function Home() {
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
+        <AppStateDiagnostics activeView={activeView} currentStoryId={currentStoryId} generationSource={generationSource} isGenerating={isGenerating} lastGenerationTrigger={lastGenerationTrigger} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} />
         <ReaderProfileDiagnostics cloudSync={cloudReaderProfileSync} profile={readerProfile} onClear={handleClearReaderProfile} />
         <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
@@ -822,8 +860,8 @@ export default function Home() {
             pendingStoryTitle={pendingStoryStart?.title ?? null}
           />
         ) : null}
-        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader isGenerating={isGenerating} onContinue={() => handleContinueLatest()} onExport={handleExportLatestStory} onStartDifferent={handleStartSomethingDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
-        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} suggestedStarts={suggestedStarts} /> : null}
+        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader isGenerating={isContinuationGenerating} onContinue={() => handleContinueLatest()} onExport={handleExportLatestStory} onStartDifferent={handleStartSomethingDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
+        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
@@ -852,16 +890,16 @@ function EpisodeReader({ eyebrow, isGenerating, onContinue, onExport, onStartDif
   );
 }
 
-function HomeView(props: { activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
-  const { activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onStartNewStory, onStartRecommendation, onToggleDirection, showStoryStartOptions, suggestedStarts } = props;
+function HomeView(props: { activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; isContinuationGenerating: boolean; isNewStoryGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
+  const { activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, isContinuationGenerating, isNewStoryGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onStartNewStory, onStartRecommendation, onToggleDirection, showStoryStartOptions, suggestedStarts } = props;
   const [isRecapOpen, setIsRecapOpen] = useState(false);
   const storyBrief = latestStory ? createStoryBrief(latestStory) : null;
 
-  return <div className="grid min-w-0 gap-6 md:gap-8"><div className="md:hidden"><MobileHomeView activeMood={activeMood} brief={storyBrief} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isGenerating={isGenerating} isRecapOpen={isRecapOpen} latestStory={latestStory} onClearDemoStory={onClearDemoStory} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onLoadDemoStory={onLoadDemoStory} onMoodSelect={onMoodSelect} onOpenRecap={() => setIsRecapOpen(true)} onStartNewStory={onStartNewStory} onStartRecommendation={onStartRecommendation} showStoryStartOptions={showStoryStartOptions} suggestedStarts={suggestedStarts} /></div><div className="hidden md:grid md:min-w-0 md:gap-8">{latestStory && storyBrief ? <CurrentStoryCard brief={storyBrief} direction={continueDirection} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onDirectionChange={onDirectionChange} onExportStory={onExportStory} onOpenRecap={() => setIsRecapOpen(true)} onToggleDirection={onToggleDirection} story={latestStory} /> : null}<MoodPicker activeMood={activeMood} hasCurrentStory={Boolean(latestStory)} onSelect={onMoodSelect} />{showStoryStartOptions ? <SuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} stories={suggestedStarts} onStart={onStartRecommendation} /> : <StartSomethingNewPanel canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isGenerating={isGenerating} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStartNewStory={onStartNewStory} />}</div></div>;
+  return <div className="grid min-w-0 gap-6 md:gap-8"><div className="md:hidden"><MobileHomeView activeMood={activeMood} brief={storyBrief} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isContinuationGenerating={isContinuationGenerating} isGenerating={isGenerating} isNewStoryGenerating={isNewStoryGenerating} isRecapOpen={isRecapOpen} latestStory={latestStory} onClearDemoStory={onClearDemoStory} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onLoadDemoStory={onLoadDemoStory} onMoodSelect={onMoodSelect} onOpenRecap={() => setIsRecapOpen(true)} onStartNewStory={onStartNewStory} onStartRecommendation={onStartRecommendation} showStoryStartOptions={showStoryStartOptions} suggestedStarts={suggestedStarts} /></div><div className="hidden md:grid md:min-w-0 md:gap-8">{latestStory && storyBrief ? <CurrentStoryCard brief={storyBrief} direction={continueDirection} isDirectionOpen={isDirectionOpen} isGenerating={isContinuationGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onDirectionChange={onDirectionChange} onExportStory={onExportStory} onOpenRecap={() => setIsRecapOpen(true)} onToggleDirection={onToggleDirection} story={latestStory} /> : null}<MoodPicker activeMood={activeMood} hasCurrentStory={Boolean(latestStory)} onSelect={onMoodSelect} />{showStoryStartOptions ? <SuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} stories={suggestedStarts} onStart={onStartRecommendation} /> : <StartSomethingNewPanel canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isGenerating={isGenerating} isNewStoryGenerating={isNewStoryGenerating} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStartNewStory={onStartNewStory} />}</div></div>;
 }
 
-function MobileHomeView({ activeMood, brief, canUseDemoStory, hasDemoStory, isGenerating, isRecapOpen, latestStory, onClearDemoStory, onCloseRecap, onContinue, onLoadDemoStory, onMoodSelect, onOpenRecap, onStartNewStory, onStartRecommendation, showStoryStartOptions, suggestedStarts }: { activeMood: Mood; brief: StoryBrief | null; canUseDemoStory: boolean; hasDemoStory: boolean; isGenerating: boolean; isRecapOpen: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onCloseRecap: () => void; onContinue: (direction?: string) => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onOpenRecap: () => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
-  return <div className="grid min-w-0 gap-5">{latestStory && brief ? <div className="grid min-w-0 gap-3" data-mobile-react-current-story="true"><MobileCurrentStoryCard brief={brief} isGenerating={isGenerating} isRecapOpen={isRecapOpen} onCloseRecap={onCloseRecap} onContinue={onContinue} onOpenRecap={onOpenRecap} story={latestStory} /></div> : null}<MobileMoodPicker activeMood={activeMood} onSelect={onMoodSelect} />{showStoryStartOptions ? <MobileSuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStart={onStartRecommendation} stories={suggestedStarts} /> : <StartSomethingNewPanel canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isGenerating={isGenerating} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStartNewStory={onStartNewStory} />}</div>;
+function MobileHomeView({ activeMood, brief, canUseDemoStory, hasDemoStory, isContinuationGenerating, isGenerating, isNewStoryGenerating, isRecapOpen, latestStory, onClearDemoStory, onCloseRecap, onContinue, onLoadDemoStory, onMoodSelect, onOpenRecap, onStartNewStory, onStartRecommendation, showStoryStartOptions, suggestedStarts }: { activeMood: Mood; brief: StoryBrief | null; canUseDemoStory: boolean; hasDemoStory: boolean; isContinuationGenerating: boolean; isGenerating: boolean; isNewStoryGenerating: boolean; isRecapOpen: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onCloseRecap: () => void; onContinue: (direction?: string) => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onOpenRecap: () => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
+  return <div className="grid min-w-0 gap-5">{latestStory && brief ? <div className="grid min-w-0 gap-3" data-mobile-react-current-story="true"><MobileCurrentStoryCard brief={brief} isGenerating={isContinuationGenerating} isRecapOpen={isRecapOpen} onCloseRecap={onCloseRecap} onContinue={onContinue} onOpenRecap={onOpenRecap} story={latestStory} /></div> : null}<MobileMoodPicker activeMood={activeMood} onSelect={onMoodSelect} />{showStoryStartOptions ? <MobileSuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStart={onStartRecommendation} stories={suggestedStarts} /> : <StartSomethingNewPanel canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isGenerating={isGenerating} isNewStoryGenerating={isNewStoryGenerating} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStartNewStory={onStartNewStory} />}</div>;
 }
 
 function MobileCurrentStoryCard({ brief, isGenerating, isRecapOpen, onCloseRecap, onContinue, onOpenRecap, story }: { brief: StoryBrief; isGenerating: boolean; isRecapOpen: boolean; onCloseRecap: () => void; onContinue: (direction?: string) => void; onOpenRecap: () => void; story: LibraryStory }) {
@@ -872,8 +910,8 @@ function MobileMoodPicker({ activeMood, onSelect }: { activeMood: Mood; onSelect
   return <section className="min-w-0"><h2 className="text-xl font-semibold leading-tight text-paper">What are you in the mood to read?</h2><div className="-mx-3 mt-3 flex min-w-0 gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none]">{MOODS.map((mood) => <button className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition ${activeMood === mood ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper"}`} key={mood} onClick={() => onSelect(mood)} type="button">{mood}</button>)}</div></section>;
 }
 
-function StartSomethingNewPanel({ canUseDemoStory, hasDemoStory, isGenerating, onClearDemoStory, onLoadDemoStory, onStartNewStory }: { canUseDemoStory: boolean; hasDemoStory: boolean; isGenerating: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStartNewStory: () => void }) {
-  return <section className="min-w-0 rounded-md border border-lantern-gold/25 bg-paper/10 p-5"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">Start Something New</p><h2 className="mt-2 text-2xl font-semibold text-paper md:text-3xl">Let Lantyrn find your next story.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-paper/65">Tap once and Lantern will generate a new story for you automatically. Mood chips are optional context, not a required step.</p><div className="mt-4 flex flex-wrap items-center gap-2"><button className="inline-flex items-center gap-2 rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-60" disabled={isGenerating} onClick={onStartNewStory} type="button">{isGenerating ? <span className="size-4 animate-spin rounded-full border-2 border-night-ink/30 border-t-night-ink" aria-hidden="true" /> : null}{isGenerating ? "Writing the perfect story for you…" : "Start Something New"}</button>{canUseDemoStory ? (hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo story</SmallButton> : <SmallButton onClick={onLoadDemoStory}>Load demo story</SmallButton>) : null}</div>{isGenerating ? <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-lantern-gold"><span aria-hidden="true">⌛</span>Writing the perfect story for you…</p> : null}</section>;
+function StartSomethingNewPanel({ canUseDemoStory, hasDemoStory, isGenerating, isNewStoryGenerating, onClearDemoStory, onLoadDemoStory, onStartNewStory }: { canUseDemoStory: boolean; hasDemoStory: boolean; isGenerating: boolean; isNewStoryGenerating: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStartNewStory: () => void }) {
+  return <section className="min-w-0 rounded-md border border-lantern-gold/25 bg-paper/10 p-5"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">Start Something New</p><h2 className="mt-2 text-2xl font-semibold text-paper md:text-3xl">Let Lantyrn find your next story.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-paper/65">Tap once and Lantern will generate a new story for you automatically. Mood chips are optional context, not a required step.</p><div className="mt-4 flex flex-wrap items-center gap-2"><button className="inline-flex items-center gap-2 rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-60" disabled={isGenerating} onClick={onStartNewStory} type="button">{isNewStoryGenerating ? <span className="size-4 animate-spin rounded-full border-2 border-night-ink/30 border-t-night-ink" aria-hidden="true" /> : null}{isNewStoryGenerating ? "Writing the perfect story for you…" : "Start Something New"}</button>{canUseDemoStory ? (hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo story</SmallButton> : <SmallButton onClick={onLoadDemoStory}>Load demo story</SmallButton>) : null}</div>{isNewStoryGenerating ? <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-lantern-gold"><span aria-hidden="true">⌛</span>Writing the perfect story for you…</p> : null}</section>;
 }
 
 function MobileSuggestedStoryStarts({ activeMood, canUseDemoStory, hasDemoStory, onClearDemoStory, onLoadDemoStory, onStart, stories }: { activeMood: Mood; canUseDemoStory: boolean; hasDemoStory: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStart: (story: StoryStart) => void; stories: StoryStart[] }) {
@@ -987,6 +1025,22 @@ function IntakeTextArea({ label, onChange, placeholder, required = false, value 
 
 function SegmentedChoice({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: { label: string; value: string }[]; value: string }) {
   return <div className="grid gap-2"><p className="text-sm font-semibold text-paper">{label}</p><div className="grid grid-cols-3 gap-2">{options.map((option) => <button className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${value === option.value ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper"}`} key={option.value} onClick={() => onChange(option.value)} type="button">{option.label}</button>)}</div></div>;
+}
+
+function AppStateDiagnostics({ activeView, currentStoryId, generationSource, isGenerating, lastGenerationTrigger, lastRequestIncludedContinuationStoryId }: { activeView: AppView; currentStoryId: string; generationSource: GenerationSource; isGenerating: boolean; lastGenerationTrigger: string; lastRequestIncludedContinuationStoryId: boolean }) {
+  return (
+    <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
+      <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
+      <div className="mt-3 grid gap-1 sm:grid-cols-2">
+        <p><span className="font-semibold text-paper/80">Active view:</span> {activeView}</p>
+        <p><span className="font-semibold text-paper/80">Generation in progress:</span> {isGenerating ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">Last generation trigger/source:</span> {lastGenerationTrigger}</p>
+        <p><span className="font-semibold text-paper/80">Active generation source:</span> {generationSource ?? "none"}</p>
+        <p><span className="font-semibold text-paper/80">Current story ID:</span> {currentStoryId || "none"}</p>
+        <p><span className="font-semibold text-paper/80">Last request included continuation story ID:</span> {lastRequestIncludedContinuationStoryId ? "yes" : "no"}</p>
+      </div>
+    </details>
+  );
 }
 
 function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: CloudReaderProfileSyncState; onClear: () => void; profile: ReaderProfile }) {
