@@ -23,10 +23,22 @@ import {
   recordReaderProfileEvent,
   saveReaderMoodSnapshot,
   saveStoryFeedbackSignal,
+  saveReadyStoryQueueSignal,
   DEFAULT_READER_SAFETY_GUARDRAILS,
   normalizeReaderTasteProfile,
   STORY_FEEDBACK_SCORE_BY_RATING
 } from "@/lib/reader-profile";
+import {
+  createReadyStoryQueueItem,
+  persistReadyStoryQueue,
+  persistSavedForLaterStoryQueue,
+  readReadyStoryQueue,
+  readSavedForLaterStoryQueue,
+  removeReadyStoryQueueItem,
+  upsertSavedForLaterStoryQueueItem,
+  type ReadyStoryQueueItem,
+  type ReadyStoryQueueSignal
+} from "@/lib/ready-story-queue";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
 import type { EerieReaderProfile } from "@/lib/eerie-reader-profile";
@@ -163,6 +175,36 @@ const SUGGESTED_STORY_STARTS: StoryStart[] = [
   { title: "Map of the Seventh Door", premise: "A courier must cross seven impossible thresholds before sunrise to return a stolen city map.", genre: "Speculative Mystery", mood: "Adventure", heroName: "Talia Reed", heroRole: "Threshold courier", heroBio: "A quick courier with an old civic debt, fast enough for impossible routes and honest enough to fear what the seventh door knows.", worldName: "The Seven-Door City", world: "A layered city where doors can open into old decisions, lost districts, and rooms that remember names.", seed: "Talia Reed steals back a living map and learns the seventh door will only open for someone who has betrayed the city once.", cast: "Talia Reed - quick courier with an old civic debt. Rowan Saye - mapmaker whose loyalties change with every door.", rules: "Make each threshold active, surprising, and tied to Talia's choices rather than puzzle mechanics alone." }
 ];
 
+
+function createInitialReadyStoryQueue(): ReadyStoryQueueItem[] {
+  return SUGGESTED_STORY_STARTS.slice(0, 3).map((story) =>
+    createReadyStoryQueueItem({
+      title: story.title,
+      premise: story.premise,
+      genre: story.genre,
+      mood: story.mood,
+      heroName: story.heroName,
+      heroRole: story.heroRole,
+      heroBio: story.heroBio,
+      worldName: story.worldName,
+      world: story.world,
+      seed: story.seed,
+      cast: story.cast,
+      rules: story.rules
+    })
+  );
+}
+
+function readMood(value: string): Mood {
+  return MOODS.includes(value as Mood) ? value as Mood : "Mystery";
+}
+
+function formatLatestReadyStoryQueueSignal(signals: ReaderProfile["readyStoryQueueSignals"]): string {
+  const latest = Array.isArray(signals) ? signals[0] : null;
+  if (!latest) return "none";
+  return `${latest.signal}: ${latest.storyTitle}`;
+}
+
 export default function Home() {
   const searchParams = useSearchParams();
   const [activeView, setActiveView] = useState<AppView>(readAppView(searchParams.get("view")) ?? "home");
@@ -209,6 +251,9 @@ export default function Home() {
   const [feedbackSaveBlockedBecauseRatingMissing, setFeedbackSaveBlockedBecauseRatingMissing] = useState(false);
   const [generationBlockedBecauseUnsavedFeedback, setGenerationBlockedBecauseUnsavedFeedback] = useState(false);
   const [lastNewStoryPersonalization, setLastNewStoryPersonalization] = useState<LastNewStoryPersonalization>(createEmptyLastNewStoryPersonalization());
+  const [readyStoryQueue, setReadyStoryQueue] = useState<ReadyStoryQueueItem[]>([]);
+  const [savedForLaterStoryQueue, setSavedForLaterStoryQueue] = useState<ReadyStoryQueueItem[]>([]);
+  const [lastReadyStoryQueueAction, setLastReadyStoryQueueAction] = useState("none");
   const [isStoryStartSelectionOpen, setIsStoryStartSelectionOpen] = useState(false);
   const activeGenerationRequestId = useRef(0);
 
@@ -240,6 +285,11 @@ export default function Home() {
       : localProfile;
     if (enrichedProfile !== localProfile) persistReaderProfile(enrichedProfile);
     setReaderProfile(enrichedProfile);
+    const storedReadyQueue = readReadyStoryQueue();
+    const seededReadyQueue = storedReadyQueue.length ? storedReadyQueue : createInitialReadyStoryQueue();
+    const persistedReadyQueue = persistReadyStoryQueue(seededReadyQueue);
+    setReadyStoryQueue(persistedReadyQueue);
+    setSavedForLaterStoryQueue(readSavedForLaterStoryQueue());
     setCloudReaderProfileSync((current) => ({ ...current, profileId, localUpdatedAt: enrichedProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage(), status: "pending" }));
     void reconcileReaderProfileWithCloud(profileId, enrichedProfile);
     setEerieReaderProfile(localEerieProfile);
@@ -425,6 +475,95 @@ export default function Home() {
     setMoodIntakeMode("story-start");
     setStatusMessage("Tell Lantyrn what you need from this story.");
     navigateToView("mood-intake");
+  }
+
+
+  function recordReadyStoryQueueSignal(item: ReadyStoryQueueItem, signal: ReadyStoryQueueSignal) {
+    const now = new Date().toISOString();
+    const nextProfile = saveReadyStoryQueueSignal({
+      storyCardId: item.id,
+      storyTitle: item.title,
+      signal,
+      genre: item.genre,
+      mood: item.mood,
+      source: "desktop-ready-story-queue",
+      createdAt: now,
+      updatedAt: now
+    });
+
+    setReaderProfile(nextProfile);
+    void syncReaderProfileToCloud(nextProfile);
+    setLastReadyStoryQueueAction(`${signal}: ${item.title}`);
+  }
+
+  function removeReadyQueueItemAndPersist(itemId: string) {
+    const nextQueue = persistReadyStoryQueue(removeReadyStoryQueueItem(readyStoryQueue, itemId));
+    setReadyStoryQueue(nextQueue);
+    return nextQueue;
+  }
+
+  function readyStoryQueueItemToStoryStart(item: ReadyStoryQueueItem): StoryStart {
+    return {
+      title: item.title,
+      premise: item.premise,
+      genre: item.genre,
+      mood: readMood(item.mood),
+      heroName: item.heroName,
+      heroRole: item.heroRole,
+      heroBio: item.heroBio,
+      worldName: item.worldName,
+      world: item.world,
+      seed: item.seed,
+      cast: item.cast,
+      rules: item.rules
+    };
+  }
+
+  function handleReadReadyStory(item: ReadyStoryQueueItem) {
+    if (isGenerating) return;
+
+    recordReadyStoryQueueSignal(item, "read");
+    removeReadyQueueItemAndPersist(item.id);
+
+    const storyStart = readyStoryQueueItemToStoryStart(item);
+    applyStoryStart(storyStart);
+    setStoryResponse(null);
+    setCurrentStoryId("");
+    setGeneratedStoryPresentation(null);
+    setIsStoryStartSelectionOpen(false);
+    setPendingStoryStart(null);
+    setMoodIntakeMode(null);
+
+    void handleGenerate({
+      worldBible: storyStart.world,
+      characterProfiles: storyStart.cast,
+      storySeed: storyStart.seed,
+      storyRules: storyStart.rules,
+      genrePreset: storyStart.genre,
+      narrativeArchitecture,
+      characterArc,
+      endingType,
+      lengthTarget: "Standard",
+      readerMood: readerProfile.latestMood ?? null,
+      presentation: "first-episode",
+      loadingMessage: `Opening ${storyStart.title}…`,
+      signalSource: "startSomethingNew",
+      generationSource: "new-story"
+    });
+  }
+
+  function handlePassReadyStory(item: ReadyStoryQueueItem) {
+    recordReadyStoryQueueSignal(item, "pass");
+    removeReadyQueueItemAndPersist(item.id);
+    setStatusMessage(`Passed ${item.title}.`);
+  }
+
+  function handleSaveReadyStoryForLater(item: ReadyStoryQueueItem) {
+    recordReadyStoryQueueSignal(item, "save_for_later");
+    removeReadyQueueItemAndPersist(item.id);
+    const nextSaved = persistSavedForLaterStoryQueue(upsertSavedForLaterStoryQueueItem(savedForLaterStoryQueue, item));
+    setSavedForLaterStoryQueue(nextSaved);
+    setStatusMessage(`Saved ${item.title} for later.`);
   }
 
   function handleStartSomethingNew() {
@@ -1013,7 +1152,7 @@ export default function Home() {
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        <AppStateDiagnostics activeView={activeView} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} profile={readerProfile} />
+        <AppStateDiagnostics activeView={activeView} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
         <ReaderProfileDiagnostics cloudSync={cloudReaderProfileSync} profile={readerProfile} onClear={handleClearReaderProfile} />
         <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
@@ -1025,7 +1164,7 @@ export default function Home() {
           />
         ) : null}
         {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} generationProfileSnapshot={storyResponse?.metadata.diagnostics.readerProfileSnapshot ?? storyResponse?.metadata.diagnostics.readerProfileGenerationSnapshot} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
-        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} suggestedStarts={suggestedStarts} /> : null}
+        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
@@ -1164,12 +1303,85 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
   );
 }
 
-function HomeView(props: { activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; isContinuationGenerating: boolean; isNewStoryGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
-  const { activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, isContinuationGenerating, isNewStoryGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onStartNewStory, onStartRecommendation, onToggleDirection, showStoryStartOptions, suggestedStarts } = props;
+function HomeView(props: { activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; isContinuationGenerating: boolean; isNewStoryGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onPassReadyStory: (item: ReadyStoryQueueItem) => void; onReadReadyStory: (item: ReadyStoryQueueItem) => void; onSaveReadyStoryForLater: (item: ReadyStoryQueueItem) => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
+  const { activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, isContinuationGenerating, isNewStoryGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onPassReadyStory, onReadReadyStory, onSaveReadyStoryForLater, onStartNewStory, onStartRecommendation, onToggleDirection, readyStoryQueue, savedForLaterStoryQueue, showStoryStartOptions, suggestedStarts } = props;
   const [isRecapOpen, setIsRecapOpen] = useState(false);
   const storyBrief = latestStory ? createStoryBrief(latestStory) : null;
 
-  return <div className="grid min-w-0 gap-6 md:gap-8"><div className="md:hidden"><MobileHomeView activeMood={activeMood} brief={storyBrief} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isContinuationGenerating={isContinuationGenerating} isGenerating={isGenerating} isNewStoryGenerating={isNewStoryGenerating} isRecapOpen={isRecapOpen} latestStory={latestStory} onClearDemoStory={onClearDemoStory} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onLoadDemoStory={onLoadDemoStory} onMoodSelect={onMoodSelect} onOpenRecap={() => setIsRecapOpen(true)} onStartNewStory={onStartNewStory} onStartRecommendation={onStartRecommendation} showStoryStartOptions={showStoryStartOptions} suggestedStarts={suggestedStarts} /></div><div className="hidden md:grid md:min-w-0 md:gap-8">{latestStory && storyBrief ? <CurrentStoryCard brief={storyBrief} direction={continueDirection} isDirectionOpen={isDirectionOpen} isGenerating={isContinuationGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onDirectionChange={onDirectionChange} onExportStory={onExportStory} onOpenRecap={() => setIsRecapOpen(true)} onToggleDirection={onToggleDirection} story={latestStory} /> : null}<MoodPicker activeMood={activeMood} hasCurrentStory={Boolean(latestStory)} onSelect={onMoodSelect} />{showStoryStartOptions ? <SuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} stories={suggestedStarts} onStart={onStartRecommendation} /> : <StartSomethingNewPanel canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isGenerating={isGenerating} isNewStoryGenerating={isNewStoryGenerating} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStartNewStory={onStartNewStory} />}</div></div>;
+  return (
+    <div className="grid min-w-0 gap-6 md:gap-8">
+      <div className="md:hidden">
+        <MobileHomeView activeMood={activeMood} brief={storyBrief} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isContinuationGenerating={isContinuationGenerating} isGenerating={isGenerating} isNewStoryGenerating={isNewStoryGenerating} isRecapOpen={isRecapOpen} latestStory={latestStory} onClearDemoStory={onClearDemoStory} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onLoadDemoStory={onLoadDemoStory} onMoodSelect={onMoodSelect} onOpenRecap={() => setIsRecapOpen(true)} onStartNewStory={onStartNewStory} onStartRecommendation={onStartRecommendation} showStoryStartOptions={showStoryStartOptions} suggestedStarts={suggestedStarts} />
+      </div>
+      <div className="hidden md:grid md:min-w-0 md:gap-8">
+        {latestStory && storyBrief ? <CurrentStoryCard brief={storyBrief} direction={continueDirection} isDirectionOpen={isDirectionOpen} isGenerating={isContinuationGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onDirectionChange={onDirectionChange} onExportStory={onExportStory} onOpenRecap={() => setIsRecapOpen(true)} onToggleDirection={onToggleDirection} story={latestStory} /> : null}
+        <ReadyStoryQueuePanel isGenerating={isGenerating} items={readyStoryQueue} onPass={onPassReadyStory} onRead={onReadReadyStory} onSaveForLater={onSaveReadyStoryForLater} savedForLaterCount={savedForLaterStoryQueue.length} />
+        <MoodPicker activeMood={activeMood} hasCurrentStory={Boolean(latestStory)} onSelect={onMoodSelect} />
+        {showStoryStartOptions ? <SuggestedStoryStarts activeMood={activeMood} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} stories={suggestedStarts} onStart={onStartRecommendation} /> : <StartSomethingNewPanel canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isGenerating={isGenerating} isNewStoryGenerating={isNewStoryGenerating} onClearDemoStory={onClearDemoStory} onLoadDemoStory={onLoadDemoStory} onStartNewStory={onStartNewStory} />}
+      </div>
+    </div>
+  );
+}
+
+
+
+function ReadyStoryQueuePanel({
+  isGenerating,
+  items,
+  onPass,
+  onRead,
+  onSaveForLater,
+  savedForLaterCount
+}: {
+  isGenerating: boolean;
+  items: ReadyStoryQueueItem[];
+  onPass: (item: ReadyStoryQueueItem) => void;
+  onRead: (item: ReadyStoryQueueItem) => void;
+  onSaveForLater: (item: ReadyStoryQueueItem) => void;
+  savedForLaterCount: number;
+}) {
+  if (!items.length) {
+    return (
+      <section className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">Stories waiting for you</p>
+        <h2 className="mt-2 text-2xl font-semibold text-paper">No waiting stories right now.</h2>
+        <p className="mt-2 text-sm leading-6 text-paper/60">Use Start Something New to generate a story while the queue learns what to prepare next.</p>
+        <p className="mt-3 text-xs text-paper/45">Saved for later: {savedForLaterCount}</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="min-w-0 rounded-md border border-lantern-gold/20 bg-paper/10 p-5">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">Stories waiting for you</p>
+          <h2 className="mt-2 text-2xl font-semibold text-paper">Pick what should find you next.</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-paper/60">Read, pass, or save for later. Lantyrn learns from each story-level choice.</p>
+        </div>
+        <p className="shrink-0 text-xs font-semibold text-paper/45">Saved for later: {savedForLaterCount}</p>
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        {items.map((item) => (
+          <article key={item.id} className="grid min-w-0 grid-cols-[1fr_auto] overflow-hidden rounded-md border border-paper/10 bg-night-ink/70">
+            <div className="min-w-0 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lantern-gold">{item.mood} · {item.genre}</p>
+              <h3 className="mt-2 text-xl font-semibold leading-tight text-paper">{item.title}</h3>
+              <p className="mt-2 line-clamp-2 text-sm leading-6 text-paper/65">{item.premise}</p>
+              <p className="mt-3 text-xs text-paper/45">{item.heroName} · {item.heroRole} · {item.worldName}</p>
+            </div>
+
+            <div className="flex w-40 flex-col justify-center gap-2 border-l border-paper/10 bg-paper/5 p-3">
+              <button className="rounded-md bg-lantern-gold px-3 py-2 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={() => onRead(item)} type="button">Read</button>
+              <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-sm font-semibold text-paper hover:border-lantern-gold/50 disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={() => onPass(item)} type="button">Pass</button>
+              <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-sm font-semibold text-paper hover:border-lantern-gold/50 disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={() => onSaveForLater(item)} type="button">Save for later</button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function MobileHomeView({ activeMood, brief, canUseDemoStory, hasDemoStory, isContinuationGenerating, isGenerating, isNewStoryGenerating, isRecapOpen, latestStory, onClearDemoStory, onCloseRecap, onContinue, onLoadDemoStory, onMoodSelect, onOpenRecap, onStartNewStory, onStartRecommendation, showStoryStartOptions, suggestedStarts }: { activeMood: Mood; brief: StoryBrief | null; canUseDemoStory: boolean; hasDemoStory: boolean; isContinuationGenerating: boolean; isGenerating: boolean; isNewStoryGenerating: boolean; isRecapOpen: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onCloseRecap: () => void; onContinue: (direction?: string) => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onOpenRecap: () => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
@@ -1485,7 +1697,7 @@ function createReaderProfileGenerationSnapshot({ defaultSafetyGuardrails, feedba
   };
 }
 
-function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationTrigger, lastNewStoryPersonalization, lastRequestIncludedContinuationStoryId, profile }: { activeView: AppView; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationTrigger: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastRequestIncludedContinuationStoryId: boolean; profile: ReaderProfile }) {
+function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationTrigger, lastNewStoryPersonalization, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, profile, readyStoryQueue, savedForLaterStoryQueue }: { activeView: AppView; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationTrigger: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; profile: ReaderProfile; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[] }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
@@ -1500,6 +1712,9 @@ function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId,
         <p><span className="font-semibold text-paper/80">Current story feedback rating:</span> {currentStoryFeedback?.rating ?? "none"}</p>
         <p><span className="font-semibold text-paper/80">Current story feedback reasons:</span> {currentStoryFeedback?.reasons.length ? currentStoryFeedback.reasons.join(", ") : "none"}</p>
         <p><span className="font-semibold text-paper/80">Total story feedback signals:</span> {profile.storyFeedbackSignals?.length ?? 0}</p>
+        <p><span className="font-semibold text-paper/80">Ready story queue count:</span> {readyStoryQueue.length}</p>
+        <p><span className="font-semibold text-paper/80">Saved for later queue count:</span> {savedForLaterStoryQueue.length}</p>
+        <p><span className="font-semibold text-paper/80">Last ready story queue action:</span> {lastReadyStoryQueueAction}</p>
         <p><span className="font-semibold text-paper/80">Feedback draft has unsaved changes:</span> {feedbackDraftHasUnsavedChanges ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Feedback save blocked because rating missing:</span> {feedbackSaveBlockedBecauseRatingMissing ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Generation blocked because unsaved feedback:</span> {generationBlockedBecauseUnsavedFeedback ? "yes" : "no"}</p>
@@ -1554,6 +1769,8 @@ function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: 
           <p><span className="font-semibold text-paper/80">Total start something different:</span> {profile.counters.totalStartSomethingDifferent}</p>
           <p><span className="font-semibold text-paper/80">Total mood selections:</span> {profile.counters.totalMoodSelections}</p>
           <p><span className="font-semibold text-paper/80">Total story feedback signals:</span> {profile.storyFeedbackSignals?.length ?? 0}</p>
+          <p><span className="font-semibold text-paper/80">Ready story queue signal count:</span> {profile.readyStoryQueueSignals?.length ?? 0}</p>
+          <p><span className="font-semibold text-paper/80">Latest ready story queue signal:</span> {formatLatestReadyStoryQueueSignal(profile.readyStoryQueueSignals)}</p>
           <p><span className="font-semibold text-paper/80">Top mood:</span> {topMood ?? "none"}</p>
           <p><span className="font-semibold text-paper/80">Top genre:</span> {topGenre ?? "none"}</p>
           <p><span className="font-semibold text-paper/80">Storage key:</span> {READER_PROFILE_STORAGE_KEY}</p>

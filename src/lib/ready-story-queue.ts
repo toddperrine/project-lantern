@@ -1,0 +1,131 @@
+import type { GenrePreset } from "@/lib/types";
+
+export const READY_STORY_QUEUE_STORAGE_KEY = "projectLantern.readyStoryQueue.v1";
+export const SAVED_FOR_LATER_STORY_QUEUE_STORAGE_KEY = "projectLantern.savedForLaterStoryQueue.v1";
+export const MAX_READY_STORY_QUEUE_ITEMS = 3;
+export const MAX_SAVED_FOR_LATER_STORY_ITEMS = 25;
+
+export type ReadyStoryQueueSignal = "read" | "pass" | "save_for_later";
+
+export interface ReadyStoryQueueItem {
+  id: string;
+  title: string;
+  premise: string;
+  genre: GenrePreset;
+  mood: string;
+  heroName: string;
+  heroRole: string;
+  heroBio: string;
+  worldName: string;
+  world: string;
+  seed: string;
+  cast: string;
+  rules: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function createReadyStoryQueueItem(input: Omit<ReadyStoryQueueItem, "id" | "createdAt" | "updatedAt">, createdAt = new Date().toISOString()): ReadyStoryQueueItem {
+  return normalizeReadyStoryQueueItem({
+    ...input,
+    id: createReadyStoryQueueItemId(input.title, createdAt),
+    createdAt,
+    updatedAt: createdAt
+  });
+}
+
+export function readReadyStoryQueue(): ReadyStoryQueueItem[] {
+  return readQueueItems(READY_STORY_QUEUE_STORAGE_KEY).slice(0, MAX_READY_STORY_QUEUE_ITEMS);
+}
+
+export function persistReadyStoryQueue(items: ReadyStoryQueueItem[]): ReadyStoryQueueItem[] {
+  const normalized = items.map(normalizeReadyStoryQueueItem).filter(isReadyStoryQueueItem).slice(0, MAX_READY_STORY_QUEUE_ITEMS);
+  writeQueueItems(READY_STORY_QUEUE_STORAGE_KEY, normalized);
+  return normalized;
+}
+
+export function readSavedForLaterStoryQueue(): ReadyStoryQueueItem[] {
+  return readQueueItems(SAVED_FOR_LATER_STORY_QUEUE_STORAGE_KEY).slice(0, MAX_SAVED_FOR_LATER_STORY_ITEMS);
+}
+
+export function persistSavedForLaterStoryQueue(items: ReadyStoryQueueItem[]): ReadyStoryQueueItem[] {
+  const normalized = items.map(normalizeReadyStoryQueueItem).filter(isReadyStoryQueueItem).slice(0, MAX_SAVED_FOR_LATER_STORY_ITEMS);
+  writeQueueItems(SAVED_FOR_LATER_STORY_QUEUE_STORAGE_KEY, normalized);
+  return normalized;
+}
+
+export function removeReadyStoryQueueItem(items: ReadyStoryQueueItem[], itemId: string): ReadyStoryQueueItem[] {
+  return items.filter((item) => item.id !== itemId);
+}
+
+export function upsertSavedForLaterStoryQueueItem(items: ReadyStoryQueueItem[], item: ReadyStoryQueueItem): ReadyStoryQueueItem[] {
+  return [item, ...items.filter((savedItem) => savedItem.id !== item.id)].slice(0, MAX_SAVED_FOR_LATER_STORY_ITEMS);
+}
+
+function readQueueItems(storageKey: string): ReadyStoryQueueItem[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalizeReadyStoryQueueItem).filter(isReadyStoryQueueItem);
+  } catch {
+    return [];
+  }
+}
+
+function writeQueueItems(storageKey: string, items: ReadyStoryQueueItem[]) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(items));
+  } catch {
+    // Ignore storage quota/privacy errors; queue state remains in memory for this session.
+  }
+}
+
+function normalizeReadyStoryQueueItem(value: unknown): ReadyStoryQueueItem {
+  const candidate = value as Partial<ReadyStoryQueueItem>;
+
+  return {
+    id: normalizeQueueText(candidate?.id, 180),
+    title: normalizeQueueText(candidate?.title, 180),
+    premise: normalizeQueueText(candidate?.premise, 1200),
+    genre: normalizeQueueText(candidate?.genre, 120) as GenrePreset,
+    mood: normalizeQueueText(candidate?.mood, 80),
+    heroName: normalizeQueueText(candidate?.heroName, 120),
+    heroRole: normalizeQueueText(candidate?.heroRole, 120),
+    heroBio: normalizeQueueText(candidate?.heroBio, 800),
+    worldName: normalizeQueueText(candidate?.worldName, 160),
+    world: normalizeQueueText(candidate?.world, 2500),
+    seed: normalizeQueueText(candidate?.seed, 1200),
+    cast: normalizeQueueText(candidate?.cast, 2000),
+    rules: normalizeQueueText(candidate?.rules, 1600),
+    createdAt: normalizeQueueText(candidate?.createdAt, 80),
+    updatedAt: normalizeQueueText(candidate?.updatedAt, 80)
+  };
+}
+
+function isReadyStoryQueueItem(item: ReadyStoryQueueItem): item is ReadyStoryQueueItem {
+  return Boolean(
+    item.id &&
+      item.title &&
+      item.premise &&
+      item.world &&
+      item.seed &&
+      item.cast &&
+      item.rules
+  );
+}
+
+function createReadyStoryQueueItemId(title: string, createdAt: string): string {
+  const slug = normalizeQueueText(title, 80).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "story";
+  const timestamp = normalizeQueueText(createdAt, 80).replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return `ready-story-${slug}-${timestamp}`.slice(0, 180);
+}
+
+function normalizeQueueText(value: unknown, maxLength = 600): string {
+  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
