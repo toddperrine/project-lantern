@@ -129,6 +129,7 @@ function withReaderProfileGenerationSnapshot(
       ...response.metadata,
       diagnostics: {
         ...response.metadata.diagnostics,
+        readerProfileSnapshot: readerProfileGenerationSnapshot,
         readerProfileGenerationSnapshot
       }
     }
@@ -203,6 +204,7 @@ function withServerGenerationDuration(
         gitBranch: buildInfo.gitBranch,
         commitSha: buildInfo.commitSha,
         buildTimestamp: buildInfo.buildTimestamp,
+        readerProfileSnapshot: response.metadata.diagnostics.readerProfileSnapshot ?? response.metadata.diagnostics.readerProfileGenerationSnapshot,
         readerProfileGenerationSnapshot: response.metadata.diagnostics.readerProfileGenerationSnapshot
       }
     }

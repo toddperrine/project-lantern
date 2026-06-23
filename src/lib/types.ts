@@ -140,5 +140,6 @@ export type StoryDiagnostics = {
   partialBeatNormalizationUsed?: boolean;
   missingBeatRepairAttempted?: boolean;
   finalAcceptedBlueprintSceneCount?: number;
+  readerProfileSnapshot?: ReaderProfileGenerationSnapshot;
   readerProfileGenerationSnapshot?: ReaderProfileGenerationSnapshot;
 };

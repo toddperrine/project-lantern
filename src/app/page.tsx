@@ -348,7 +348,7 @@ export default function Home() {
       const normalizedResponse = normalizeGenerateStoryResponse(payload);
       setLastNewStoryPersonalization((current) => ({
         ...current,
-        responseSnapshot: normalizedResponse.metadata.diagnostics.readerProfileGenerationSnapshot
+        responseSnapshot: normalizedResponse.metadata.diagnostics.readerProfileSnapshot ?? normalizedResponse.metadata.diagnostics.readerProfileGenerationSnapshot
       }));
       const generatedStoryId = createStoryId(normalizedResponse.story);
       const savedStory = createSavedStory(normalizedResponse, generatedStoryId);
@@ -1024,7 +1024,7 @@ export default function Home() {
             pendingStoryTitle={pendingStoryStart?.title ?? null}
           />
         ) : null}
-        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
+        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} generationProfileSnapshot={storyResponse?.metadata.diagnostics.readerProfileSnapshot ?? storyResponse?.metadata.diagnostics.readerProfileGenerationSnapshot} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
         {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
@@ -1036,7 +1036,7 @@ export default function Home() {
   );
 }
 
-function EpisodeReader({ eyebrow, feedback, generationBlockedBecauseUnsavedFeedback, isGenerating, onContinue, onExport, onFeedbackChange, onFeedbackDraftStateChange, onStartDifferent, source, story }: { eyebrow: string; feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; isGenerating: boolean; onContinue: () => void; onExport: () => void; onFeedbackChange: (story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void; onFeedbackDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
+function EpisodeReader({ eyebrow, feedback, generationBlockedBecauseUnsavedFeedback, generationProfileSnapshot, isGenerating, onContinue, onExport, onFeedbackChange, onFeedbackDraftStateChange, onStartDifferent, source, story }: { eyebrow: string; feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; generationProfileSnapshot?: ReaderProfileGenerationSnapshot; isGenerating: boolean; onContinue: () => void; onExport: () => void; onFeedbackChange: (story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void; onFeedbackDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
   return (
     <article className="grid min-w-0 gap-5 rounded-md border border-lantern-gold/25 bg-paper/10 p-4 shadow-soft sm:p-6">
       <div className="min-w-0">
@@ -1045,6 +1045,7 @@ function EpisodeReader({ eyebrow, feedback, generationBlockedBecauseUnsavedFeedb
         <p className="mt-3 text-sm leading-6 text-paper/60">{story.wordCount.toLocaleString()} words | {story.genrePreset} | {source}</p>
       </div>
       <div className="min-w-0 whitespace-pre-wrap rounded-md border border-paper/10 bg-night-ink/70 p-4 text-base leading-8 text-paper/85 sm:p-5">{story.story}</div>
+      {generationProfileSnapshot ? <GenerationProfileSnapshotPanel snapshot={generationProfileSnapshot} /> : null}
       {story.id ? <StoryFeedbackPanel feedback={feedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} onDraftStateChange={onFeedbackDraftStateChange} onSave={(rating, reasons) => onFeedbackChange(story, rating, reasons)} /> : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <button className="inline-flex items-center gap-2 rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={onContinue} type="button">{isGenerating ? <><span className="size-4 animate-spin rounded-full border-2 border-night-ink/30 border-t-night-ink" aria-hidden="true" />Writing the next chapter…</> : "Continue this story"}</button>
@@ -1052,6 +1053,40 @@ function EpisodeReader({ eyebrow, feedback, generationBlockedBecauseUnsavedFeedb
         <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-lantern-gold/50" onClick={onStartDifferent} type="button">Start something different</button>
       </div>
     </article>
+  );
+}
+
+function GenerationProfileSnapshotPanel({ snapshot }: { snapshot: ReaderProfileGenerationSnapshot }) {
+  const rows = [
+    ["Mode", snapshot.mode],
+    ["Profile used", snapshot.profileUsed ? "yes" : "no"],
+    ["Profile source", snapshot.profileSourceUsed],
+    ["Profile updatedAt", snapshot.profileUpdatedAt || "none"],
+    ["Taste profile present", snapshot.tasteProfilePresent ? "yes" : "no"],
+    ["Taste profile source", snapshot.tasteProfileSource || "none"],
+    ["Taste profile updatedAt", snapshot.tasteProfileUpdatedAt || "none"],
+    ["Feedback signal count", String(snapshot.feedbackSignalCount)],
+    ["Feedback included", snapshot.feedbackIncluded ? "yes" : "no"],
+    ["Latest feedback rating", snapshot.latestFeedbackRating || "none"],
+    ["User hard avoidances", snapshot.userHardAvoidancesSummary || "none"],
+    ["Default safety guardrails", snapshot.defaultSafetyGuardrailsSummary || "none"],
+    ["Mood signal", snapshot.moodSignal || "none"],
+    ["Genre signal", snapshot.genreSignal || "none"],
+    ["Snapshot created", snapshot.generatedAt || "none"],
+  ];
+
+  return (
+    <details className="rounded-md border border-paper/10 bg-night-ink/50 p-4 text-sm text-paper/70">
+      <summary className="cursor-pointer font-semibold text-paper">Generation profile snapshot</summary>
+      <dl className="mt-3 grid gap-x-4 gap-y-2 sm:grid-cols-2">
+        {rows.map(([label, value]) => (
+          <div className="min-w-0" key={label}>
+            <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{label}</dt>
+            <dd className="mt-1 break-words text-paper/80">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }
 
