@@ -67,11 +67,17 @@ type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" |
 type CloudReaderProfileSyncState = {
   profileId: string;
   status: CloudReaderProfileStatus;
+  lastSaveOutcome: "none" | "saved" | "stale-write-ignored" | "unavailable" | "error";
   lastSyncAt: string;
   lastError: string;
   localUpdatedAt: string;
   cloudUpdatedAt: string;
   localProfileExists: boolean;
+};
+type ReaderProfileSaveResponse = {
+  profile?: ReaderProfile | null;
+  cloudProfileSaveStatus?: "saved" | "stale-write-ignored";
+  error?: string;
 };
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
@@ -141,6 +147,7 @@ const DEMO_STORY_BRIEF: StoryBrief = {
 const EMPTY_CLOUD_READER_PROFILE_SYNC: CloudReaderProfileSyncState = {
   profileId: "",
   status: "pending",
+  lastSaveOutcome: "none",
   lastSyncAt: "",
   lastError: "",
   localUpdatedAt: "",
@@ -553,7 +560,7 @@ export default function Home() {
       const payload = await response.json().catch(() => ({}));
 
       if (response.status === 503) {
-        updateCloudReaderProfileSync({ profileId, status: "unavailable", lastError: payload.error ?? "Reader profile cloud persistence is unavailable.", localUpdatedAt: localProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+        updateCloudReaderProfileSync({ profileId, status: "unavailable", lastSaveOutcome: "unavailable", lastError: payload.error ?? "Reader profile cloud persistence is unavailable.", localUpdatedAt: localProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
         return;
       }
 
@@ -575,7 +582,7 @@ export default function Home() {
 
       updateCloudReaderProfileSync({ profileId, status: "not found", cloudUpdatedAt, localUpdatedAt: localProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage(), lastError: "" });
     } catch (caughtError) {
-      updateCloudReaderProfileSync({ profileId, status: "error", lastError: formatErrorMessage(caughtError), localUpdatedAt: localProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+      updateCloudReaderProfileSync({ profileId, status: "error", lastSaveOutcome: "error", lastError: formatErrorMessage(caughtError), localUpdatedAt: localProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
     }
   }
 
@@ -586,7 +593,7 @@ export default function Home() {
     try {
       await saveReaderProfileToCloud(profileId, profile);
     } catch (caughtError) {
-      updateCloudReaderProfileSync({ profileId, status: "error", lastError: formatErrorMessage(caughtError), localUpdatedAt: profile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+      updateCloudReaderProfileSync({ profileId, status: "error", lastSaveOutcome: "error", lastError: formatErrorMessage(caughtError), localUpdatedAt: profile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
     }
   }
 
@@ -596,17 +603,23 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ profileId, profile })
     });
-    const payload = await response.json().catch(() => ({}));
+    const payload = (await response.json().catch(() => ({}))) as ReaderProfileSaveResponse;
 
     if (response.status === 503) {
-      updateCloudReaderProfileSync({ profileId, status: "unavailable", lastError: payload.error ?? "Reader profile cloud persistence is unavailable.", localUpdatedAt: profile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+      updateCloudReaderProfileSync({ profileId, status: "unavailable", lastSaveOutcome: "unavailable", lastError: payload.error ?? "Reader profile cloud persistence is unavailable.", localUpdatedAt: profile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
       return;
     }
 
     if (!response.ok) throw new Error(payload.error ?? "Reader profile cloud save failed.");
 
-    const savedProfile = normalizeCloudReaderProfile(payload.profile) ?? profile;
-    updateCloudReaderProfileSync({ profileId, status: "synced", lastSyncAt: new Date().toISOString(), lastError: "", localUpdatedAt: savedProfile.updatedAt, cloudUpdatedAt: savedProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+    const savedProfile = normalizeCloudReaderProfile(payload.profile);
+    if (payload.cloudProfileSaveStatus === "stale-write-ignored") {
+      updateCloudReaderProfileSync({ profileId, status: "synced", lastSaveOutcome: "stale-write-ignored", lastSyncAt: new Date().toISOString(), lastError: "", localUpdatedAt: profile.updatedAt, ...(savedProfile ? { cloudUpdatedAt: savedProfile.updatedAt } : {}), localProfileExists: readerProfileExistsInLocalStorage() });
+      return;
+    }
+
+    const cloudProfile = savedProfile ?? profile;
+    updateCloudReaderProfileSync({ profileId, status: "synced", lastSaveOutcome: "saved", lastSyncAt: new Date().toISOString(), lastError: "", localUpdatedAt: cloudProfile.updatedAt, cloudUpdatedAt: cloudProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
   }
 
   async function deleteCloudReaderProfile(profileId: string) {
@@ -1431,6 +1444,7 @@ function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: 
           <p><span className="font-semibold text-paper/80">Profile ID:</span> {cloudSync.profileId || "pending"}</p>
           <p><span className="font-semibold text-paper/80">Local profile exists:</span> {cloudSync.localProfileExists ? "yes" : "no"}</p>
           <p><span className="font-semibold text-paper/80">Cloud profile status:</span> {cloudSync.status}</p>
+          <p><span className="font-semibold text-paper/80">Last cloud save outcome:</span> {cloudSync.lastSaveOutcome}</p>
           <p><span className="font-semibold text-paper/80">Last profile save status for feedback:</span> {profile.storyFeedbackSignals?.length ? cloudSync.status : "no feedback saved"}</p>
           <p><span className="font-semibold text-paper/80">Last cloud sync:</span> {cloudSync.lastSyncAt || "never"}</p>
           <p><span className="font-semibold text-paper/80">Last cloud error:</span> {cloudSync.lastError || "none"}</p>

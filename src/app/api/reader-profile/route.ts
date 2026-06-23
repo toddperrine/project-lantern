@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { deleteCloudReaderProfile, getCloudReaderProfile, getCloudReaderProfileConfigError, saveCloudReaderProfile } from "@/lib/cloud-reader-profile-persistence";
+import { CloudReaderProfileStaleWriteError, deleteCloudReaderProfile, getCloudReaderProfile, getCloudReaderProfileConfigError, saveCloudReaderProfile } from "@/lib/cloud-reader-profile-persistence";
 import { normalizeReaderProfile } from "@/lib/reader-profile";
 
 export const runtime = "nodejs";
@@ -35,8 +35,17 @@ export async function PUT(request: Request) {
 
   const profile = normalizeReaderProfile((body as { profile?: unknown }).profile);
   try {
-    return NextResponse.json({ profileId, profile: await saveCloudReaderProfile(profileId, profile), cloudProfileAvailable: true });
-  } catch {
+    return NextResponse.json({ profileId, profile: await saveCloudReaderProfile(profileId, profile), cloudProfileAvailable: true, cloudProfileSaveStatus: "saved" });
+  } catch (caughtError) {
+    if (caughtError instanceof CloudReaderProfileStaleWriteError) {
+      try {
+        const latestProfile = await getCloudReaderProfile(profileId);
+        return NextResponse.json({ profileId, profile: latestProfile, cloudProfileAvailable: true, cloudProfileSaveStatus: "stale-write-ignored", diagnostic: "stale-cloud-write-ignored" });
+      } catch {
+        return cloudRequestErrorResponse("Reader profile save");
+      }
+    }
+
     return cloudRequestErrorResponse("Reader profile save");
   }
 }

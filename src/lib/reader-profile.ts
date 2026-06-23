@@ -206,6 +206,17 @@ export function createDefaultReaderTasteProfile(updatedAt = new Date().toISOStri
   };
 }
 
+export function createNextReaderProfileUpdatedAt(previousUpdatedAt?: string, requestedUpdatedAt?: string): string {
+  const nowMs = Date.now();
+  const previousMs = Date.parse(previousUpdatedAt || "");
+  const requestedMs = Date.parse(requestedUpdatedAt || "");
+  const safePreviousMs = Number.isFinite(previousMs) ? previousMs : 0;
+  const safeRequestedMs = Number.isFinite(requestedMs) ? requestedMs : 0;
+  const nextMs = Math.max(nowMs, safeRequestedMs, safePreviousMs + 1);
+
+  return new Date(nextMs).toISOString();
+}
+
 export function readReaderProfile(): ReaderProfile {
   if (typeof window === "undefined") return createEmptyReaderProfile();
 
@@ -261,7 +272,8 @@ export function clearReaderProfile(): ReaderProfile {
 }
 
 export function saveReaderMoodSnapshot(draft: ReaderMoodDraft): ReaderProfile {
-  const now = new Date().toISOString();
+  const currentProfile = readReaderProfile();
+  const now = createNextReaderProfileUpdatedAt(currentProfile.updatedAt);
   const snapshot: ReaderMoodSnapshot = {
     id: createReaderMoodSnapshotId(now),
     createdAt: now,
@@ -277,7 +289,6 @@ export function saveReaderMoodSnapshot(draft: ReaderMoodDraft): ReaderProfile {
     needRightNow: normalizeFreeText(draft.needRightNow),
   };
 
-  const currentProfile = readReaderProfile();
   const nextProfile: ReaderProfile = {
     ...currentProfile,
     schemaVersion: READER_PROFILE_SCHEMA_VERSION,
@@ -296,14 +307,15 @@ export function saveReaderMoodSnapshot(draft: ReaderMoodDraft): ReaderProfile {
 }
 
 export function recordReaderProfileEvent(event: ReaderProfileEventInput): ReaderProfile {
-  const now = event.timestamp ?? new Date().toISOString();
   const currentProfile = readReaderProfile();
-  const normalizedEvent = normalizeReaderProfileEvent({ ...event, timestamp: now });
+  const eventTimestamp = event.timestamp ?? createNextReaderProfileUpdatedAt(currentProfile.updatedAt);
+  const updatedAt = createNextReaderProfileUpdatedAt(currentProfile.updatedAt, eventTimestamp);
+  const normalizedEvent = normalizeReaderProfileEvent({ ...event, timestamp: eventTimestamp });
   const nextProfile: ReaderProfile = {
     ...currentProfile,
     profileExists: true,
-    createdAt: currentProfile.createdAt || now,
-    updatedAt: now,
+    createdAt: currentProfile.createdAt || updatedAt,
+    updatedAt,
     counters: incrementReaderProfileCounters(currentProfile.counters, normalizedEvent.eventType),
     moodCounts: incrementCount(currentProfile.moodCounts, normalizedEvent.mood),
     genreCounts: incrementCount(currentProfile.genreCounts, normalizedEvent.genre),
@@ -316,8 +328,8 @@ export function recordReaderProfileEvent(event: ReaderProfileEventInput): Reader
 }
 
 export function saveStoryFeedbackSignal(nextSignal: StoryFeedbackSignal): ReaderProfile {
-  const now = nextSignal.updatedAt || new Date().toISOString();
   const currentProfile = readReaderProfile();
+  const now = createNextReaderProfileUpdatedAt(currentProfile.updatedAt, nextSignal.updatedAt);
   const existingSignal = currentProfile.storyFeedbackSignals?.find(
     (signal) => signal.storyId === nextSignal.storyId,
   );
