@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.8.03";
+export const APP_VERSION = "0.8.02";
 
 export type BuildInfo = {
   appVersion: string;

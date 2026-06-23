@@ -4,6 +4,11 @@ export const READER_PROFILE_SCHEMA_VERSION = 1;
 export const MAX_READER_MOOD_HISTORY = 10;
 export const MAX_READER_PROFILE_EVENTS = 50;
 export const MAX_STORY_FEEDBACK_SIGNALS = 50;
+export const DEFAULT_READER_SAFETY_GUARDRAILS = [
+  "sexual violence",
+  "explicit harm to children",
+  "extreme gore",
+];
 
 export type ReaderEnergyLevel = "low" | "medium" | "high";
 export type ReaderIntensityLevel = "gentle" | "moderate" | "intense";
@@ -42,6 +47,41 @@ export type StoryFeedbackReason =
   | "surprising"
   | "comforting";
 export type StoryFeedbackGenerationMode = "new-story" | "continue-story" | "unknown";
+
+export type ReaderTasteProfileSource =
+  | "default"
+  | "onboarding"
+  | "story-card-swipe"
+  | "rating"
+  | "behavior"
+  | "manual"
+  | "legacy-eerie-profile";
+export type ReaderFormatPreference = "read" | "listen" | "both";
+export type ReaderTasteProfileConfidence = "low" | "medium" | "high";
+
+export interface ReaderWeightedPreference {
+  value: number;
+  confidence: number;
+  source: ReaderTasteProfileSource;
+  updatedAt: string;
+}
+
+export interface ReaderTasteProfile {
+  profileConfidence: ReaderTasteProfileConfidence;
+  fearIntensity: ReaderWeightedPreference;
+  weirdnessTolerance: ReaderWeightedPreference;
+  supernaturalAffinity: ReaderWeightedPreference;
+  ambiguityTolerance: ReaderWeightedPreference;
+  goreTolerance: ReaderWeightedPreference;
+  sleepSafePreference: ReaderWeightedPreference;
+  preferredFormat: ReaderFormatPreference;
+  preferredDurationMinutes: 5 | 10 | 15 | 20;
+  defaultSafetyGuardrails: string[];
+  userHardAvoidances: string[];
+  affinities: Record<string, ReaderWeightedPreference>;
+  source: ReaderTasteProfileSource;
+  updatedAt: string;
+}
 
 export const STORY_FEEDBACK_SCORE_BY_RATING: Record<StoryFeedbackRating, StoryFeedbackScore> = {
   missed: 1,
@@ -107,6 +147,7 @@ export interface ReaderProfile {
   latestMood?: ReaderMoodSnapshot;
   moodHistory: ReaderMoodSnapshot[];
   storyFeedbackSignals?: StoryFeedbackSignal[];
+  tasteProfile?: ReaderTasteProfile;
 }
 
 export type ReaderMoodDraft = {
@@ -135,6 +176,33 @@ export function createEmptyReaderProfile(updatedAt = ""): ReaderProfile {
     recentEvents: [],
     moodHistory: [],
     storyFeedbackSignals: [],
+    tasteProfile: createDefaultReaderTasteProfile(updatedAt || new Date().toISOString()),
+  };
+}
+
+export function createDefaultReaderTasteProfile(updatedAt = new Date().toISOString()): ReaderTasteProfile {
+  const weighted = (value: number): ReaderWeightedPreference => ({
+    value,
+    confidence: 0.2,
+    source: "default",
+    updatedAt,
+  });
+
+  return {
+    profileConfidence: "low",
+    fearIntensity: weighted(0.45),
+    weirdnessTolerance: weighted(0.45),
+    supernaturalAffinity: weighted(0.5),
+    ambiguityTolerance: weighted(0.6),
+    goreTolerance: weighted(0.15),
+    sleepSafePreference: weighted(0.7),
+    preferredFormat: "both",
+    preferredDurationMinutes: 10,
+    defaultSafetyGuardrails: [...DEFAULT_READER_SAFETY_GUARDRAILS],
+    userHardAvoidances: [],
+    affinities: {},
+    source: "default",
+    updatedAt,
   };
 }
 
@@ -327,6 +395,10 @@ export function normalizeReaderProfile(value: unknown): ReaderProfile {
     typeof candidate.createdAt === "string"
       ? candidate.createdAt
       : (recentEvents[recentEvents.length - 1]?.timestamp ?? latestMood?.createdAt ?? "");
+  const tasteProfile = candidate.tasteProfile
+    ? normalizeReaderTasteProfile(candidate.tasteProfile)
+    : createDefaultReaderTasteProfile(updatedAt || new Date().toISOString());
+
   const profileExists = Boolean(
     candidate.profileExists ||
       latestMood ||
@@ -349,7 +421,93 @@ export function normalizeReaderProfile(value: unknown): ReaderProfile {
     ...(latestMood ? { latestMood } : {}),
     moodHistory,
     storyFeedbackSignals,
+    tasteProfile,
   };
+}
+
+export function normalizeReaderTasteProfile(value: unknown): ReaderTasteProfile {
+  const fallback = createDefaultReaderTasteProfile();
+  const candidate = value as Partial<ReaderTasteProfile>;
+
+  if (!candidate || typeof candidate !== "object") return fallback;
+
+  const updatedAt = typeof candidate.updatedAt === "string" && candidate.updatedAt.trim()
+    ? candidate.updatedAt
+    : fallback.updatedAt;
+
+  return {
+    profileConfidence: isReaderTasteProfileConfidence(candidate.profileConfidence) ? candidate.profileConfidence : fallback.profileConfidence,
+    fearIntensity: normalizeReaderWeightedPreference(candidate.fearIntensity, fallback.fearIntensity),
+    weirdnessTolerance: normalizeReaderWeightedPreference(candidate.weirdnessTolerance, fallback.weirdnessTolerance),
+    supernaturalAffinity: normalizeReaderWeightedPreference(candidate.supernaturalAffinity, fallback.supernaturalAffinity),
+    ambiguityTolerance: normalizeReaderWeightedPreference(candidate.ambiguityTolerance, fallback.ambiguityTolerance),
+    goreTolerance: normalizeReaderWeightedPreference(candidate.goreTolerance, fallback.goreTolerance),
+    sleepSafePreference: normalizeReaderWeightedPreference(candidate.sleepSafePreference, fallback.sleepSafePreference),
+    preferredFormat: isReaderFormatPreference(candidate.preferredFormat) ? candidate.preferredFormat : fallback.preferredFormat,
+    preferredDurationMinutes: isReaderPreferredDuration(candidate.preferredDurationMinutes) ? candidate.preferredDurationMinutes : fallback.preferredDurationMinutes,
+    defaultSafetyGuardrails: Array.isArray(candidate.defaultSafetyGuardrails)
+      ? dedupe(candidate.defaultSafetyGuardrails.filter((item): item is string => typeof item === "string"))
+      : fallback.defaultSafetyGuardrails,
+    userHardAvoidances: Array.isArray(candidate.userHardAvoidances)
+      ? dedupe(candidate.userHardAvoidances.filter((item): item is string => typeof item === "string"))
+      : [],
+    affinities: normalizeReaderTasteAffinities(candidate.affinities, fallback.affinities),
+    source: isReaderTasteProfileSource(candidate.source) ? candidate.source : fallback.source,
+    updatedAt,
+  };
+}
+
+function normalizeReaderWeightedPreference(value: unknown, fallback: ReaderWeightedPreference): ReaderWeightedPreference {
+  const candidate = value as Partial<ReaderWeightedPreference>;
+  if (!candidate || typeof candidate !== "object") return fallback;
+
+  return {
+    value: clamp01(typeof candidate.value === "number" ? candidate.value : fallback.value),
+    confidence: clamp01(typeof candidate.confidence === "number" ? candidate.confidence : fallback.confidence),
+    source: isReaderTasteProfileSource(candidate.source) ? candidate.source : fallback.source,
+    updatedAt: typeof candidate.updatedAt === "string" && candidate.updatedAt.trim() ? candidate.updatedAt : fallback.updatedAt,
+  };
+}
+
+function normalizeReaderTasteAffinities(
+  value: unknown,
+  fallback: Record<string, ReaderWeightedPreference>
+): Record<string, ReaderWeightedPreference> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, preference]) => [
+      normalizeFreeText(key),
+      normalizeReaderWeightedPreference(preference, createDefaultReaderTasteProfile().fearIntensity),
+    ]).filter(([key]) => Boolean(key))
+  );
+}
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
+}
+
+function isReaderTasteProfileSource(value: unknown): value is ReaderTasteProfileSource {
+  return value === "default" ||
+    value === "onboarding" ||
+    value === "story-card-swipe" ||
+    value === "rating" ||
+    value === "behavior" ||
+    value === "manual" ||
+    value === "legacy-eerie-profile";
+}
+
+function isReaderFormatPreference(value: unknown): value is ReaderFormatPreference {
+  return value === "read" || value === "listen" || value === "both";
+}
+
+function isReaderTasteProfileConfidence(value: unknown): value is ReaderTasteProfileConfidence {
+  return value === "low" || value === "medium" || value === "high";
+}
+
+function isReaderPreferredDuration(value: unknown): value is 5 | 10 | 15 | 20 {
+  return value === 5 || value === 10 || value === 15 || value === 20;
 }
 
 export function isReaderProfileId(value: unknown): value is string {
