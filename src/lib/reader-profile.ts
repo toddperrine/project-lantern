@@ -4,6 +4,7 @@ export const READER_PROFILE_SCHEMA_VERSION = 1;
 export const MAX_READER_MOOD_HISTORY = 10;
 export const MAX_READER_PROFILE_EVENTS = 50;
 export const MAX_STORY_FEEDBACK_SIGNALS = 50;
+export const MAX_READY_STORY_QUEUE_SIGNALS = 100;
 export const DEFAULT_READER_SAFETY_GUARDRAILS = [
   "sexual violence",
   "explicit harm to children",
@@ -47,6 +48,7 @@ export type StoryFeedbackReason =
   | "surprising"
   | "comforting";
 export type StoryFeedbackGenerationMode = "new-story" | "continue-story" | "unknown";
+export type ReadyStoryQueueSignalType = "read" | "pass" | "save_for_later";
 
 export type ReaderTasteProfileSource =
   | "default"
@@ -123,6 +125,17 @@ export interface StoryFeedbackSignal {
   updatedAt: string;
 }
 
+export interface ReadyStoryQueueLearningSignal {
+  storyCardId: string;
+  storyTitle: string;
+  signal: ReadyStoryQueueSignalType;
+  genre?: string;
+  mood?: string;
+  source: "desktop-ready-story-queue";
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ReaderProfileEvent {
   eventType: ReaderProfileEventType;
   timestamp: string;
@@ -147,6 +160,7 @@ export interface ReaderProfile {
   latestMood?: ReaderMoodSnapshot;
   moodHistory: ReaderMoodSnapshot[];
   storyFeedbackSignals?: StoryFeedbackSignal[];
+  readyStoryQueueSignals?: ReadyStoryQueueLearningSignal[];
   tasteProfile?: ReaderTasteProfile;
 }
 
@@ -176,6 +190,7 @@ export function createEmptyReaderProfile(updatedAt = ""): ReaderProfile {
     recentEvents: [],
     moodHistory: [],
     storyFeedbackSignals: [],
+    readyStoryQueueSignals: [],
     tasteProfile: createDefaultReaderTasteProfile(updatedAt || new Date().toISOString()),
   };
 }
@@ -355,6 +370,34 @@ export function saveStoryFeedbackSignal(nextSignal: StoryFeedbackSignal): Reader
   return nextProfile;
 }
 
+export function saveReadyStoryQueueSignal(nextSignal: ReadyStoryQueueLearningSignal): ReaderProfile {
+  const currentProfile = readReaderProfile();
+  const updatedAt = createNextReaderProfileUpdatedAt(currentProfile.updatedAt, nextSignal.updatedAt || nextSignal.createdAt);
+  const normalizedSignal = normalizeReadyStoryQueueLearningSignal({
+    ...nextSignal,
+    createdAt: nextSignal.createdAt || updatedAt,
+    updatedAt
+  });
+
+  if (!normalizedSignal) return currentProfile;
+
+  const nextProfile: ReaderProfile = {
+    ...currentProfile,
+    profileExists: true,
+    createdAt: currentProfile.createdAt || updatedAt,
+    updatedAt,
+    readyStoryQueueSignals: [
+      normalizedSignal,
+      ...(currentProfile.readyStoryQueueSignals ?? []).filter(
+        (signal) => !(signal.storyCardId === normalizedSignal.storyCardId && signal.signal === normalizedSignal.signal)
+      )
+    ].slice(0, MAX_READY_STORY_QUEUE_SIGNALS)
+  };
+
+  persistReaderProfile(nextProfile);
+  return nextProfile;
+}
+
 export function upsertStoryFeedbackSignal(
   existingSignals: StoryFeedbackSignal[] | undefined,
   nextSignal: StoryFeedbackSignal
@@ -398,6 +441,12 @@ export function normalizeReaderProfile(value: unknown): ReaderProfile {
         .filter((signal): signal is StoryFeedbackSignal => Boolean(signal))
         .slice(-MAX_STORY_FEEDBACK_SIGNALS)
     : [];
+  const readyStoryQueueSignals = Array.isArray(candidate.readyStoryQueueSignals)
+    ? candidate.readyStoryQueueSignals
+        .map(normalizeReadyStoryQueueLearningSignal)
+        .filter((signal): signal is ReadyStoryQueueLearningSignal => Boolean(signal))
+        .slice(0, MAX_READY_STORY_QUEUE_SIGNALS)
+    : [];
   const counters = normalizeReaderProfileCounters(candidate.counters);
   const updatedAt =
     typeof candidate.updatedAt === "string"
@@ -417,7 +466,8 @@ export function normalizeReaderProfile(value: unknown): ReaderProfile {
       moodHistory.length ||
       recentEvents.length ||
       Object.values(counters).some((count) => count > 0) ||
-      storyFeedbackSignals.length > 0,
+      storyFeedbackSignals.length > 0 ||
+      readyStoryQueueSignals.length > 0,
   );
 
   return {
@@ -433,6 +483,7 @@ export function normalizeReaderProfile(value: unknown): ReaderProfile {
     ...(latestMood ? { latestMood } : {}),
     moodHistory,
     storyFeedbackSignals,
+    readyStoryQueueSignals,
     tasteProfile,
   };
 }
@@ -637,6 +688,41 @@ function normalizeStoryFeedbackSignal(value: unknown): StoryFeedbackSignal | nul
     createdAt: typeof candidate.createdAt === "string" ? candidate.createdAt : "",
     updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : "",
   };
+}
+
+function normalizeReadyStoryQueueLearningSignal(value: unknown): ReadyStoryQueueLearningSignal | null {
+  const candidate = value as Partial<ReadyStoryQueueLearningSignal>;
+  if (
+    !candidate ||
+    typeof candidate !== "object" ||
+    !candidate.storyCardId ||
+    !candidate.storyTitle ||
+    !isReadyStoryQueueSignalType(candidate.signal) ||
+    candidate.source !== "desktop-ready-story-queue" ||
+    typeof candidate.createdAt !== "string" ||
+    typeof candidate.updatedAt !== "string"
+  ) {
+    return null;
+  }
+
+  const storyCardId = normalizeFreeText(candidate.storyCardId);
+  const storyTitle = normalizeFreeText(candidate.storyTitle);
+  if (!storyCardId || !storyTitle) return null;
+
+  return {
+    storyCardId,
+    storyTitle,
+    signal: candidate.signal,
+    ...(candidate.genre ? { genre: normalizeFreeText(candidate.genre) } : {}),
+    ...(candidate.mood ? { mood: normalizeFreeText(candidate.mood) } : {}),
+    source: "desktop-ready-story-queue",
+    createdAt: candidate.createdAt,
+    updatedAt: candidate.updatedAt,
+  };
+}
+
+function isReadyStoryQueueSignalType(value: unknown): value is ReadyStoryQueueSignalType {
+  return value === "read" || value === "pass" || value === "save_for_later";
 }
 
 function isStoryFeedbackRating(value: unknown): value is StoryFeedbackRating {
