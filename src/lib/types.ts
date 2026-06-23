@@ -47,6 +47,7 @@ export type GenerateStoryRequest = {
   endingType: EndingType;
   lengthTarget: LengthTarget;
   readerMood?: ReaderMoodSnapshot | null;
+  personalizationContext?: string;
   continuationStoryId?: string;
 };
 
