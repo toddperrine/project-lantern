@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   EERIE_READER_PROFILE_STORAGE_KEY,
@@ -192,6 +192,9 @@ export default function Home() {
   const [lastRequestIncludedContinuationStoryId, setLastRequestIncludedContinuationStoryId] = useState(false);
   const [lastContinuationContextIncluded, setLastContinuationContextIncluded] = useState(false);
   const [lastContinuationBlockedBecauseContextMissing, setLastContinuationBlockedBecauseContextMissing] = useState(false);
+  const [feedbackDraftHasUnsavedChanges, setFeedbackDraftHasUnsavedChanges] = useState(false);
+  const [feedbackSaveBlockedBecauseRatingMissing, setFeedbackSaveBlockedBecauseRatingMissing] = useState(false);
+  const [generationBlockedBecauseUnsavedFeedback, setGenerationBlockedBecauseUnsavedFeedback] = useState(false);
   const [lastNewStoryPersonalization, setLastNewStoryPersonalization] = useState<LastNewStoryPersonalization>(createEmptyLastNewStoryPersonalization());
   const [isStoryStartSelectionOpen, setIsStoryStartSelectionOpen] = useState(false);
   const activeGenerationRequestId = useRef(0);
@@ -245,6 +248,7 @@ export default function Home() {
     setPendingStoryStart(null);
     setMoodIntakeMode(null);
     setIsDirectionOpen(false);
+    resetFeedbackDraftDiagnostics();
   }
 
   function navigateHome(options?: { preserveGeneration?: boolean }) {
@@ -872,6 +876,35 @@ export default function Home() {
     else setStoryRules(value);
   }
 
+  function resetFeedbackDraftDiagnostics() {
+    setFeedbackDraftHasUnsavedChanges(false);
+    setFeedbackSaveBlockedBecauseRatingMissing(false);
+    setGenerationBlockedBecauseUnsavedFeedback(false);
+  }
+
+  const handleFeedbackDraftStateChange = useCallback((state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => {
+    setFeedbackDraftHasUnsavedChanges(state.hasUnsavedChanges);
+    setFeedbackSaveBlockedBecauseRatingMissing(state.saveBlockedBecauseRatingMissing);
+    if (!state.hasUnsavedChanges) setGenerationBlockedBecauseUnsavedFeedback(false);
+  }, []);
+
+  function blockGenerationForUnsavedFeedback(): boolean {
+    if (!feedbackDraftHasUnsavedChanges) return false;
+    setGenerationBlockedBecauseUnsavedFeedback(true);
+    setStatusMessage("Save feedback before starting another story.");
+    return true;
+  }
+
+  function handleReaderContinue() {
+    if (blockGenerationForUnsavedFeedback()) return;
+    handleContinueLatest();
+  }
+
+  function handleReaderStartDifferent() {
+    if (blockGenerationForUnsavedFeedback()) return;
+    handleStartSomethingDifferent();
+  }
+
   function handleStoryFeedbackChange(story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) {
     if (!story.id) return;
     const now = new Date().toISOString();
@@ -889,6 +922,7 @@ export default function Home() {
     const nextProfile = saveStoryFeedbackSignal(signal);
     setReaderProfile(nextProfile);
     void syncReaderProfileToCloud(nextProfile);
+    setGenerationBlockedBecauseUnsavedFeedback(false);
     setStatusMessage("Story feedback saved to your reader profile.");
   }
 
@@ -947,7 +981,7 @@ export default function Home() {
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        <AppStateDiagnostics activeView={activeView} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} profile={readerProfile} />
+        <AppStateDiagnostics activeView={activeView} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} profile={readerProfile} />
         <ReaderProfileDiagnostics cloudSync={cloudReaderProfileSync} profile={readerProfile} onClear={handleClearReaderProfile} />
         <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
@@ -958,7 +992,7 @@ export default function Home() {
             pendingStoryTitle={pendingStoryStart?.title ?? null}
           />
         ) : null}
-        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} isGenerating={isContinuationGenerating} onContinue={() => handleContinueLatest()} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onStartDifferent={handleStartSomethingDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
+        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
         {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
@@ -970,7 +1004,7 @@ export default function Home() {
   );
 }
 
-function EpisodeReader({ eyebrow, feedback, isGenerating, onContinue, onExport, onFeedbackChange, onStartDifferent, source, story }: { eyebrow: string; feedback: StoryFeedbackSignal | null; isGenerating: boolean; onContinue: () => void; onExport: () => void; onFeedbackChange: (story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
+function EpisodeReader({ eyebrow, feedback, generationBlockedBecauseUnsavedFeedback, isGenerating, onContinue, onExport, onFeedbackChange, onFeedbackDraftStateChange, onStartDifferent, source, story }: { eyebrow: string; feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; isGenerating: boolean; onContinue: () => void; onExport: () => void; onFeedbackChange: (story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void; onFeedbackDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
   return (
     <article className="grid min-w-0 gap-5 rounded-md border border-lantern-gold/25 bg-paper/10 p-4 shadow-soft sm:p-6">
       <div className="min-w-0">
@@ -979,7 +1013,7 @@ function EpisodeReader({ eyebrow, feedback, isGenerating, onContinue, onExport, 
         <p className="mt-3 text-sm leading-6 text-paper/60">{story.wordCount.toLocaleString()} words | {story.genrePreset} | {source}</p>
       </div>
       <div className="min-w-0 whitespace-pre-wrap rounded-md border border-paper/10 bg-night-ink/70 p-4 text-base leading-8 text-paper/85 sm:p-5">{story.story}</div>
-      {story.id ? <StoryFeedbackPanel feedback={feedback} onChange={(rating, reasons) => onFeedbackChange(story, rating, reasons)} /> : null}
+      {story.id ? <StoryFeedbackPanel feedback={feedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} onDraftStateChange={onFeedbackDraftStateChange} onSave={(rating, reasons) => onFeedbackChange(story, rating, reasons)} /> : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <button className="inline-flex items-center gap-2 rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={onContinue} type="button">{isGenerating ? <><span className="size-4 animate-spin rounded-full border-2 border-night-ink/30 border-t-night-ink" aria-hidden="true" />Writing the next chapter…</> : "Continue this story"}</button>
         <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-lantern-gold/50" onClick={onExport} type="button">Export</button>
@@ -989,16 +1023,31 @@ function EpisodeReader({ eyebrow, feedback, isGenerating, onContinue, onExport, 
   );
 }
 
-function StoryFeedbackPanel({ feedback, onChange }: { feedback: StoryFeedbackSignal | null; onChange: (rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void }) {
-  const selectedRating = feedback?.rating ?? null;
-  const selectedReasons = feedback?.reasons ?? [];
+function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback, onDraftStateChange, onSave }: { feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; onDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onSave: (rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void }) {
+  const [draftRating, setDraftRating] = useState<StoryFeedbackRating | null>(feedback?.rating ?? null);
+  const [draftReasons, setDraftReasons] = useState<StoryFeedbackReason[]>(feedback?.reasons ?? []);
+
+  useEffect(() => {
+    setDraftRating(feedback?.rating ?? null);
+    setDraftReasons(feedback?.reasons ?? []);
+  }, [feedback?.rating, feedback?.reasons, feedback?.storyId]);
+
+  const hasUnsavedChanges = !areFeedbackDraftsEqual(draftRating, draftReasons, feedback);
+  const saveBlockedBecauseRatingMissing = !draftRating;
+
+  useEffect(() => {
+    onDraftStateChange({ hasUnsavedChanges, saveBlockedBecauseRatingMissing });
+  }, [hasUnsavedChanges, onDraftStateChange, saveBlockedBecauseRatingMissing]);
 
   function toggleReason(reason: StoryFeedbackReason) {
-    if (!selectedRating) return;
-    const nextReasons = selectedReasons.includes(reason)
-      ? selectedReasons.filter((selectedReason) => selectedReason !== reason)
-      : [...selectedReasons, reason];
-    onChange(selectedRating, nextReasons);
+    setDraftReasons((currentReasons) => currentReasons.includes(reason)
+      ? currentReasons.filter((selectedReason) => selectedReason !== reason)
+      : [...currentReasons, reason]);
+  }
+
+  function saveFeedback() {
+    if (!draftRating) return;
+    onSave(draftRating, draftReasons);
   }
 
   return (
@@ -1010,37 +1059,40 @@ function StoryFeedbackPanel({ feedback, onChange }: { feedback: StoryFeedbackSig
       <div className="flex flex-wrap gap-2">
         {STORY_FEEDBACK_RATING_OPTIONS.map((option) => (
           <button
-            aria-pressed={selectedRating === option.rating}
-            className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${selectedRating === option.rating ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper hover:border-lantern-gold/50"}`}
+            aria-pressed={draftRating === option.rating}
+            className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${draftRating === option.rating ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper hover:border-lantern-gold/50"}`}
             key={option.rating}
-            onClick={() => onChange(option.rating, selectedRating === option.rating ? selectedReasons : [])}
+            onClick={() => setDraftRating(option.rating)}
             type="button"
           >
             {option.label}
           </button>
         ))}
       </div>
-      {selectedRating ? (
-        <div className="grid gap-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/50">Optional reasons</p>
-          <div className="flex flex-wrap gap-2">
-            {STORY_FEEDBACK_REASON_OPTIONS.map((option) => {
-              const isSelected = selectedReasons.includes(option.reason);
-              return (
-                <button
-                  aria-pressed={isSelected}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${isSelected ? "border-lantern-gold bg-lantern-gold/90 text-night-ink" : "border-paper/15 bg-paper/10 text-paper/80 hover:border-lantern-gold/50"}`}
-                  key={option.reason}
-                  onClick={() => toggleReason(option.reason)}
-                  type="button"
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
+      <div className="grid gap-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/50">Optional reasons</p>
+        <div className="flex flex-wrap gap-2">
+          {STORY_FEEDBACK_REASON_OPTIONS.map((option) => {
+            const isSelected = draftReasons.includes(option.reason);
+            return (
+              <button
+                aria-pressed={isSelected}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${isSelected ? "border-lantern-gold bg-lantern-gold/90 text-night-ink" : "border-paper/15 bg-paper/10 text-paper/80 hover:border-lantern-gold/50"}`}
+                key={option.reason}
+                onClick={() => toggleReason(option.reason)}
+                type="button"
+              >
+                {option.label}
+              </button>
+            );
+          })}
         </div>
-      ) : null}
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <button className="w-fit rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={!draftRating} onClick={saveFeedback} type="button">Save feedback</button>
+        <p className={`text-sm font-semibold ${hasUnsavedChanges ? "text-lantern-gold" : feedback ? "text-paper/70" : "text-paper/50"}`}>{hasUnsavedChanges ? "Unsaved feedback" : feedback ? "Feedback saved" : "Select a rating to save feedback."}</p>
+      </div>
+      {generationBlockedBecauseUnsavedFeedback && hasUnsavedChanges ? <p className="text-sm font-semibold text-lantern-gold">Save feedback before starting another story.</p> : null}
     </section>
   );
 }
@@ -1262,7 +1314,7 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
   };
 }
 
-function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationTrigger, lastNewStoryPersonalization, lastRequestIncludedContinuationStoryId, profile }: { activeView: AppView; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationTrigger: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastRequestIncludedContinuationStoryId: boolean; profile: ReaderProfile }) {
+function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationTrigger, lastNewStoryPersonalization, lastRequestIncludedContinuationStoryId, profile }: { activeView: AppView; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationTrigger: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastRequestIncludedContinuationStoryId: boolean; profile: ReaderProfile }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
@@ -1277,6 +1329,9 @@ function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId,
         <p><span className="font-semibold text-paper/80">Current story feedback rating:</span> {currentStoryFeedback?.rating ?? "none"}</p>
         <p><span className="font-semibold text-paper/80">Current story feedback reasons:</span> {currentStoryFeedback?.reasons.length ? currentStoryFeedback.reasons.join(", ") : "none"}</p>
         <p><span className="font-semibold text-paper/80">Total story feedback signals:</span> {profile.storyFeedbackSignals?.length ?? 0}</p>
+        <p><span className="font-semibold text-paper/80">Feedback draft has unsaved changes:</span> {feedbackDraftHasUnsavedChanges ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">Feedback save blocked because rating missing:</span> {feedbackSaveBlockedBecauseRatingMissing ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">Generation blocked because unsaved feedback:</span> {generationBlockedBecauseUnsavedFeedback ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Last request included continuation story ID:</span> {lastRequestIncludedContinuationStoryId ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Continuation context included:</span> {lastContinuationContextIncluded ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Continuation blocked because context missing:</span> {lastContinuationBlockedBecauseContextMissing ? "yes" : "no"}</p>
@@ -1339,6 +1394,27 @@ function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: 
       </div>
     </details>
   );
+}
+
+function areFeedbackDraftsEqual(
+  draftRating: StoryFeedbackRating | null,
+  draftReasons: StoryFeedbackReason[],
+  savedSignal: StoryFeedbackSignal | null | undefined
+): boolean {
+  if (!draftRating && !savedSignal) return draftReasons.length === 0;
+  if (!draftRating || !savedSignal) return false;
+  if (draftRating !== savedSignal.rating) return false;
+
+  const draftSet = new Set(draftReasons);
+  const savedSet = new Set(savedSignal.reasons ?? []);
+
+  if (draftSet.size !== savedSet.size) return false;
+
+  for (const reason of draftSet) {
+    if (!savedSet.has(reason)) return false;
+  }
+
+  return true;
 }
 
 function getTopCount(counts: Record<string, number>): string | null {
