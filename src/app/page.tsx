@@ -147,6 +147,7 @@ export default function Home() {
   const [generatedStoryPresentation, setGeneratedStoryPresentation] = useState<GeneratedStoryPresentation>(null);
   const [lastGenerationTrigger, setLastGenerationTrigger] = useState("none");
   const [generationSource, setGenerationSource] = useState<GenerationSource>(null);
+  const [lastRequestIncludedContinuationStoryId, setLastRequestIncludedContinuationStoryId] = useState(false);
   const [isStoryStartSelectionOpen, setIsStoryStartSelectionOpen] = useState(false);
   const activeGenerationRequestId = useRef(0);
 
@@ -220,13 +221,22 @@ export default function Home() {
     window.history.pushState(null, "", `${window.location.pathname}?view=${view}`);
   }
 
-  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null; presentation: Exclude<GeneratedStoryPresentation, null>; loadingMessage: string; signalSource: ReaderProfileEventSource; generationSource: Exclude<GenerationSource, null> }>) {
+  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null; presentation: Exclude<GeneratedStoryPresentation, null>; loadingMessage: string; signalSource: ReaderProfileEventSource; generationSource: Exclude<GenerationSource, null>; continuationStoryId: string }>) {
+    const nextGenerationSource = overrides?.generationSource ?? "new-story";
+    const continuationStoryId = nextGenerationSource === "continue-story" ? overrides?.continuationStoryId?.trim() ?? "" : "";
+
+    if (nextGenerationSource === "continue-story" && !continuationStoryId) {
+      setError("Choose an active story before continuing it.");
+      return;
+    }
+
     const requestId = activeGenerationRequestId.current + 1;
     activeGenerationRequestId.current = requestId;
     setError("");
     setStatusMessage(overrides?.loadingMessage ?? "");
     setLastGenerationTrigger(overrides?.signalSource ?? "create");
-    setGenerationSource(overrides?.generationSource ?? "new-story");
+    setGenerationSource(nextGenerationSource);
+    setLastRequestIncludedContinuationStoryId(Boolean(continuationStoryId));
     setIsGenerating(true);
     try {
       const response = await fetch("/api/generate", {
@@ -242,7 +252,8 @@ export default function Home() {
           characterArc: overrides?.characterArc ?? characterArc,
           endingType: overrides?.endingType ?? endingType,
           lengthTarget: overrides?.lengthTarget ?? lengthTarget,
-          readerMood: overrides?.readerMood ?? readerProfile.latestMood ?? null
+          readerMood: overrides?.readerMood ?? readerProfile.latestMood ?? null,
+          ...(continuationStoryId ? { continuationStoryId } : {})
         })
       });
       const payload = await response.json();
@@ -582,7 +593,8 @@ export default function Home() {
       presentation: "continuation",
       loadingMessage: "Writing the next chapter…",
       signalSource: "continueSeries",
-      generationSource: "continue-story"
+      generationSource: "continue-story",
+      continuationStoryId: latestStory.id
     });
   }
 
@@ -837,7 +849,7 @@ export default function Home() {
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        <AppStateDiagnostics activeView={activeView} currentStoryId={currentStoryId} generationSource={generationSource} isGenerating={isGenerating} lastGenerationTrigger={lastGenerationTrigger} />
+        <AppStateDiagnostics activeView={activeView} currentStoryId={currentStoryId} generationSource={generationSource} isGenerating={isGenerating} lastGenerationTrigger={lastGenerationTrigger} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} />
         <ReaderProfileDiagnostics cloudSync={cloudReaderProfileSync} profile={readerProfile} onClear={handleClearReaderProfile} />
         <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
@@ -1015,7 +1027,7 @@ function SegmentedChoice({ label, onChange, options, value }: { label: string; o
   return <div className="grid gap-2"><p className="text-sm font-semibold text-paper">{label}</p><div className="grid grid-cols-3 gap-2">{options.map((option) => <button className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${value === option.value ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper"}`} key={option.value} onClick={() => onChange(option.value)} type="button">{option.label}</button>)}</div></div>;
 }
 
-function AppStateDiagnostics({ activeView, currentStoryId, generationSource, isGenerating, lastGenerationTrigger }: { activeView: AppView; currentStoryId: string; generationSource: GenerationSource; isGenerating: boolean; lastGenerationTrigger: string }) {
+function AppStateDiagnostics({ activeView, currentStoryId, generationSource, isGenerating, lastGenerationTrigger, lastRequestIncludedContinuationStoryId }: { activeView: AppView; currentStoryId: string; generationSource: GenerationSource; isGenerating: boolean; lastGenerationTrigger: string; lastRequestIncludedContinuationStoryId: boolean }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
@@ -1025,6 +1037,7 @@ function AppStateDiagnostics({ activeView, currentStoryId, generationSource, isG
         <p><span className="font-semibold text-paper/80">Last generation trigger/source:</span> {lastGenerationTrigger}</p>
         <p><span className="font-semibold text-paper/80">Active generation source:</span> {generationSource ?? "none"}</p>
         <p><span className="font-semibold text-paper/80">Current story ID:</span> {currentStoryId || "none"}</p>
+        <p><span className="font-semibold text-paper/80">Last request included continuation story ID:</span> {lastRequestIncludedContinuationStoryId ? "yes" : "no"}</p>
       </div>
     </details>
   );
