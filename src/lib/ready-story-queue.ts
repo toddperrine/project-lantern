@@ -1,4 +1,4 @@
-import type { GenrePreset } from "@/lib/types";
+import type { GenerateStoryResponse, GenrePreset } from "@/lib/types";
 
 export const READY_STORY_QUEUE_STORAGE_KEY = "projectLantern.readyStoryQueue.v1";
 export const SAVED_FOR_LATER_STORY_QUEUE_STORAGE_KEY = "projectLantern.savedForLaterStoryQueue.v1";
@@ -23,6 +23,11 @@ export interface ReadyStoryQueueItem {
   rules: string;
   createdAt: string;
   updatedAt: string;
+  generationStatus?: "not_started" | "generating" | "ready" | "failed";
+  generatedStory?: GenerateStoryResponse | null;
+  generatedStoryId?: string;
+  generatedAt?: string;
+  generationError?: string;
 }
 
 export function createReadyStoryQueueItem(input: Omit<ReadyStoryQueueItem, "id" | "createdAt" | "updatedAt">, createdAt = new Date().toISOString()): ReadyStoryQueueItem {
@@ -39,7 +44,7 @@ export function readReadyStoryQueue(): ReadyStoryQueueItem[] {
 }
 
 export function persistReadyStoryQueue(items: ReadyStoryQueueItem[]): ReadyStoryQueueItem[] {
-  const normalized = items.map(normalizeReadyStoryQueueItem).filter(isReadyStoryQueueItem).slice(0, MAX_READY_STORY_QUEUE_ITEMS);
+  const normalized = items.map((item) => normalizeReadyStoryQueueItem(item)).filter(isReadyStoryQueueItem).slice(0, MAX_READY_STORY_QUEUE_ITEMS);
   writeQueueItems(READY_STORY_QUEUE_STORAGE_KEY, normalized);
   return normalized;
 }
@@ -49,13 +54,29 @@ export function readSavedForLaterStoryQueue(): ReadyStoryQueueItem[] {
 }
 
 export function persistSavedForLaterStoryQueue(items: ReadyStoryQueueItem[]): ReadyStoryQueueItem[] {
-  const normalized = items.map(normalizeReadyStoryQueueItem).filter(isReadyStoryQueueItem).slice(0, MAX_SAVED_FOR_LATER_STORY_ITEMS);
+  const normalized = items.map((item) => normalizeReadyStoryQueueItem(item)).filter(isReadyStoryQueueItem).slice(0, MAX_SAVED_FOR_LATER_STORY_ITEMS);
   writeQueueItems(SAVED_FOR_LATER_STORY_QUEUE_STORAGE_KEY, normalized);
   return normalized;
 }
 
 export function removeReadyStoryQueueItem(items: ReadyStoryQueueItem[], itemId: string): ReadyStoryQueueItem[] {
   return items.filter((item) => item.id !== itemId);
+}
+
+export function countPreparedReadyStoryQueueItems(items: ReadyStoryQueueItem[]): number {
+  return items.filter((item) => item.generationStatus === "ready" && item.generatedStory).length;
+}
+
+export function updateReadyStoryQueueItem(
+  items: ReadyStoryQueueItem[],
+  itemId: string,
+  update: Partial<ReadyStoryQueueItem>
+): ReadyStoryQueueItem[] {
+  return items.map((item) =>
+    item.id === itemId
+      ? normalizeReadyStoryQueueItem({ ...item, ...update, updatedAt: update.updatedAt ?? new Date().toISOString() })
+      : item
+  );
 }
 
 export function upsertSavedForLaterStoryQueueItem(items: ReadyStoryQueueItem[], item: ReadyStoryQueueItem): ReadyStoryQueueItem[] {
@@ -70,7 +91,7 @@ function readQueueItems(storageKey: string): ReadyStoryQueueItem[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.map(normalizeReadyStoryQueueItem).filter(isReadyStoryQueueItem);
+    return parsed.map((item) => normalizeReadyStoryQueueItem(item, { resetGenerating: true })).filter(isReadyStoryQueueItem);
   } catch {
     return [];
   }
@@ -86,8 +107,17 @@ function writeQueueItems(storageKey: string, items: ReadyStoryQueueItem[]) {
   }
 }
 
-function normalizeReadyStoryQueueItem(value: unknown): ReadyStoryQueueItem {
+function normalizeReadyStoryQueueItem(value: unknown, options?: { resetGenerating?: boolean }): ReadyStoryQueueItem {
   const candidate = value as Partial<ReadyStoryQueueItem>;
+  const generatedStory = normalizeGeneratedStory(candidate?.generatedStory);
+  const candidateStatus = candidate?.generationStatus;
+  const generationStatus = generatedStory && candidateStatus === "ready"
+    ? "ready"
+    : candidateStatus === "failed"
+      ? "failed"
+      : candidateStatus === "generating" && !options?.resetGenerating
+        ? "generating"
+        : "not_started";
 
   return {
     id: normalizeQueueText(candidate?.id, 180),
@@ -104,8 +134,18 @@ function normalizeReadyStoryQueueItem(value: unknown): ReadyStoryQueueItem {
     cast: normalizeQueueText(candidate?.cast, 2000),
     rules: normalizeQueueText(candidate?.rules, 1600),
     createdAt: normalizeQueueText(candidate?.createdAt, 80),
-    updatedAt: normalizeQueueText(candidate?.updatedAt, 80)
+    updatedAt: normalizeQueueText(candidate?.updatedAt, 80),
+    generationStatus,
+    generatedStory,
+    generatedStoryId: normalizeQueueText(candidate?.generatedStoryId, 180),
+    generatedAt: normalizeQueueText(candidate?.generatedAt, 80),
+    generationError: normalizeQueueText(candidate?.generationError, 500)
   };
+}
+
+function normalizeGeneratedStory(value: unknown): GenerateStoryResponse | null {
+  const candidate = value as Partial<GenerateStoryResponse> | null | undefined;
+  return typeof candidate?.story === "string" && Boolean(candidate.metadata) ? candidate as GenerateStoryResponse : null;
 }
 
 function isReadyStoryQueueItem(item: ReadyStoryQueueItem): item is ReadyStoryQueueItem {

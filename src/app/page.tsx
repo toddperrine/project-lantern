@@ -29,6 +29,7 @@ import {
   STORY_FEEDBACK_SCORE_BY_RATING
 } from "@/lib/reader-profile";
 import {
+  countPreparedReadyStoryQueueItems,
   createReadyStoryQueueItem,
   persistReadyStoryQueue,
   persistSavedForLaterStoryQueue,
@@ -254,6 +255,8 @@ export default function Home() {
   const [readyStoryQueue, setReadyStoryQueue] = useState<ReadyStoryQueueItem[]>([]);
   const [savedForLaterStoryQueue, setSavedForLaterStoryQueue] = useState<ReadyStoryQueueItem[]>([]);
   const [lastReadyStoryQueueAction, setLastReadyStoryQueueAction] = useState("none");
+  const [readyStoryPreparationStatus, setReadyStoryPreparationStatus] = useState("idle");
+  const [lastReadyStoryPreparationOutcome, setLastReadyStoryPreparationOutcome] = useState("none");
   const [isStoryStartSelectionOpen, setIsStoryStartSelectionOpen] = useState(false);
   const activeGenerationRequestId = useRef(0);
 
@@ -520,10 +523,30 @@ export default function Home() {
   }
 
   function handleReadReadyStory(item: ReadyStoryQueueItem) {
-    if (isGenerating) return;
+    if (isGenerating || item.generationStatus === "generating") return;
 
     recordReadyStoryQueueSignal(item, "read");
     removeReadyQueueItemAndPersist(item.id);
+
+    if (item.generationStatus === "ready" && item.generatedStory) {
+      const generatedStoryId = item.generatedStoryId || createStoryId(item.generatedStory.story);
+      const savedStory = createSavedStory(item.generatedStory, generatedStoryId);
+      const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
+      persistSavedStories(nextSavedStories);
+      setSavedStories(nextSavedStories);
+      setStoryResponse(item.generatedStory);
+      setCurrentStoryId(generatedStoryId);
+      setGeneratedStoryPresentation("first-episode");
+      setIsStoryStartSelectionOpen(false);
+      setPendingStoryStart(null);
+      setMoodIntakeMode(null);
+      clearDemoLatestStory();
+      setDemoStory(null);
+      navigateHome({ preserveGeneration: true });
+      setStatusMessage(`Opened ${item.title}.`);
+      recordReaderSignal({ eventType: "storyOpened", source: "startSomethingNew", storyId: generatedStoryId, title: savedStory.title, genre: savedStory.genrePreset, wordCount: savedStory.wordCount });
+      return;
+    }
 
     const storyStart = readyStoryQueueItemToStoryStart(item);
     applyStoryStart(storyStart);
@@ -1152,7 +1175,7 @@ export default function Home() {
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        <AppStateDiagnostics activeView={activeView} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
+        <AppStateDiagnostics activeView={activeView} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
         <ReaderProfileDiagnostics cloudSync={cloudReaderProfileSync} profile={readerProfile} onClear={handleClearReaderProfile} />
         <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
@@ -1363,22 +1386,35 @@ function ReadyStoryQueuePanel({
       </div>
 
       <div className="mt-4 grid gap-3">
-        {items.map((item) => (
-          <article key={item.id} className="grid min-w-0 grid-cols-[1fr_auto] overflow-hidden rounded-md border border-paper/10 bg-night-ink/70">
-            <div className="min-w-0 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lantern-gold">{item.mood} · {item.genre}</p>
-              <h3 className="mt-2 text-xl font-semibold leading-tight text-paper">{item.title}</h3>
-              <p className="mt-2 line-clamp-2 text-sm leading-6 text-paper/65">{item.premise}</p>
-              <p className="mt-3 text-xs text-paper/45">{item.heroName} · {item.heroRole} · {item.worldName}</p>
-            </div>
+        {items.map((item) => {
+          const isPreparing = item.generationStatus === "generating";
+          const isReady = item.generationStatus === "ready" && item.generatedStory;
+          const preparationLabel = isReady
+            ? "Ready to read"
+            : isPreparing
+              ? "Preparing story…"
+              : item.generationStatus === "failed"
+                ? "Preparation failed — Read can try again"
+                : "Queued";
 
-            <div className="flex w-40 flex-col justify-center gap-2 border-l border-paper/10 bg-paper/5 p-3">
-              <button className="rounded-md bg-lantern-gold px-3 py-2 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={() => onRead(item)} type="button">Read</button>
-              <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-sm font-semibold text-paper hover:border-lantern-gold/50 disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={() => onPass(item)} type="button">Pass</button>
-              <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-sm font-semibold text-paper hover:border-lantern-gold/50 disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={() => onSaveForLater(item)} type="button">Save for later</button>
-            </div>
-          </article>
-        ))}
+          return (
+            <article key={item.id} className="grid min-w-0 grid-cols-[1fr_auto] overflow-hidden rounded-md border border-paper/10 bg-night-ink/70">
+              <div className="min-w-0 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lantern-gold">{item.mood} · {item.genre}</p>
+                <h3 className="mt-2 text-xl font-semibold leading-tight text-paper">{item.title}</h3>
+                <p className="mt-2 line-clamp-2 text-sm leading-6 text-paper/65">{item.premise}</p>
+                <p className="mt-3 text-xs font-semibold text-lantern-gold/75">{preparationLabel}</p>
+                <p className="mt-2 text-xs text-paper/45">{item.heroName} · {item.heroRole} · {item.worldName}</p>
+              </div>
+
+              <div className="flex w-40 flex-col justify-center gap-2 border-l border-paper/10 bg-paper/5 p-3">
+                <button className="rounded-md bg-lantern-gold px-3 py-2 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating || isPreparing} onClick={() => onRead(item)} type="button">{isPreparing ? "Preparing…" : "Read"}</button>
+                <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-sm font-semibold text-paper hover:border-lantern-gold/50 disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={() => onPass(item)} type="button">Pass</button>
+                <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-sm font-semibold text-paper hover:border-lantern-gold/50 disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={() => onSaveForLater(item)} type="button">Save for later</button>
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -1697,7 +1733,7 @@ function createReaderProfileGenerationSnapshot({ defaultSafetyGuardrails, feedba
   };
 }
 
-function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationTrigger, lastNewStoryPersonalization, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, profile, readyStoryQueue, savedForLaterStoryQueue }: { activeView: AppView; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationTrigger: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; profile: ReaderProfile; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[] }) {
+function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationTrigger, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, profile, readyStoryQueue, savedForLaterStoryQueue }: { activeView: AppView; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationTrigger: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; profile: ReaderProfile; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[] }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
@@ -1713,6 +1749,9 @@ function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId,
         <p><span className="font-semibold text-paper/80">Current story feedback reasons:</span> {currentStoryFeedback?.reasons.length ? currentStoryFeedback.reasons.join(", ") : "none"}</p>
         <p><span className="font-semibold text-paper/80">Total story feedback signals:</span> {profile.storyFeedbackSignals?.length ?? 0}</p>
         <p><span className="font-semibold text-paper/80">Ready story queue count:</span> {readyStoryQueue.length}</p>
+        <p><span className="font-semibold text-paper/80">Ready story prepared count:</span> {countPreparedReadyStoryQueueItems(readyStoryQueue)}</p>
+        <p><span className="font-semibold text-paper/80">Ready story preparation status:</span> {lastReadyStoryPreparationStatus}</p>
+        <p><span className="font-semibold text-paper/80">Last ready story preparation outcome:</span> {lastReadyStoryPreparationOutcome}</p>
         <p><span className="font-semibold text-paper/80">Saved for later queue count:</span> {savedForLaterStoryQueue.length}</p>
         <p><span className="font-semibold text-paper/80">Last ready story queue action:</span> {lastReadyStoryQueueAction}</p>
         <p><span className="font-semibold text-paper/80">Feedback draft has unsaved changes:</span> {feedbackDraftHasUnsavedChanges ? "yes" : "no"}</p>
