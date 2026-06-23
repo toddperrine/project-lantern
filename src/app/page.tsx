@@ -31,7 +31,7 @@ import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
 import type { EerieReaderProfile } from "@/lib/eerie-reader-profile";
 import type { ReaderEnergyLevel, ReaderIntensityLevel, ReaderMoodDraft, ReaderMoodSnapshot, ReaderProfile, ReaderProfileEventInput, ReaderProfileEventSource, StoryFeedbackGenerationMode, StoryFeedbackRating, StoryFeedbackReason, StoryFeedbackSignal } from "@/lib/reader-profile";
-import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture } from "@/lib/types";
+import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture, ReaderProfileGenerationSnapshot } from "@/lib/types";
 import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
 import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
 
@@ -62,6 +62,7 @@ type LastNewStoryPersonalization = {
   feedbackIncluded: boolean;
   latestStoryFeedbackSummary: string;
   summary: string;
+  responseSnapshot?: ReaderProfileGenerationSnapshot;
 };
 type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" | "not found";
 type CloudReaderProfileSyncState = {
@@ -337,6 +338,7 @@ export default function Home() {
           lengthTarget: overrides?.lengthTarget ?? lengthTarget,
           readerMood: overrides?.readerMood ?? readerProfile.latestMood ?? null,
           ...(personalization.prompt ? { personalizationContext: personalization.prompt } : {}),
+          readerProfileGenerationSnapshot: personalization.snapshot,
           ...(continuationStoryId ? { continuationStoryId } : {})
         })
       });
@@ -344,6 +346,10 @@ export default function Home() {
       if (activeGenerationRequestId.current !== requestId) return;
       if (!response.ok) throw new Error(payload.error ?? "Story generation failed.");
       const normalizedResponse = normalizeGenerateStoryResponse(payload);
+      setLastNewStoryPersonalization((current) => ({
+        ...current,
+        responseSnapshot: normalizedResponse.metadata.diagnostics.readerProfileGenerationSnapshot
+      }));
       const generatedStoryId = createStoryId(normalizedResponse.story);
       const savedStory = createSavedStory(normalizedResponse, generatedStoryId);
       const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
@@ -1316,8 +1322,21 @@ function shouldMirrorEerieProfileToReaderTasteProfile(profile: ReaderProfile): b
   return !profile.tasteProfile || profile.tasteProfile.source === "default";
 }
 
-function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre, mode, profile, source, trigger }: { continuationStoryId: string; eerieProfile: EerieReaderProfile; genre: GenrePreset; mode: Exclude<GenerationSource, null>; profile: ReaderProfile; source: ProfileSourceUsed; trigger: ReaderProfileEventSource; }): { diagnostics: LastNewStoryPersonalization; prompt: string } {
+function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre, mode, profile, source, trigger }: { continuationStoryId: string; eerieProfile: EerieReaderProfile; genre: GenrePreset; mode: Exclude<GenerationSource, null>; profile: ReaderProfile; source: ProfileSourceUsed; trigger: ReaderProfileEventSource; }): { diagnostics: LastNewStoryPersonalization; prompt: string; snapshot: ReaderProfileGenerationSnapshot } {
   if (mode === "continue-story") {
+    const snapshot = createReaderProfileGenerationSnapshot({
+      defaultSafetyGuardrails: DEFAULT_READER_SAFETY_GUARDRAILS,
+      feedbackIncluded: false,
+      genreSignal: genre,
+      mode,
+      moodSignal: profile.latestMood?.mood ?? "none",
+      profile,
+      profileSource: "none",
+      profileUsed: false,
+      tasteProfile: profile.tasteProfile ?? null,
+      userHardAvoidances: []
+    });
+
     return {
       diagnostics: {
         ...createEmptyLastNewStoryPersonalization(),
@@ -1327,7 +1346,8 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
         continuationStoryIdIncludedInLastNewStoryRequest: false,
         summary: "Continuation generation did not use new-story reader profile personalization."
       },
-      prompt: ""
+      prompt: "",
+      snapshot
     };
   }
 
@@ -1368,6 +1388,19 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
     "Do not mention personalization or the reader profile in the story."
   ].join("\n") : "";
 
+  const snapshot = createReaderProfileGenerationSnapshot({
+    defaultSafetyGuardrails: defaultEerieSafetyGuardrails,
+    feedbackIncluded: profileUsed && feedbackIncluded,
+    genreSignal: topGenre ?? genre,
+    mode,
+    moodSignal: topMood ?? profile.latestMood?.mood ?? "none",
+    profile,
+    profileSource: profileUsed ? profileSource : "none",
+    profileUsed,
+    tasteProfile,
+    userHardAvoidances
+  });
+
   return {
     diagnostics: {
       profileUsed,
@@ -1386,7 +1419,34 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
       latestStoryFeedbackSummary: feedbackSummary,
       summary: profileUsed ? `Used ${confidence}-confidence reader profile ${confidence === "low" ? "lightly" : "as preference guidance"}: favored ${topGenre ?? genre} and ${topMood ?? profile.latestMood?.mood ?? "available mood"} mood; ${userHardAvoidances.length ? "included user hard avoidances" : "no user hard avoidances found"}; ${feedbackIncluded ? "included recent story feedback as weak guidance" : "no story feedback found"}; ${includeEerieSignals ? "included taste profile guidance without forcing horror." : "did not force eerie preferences."}` : "No persisted reader profile was available; generated with the existing new-story inputs only."
     },
-    prompt
+    prompt,
+    snapshot
+  };
+}
+
+function createReaderProfileGenerationSnapshot({ defaultSafetyGuardrails, feedbackIncluded, genreSignal, mode, moodSignal, profile, profileSource, profileUsed, tasteProfile, userHardAvoidances }: { defaultSafetyGuardrails: string[]; feedbackIncluded: boolean; genreSignal: string; mode: Exclude<GenerationSource, null>; moodSignal: string; profile: ReaderProfile; profileSource: ProfileSourceUsed; profileUsed: boolean; tasteProfile: ReaderProfile["tasteProfile"] | null; userHardAvoidances: string[]; }): ReaderProfileGenerationSnapshot {
+  const feedbackSignals = profile.storyFeedbackSignals ?? [];
+  const latestFeedback = [...feedbackSignals].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+
+  return {
+    mode,
+    profileUsed,
+    profileSourceUsed: profileSource,
+    profileUpdatedAt: profileUsed ? profile.updatedAt : "none",
+    profileConfidence: profileUsed ? getReaderProfileConfidence(profile) : "unavailable",
+    tasteProfilePresent: Boolean(tasteProfile),
+    tasteProfileSource: tasteProfile?.source ?? "none",
+    tasteProfileUpdatedAt: tasteProfile?.updatedAt ?? "none",
+    feedbackSignalCount: feedbackSignals.length,
+    feedbackIncluded,
+    latestFeedbackRating: latestFeedback?.rating ?? "none",
+    userHardAvoidanceCount: userHardAvoidances.length,
+    userHardAvoidancesSummary: userHardAvoidances.length ? userHardAvoidances.join(", ") : "none",
+    defaultSafetyGuardrailCount: defaultSafetyGuardrails.length,
+    defaultSafetyGuardrailsSummary: defaultSafetyGuardrails.length ? defaultSafetyGuardrails.join(", ") : "none",
+    moodSignal,
+    genreSignal,
+    generatedAt: new Date().toISOString()
   };
 }
 
@@ -1425,6 +1485,7 @@ function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId,
         <p><span className="font-semibold text-paper/80">Continuation story id included in last new-story request:</span> {lastNewStoryPersonalization.continuationStoryIdIncludedInLastNewStoryRequest ? "yes" : "no"}</p>
         <p className="sm:col-span-2"><span className="font-semibold text-paper/80">Latest story feedback summary:</span> {lastNewStoryPersonalization.latestStoryFeedbackSummary}</p>
         <p className="sm:col-span-2"><span className="font-semibold text-paper/80">Personalization summary:</span> {lastNewStoryPersonalization.summary}</p>
+        <pre className="max-h-72 overflow-auto rounded border border-paper/10 bg-night-ink/80 p-3 text-[0.68rem] leading-5 text-paper/70 sm:col-span-2">{JSON.stringify(lastNewStoryPersonalization.responseSnapshot ?? null, null, 2)}</pre>
       </div>
     </details>
   );

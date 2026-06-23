@@ -47,6 +47,7 @@ export async function POST(request: Request) {
   }
 
   const readerMood = isReaderMoodSnapshot(body.readerMood) ? body.readerMood : null;
+  const readerProfileGenerationSnapshot = normalizeReaderProfileGenerationSnapshot(body.readerProfileGenerationSnapshot);
 
   const input = {
     worldBible: body.worldBible!.trim(),
@@ -59,13 +60,14 @@ export async function POST(request: Request) {
     endingType: body.endingType!,
     lengthTarget: body.lengthTarget!,
     readerMood,
-    personalizationContext: body.personalizationContext?.trim() || undefined
+    personalizationContext: body.personalizationContext?.trim() || undefined,
+    readerProfileGenerationSnapshot
   } satisfies GenerateStoryRequest;
 
   if (!hasOpenAIKey()) {
     return NextResponse.json(
       withServerGenerationDuration(
-        generateFallbackStory(
+        withReaderProfileGenerationSnapshot(generateFallbackStory(
           input,
           getOpenAIDiagnostics({
             fallbackReason: "OPENAI_API_KEY is missing or empty in this deployment environment.",
@@ -75,14 +77,14 @@ export async function POST(request: Request) {
             endingType: input.endingType,
             lengthTarget: formatLengthTarget(input.lengthTarget)
           })
-        ),
+        ), input.readerProfileGenerationSnapshot),
         generationStartedAt
       )
     );
   }
 
   try {
-    return NextResponse.json(withServerGenerationDuration(await generateOpenAIStoryWithLongFloor(input), generationStartedAt));
+    return NextResponse.json(withServerGenerationDuration(withReaderProfileGenerationSnapshot(await generateOpenAIStoryWithLongFloor(input), input.readerProfileGenerationSnapshot), generationStartedAt));
   } catch (error) {
     const errorSummary = summarizeOpenAIError(error);
 
@@ -91,7 +93,7 @@ export async function POST(request: Request) {
         const repairedResponse = await generateOpenAIStoryWithLongFloor(buildBlueprintRepairRetryInput(input, errorSummary));
         return NextResponse.json(
           withServerGenerationDuration(
-            withBlueprintRepairSuccessDiagnostics(repairedResponse, errorSummary),
+            withReaderProfileGenerationSnapshot(withBlueprintRepairSuccessDiagnostics(repairedResponse, errorSummary), input.readerProfileGenerationSnapshot),
             generationStartedAt
           )
         );
@@ -99,7 +101,7 @@ export async function POST(request: Request) {
         const repairSummary = summarizeOpenAIError(repairError);
         return NextResponse.json(
           withServerGenerationDuration(
-            buildOpenAIFallbackResponse(input, `OpenAI request failed: ${errorSummary}. Blueprint repair retry failed: ${repairSummary}`, `${errorSummary}; repair retry: ${repairSummary}`),
+            withReaderProfileGenerationSnapshot(buildOpenAIFallbackResponse(input, `OpenAI request failed: ${errorSummary}. Blueprint repair retry failed: ${repairSummary}`, `${errorSummary}; repair retry: ${repairSummary}`), input.readerProfileGenerationSnapshot),
             generationStartedAt
           )
         );
@@ -108,11 +110,68 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       withServerGenerationDuration(
-        buildOpenAIFallbackResponse(input, `OpenAI request failed: ${errorSummary}`, errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null),
+        withReaderProfileGenerationSnapshot(buildOpenAIFallbackResponse(input, `OpenAI request failed: ${errorSummary}`, errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null), input.readerProfileGenerationSnapshot),
         generationStartedAt
       )
     );
   }
+}
+
+function withReaderProfileGenerationSnapshot(
+  response: GenerateStoryResponse,
+  readerProfileGenerationSnapshot: GenerateStoryRequest["readerProfileGenerationSnapshot"]
+): GenerateStoryResponse {
+  if (!readerProfileGenerationSnapshot) return response;
+
+  return {
+    ...response,
+    metadata: {
+      ...response.metadata,
+      diagnostics: {
+        ...response.metadata.diagnostics,
+        readerProfileGenerationSnapshot
+      }
+    }
+  };
+}
+
+function normalizeReaderProfileGenerationSnapshot(
+  snapshot: Partial<GenerateStoryRequest>["readerProfileGenerationSnapshot"]
+): GenerateStoryRequest["readerProfileGenerationSnapshot"] {
+  if (!snapshot || typeof snapshot !== "object") return undefined;
+
+  const mode = snapshot.mode === "new-story" || snapshot.mode === "continue-story" ? snapshot.mode : "unknown";
+  const profileSourceUsed = ["local", "cloud", "default", "none"].includes(snapshot.profileSourceUsed ?? "")
+    ? snapshot.profileSourceUsed!
+    : "none";
+  const profileConfidence = ["low", "medium", "high", "unavailable"].includes(snapshot.profileConfidence ?? "")
+    ? snapshot.profileConfidence!
+    : "unavailable";
+
+  return {
+    mode,
+    profileUsed: Boolean(snapshot.profileUsed),
+    profileSourceUsed,
+    profileUpdatedAt: normalizeDiagnosticString(snapshot.profileUpdatedAt),
+    profileConfidence,
+    tasteProfilePresent: Boolean(snapshot.tasteProfilePresent),
+    tasteProfileSource: normalizeDiagnosticString(snapshot.tasteProfileSource),
+    tasteProfileUpdatedAt: normalizeDiagnosticString(snapshot.tasteProfileUpdatedAt),
+    feedbackSignalCount: Math.max(0, Number(snapshot.feedbackSignalCount) || 0),
+    feedbackIncluded: Boolean(snapshot.feedbackIncluded),
+    latestFeedbackRating: normalizeDiagnosticString(snapshot.latestFeedbackRating),
+    userHardAvoidanceCount: Math.max(0, Number(snapshot.userHardAvoidanceCount) || 0),
+    userHardAvoidancesSummary: normalizeDiagnosticString(snapshot.userHardAvoidancesSummary),
+    defaultSafetyGuardrailCount: Math.max(0, Number(snapshot.defaultSafetyGuardrailCount) || 0),
+    defaultSafetyGuardrailsSummary: normalizeDiagnosticString(snapshot.defaultSafetyGuardrailsSummary),
+    moodSignal: normalizeDiagnosticString(snapshot.moodSignal),
+    genreSignal: normalizeDiagnosticString(snapshot.genreSignal),
+    generatedAt: normalizeDiagnosticString(snapshot.generatedAt) || new Date().toISOString()
+  };
+}
+
+function normalizeDiagnosticString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function withServerGenerationDuration(
@@ -143,7 +202,8 @@ function withServerGenerationDuration(
         buildEnvironment: buildInfo.buildEnvironment,
         gitBranch: buildInfo.gitBranch,
         commitSha: buildInfo.commitSha,
-        buildTimestamp: buildInfo.buildTimestamp
+        buildTimestamp: buildInfo.buildTimestamp,
+        readerProfileGenerationSnapshot: response.metadata.diagnostics.readerProfileGenerationSnapshot
       }
     }
   };

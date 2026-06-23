@@ -36,6 +36,27 @@ export type CharacterArc = (typeof CHARACTER_ARCS)[number];
 export type EndingType = (typeof ENDING_TYPES)[number];
 export type LengthTarget = (typeof LENGTH_TARGETS)[number]["value"];
 
+export type ReaderProfileGenerationSnapshot = {
+  mode: "new-story" | "continue-story" | "unknown";
+  profileUsed: boolean;
+  profileSourceUsed: "local" | "cloud" | "default" | "none";
+  profileUpdatedAt: string;
+  profileConfidence: "low" | "medium" | "high" | "unavailable";
+  tasteProfilePresent: boolean;
+  tasteProfileSource: string;
+  tasteProfileUpdatedAt: string;
+  feedbackSignalCount: number;
+  feedbackIncluded: boolean;
+  latestFeedbackRating: string;
+  userHardAvoidanceCount: number;
+  userHardAvoidancesSummary: string;
+  defaultSafetyGuardrailCount: number;
+  defaultSafetyGuardrailsSummary: string;
+  moodSignal: string;
+  genreSignal: string;
+  generatedAt: string;
+};
+
 export type GenerateStoryRequest = {
   worldBible: string;
   characterProfiles: string;
@@ -49,6 +70,7 @@ export type GenerateStoryRequest = {
   readerMood?: ReaderMoodSnapshot | null;
   personalizationContext?: string;
   continuationStoryId?: string;
+  readerProfileGenerationSnapshot?: ReaderProfileGenerationSnapshot;
 };
 
 export type StoryMetadata = {
@@ -118,4 +140,5 @@ export type StoryDiagnostics = {
   partialBeatNormalizationUsed?: boolean;
   missingBeatRepairAttempted?: boolean;
   finalAcceptedBlueprintSceneCount?: number;
+  readerProfileGenerationSnapshot?: ReaderProfileGenerationSnapshot;
 };
