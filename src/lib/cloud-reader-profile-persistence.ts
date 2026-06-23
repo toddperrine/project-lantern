@@ -48,6 +48,13 @@ export class CloudReaderProfilePersistenceError extends Error {
   }
 }
 
+export class CloudReaderProfileStaleWriteError extends Error {
+  constructor(message = "Reader profile cloud save ignored because a newer cloud profile already exists.") {
+    super(message);
+    this.name = "CloudReaderProfileStaleWriteError";
+  }
+}
+
 export async function getCloudReaderProfile(profileId: string): Promise<ReaderProfile | null> {
   const config = getDynamoDbConfig();
   const response = await dynamoDbRequest<{ Item?: DynamoDbItem }>(config, "GetItem", {
@@ -76,7 +83,14 @@ export async function saveCloudReaderProfile(profileId: string, profile: ReaderP
 
   await dynamoDbRequest(config, "PutItem", {
     TableName: config.tableName,
-    Item: toDynamoDbItem(record)
+    Item: toDynamoDbItem(record),
+    ConditionExpression: "attribute_not_exists(#updatedAt) OR #updatedAt <= :nextUpdatedAt",
+    ExpressionAttributeNames: {
+      "#updatedAt": "updatedAt"
+    },
+    ExpressionAttributeValues: {
+      ":nextUpdatedAt": { S: record.updatedAt }
+    }
   });
 
   return normalizedProfile;
@@ -146,7 +160,14 @@ async function dynamoDbRequest<T = unknown>(config: DynamoDbConfig, action: stri
   const responseText = await response.text();
   const parsed = parseJsonResponse(responseText);
 
-  if (!response.ok) throw new CloudReaderProfilePersistenceError(getAwsErrorMessage(parsed) ?? `DynamoDB ${action} reader profile request failed.`);
+  if (!response.ok) {
+    const awsErrorCode = getAwsErrorCode(parsed);
+    if (awsErrorCode === "ConditionalCheckFailedException") {
+      throw new CloudReaderProfileStaleWriteError();
+    }
+
+    throw new CloudReaderProfilePersistenceError(getAwsErrorMessage(parsed) ?? `DynamoDB ${action} reader profile request failed.`);
+  }
   return parsed as T;
 }
 
@@ -188,6 +209,16 @@ function getAwsErrorMessage(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
   const message = (payload as Record<string, unknown>).message ?? (payload as Record<string, unknown>).Message;
   return typeof message === "string" && message.trim() ? message : null;
+}
+
+function getAwsErrorCode(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+
+  const record = payload as Record<string, unknown>;
+  const rawCode = record.__type ?? record.code ?? record.Code;
+  if (typeof rawCode !== "string" || !rawCode.trim()) return null;
+
+  return rawCode.split("#").pop()?.split(":").pop() ?? rawCode;
 }
 
 function toAmzDate(date: Date): string { return date.toISOString().replace(/[:-]|\.\d{3}/g, ""); }
