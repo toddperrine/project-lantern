@@ -23,6 +23,8 @@ import {
   recordReaderProfileEvent,
   saveReaderMoodSnapshot,
   saveStoryFeedbackSignal,
+  DEFAULT_READER_SAFETY_GUARDRAILS,
+  normalizeReaderTasteProfile,
   STORY_FEEDBACK_SCORE_BY_RATING
 } from "@/lib/reader-profile";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
@@ -221,10 +223,18 @@ export default function Home() {
     setDemoStory(browserSavedStories.length === 0 ? readDemoLatestStory() : null);
     const profileId = readOrCreateReaderProfileId();
     const localProfile = readReaderProfile();
-    setReaderProfile(localProfile);
-    setCloudReaderProfileSync((current) => ({ ...current, profileId, localUpdatedAt: localProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage(), status: "pending" }));
-    void reconcileReaderProfileWithCloud(profileId, localProfile);
-    setEerieReaderProfile(readEerieReaderProfile());
+    const localEerieProfile = readEerieReaderProfile();
+    const enrichedProfile = shouldMirrorEerieProfileToReaderTasteProfile(localProfile)
+      ? normalizeReaderProfile({
+          ...localProfile,
+          tasteProfile: readerTasteProfileFromEerieProfile(localEerieProfile),
+        })
+      : localProfile;
+    if (enrichedProfile !== localProfile) persistReaderProfile(enrichedProfile);
+    setReaderProfile(enrichedProfile);
+    setCloudReaderProfileSync((current) => ({ ...current, profileId, localUpdatedAt: enrichedProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage(), status: "pending" }));
+    void reconcileReaderProfileWithCloud(profileId, enrichedProfile);
+    setEerieReaderProfile(localEerieProfile);
     void handleRefreshCloudProjects();
   }, []);
 
@@ -1248,13 +1258,49 @@ function createEmptyLastNewStoryPersonalization(): LastNewStoryPersonalization {
     genreSignal: "none",
     hardAvoidancesIncluded: false,
     userHardAvoidancesSummary: "none",
-    defaultEerieSafetyGuardrailsSummary: DEFAULT_EERIE_SAFETY_GUARDRAILS.join(", "),
+    defaultEerieSafetyGuardrailsSummary: DEFAULT_READER_SAFETY_GUARDRAILS.join(", "),
     eerieSignalsIncluded: false,
     continuationStoryIdIncludedInLastNewStoryRequest: false,
     feedbackIncluded: false,
     latestStoryFeedbackSummary: "No prior story feedback available.",
     summary: "No new-story generation personalization has been applied yet."
   };
+}
+
+function readerTasteProfileFromEerieProfile(eerieProfile: EerieReaderProfile) {
+  const updatedAt = eerieProfile.updatedAt || new Date().toISOString();
+  const convertPreference = (preference: EerieReaderProfile["fearIntensity"]) => ({
+    value: preference.value,
+    confidence: preference.confidence,
+    source: "legacy-eerie-profile" as const,
+    updatedAt: preference.updatedAt || updatedAt,
+  });
+
+  return normalizeReaderTasteProfile({
+    profileConfidence: eerieProfile.profileConfidence,
+    fearIntensity: convertPreference(eerieProfile.fearIntensity),
+    weirdnessTolerance: convertPreference(eerieProfile.weirdnessTolerance),
+    supernaturalAffinity: convertPreference(eerieProfile.supernaturalAffinity),
+    ambiguityTolerance: convertPreference(eerieProfile.ambiguityTolerance),
+    goreTolerance: convertPreference(eerieProfile.goreTolerance),
+    sleepSafePreference: convertPreference(eerieProfile.sleepSafePreference),
+    preferredFormat: eerieProfile.preferredFormat,
+    preferredDurationMinutes: eerieProfile.preferredDurationMinutes,
+    defaultSafetyGuardrails: eerieProfile.hardAvoidances,
+    userHardAvoidances: [],
+    affinities: Object.fromEntries(
+      Object.entries(eerieProfile.affinities).map(([key, preference]) => [
+        key,
+        convertPreference(preference),
+      ])
+    ),
+    source: "legacy-eerie-profile",
+    updatedAt,
+  });
+}
+
+function shouldMirrorEerieProfileToReaderTasteProfile(profile: ReaderProfile): boolean {
+  return !profile.tasteProfile || profile.tasteProfile.source === "default";
 }
 
 function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre, mode, profile, source, trigger }: { continuationStoryId: string; eerieProfile: EerieReaderProfile; genre: GenrePreset; mode: Exclude<GenerationSource, null>; profile: ReaderProfile; source: ProfileSourceUsed; trigger: ReaderProfileEventSource; }): { diagnostics: LastNewStoryPersonalization; prompt: string } {
@@ -1275,8 +1321,16 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
   const topMood = getTopCount(profile.moodCounts);
   const topGenre = getTopCount(profile.genreCounts);
   const confidence = getReaderProfileConfidence(profile);
-  const userHardAvoidances = dedupe(splitAvoidances(profile.latestMood?.avoidances));
-  const defaultEerieSafetyGuardrails = dedupe(DEFAULT_EERIE_SAFETY_GUARDRAILS);
+  const tasteProfile = profile.tasteProfile ?? readerTasteProfileFromEerieProfile(eerieProfile);
+  const userHardAvoidances = dedupe([
+    ...splitAvoidances(profile.latestMood?.avoidances),
+    ...(tasteProfile.userHardAvoidances ?? []),
+  ]);
+  const defaultEerieSafetyGuardrails = dedupe(
+    tasteProfile.defaultSafetyGuardrails?.length
+      ? tasteProfile.defaultSafetyGuardrails
+      : DEFAULT_READER_SAFETY_GUARDRAILS
+  );
   const profileUsed = profile.profileExists;
   const feedbackSummary = summarizeStoryFeedback(profile.storyFeedbackSignals);
   const feedbackIncluded = feedbackSummary !== "No prior story feedback available.";
@@ -1285,10 +1339,10 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
   const weakly = confidence === "low" ? "Treat these as weak preferences, not hard rules." : "Treat these as preferences, not hard rules.";
   const prompt = profileUsed ? [
     "Controlled reader-profile personalization for this brand-new story only:",
-    `- Profile source: ${profileSource}. Profile confidence: ${confidence}. ${weakly}`,
+    `- Profile source: ${profileSource}. Profile confidence: ${confidence}. Taste profile source: ${tasteProfile.source}. ${weakly}`,
     `- Top mood signal: ${topMood ?? profile.latestMood?.mood ?? "none"}.`,
     `- Top genre signal: ${topGenre ?? "none"}. Current selected genre: ${genre}.`,
-    `- Preferred format: ${eerieProfile.preferredFormat}. Preferred duration: ${eerieProfile.preferredDurationMinutes} minutes.`,
+    `- Preferred format: ${tasteProfile.preferredFormat}. Preferred duration: ${tasteProfile.preferredDurationMinutes} minutes.`,
     `- Engagement totals: generated ${profile.counters.totalStoriesGenerated}, opened ${profile.counters.totalStoriesOpened}, continued ${profile.counters.totalContinues}.`,
     `- Mood selection counts: ${formatCounts(profile.moodCounts)}.`,
     `- Genre counts: ${formatCounts(profile.genreCounts)}.`,
@@ -1296,7 +1350,7 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
     userHardAvoidances.length ? `- User hard avoidances, as hard constraints: ${userHardAvoidances.join(", ")}.` : "- User hard avoidances: none recorded.",
     defaultEerieSafetyGuardrails.length ? `- Default/eerie safety guardrails, not user-entered avoidances: ${defaultEerieSafetyGuardrails.join(", ")}.` : "- Default/eerie safety guardrails: none recorded.",
     includeEerieSignals
-      ? `- Eerie taste/safety guidance: fear intensity ${formatWeightedPreference(eerieProfile.fearIntensity)}, weirdness tolerance ${formatWeightedPreference(eerieProfile.weirdnessTolerance)}, supernatural affinity ${formatWeightedPreference(eerieProfile.supernaturalAffinity)}, ambiguity tolerance ${formatWeightedPreference(eerieProfile.ambiguityTolerance)}, gore tolerance ${formatWeightedPreference(eerieProfile.goreTolerance)} as a safety constraint, sleep-safe preference ${formatWeightedPreference(eerieProfile.sleepSafePreference)}.`
+      ? `- Taste profile guidance: fear intensity ${formatWeightedPreference(tasteProfile.fearIntensity)}, weirdness tolerance ${formatWeightedPreference(tasteProfile.weirdnessTolerance)}, supernatural affinity ${formatWeightedPreference(tasteProfile.supernaturalAffinity)}, ambiguity tolerance ${formatWeightedPreference(tasteProfile.ambiguityTolerance)}, gore tolerance ${formatWeightedPreference(tasteProfile.goreTolerance)} as a safety constraint, sleep-safe preference ${formatWeightedPreference(tasteProfile.sleepSafePreference)}.`
       : "- Eerie profile signals are present but should be used only lightly because the selected genre is not primarily eerie/horror/dark-adjacent. Do not let horror preferences dominate.",
     "Do not mention personalization or the reader profile in the story."
   ].join("\n") : "";
@@ -1317,7 +1371,7 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
       continuationStoryIdIncludedInLastNewStoryRequest: Boolean(continuationStoryId),
       feedbackIncluded: profileUsed && feedbackIncluded,
       latestStoryFeedbackSummary: feedbackSummary,
-      summary: profileUsed ? `Used ${confidence}-confidence reader profile ${confidence === "low" ? "lightly" : "as preference guidance"}: favored ${topGenre ?? genre} and ${topMood ?? profile.latestMood?.mood ?? "available mood"} mood; ${userHardAvoidances.length ? "included user hard avoidances" : "no user hard avoidances found"}; ${feedbackIncluded ? "included recent story feedback as weak guidance" : "no story feedback found"}; ${includeEerieSignals ? "included eerie taste/safety guidance without forcing horror." : "did not force eerie preferences."}` : "No persisted reader profile was available; generated with the existing new-story inputs only."
+      summary: profileUsed ? `Used ${confidence}-confidence reader profile ${confidence === "low" ? "lightly" : "as preference guidance"}: favored ${topGenre ?? genre} and ${topMood ?? profile.latestMood?.mood ?? "available mood"} mood; ${userHardAvoidances.length ? "included user hard avoidances" : "no user hard avoidances found"}; ${feedbackIncluded ? "included recent story feedback as weak guidance" : "no story feedback found"}; ${includeEerieSignals ? "included taste profile guidance without forcing horror." : "did not force eerie preferences."}` : "No persisted reader profile was available; generated with the existing new-story inputs only."
     },
     prompt
   };
@@ -1366,6 +1420,7 @@ function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId,
 function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: CloudReaderProfileSyncState; onClear: () => void; profile: ReaderProfile }) {
   const topMood = getTopCount(profile.moodCounts);
   const topGenre = getTopCount(profile.genreCounts);
+  const tasteProfile = profile.tasteProfile;
 
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
@@ -1394,6 +1449,24 @@ function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: 
           <p><span className="font-semibold text-paper/80">Storage key:</span> {READER_PROFILE_STORAGE_KEY}</p>
           <p><span className="font-semibold text-paper/80">Profile ID key:</span> {READER_PROFILE_ID_STORAGE_KEY}</p>
           <p><span className="font-semibold text-paper/80">Updated:</span> {profile.updatedAt || "never"}</p>
+        </div>
+
+        <div className="rounded-md border border-lantern-gold/15 bg-night-ink/60 p-3">
+          <p className="mb-2 font-semibold text-paper/80">Taste Profile</p>
+          <div className="grid gap-1 sm:grid-cols-2">
+            <p><span className="font-semibold text-paper/80">Taste profile source:</span> {tasteProfile?.source ?? "not available"}</p>
+            <p><span className="font-semibold text-paper/80">Taste profile confidence:</span> {tasteProfile?.profileConfidence ?? "not available"}</p>
+            <p><span className="font-semibold text-paper/80">Preferred format:</span> {tasteProfile?.preferredFormat ?? "not available"}</p>
+            <p><span className="font-semibold text-paper/80">Preferred duration:</span> {tasteProfile?.preferredDurationMinutes ? `${tasteProfile.preferredDurationMinutes} minutes` : "not available"}</p>
+            <p><span className="font-semibold text-paper/80">Fear intensity:</span> {tasteProfile?.fearIntensity ? formatPreferencePair(tasteProfile.fearIntensity) : "not available"}</p>
+            <p><span className="font-semibold text-paper/80">Weirdness tolerance:</span> {tasteProfile?.weirdnessTolerance ? formatPreferencePair(tasteProfile.weirdnessTolerance) : "not available"}</p>
+            <p><span className="font-semibold text-paper/80">Supernatural affinity:</span> {tasteProfile?.supernaturalAffinity ? formatPreferencePair(tasteProfile.supernaturalAffinity) : "not available"}</p>
+            <p><span className="font-semibold text-paper/80">Ambiguity tolerance:</span> {tasteProfile?.ambiguityTolerance ? formatPreferencePair(tasteProfile.ambiguityTolerance) : "not available"}</p>
+            <p><span className="font-semibold text-paper/80">Gore tolerance:</span> {tasteProfile?.goreTolerance ? formatPreferencePair(tasteProfile.goreTolerance) : "not available"}</p>
+            <p><span className="font-semibold text-paper/80">Sleep-safe preference:</span> {tasteProfile?.sleepSafePreference ? formatPreferencePair(tasteProfile.sleepSafePreference) : "not available"}</p>
+            <p><span className="font-semibold text-paper/80">User hard avoidances:</span> {tasteProfile?.userHardAvoidances?.length ? tasteProfile.userHardAvoidances.join(", ") : tasteProfile ? "none" : "not available"}</p>
+            <p><span className="font-semibold text-paper/80">Default safety guardrails:</span> {tasteProfile?.defaultSafetyGuardrails?.length ? tasteProfile.defaultSafetyGuardrails.join(", ") : "not available"}</p>
+          </div>
         </div>
         <details className="rounded-md border border-paper/10 bg-night-ink p-3">
           <summary className="cursor-pointer font-semibold text-paper/75">Raw JSON</summary>
@@ -1522,9 +1595,10 @@ function EerieReaderProfileDiagnostics({ onClear, profile }: { onClear: () => vo
 
   return (
     <details className="min-w-0 rounded-md border border-lantern-gold/15 bg-paper/5 p-3 text-xs text-paper/65">
-      <summary className="cursor-pointer font-semibold text-paper/75">Eerie reader profile diagnostics</summary>
+      <summary className="cursor-pointer font-semibold text-paper/75">Legacy local eerie profile diagnostics</summary>
       <div className="mt-3 grid gap-3">
         <div className="grid gap-1 sm:grid-cols-2">
+          <p><span className="font-semibold text-paper/80">Persistence:</span> local-only legacy profile; mirrored into cloud-backed reader tasteProfile when needed</p>
           <p><span className="font-semibold text-paper/80">Profile exists in local storage:</span> {profileExists ? "yes" : "no"}</p>
           <p><span className="font-semibold text-paper/80">Storage key:</span> {EERIE_READER_PROFILE_STORAGE_KEY}</p>
           <p><span className="font-semibold text-paper/80">Onboarding mode:</span> {profile.onboardingMode}</p>
