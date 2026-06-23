@@ -144,6 +144,7 @@ export default function Home() {
   const [moodIntakeMode, setMoodIntakeMode] = useState<MoodIntakeMode>(null);
   const [generationApprovedMoodSnapshotId, setGenerationApprovedMoodSnapshotId] = useState<string | null>(null);
   const [generatedStoryPresentation, setGeneratedStoryPresentation] = useState<GeneratedStoryPresentation>(null);
+  const [lastGenerationTrigger, setLastGenerationTrigger] = useState("none");
   const [isStoryStartSelectionOpen, setIsStoryStartSelectionOpen] = useState(false);
   const activeGenerationRequestId = useRef(0);
 
@@ -197,15 +198,23 @@ export default function Home() {
     setIsDirectionOpen(false);
   }
 
-  function navigateToView(view: AppView, options?: { preserveGeneration?: boolean }) {
+  function navigateHome(options?: { preserveGeneration?: boolean }) {
     if (!options?.preserveGeneration) {
       cancelActiveGeneration();
-      if (view === "home") exitStoryReaderForHome();
+      exitStoryReaderForHome();
+    }
+    setActiveView("home");
+    if (typeof window !== "undefined") window.history.pushState(null, "", window.location.pathname);
+  }
+
+  function navigateToView(view: AppView, options?: { preserveGeneration?: boolean }) {
+    if (view === "home") {
+      navigateHome(options);
+      return;
     }
     setActiveView(view);
     if (typeof window === "undefined") return;
-    const nextUrl = view === "home" ? window.location.pathname : `${window.location.pathname}?view=${view}`;
-    window.history.pushState(null, "", nextUrl);
+    window.history.pushState(null, "", `${window.location.pathname}?view=${view}`);
   }
 
   async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null; presentation: Exclude<GeneratedStoryPresentation, null>; loadingMessage: string; signalSource: ReaderProfileEventSource }>) {
@@ -213,6 +222,7 @@ export default function Home() {
     activeGenerationRequestId.current = requestId;
     setError("");
     setStatusMessage(overrides?.loadingMessage ?? "");
+    setLastGenerationTrigger(overrides?.signalSource ?? "create");
     setIsGenerating(true);
     try {
       const response = await fetch("/api/generate", {
@@ -248,7 +258,7 @@ export default function Home() {
       setIsStoryStartSelectionOpen(false);
       clearDemoLatestStory();
       setDemoStory(null);
-      navigateToView("home", { preserveGeneration: true });
+      navigateHome({ preserveGeneration: true });
       setGenerationApprovedMoodSnapshotId(null);
       setStatusMessage("Story ready.");
     } catch (caughtError) {
@@ -399,7 +409,7 @@ export default function Home() {
 
     if (modeToComplete === "story-start") {
       setIsStoryStartSelectionOpen(true);
-      navigateToView("home");
+      navigateHome({ preserveGeneration: true });
       setStatusMessage("Reader pulse saved. Choose a story based on your reader pulse.");
       return;
     }
@@ -531,7 +541,7 @@ export default function Home() {
     recordReaderSignal({ eventType: "demoStoryLoaded", source: "demo", storyId: nextDemoStory.id, title: nextDemoStory.title, genre: nextDemoStory.genrePreset, wordCount: nextDemoStory.wordCount });
     recordReaderSignal({ eventType: "storyOpened", source: "demo", storyId: nextDemoStory.id, title: nextDemoStory.title, genre: nextDemoStory.genrePreset, wordCount: nextDemoStory.wordCount });
     setDemoStory(nextDemoStory);
-    navigateToView("home");
+    navigateHome({ preserveGeneration: true });
     setStatusMessage("Demo story loaded for review. Your saved history was not changed.");
   }
 
@@ -582,7 +592,7 @@ export default function Home() {
     clearDemoLatestStory();
     setDemoStory(null);
     recordReaderSignal({ eventType: "storyOpened", storyId: story.id, title: story.title, genre: story.genrePreset, wordCount: story.wordCount });
-    navigateToView("home");
+    navigateHome({ preserveGeneration: true });
     setStatusMessage(`Restored ${story.title}.`);
   }
 
@@ -595,7 +605,7 @@ export default function Home() {
 
   function handleOpenCurrentStory() {
     if (currentGeneratedStory) recordReaderSignal({ eventType: "storyOpened", storyId: currentGeneratedStory.id, title: currentGeneratedStory.title, genre: currentGeneratedStory.genrePreset, wordCount: currentGeneratedStory.wordCount });
-    navigateToView("home");
+    navigateHome({ preserveGeneration: true });
   }
 
   function handleExportLatestStory() {
@@ -797,7 +807,7 @@ export default function Home() {
             if (typeof window !== "undefined") {
               window.dispatchEvent(new CustomEvent("lantern:reset-mobile-home-gate"));
             }
-            navigateToView("home");
+            navigateHome();
           }}
         />
         <header className="hidden min-w-0 flex-col gap-5 border-b border-paper/10 pb-6 md:flex md:flex-row md:items-end md:justify-between">
@@ -812,6 +822,7 @@ export default function Home() {
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
+        <AppStateDiagnostics activeView={activeView} currentStoryId={currentStoryId} isGenerating={isGenerating} lastGenerationTrigger={lastGenerationTrigger} />
         <ReaderProfileDiagnostics cloudSync={cloudReaderProfileSync} profile={readerProfile} onClear={handleClearReaderProfile} />
         <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
@@ -987,6 +998,20 @@ function IntakeTextArea({ label, onChange, placeholder, required = false, value 
 
 function SegmentedChoice({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: { label: string; value: string }[]; value: string }) {
   return <div className="grid gap-2"><p className="text-sm font-semibold text-paper">{label}</p><div className="grid grid-cols-3 gap-2">{options.map((option) => <button className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${value === option.value ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper"}`} key={option.value} onClick={() => onChange(option.value)} type="button">{option.label}</button>)}</div></div>;
+}
+
+function AppStateDiagnostics({ activeView, currentStoryId, isGenerating, lastGenerationTrigger }: { activeView: AppView; currentStoryId: string; isGenerating: boolean; lastGenerationTrigger: string }) {
+  return (
+    <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
+      <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
+      <div className="mt-3 grid gap-1 sm:grid-cols-2">
+        <p><span className="font-semibold text-paper/80">Active view:</span> {activeView}</p>
+        <p><span className="font-semibold text-paper/80">Generation in progress:</span> {isGenerating ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">Last generation trigger/source:</span> {lastGenerationTrigger}</p>
+        <p><span className="font-semibold text-paper/80">Current story ID:</span> {currentStoryId || "none"}</p>
+      </div>
+    </details>
+  );
 }
 
 function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: CloudReaderProfileSyncState; onClear: () => void; profile: ReaderProfile }) {
