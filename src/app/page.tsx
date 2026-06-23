@@ -31,7 +31,7 @@ import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
 import type { EerieReaderProfile } from "@/lib/eerie-reader-profile";
 import type { ReaderEnergyLevel, ReaderIntensityLevel, ReaderMoodDraft, ReaderMoodSnapshot, ReaderProfile, ReaderProfileEventInput, ReaderProfileEventSource, StoryFeedbackGenerationMode, StoryFeedbackRating, StoryFeedbackReason, StoryFeedbackSignal } from "@/lib/reader-profile";
-import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture } from "@/lib/types";
+import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture, ReaderProfileGenerationSnapshot } from "@/lib/types";
 import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
 import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
 
@@ -62,6 +62,7 @@ type LastNewStoryPersonalization = {
   feedbackIncluded: boolean;
   latestStoryFeedbackSummary: string;
   summary: string;
+  responseSnapshot?: ReaderProfileGenerationSnapshot;
 };
 type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" | "not found";
 type CloudReaderProfileSyncState = {
@@ -337,6 +338,7 @@ export default function Home() {
           lengthTarget: overrides?.lengthTarget ?? lengthTarget,
           readerMood: overrides?.readerMood ?? readerProfile.latestMood ?? null,
           ...(personalization.prompt ? { personalizationContext: personalization.prompt } : {}),
+          readerProfileGenerationSnapshot: personalization.snapshot,
           ...(continuationStoryId ? { continuationStoryId } : {})
         })
       });
@@ -344,6 +346,10 @@ export default function Home() {
       if (activeGenerationRequestId.current !== requestId) return;
       if (!response.ok) throw new Error(payload.error ?? "Story generation failed.");
       const normalizedResponse = normalizeGenerateStoryResponse(payload);
+      setLastNewStoryPersonalization((current) => ({
+        ...current,
+        responseSnapshot: normalizedResponse.metadata.diagnostics.readerProfileSnapshot ?? normalizedResponse.metadata.diagnostics.readerProfileGenerationSnapshot
+      }));
       const generatedStoryId = createStoryId(normalizedResponse.story);
       const savedStory = createSavedStory(normalizedResponse, generatedStoryId);
       const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
@@ -1018,7 +1024,7 @@ export default function Home() {
             pendingStoryTitle={pendingStoryStart?.title ?? null}
           />
         ) : null}
-        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
+        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} generationProfileSnapshot={storyResponse?.metadata.diagnostics.readerProfileSnapshot ?? storyResponse?.metadata.diagnostics.readerProfileGenerationSnapshot} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
         {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
@@ -1030,7 +1036,7 @@ export default function Home() {
   );
 }
 
-function EpisodeReader({ eyebrow, feedback, generationBlockedBecauseUnsavedFeedback, isGenerating, onContinue, onExport, onFeedbackChange, onFeedbackDraftStateChange, onStartDifferent, source, story }: { eyebrow: string; feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; isGenerating: boolean; onContinue: () => void; onExport: () => void; onFeedbackChange: (story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void; onFeedbackDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
+function EpisodeReader({ eyebrow, feedback, generationBlockedBecauseUnsavedFeedback, generationProfileSnapshot, isGenerating, onContinue, onExport, onFeedbackChange, onFeedbackDraftStateChange, onStartDifferent, source, story }: { eyebrow: string; feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; generationProfileSnapshot?: ReaderProfileGenerationSnapshot; isGenerating: boolean; onContinue: () => void; onExport: () => void; onFeedbackChange: (story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void; onFeedbackDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
   return (
     <article className="grid min-w-0 gap-5 rounded-md border border-lantern-gold/25 bg-paper/10 p-4 shadow-soft sm:p-6">
       <div className="min-w-0">
@@ -1039,6 +1045,7 @@ function EpisodeReader({ eyebrow, feedback, generationBlockedBecauseUnsavedFeedb
         <p className="mt-3 text-sm leading-6 text-paper/60">{story.wordCount.toLocaleString()} words | {story.genrePreset} | {source}</p>
       </div>
       <div className="min-w-0 whitespace-pre-wrap rounded-md border border-paper/10 bg-night-ink/70 p-4 text-base leading-8 text-paper/85 sm:p-5">{story.story}</div>
+      {generationProfileSnapshot ? <GenerationProfileSnapshotPanel snapshot={generationProfileSnapshot} /> : null}
       {story.id ? <StoryFeedbackPanel feedback={feedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} onDraftStateChange={onFeedbackDraftStateChange} onSave={(rating, reasons) => onFeedbackChange(story, rating, reasons)} /> : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <button className="inline-flex items-center gap-2 rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={onContinue} type="button">{isGenerating ? <><span className="size-4 animate-spin rounded-full border-2 border-night-ink/30 border-t-night-ink" aria-hidden="true" />Writing the next chapter…</> : "Continue this story"}</button>
@@ -1046,6 +1053,40 @@ function EpisodeReader({ eyebrow, feedback, generationBlockedBecauseUnsavedFeedb
         <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-lantern-gold/50" onClick={onStartDifferent} type="button">Start something different</button>
       </div>
     </article>
+  );
+}
+
+function GenerationProfileSnapshotPanel({ snapshot }: { snapshot: ReaderProfileGenerationSnapshot }) {
+  const rows = [
+    ["Mode", snapshot.mode],
+    ["Profile used", snapshot.profileUsed ? "yes" : "no"],
+    ["Profile source", snapshot.profileSourceUsed],
+    ["Profile updatedAt", snapshot.profileUpdatedAt || "none"],
+    ["Taste profile present", snapshot.tasteProfilePresent ? "yes" : "no"],
+    ["Taste profile source", snapshot.tasteProfileSource || "none"],
+    ["Taste profile updatedAt", snapshot.tasteProfileUpdatedAt || "none"],
+    ["Feedback signal count", String(snapshot.feedbackSignalCount)],
+    ["Feedback included", snapshot.feedbackIncluded ? "yes" : "no"],
+    ["Latest feedback rating", snapshot.latestFeedbackRating || "none"],
+    ["User hard avoidances", snapshot.userHardAvoidancesSummary || "none"],
+    ["Default safety guardrails", snapshot.defaultSafetyGuardrailsSummary || "none"],
+    ["Mood signal", snapshot.moodSignal || "none"],
+    ["Genre signal", snapshot.genreSignal || "none"],
+    ["Snapshot created", snapshot.generatedAt || "none"],
+  ];
+
+  return (
+    <details className="rounded-md border border-paper/10 bg-night-ink/50 p-4 text-sm text-paper/70">
+      <summary className="cursor-pointer font-semibold text-paper">Generation profile snapshot</summary>
+      <dl className="mt-3 grid gap-x-4 gap-y-2 sm:grid-cols-2">
+        {rows.map(([label, value]) => (
+          <div className="min-w-0" key={label}>
+            <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{label}</dt>
+            <dd className="mt-1 break-words text-paper/80">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }
 
@@ -1316,8 +1357,21 @@ function shouldMirrorEerieProfileToReaderTasteProfile(profile: ReaderProfile): b
   return !profile.tasteProfile || profile.tasteProfile.source === "default";
 }
 
-function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre, mode, profile, source, trigger }: { continuationStoryId: string; eerieProfile: EerieReaderProfile; genre: GenrePreset; mode: Exclude<GenerationSource, null>; profile: ReaderProfile; source: ProfileSourceUsed; trigger: ReaderProfileEventSource; }): { diagnostics: LastNewStoryPersonalization; prompt: string } {
+function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre, mode, profile, source, trigger }: { continuationStoryId: string; eerieProfile: EerieReaderProfile; genre: GenrePreset; mode: Exclude<GenerationSource, null>; profile: ReaderProfile; source: ProfileSourceUsed; trigger: ReaderProfileEventSource; }): { diagnostics: LastNewStoryPersonalization; prompt: string; snapshot: ReaderProfileGenerationSnapshot } {
   if (mode === "continue-story") {
+    const snapshot = createReaderProfileGenerationSnapshot({
+      defaultSafetyGuardrails: DEFAULT_READER_SAFETY_GUARDRAILS,
+      feedbackIncluded: false,
+      genreSignal: genre,
+      mode,
+      moodSignal: profile.latestMood?.mood ?? "none",
+      profile,
+      profileSource: "none",
+      profileUsed: false,
+      tasteProfile: profile.tasteProfile ?? null,
+      userHardAvoidances: []
+    });
+
     return {
       diagnostics: {
         ...createEmptyLastNewStoryPersonalization(),
@@ -1327,7 +1381,8 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
         continuationStoryIdIncludedInLastNewStoryRequest: false,
         summary: "Continuation generation did not use new-story reader profile personalization."
       },
-      prompt: ""
+      prompt: "",
+      snapshot
     };
   }
 
@@ -1368,6 +1423,19 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
     "Do not mention personalization or the reader profile in the story."
   ].join("\n") : "";
 
+  const snapshot = createReaderProfileGenerationSnapshot({
+    defaultSafetyGuardrails: defaultEerieSafetyGuardrails,
+    feedbackIncluded: profileUsed && feedbackIncluded,
+    genreSignal: topGenre ?? genre,
+    mode,
+    moodSignal: topMood ?? profile.latestMood?.mood ?? "none",
+    profile,
+    profileSource: profileUsed ? profileSource : "none",
+    profileUsed,
+    tasteProfile,
+    userHardAvoidances
+  });
+
   return {
     diagnostics: {
       profileUsed,
@@ -1386,7 +1454,34 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
       latestStoryFeedbackSummary: feedbackSummary,
       summary: profileUsed ? `Used ${confidence}-confidence reader profile ${confidence === "low" ? "lightly" : "as preference guidance"}: favored ${topGenre ?? genre} and ${topMood ?? profile.latestMood?.mood ?? "available mood"} mood; ${userHardAvoidances.length ? "included user hard avoidances" : "no user hard avoidances found"}; ${feedbackIncluded ? "included recent story feedback as weak guidance" : "no story feedback found"}; ${includeEerieSignals ? "included taste profile guidance without forcing horror." : "did not force eerie preferences."}` : "No persisted reader profile was available; generated with the existing new-story inputs only."
     },
-    prompt
+    prompt,
+    snapshot
+  };
+}
+
+function createReaderProfileGenerationSnapshot({ defaultSafetyGuardrails, feedbackIncluded, genreSignal, mode, moodSignal, profile, profileSource, profileUsed, tasteProfile, userHardAvoidances }: { defaultSafetyGuardrails: string[]; feedbackIncluded: boolean; genreSignal: string; mode: Exclude<GenerationSource, null>; moodSignal: string; profile: ReaderProfile; profileSource: ProfileSourceUsed; profileUsed: boolean; tasteProfile: ReaderProfile["tasteProfile"] | null; userHardAvoidances: string[]; }): ReaderProfileGenerationSnapshot {
+  const feedbackSignals = profile.storyFeedbackSignals ?? [];
+  const latestFeedback = [...feedbackSignals].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+
+  return {
+    mode,
+    profileUsed,
+    profileSourceUsed: profileSource,
+    profileUpdatedAt: profileUsed ? profile.updatedAt : "none",
+    profileConfidence: profileUsed ? getReaderProfileConfidence(profile) : "unavailable",
+    tasteProfilePresent: Boolean(tasteProfile),
+    tasteProfileSource: tasteProfile?.source ?? "none",
+    tasteProfileUpdatedAt: tasteProfile?.updatedAt ?? "none",
+    feedbackSignalCount: feedbackSignals.length,
+    feedbackIncluded,
+    latestFeedbackRating: latestFeedback?.rating ?? "none",
+    userHardAvoidanceCount: userHardAvoidances.length,
+    userHardAvoidancesSummary: userHardAvoidances.length ? userHardAvoidances.join(", ") : "none",
+    defaultSafetyGuardrailCount: defaultSafetyGuardrails.length,
+    defaultSafetyGuardrailsSummary: defaultSafetyGuardrails.length ? defaultSafetyGuardrails.join(", ") : "none",
+    moodSignal,
+    genreSignal,
+    generatedAt: new Date().toISOString()
   };
 }
 
@@ -1425,6 +1520,7 @@ function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId,
         <p><span className="font-semibold text-paper/80">Continuation story id included in last new-story request:</span> {lastNewStoryPersonalization.continuationStoryIdIncludedInLastNewStoryRequest ? "yes" : "no"}</p>
         <p className="sm:col-span-2"><span className="font-semibold text-paper/80">Latest story feedback summary:</span> {lastNewStoryPersonalization.latestStoryFeedbackSummary}</p>
         <p className="sm:col-span-2"><span className="font-semibold text-paper/80">Personalization summary:</span> {lastNewStoryPersonalization.summary}</p>
+        <pre className="max-h-72 overflow-auto rounded border border-paper/10 bg-night-ink/80 p-3 text-[0.68rem] leading-5 text-paper/70 sm:col-span-2">{JSON.stringify(lastNewStoryPersonalization.responseSnapshot ?? null, null, 2)}</pre>
       </div>
     </details>
   );
