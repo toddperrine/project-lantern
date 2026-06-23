@@ -3,6 +3,7 @@ export const READER_PROFILE_ID_STORAGE_KEY = "projectLantern.readerProfileId.v1"
 export const READER_PROFILE_SCHEMA_VERSION = 1;
 export const MAX_READER_MOOD_HISTORY = 10;
 export const MAX_READER_PROFILE_EVENTS = 50;
+export const MAX_STORY_FEEDBACK_SIGNALS = 50;
 
 export type ReaderEnergyLevel = "low" | "medium" | "high";
 export type ReaderIntensityLevel = "gentle" | "moderate" | "intense";
@@ -19,6 +20,36 @@ export type ReaderProfileEventSource =
   | "demo"
   | "continueSeries"
   | "create";
+export type StoryFeedbackRating =
+  | "missed"
+  | "not_quite"
+  | "good"
+  | "great"
+  | "favorite";
+export type StoryFeedbackScore = 1 | 2 | 3 | 4 | 5;
+export type StoryFeedbackReason =
+  | "wrong_tone"
+  | "too_generic"
+  | "too_slow"
+  | "confusing"
+  | "not_personal_enough"
+  | "too_dark"
+  | "not_dark_enough"
+  | "loved_tone"
+  | "loved_character"
+  | "wanted_more"
+  | "felt_personal"
+  | "surprising"
+  | "comforting";
+export type StoryFeedbackGenerationMode = "new-story" | "continue-story" | "unknown";
+
+export const STORY_FEEDBACK_SCORE_BY_RATING: Record<StoryFeedbackRating, StoryFeedbackScore> = {
+  missed: 1,
+  not_quite: 2,
+  good: 3,
+  great: 4,
+  favorite: 5,
+};
 
 export interface ReaderMoodSnapshot {
   id: string;
@@ -39,6 +70,17 @@ export interface ReaderProfileCounters {
   totalStartSomethingDifferent: number;
   totalDemoStoriesLoaded: number;
   totalMoodSelections: number;
+}
+
+export interface StoryFeedbackSignal {
+  storyId: string;
+  storyTitle?: string;
+  rating: StoryFeedbackRating;
+  score: StoryFeedbackScore;
+  reasons: StoryFeedbackReason[];
+  generationMode: StoryFeedbackGenerationMode;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ReaderProfileEvent {
@@ -64,6 +106,7 @@ export interface ReaderProfile {
   recentEvents: ReaderProfileEvent[];
   latestMood?: ReaderMoodSnapshot;
   moodHistory: ReaderMoodSnapshot[];
+  storyFeedbackSignals?: StoryFeedbackSignal[];
 }
 
 export type ReaderMoodDraft = {
@@ -91,6 +134,7 @@ export function createEmptyReaderProfile(updatedAt = ""): ReaderProfile {
     sourceCounts: {},
     recentEvents: [],
     moodHistory: [],
+    storyFeedbackSignals: [],
   };
 }
 
@@ -203,6 +247,46 @@ export function recordReaderProfileEvent(event: ReaderProfileEventInput): Reader
   return nextProfile;
 }
 
+export function saveStoryFeedbackSignal(nextSignal: StoryFeedbackSignal): ReaderProfile {
+  const now = nextSignal.updatedAt || new Date().toISOString();
+  const currentProfile = readReaderProfile();
+  const existingSignal = currentProfile.storyFeedbackSignals?.find(
+    (signal) => signal.storyId === nextSignal.storyId,
+  );
+  const normalizedSignal = normalizeStoryFeedbackSignal({
+    ...nextSignal,
+    createdAt: existingSignal?.createdAt || nextSignal.createdAt || now,
+    updatedAt: now,
+  });
+  if (!normalizedSignal) return currentProfile;
+
+  const nextProfile: ReaderProfile = {
+    ...currentProfile,
+    profileExists: true,
+    createdAt: currentProfile.createdAt || normalizedSignal.createdAt,
+    updatedAt: normalizedSignal.updatedAt,
+    storyFeedbackSignals: upsertStoryFeedbackSignal(
+      currentProfile.storyFeedbackSignals,
+      normalizedSignal,
+    ),
+  };
+
+  persistReaderProfile(nextProfile);
+  return nextProfile;
+}
+
+export function upsertStoryFeedbackSignal(
+  existingSignals: StoryFeedbackSignal[] | undefined,
+  nextSignal: StoryFeedbackSignal
+): StoryFeedbackSignal[] {
+  const existing = Array.isArray(existingSignals) ? existingSignals : [];
+  const withoutCurrentStory = existing.filter(
+    (signal) => signal.storyId !== nextSignal.storyId
+  );
+
+  return [...withoutCurrentStory, nextSignal].slice(-50);
+}
+
 export function normalizeReaderProfile(value: unknown): ReaderProfile {
   const candidate = value as Partial<ReaderProfile>;
 
@@ -228,6 +312,12 @@ export function normalizeReaderProfile(value: unknown): ReaderProfile {
         .filter(isReaderProfileEvent)
         .slice(0, MAX_READER_PROFILE_EVENTS)
     : [];
+  const storyFeedbackSignals = Array.isArray(candidate.storyFeedbackSignals)
+    ? candidate.storyFeedbackSignals
+        .map(normalizeStoryFeedbackSignal)
+        .filter((signal): signal is StoryFeedbackSignal => Boolean(signal))
+        .slice(-MAX_STORY_FEEDBACK_SIGNALS)
+    : [];
   const counters = normalizeReaderProfileCounters(candidate.counters);
   const updatedAt =
     typeof candidate.updatedAt === "string"
@@ -242,7 +332,8 @@ export function normalizeReaderProfile(value: unknown): ReaderProfile {
       latestMood ||
       moodHistory.length ||
       recentEvents.length ||
-      Object.values(counters).some((count) => count > 0),
+      Object.values(counters).some((count) => count > 0) ||
+      storyFeedbackSignals.length > 0,
   );
 
   return {
@@ -257,6 +348,7 @@ export function normalizeReaderProfile(value: unknown): ReaderProfile {
     recentEvents,
     ...(latestMood ? { latestMood } : {}),
     moodHistory,
+    storyFeedbackSignals,
   };
 }
 
@@ -356,6 +448,39 @@ function incrementReaderProfileCounters(counters: ReaderProfileCounters, eventTy
   return nextCounters;
 }
 
+function normalizeStoryFeedbackSignal(value: unknown): StoryFeedbackSignal | null {
+  const candidate = value as Partial<StoryFeedbackSignal>;
+  if (!candidate || typeof candidate !== "object" || !candidate.storyId || !isStoryFeedbackRating(candidate.rating)) return null;
+
+  const score = STORY_FEEDBACK_SCORE_BY_RATING[candidate.rating];
+  const reasons = Array.isArray(candidate.reasons)
+    ? candidate.reasons.filter(isStoryFeedbackReason)
+    : [];
+
+  return {
+    storyId: normalizeFreeText(candidate.storyId),
+    ...(candidate.storyTitle ? { storyTitle: normalizeFreeText(candidate.storyTitle) } : {}),
+    rating: candidate.rating,
+    score,
+    reasons: dedupe(reasons) as StoryFeedbackReason[],
+    generationMode: isStoryFeedbackGenerationMode(candidate.generationMode) ? candidate.generationMode : "unknown",
+    createdAt: typeof candidate.createdAt === "string" ? candidate.createdAt : "",
+    updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : "",
+  };
+}
+
+function isStoryFeedbackRating(value: unknown): value is StoryFeedbackRating {
+  return value === "missed" || value === "not_quite" || value === "good" || value === "great" || value === "favorite";
+}
+
+function isStoryFeedbackReason(value: unknown): value is StoryFeedbackReason {
+  return value === "wrong_tone" || value === "too_generic" || value === "too_slow" || value === "confusing" || value === "not_personal_enough" || value === "too_dark" || value === "not_dark_enough" || value === "loved_tone" || value === "loved_character" || value === "wanted_more" || value === "felt_personal" || value === "surprising" || value === "comforting";
+}
+
+function isStoryFeedbackGenerationMode(value: unknown): value is StoryFeedbackGenerationMode {
+  return value === "new-story" || value === "continue-story" || value === "unknown";
+}
+
 function normalizeReaderProfileEvent(event: ReaderProfileEvent): ReaderProfileEvent {
   return {
     eventType: event.eventType,
@@ -400,6 +525,10 @@ function normalizeCountRecord(value: unknown): Record<string, number> {
 
 function normalizeCount(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+function dedupe<T extends string>(values: T[]): T[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))) as T[];
 }
 
 function createReaderMoodSnapshotId(createdAt: string): string {

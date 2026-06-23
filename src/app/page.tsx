@@ -20,12 +20,14 @@ import {
   readReaderProfile,
   readerProfileExistsInLocalStorage,
   recordReaderProfileEvent,
-  saveReaderMoodSnapshot
+  saveReaderMoodSnapshot,
+  saveStoryFeedbackSignal,
+  STORY_FEEDBACK_SCORE_BY_RATING
 } from "@/lib/reader-profile";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
 import type { EerieReaderProfile } from "@/lib/eerie-reader-profile";
-import type { ReaderEnergyLevel, ReaderIntensityLevel, ReaderMoodDraft, ReaderMoodSnapshot, ReaderProfile, ReaderProfileEventInput, ReaderProfileEventSource } from "@/lib/reader-profile";
+import type { ReaderEnergyLevel, ReaderIntensityLevel, ReaderMoodDraft, ReaderMoodSnapshot, ReaderProfile, ReaderProfileEventInput, ReaderProfileEventSource, StoryFeedbackGenerationMode, StoryFeedbackRating, StoryFeedbackReason, StoryFeedbackSignal } from "@/lib/reader-profile";
 import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture } from "@/lib/types";
 import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
 import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
@@ -52,6 +54,8 @@ type LastNewStoryPersonalization = {
   hardAvoidancesIncluded: boolean;
   eerieSignalsIncluded: boolean;
   continuationStoryIdIncludedInLastNewStoryRequest: boolean;
+  feedbackIncluded: boolean;
+  latestStoryFeedbackSummary: string;
   summary: string;
 };
 type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" | "not found";
@@ -88,6 +92,30 @@ const NAV_ITEMS: { label: string; view: AppView }[] = [
   { label: "Create", view: "create" },
   { label: "Characters", view: "characters" }
 ];
+
+const STORY_FEEDBACK_RATING_OPTIONS: { rating: StoryFeedbackRating; label: string }[] = [
+  { rating: "missed", label: "Missed" },
+  { rating: "not_quite", label: "Not quite" },
+  { rating: "good", label: "Good" },
+  { rating: "great", label: "Great" },
+  { rating: "favorite", label: "Favorite" },
+];
+const STORY_FEEDBACK_REASON_OPTIONS: { reason: StoryFeedbackReason; label: string }[] = [
+  { reason: "wrong_tone", label: "Wrong tone" },
+  { reason: "too_generic", label: "Too generic" },
+  { reason: "too_slow", label: "Too slow" },
+  { reason: "confusing", label: "Confusing" },
+  { reason: "not_personal_enough", label: "Not personal enough" },
+  { reason: "too_dark", label: "Too dark" },
+  { reason: "not_dark_enough", label: "Not dark enough" },
+  { reason: "loved_tone", label: "Loved the tone" },
+  { reason: "loved_character", label: "Loved a character" },
+  { reason: "wanted_more", label: "Wanted more" },
+  { reason: "felt_personal", label: "Felt personal" },
+  { reason: "surprising", label: "Surprising" },
+  { reason: "comforting", label: "Comforting" },
+];
+
 const DEMO_STORY_TEXT = [
   "A forgotten talisman from an estate sale begins to hum with a magic that should have died years ago.",
   "Mara Vale found the first talisman inside a box of ordinary estate-sale objects.",
@@ -821,6 +849,26 @@ export default function Home() {
     else setStoryRules(value);
   }
 
+  function handleStoryFeedbackChange(story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) {
+    if (!story.id) return;
+    const now = new Date().toISOString();
+    const existingSignal = readerProfile.storyFeedbackSignals?.find((signal) => signal.storyId === story.id);
+    const signal: StoryFeedbackSignal = {
+      storyId: story.id,
+      storyTitle: story.title,
+      rating,
+      score: STORY_FEEDBACK_SCORE_BY_RATING[rating],
+      reasons,
+      generationMode: readStoryFeedbackGenerationMode(generatedStoryPresentation),
+      createdAt: existingSignal?.createdAt || now,
+      updatedAt: now,
+    };
+    const nextProfile = saveStoryFeedbackSignal(signal);
+    setReaderProfile(nextProfile);
+    void syncReaderProfileToCloud(nextProfile);
+    setStatusMessage("Story feedback saved to your reader profile.");
+  }
+
   function recordReaderSignal(event: ReaderProfileEventInput) {
     const nextProfile = recordReaderProfileEvent(event);
     setReaderProfile(nextProfile);
@@ -849,6 +897,7 @@ export default function Home() {
     setStatusMessage("Current inputs cleared. Saved library items were not changed.");
   }
 
+  const currentStoryFeedback = currentStoryId ? readerProfile.storyFeedbackSignals?.find((signal) => signal.storyId === currentStoryId) ?? null : null;
   const isNewStoryGenerating = isGenerating && generationSource === "new-story";
   const isContinuationGenerating = isGenerating && generationSource === "continue-story";
 
@@ -875,7 +924,7 @@ export default function Home() {
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        <AppStateDiagnostics activeView={activeView} currentStoryId={currentStoryId} generationSource={generationSource} isGenerating={isGenerating} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} />
+        <AppStateDiagnostics activeView={activeView} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} generationSource={generationSource} isGenerating={isGenerating} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} profile={readerProfile} />
         <ReaderProfileDiagnostics cloudSync={cloudReaderProfileSync} profile={readerProfile} onClear={handleClearReaderProfile} />
         <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
@@ -886,7 +935,7 @@ export default function Home() {
             pendingStoryTitle={pendingStoryStart?.title ?? null}
           />
         ) : null}
-        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader isGenerating={isContinuationGenerating} onContinue={() => handleContinueLatest()} onExport={handleExportLatestStory} onStartDifferent={handleStartSomethingDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
+        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} isGenerating={isContinuationGenerating} onContinue={() => handleContinueLatest()} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onStartDifferent={handleStartSomethingDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
         {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
@@ -898,7 +947,7 @@ export default function Home() {
   );
 }
 
-function EpisodeReader({ eyebrow, isGenerating, onContinue, onExport, onStartDifferent, source, story }: { eyebrow: string; isGenerating: boolean; onContinue: () => void; onExport: () => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
+function EpisodeReader({ eyebrow, feedback, isGenerating, onContinue, onExport, onFeedbackChange, onStartDifferent, source, story }: { eyebrow: string; feedback: StoryFeedbackSignal | null; isGenerating: boolean; onContinue: () => void; onExport: () => void; onFeedbackChange: (story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
   return (
     <article className="grid min-w-0 gap-5 rounded-md border border-lantern-gold/25 bg-paper/10 p-4 shadow-soft sm:p-6">
       <div className="min-w-0">
@@ -907,12 +956,69 @@ function EpisodeReader({ eyebrow, isGenerating, onContinue, onExport, onStartDif
         <p className="mt-3 text-sm leading-6 text-paper/60">{story.wordCount.toLocaleString()} words | {story.genrePreset} | {source}</p>
       </div>
       <div className="min-w-0 whitespace-pre-wrap rounded-md border border-paper/10 bg-night-ink/70 p-4 text-base leading-8 text-paper/85 sm:p-5">{story.story}</div>
+      {story.id ? <StoryFeedbackPanel feedback={feedback} onChange={(rating, reasons) => onFeedbackChange(story, rating, reasons)} /> : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <button className="inline-flex items-center gap-2 rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={onContinue} type="button">{isGenerating ? <><span className="size-4 animate-spin rounded-full border-2 border-night-ink/30 border-t-night-ink" aria-hidden="true" />Writing the next chapter…</> : "Continue this story"}</button>
         <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-lantern-gold/50" onClick={onExport} type="button">Export</button>
         <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-lantern-gold/50" onClick={onStartDifferent} type="button">Start something different</button>
       </div>
     </article>
+  );
+}
+
+function StoryFeedbackPanel({ feedback, onChange }: { feedback: StoryFeedbackSignal | null; onChange: (rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void }) {
+  const selectedRating = feedback?.rating ?? null;
+  const selectedReasons = feedback?.reasons ?? [];
+
+  function toggleReason(reason: StoryFeedbackReason) {
+    if (!selectedRating) return;
+    const nextReasons = selectedReasons.includes(reason)
+      ? selectedReasons.filter((selectedReason) => selectedReason !== reason)
+      : [...selectedReasons, reason];
+    onChange(selectedRating, nextReasons);
+  }
+
+  return (
+    <section className="grid gap-3 rounded-md border border-paper/10 bg-night-ink/50 p-4">
+      <div>
+        <h3 className="text-sm font-semibold text-paper">How was this story?</h3>
+        <p className="mt-1 text-xs leading-5 text-paper/55">Your rating updates future recommendations and new-story personalization.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {STORY_FEEDBACK_RATING_OPTIONS.map((option) => (
+          <button
+            aria-pressed={selectedRating === option.rating}
+            className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${selectedRating === option.rating ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper hover:border-lantern-gold/50"}`}
+            key={option.rating}
+            onClick={() => onChange(option.rating, selectedRating === option.rating ? selectedReasons : [])}
+            type="button"
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      {selectedRating ? (
+        <div className="grid gap-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/50">Optional reasons</p>
+          <div className="flex flex-wrap gap-2">
+            {STORY_FEEDBACK_REASON_OPTIONS.map((option) => {
+              const isSelected = selectedReasons.includes(option.reason);
+              return (
+                <button
+                  aria-pressed={isSelected}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${isSelected ? "border-lantern-gold bg-lantern-gold/90 text-night-ink" : "border-paper/15 bg-paper/10 text-paper/80 hover:border-lantern-gold/50"}`}
+                  key={option.reason}
+                  onClick={() => toggleReason(option.reason)}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -1065,6 +1171,8 @@ function createEmptyLastNewStoryPersonalization(): LastNewStoryPersonalization {
     hardAvoidancesIncluded: false,
     eerieSignalsIncluded: false,
     continuationStoryIdIncludedInLastNewStoryRequest: false,
+    feedbackIncluded: false,
+    latestStoryFeedbackSummary: "No prior story feedback available.",
     summary: "No new-story generation personalization has been applied yet."
   };
 }
@@ -1089,6 +1197,8 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
   const confidence = getReaderProfileConfidence(profile);
   const hardAvoidances = [...splitAvoidances(profile.latestMood?.avoidances), ...eerieProfile.hardAvoidances].filter(Boolean);
   const profileUsed = profile.profileExists;
+  const feedbackSummary = summarizeStoryFeedback(profile.storyFeedbackSignals);
+  const feedbackIncluded = feedbackSummary !== "No prior story feedback available.";
   const profileSource = profileUsed && source === "none" ? "local" : source;
   const includeEerieSignals = shouldUseEerieSignalsForGenre(genre);
   const weakly = confidence === "low" ? "Treat these as weak preferences, not hard rules." : "Treat these as preferences, not hard rules.";
@@ -1101,6 +1211,7 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
     `- Engagement totals: generated ${profile.counters.totalStoriesGenerated}, opened ${profile.counters.totalStoriesOpened}, continued ${profile.counters.totalContinues}.`,
     `- Mood selection counts: ${formatCounts(profile.moodCounts)}.`,
     `- Genre counts: ${formatCounts(profile.genreCounts)}.`,
+    `- Recent story feedback, as weak preference guidance: ${feedbackSummary}`,
     hardAvoidances.length ? `- Hard avoidances, as hard constraints: ${dedupe(hardAvoidances).join(", ")}.` : "- Hard avoidances: none recorded.",
     includeEerieSignals
       ? `- Eerie taste/safety guidance: fear intensity ${formatWeightedPreference(eerieProfile.fearIntensity)}, weirdness tolerance ${formatWeightedPreference(eerieProfile.weirdnessTolerance)}, supernatural affinity ${formatWeightedPreference(eerieProfile.supernaturalAffinity)}, ambiguity tolerance ${formatWeightedPreference(eerieProfile.ambiguityTolerance)}, gore tolerance ${formatWeightedPreference(eerieProfile.goreTolerance)} as a safety constraint, sleep-safe preference ${formatWeightedPreference(eerieProfile.sleepSafePreference)}.`
@@ -1120,13 +1231,15 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
       hardAvoidancesIncluded: profileUsed && hardAvoidances.length > 0,
       eerieSignalsIncluded: profileUsed,
       continuationStoryIdIncludedInLastNewStoryRequest: Boolean(continuationStoryId),
-      summary: profileUsed ? `Used ${confidence}-confidence reader profile ${confidence === "low" ? "lightly" : "as preference guidance"}: favored ${topGenre ?? genre} and ${topMood ?? profile.latestMood?.mood ?? "available mood"} mood; ${hardAvoidances.length ? "included hard avoidances" : "no hard avoidances found"}; ${includeEerieSignals ? "included eerie taste/safety guidance without forcing horror." : "did not force eerie preferences."}` : "No persisted reader profile was available; generated with the existing new-story inputs only."
+      feedbackIncluded: profileUsed && feedbackIncluded,
+      latestStoryFeedbackSummary: feedbackSummary,
+      summary: profileUsed ? `Used ${confidence}-confidence reader profile ${confidence === "low" ? "lightly" : "as preference guidance"}: favored ${topGenre ?? genre} and ${topMood ?? profile.latestMood?.mood ?? "available mood"} mood; ${hardAvoidances.length ? "included hard avoidances" : "no hard avoidances found"}; ${feedbackIncluded ? "included recent story feedback as weak guidance" : "no story feedback found"}; ${includeEerieSignals ? "included eerie taste/safety guidance without forcing horror." : "did not force eerie preferences."}` : "No persisted reader profile was available; generated with the existing new-story inputs only."
     },
     prompt
   };
 }
 
-function AppStateDiagnostics({ activeView, currentStoryId, generationSource, isGenerating, lastGenerationTrigger, lastNewStoryPersonalization, lastRequestIncludedContinuationStoryId }: { activeView: AppView; currentStoryId: string; generationSource: GenerationSource; isGenerating: boolean; lastGenerationTrigger: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastRequestIncludedContinuationStoryId: boolean }) {
+function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId, generationSource, isGenerating, lastGenerationTrigger, lastNewStoryPersonalization, lastRequestIncludedContinuationStoryId, profile }: { activeView: AppView; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; generationSource: GenerationSource; isGenerating: boolean; lastGenerationTrigger: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastRequestIncludedContinuationStoryId: boolean; profile: ReaderProfile }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
@@ -1136,6 +1249,11 @@ function AppStateDiagnostics({ activeView, currentStoryId, generationSource, isG
         <p><span className="font-semibold text-paper/80">Last generation trigger/source:</span> {lastGenerationTrigger}</p>
         <p><span className="font-semibold text-paper/80">Active generation source:</span> {generationSource ?? "none"}</p>
         <p><span className="font-semibold text-paper/80">Current story ID:</span> {currentStoryId || "none"}</p>
+        <p><span className="font-semibold text-paper/80">Current story feedback available:</span> {currentStoryId ? "yes" : "no - current story id is missing"}</p>
+        <p><span className="font-semibold text-paper/80">Current story feedback saved:</span> {currentStoryFeedback ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">Current story feedback rating:</span> {currentStoryFeedback?.rating ?? "none"}</p>
+        <p><span className="font-semibold text-paper/80">Current story feedback reasons:</span> {currentStoryFeedback?.reasons.length ? currentStoryFeedback.reasons.join(", ") : "none"}</p>
+        <p><span className="font-semibold text-paper/80">Total story feedback signals:</span> {profile.storyFeedbackSignals?.length ?? 0}</p>
         <p><span className="font-semibold text-paper/80">Last request included continuation story ID:</span> {lastRequestIncludedContinuationStoryId ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Profile used in last new-story generation:</span> {lastNewStoryPersonalization.profileUsed ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Profile source used:</span> {lastNewStoryPersonalization.profileSourceUsed}</p>
@@ -1145,7 +1263,9 @@ function AppStateDiagnostics({ activeView, currentStoryId, generationSource, isG
         <p><span className="font-semibold text-paper/80">Last generation genre signal:</span> {lastNewStoryPersonalization.genreSignal}</p>
         <p><span className="font-semibold text-paper/80">Hard avoidances included:</span> {lastNewStoryPersonalization.hardAvoidancesIncluded ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Eerie signals included:</span> {lastNewStoryPersonalization.eerieSignalsIncluded ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">Feedback included in last new-story personalization:</span> {lastNewStoryPersonalization.feedbackIncluded ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Continuation story id included in last new-story request:</span> {lastNewStoryPersonalization.continuationStoryIdIncludedInLastNewStoryRequest ? "yes" : "no"}</p>
+        <p className="sm:col-span-2"><span className="font-semibold text-paper/80">Latest story feedback summary:</span> {lastNewStoryPersonalization.latestStoryFeedbackSummary}</p>
         <p className="sm:col-span-2"><span className="font-semibold text-paper/80">Personalization summary:</span> {lastNewStoryPersonalization.summary}</p>
       </div>
     </details>
@@ -1165,6 +1285,7 @@ function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: 
           <p><span className="font-semibold text-paper/80">Profile ID:</span> {cloudSync.profileId || "pending"}</p>
           <p><span className="font-semibold text-paper/80">Local profile exists:</span> {cloudSync.localProfileExists ? "yes" : "no"}</p>
           <p><span className="font-semibold text-paper/80">Cloud profile status:</span> {cloudSync.status}</p>
+          <p><span className="font-semibold text-paper/80">Last profile save status for feedback:</span> {profile.storyFeedbackSignals?.length ? cloudSync.status : "no feedback saved"}</p>
           <p><span className="font-semibold text-paper/80">Last cloud sync:</span> {cloudSync.lastSyncAt || "never"}</p>
           <p><span className="font-semibold text-paper/80">Last cloud error:</span> {cloudSync.lastError || "none"}</p>
           <p><span className="font-semibold text-paper/80">Local updated:</span> {cloudSync.localUpdatedAt || profile.updatedAt || "never"}</p>
@@ -1176,6 +1297,7 @@ function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: 
           <p><span className="font-semibold text-paper/80">Total demo loaded:</span> {profile.counters.totalDemoStoriesLoaded}</p>
           <p><span className="font-semibold text-paper/80">Total start something different:</span> {profile.counters.totalStartSomethingDifferent}</p>
           <p><span className="font-semibold text-paper/80">Total mood selections:</span> {profile.counters.totalMoodSelections}</p>
+          <p><span className="font-semibold text-paper/80">Total story feedback signals:</span> {profile.storyFeedbackSignals?.length ?? 0}</p>
           <p><span className="font-semibold text-paper/80">Top mood:</span> {topMood ?? "none"}</p>
           <p><span className="font-semibold text-paper/80">Top genre:</span> {topGenre ?? "none"}</p>
           <p><span className="font-semibold text-paper/80">Storage key:</span> {READER_PROFILE_STORAGE_KEY}</p>
@@ -1210,6 +1332,42 @@ function getReaderProfileConfidence(profile: ReaderProfile): "low" | "medium" | 
   if (signalCount >= 12) return "high";
   if (signalCount >= 4) return "medium";
   return "low";
+}
+
+function readStoryFeedbackGenerationMode(presentation: GeneratedStoryPresentation): StoryFeedbackGenerationMode {
+  if (presentation === "first-episode") return "new-story";
+  if (presentation === "continuation") return "continue-story";
+  return "unknown";
+}
+
+function summarizeStoryFeedback(signals: StoryFeedbackSignal[] | undefined): string {
+  const recentSignals = Array.isArray(signals) ? signals.slice(-10) : [];
+  if (recentSignals.length === 0) return "No prior story feedback available.";
+
+  const latestSignal = recentSignals[recentSignals.length - 1];
+  const latestRatingLabel = formatStoryFeedbackRating(latestSignal.rating);
+  const latestReasons = latestSignal.reasons.map(formatStoryFeedbackReason).filter(Boolean);
+  const positiveReasons = recentSignals
+    .filter((signal) => signal.score >= 4)
+    .flatMap((signal) => signal.reasons.map(formatStoryFeedbackReason));
+  const negativeReasons = recentSignals
+    .filter((signal) => signal.score <= 2)
+    .flatMap((signal) => signal.reasons.map(formatStoryFeedbackReason));
+
+  return [
+    `Recent feedback: reader rated the last story ${latestRatingLabel}${latestReasons.length ? ` and selected ${latestReasons.join(" and ")}` : ""}.`,
+    positiveReasons.length ? `Lean toward ${dedupe(positiveReasons).slice(0, 4).join(", ")}.` : "",
+    negativeReasons.length ? `Avoid or adjust around ${dedupe(negativeReasons).slice(0, 4).join(", ")}.` : "",
+    "Use feedback as weak preference guidance, not hard constraints.",
+  ].filter(Boolean).join(" ");
+}
+
+function formatStoryFeedbackRating(rating: StoryFeedbackRating): string {
+  return STORY_FEEDBACK_RATING_OPTIONS.find((option) => option.rating === rating)?.label ?? rating;
+}
+
+function formatStoryFeedbackReason(reason: StoryFeedbackReason): string {
+  return STORY_FEEDBACK_REASON_OPTIONS.find((option) => option.reason === reason)?.label ?? reason;
 }
 
 function formatCounts(counts: Record<string, number>): string {
