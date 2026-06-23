@@ -3,6 +3,7 @@
 import { type ChangeEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
+  DEFAULT_EERIE_SAFETY_GUARDRAILS,
   EERIE_READER_PROFILE_STORAGE_KEY,
   clearEerieReaderProfile,
   createDefaultEerieReaderProfile,
@@ -52,6 +53,8 @@ type LastNewStoryPersonalization = {
   moodSignal: string;
   genreSignal: string;
   hardAvoidancesIncluded: boolean;
+  userHardAvoidancesSummary: string;
+  defaultEerieSafetyGuardrailsSummary: string;
   eerieSignalsIncluded: boolean;
   continuationStoryIdIncludedInLastNewStoryRequest: boolean;
   feedbackIncluded: boolean;
@@ -1244,6 +1247,8 @@ function createEmptyLastNewStoryPersonalization(): LastNewStoryPersonalization {
     moodSignal: "none",
     genreSignal: "none",
     hardAvoidancesIncluded: false,
+    userHardAvoidancesSummary: "none",
+    defaultEerieSafetyGuardrailsSummary: DEFAULT_EERIE_SAFETY_GUARDRAILS.join(", "),
     eerieSignalsIncluded: false,
     continuationStoryIdIncludedInLastNewStoryRequest: false,
     feedbackIncluded: false,
@@ -1270,7 +1275,8 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
   const topMood = getTopCount(profile.moodCounts);
   const topGenre = getTopCount(profile.genreCounts);
   const confidence = getReaderProfileConfidence(profile);
-  const hardAvoidances = [...splitAvoidances(profile.latestMood?.avoidances), ...eerieProfile.hardAvoidances].filter(Boolean);
+  const userHardAvoidances = dedupe(splitAvoidances(profile.latestMood?.avoidances));
+  const defaultEerieSafetyGuardrails = dedupe(DEFAULT_EERIE_SAFETY_GUARDRAILS);
   const profileUsed = profile.profileExists;
   const feedbackSummary = summarizeStoryFeedback(profile.storyFeedbackSignals);
   const feedbackIncluded = feedbackSummary !== "No prior story feedback available.";
@@ -1287,7 +1293,8 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
     `- Mood selection counts: ${formatCounts(profile.moodCounts)}.`,
     `- Genre counts: ${formatCounts(profile.genreCounts)}.`,
     `- Recent story feedback, as weak preference guidance: ${feedbackSummary}`,
-    hardAvoidances.length ? `- Hard avoidances, as hard constraints: ${dedupe(hardAvoidances).join(", ")}.` : "- Hard avoidances: none recorded.",
+    userHardAvoidances.length ? `- User hard avoidances, as hard constraints: ${userHardAvoidances.join(", ")}.` : "- User hard avoidances: none recorded.",
+    defaultEerieSafetyGuardrails.length ? `- Default/eerie safety guardrails, not user-entered avoidances: ${defaultEerieSafetyGuardrails.join(", ")}.` : "- Default/eerie safety guardrails: none recorded.",
     includeEerieSignals
       ? `- Eerie taste/safety guidance: fear intensity ${formatWeightedPreference(eerieProfile.fearIntensity)}, weirdness tolerance ${formatWeightedPreference(eerieProfile.weirdnessTolerance)}, supernatural affinity ${formatWeightedPreference(eerieProfile.supernaturalAffinity)}, ambiguity tolerance ${formatWeightedPreference(eerieProfile.ambiguityTolerance)}, gore tolerance ${formatWeightedPreference(eerieProfile.goreTolerance)} as a safety constraint, sleep-safe preference ${formatWeightedPreference(eerieProfile.sleepSafePreference)}.`
       : "- Eerie profile signals are present but should be used only lightly because the selected genre is not primarily eerie/horror/dark-adjacent. Do not let horror preferences dominate.",
@@ -1303,12 +1310,14 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
       lastGenerationTrigger: trigger,
       moodSignal: topMood ?? profile.latestMood?.mood ?? "none",
       genreSignal: topGenre ?? genre,
-      hardAvoidancesIncluded: profileUsed && hardAvoidances.length > 0,
+      hardAvoidancesIncluded: profileUsed && userHardAvoidances.length > 0,
+      userHardAvoidancesSummary: userHardAvoidances.length ? userHardAvoidances.join(", ") : "none",
+      defaultEerieSafetyGuardrailsSummary: defaultEerieSafetyGuardrails.length ? defaultEerieSafetyGuardrails.join(", ") : "none",
       eerieSignalsIncluded: profileUsed,
       continuationStoryIdIncludedInLastNewStoryRequest: Boolean(continuationStoryId),
       feedbackIncluded: profileUsed && feedbackIncluded,
       latestStoryFeedbackSummary: feedbackSummary,
-      summary: profileUsed ? `Used ${confidence}-confidence reader profile ${confidence === "low" ? "lightly" : "as preference guidance"}: favored ${topGenre ?? genre} and ${topMood ?? profile.latestMood?.mood ?? "available mood"} mood; ${hardAvoidances.length ? "included hard avoidances" : "no hard avoidances found"}; ${feedbackIncluded ? "included recent story feedback as weak guidance" : "no story feedback found"}; ${includeEerieSignals ? "included eerie taste/safety guidance without forcing horror." : "did not force eerie preferences."}` : "No persisted reader profile was available; generated with the existing new-story inputs only."
+      summary: profileUsed ? `Used ${confidence}-confidence reader profile ${confidence === "low" ? "lightly" : "as preference guidance"}: favored ${topGenre ?? genre} and ${topMood ?? profile.latestMood?.mood ?? "available mood"} mood; ${userHardAvoidances.length ? "included user hard avoidances" : "no user hard avoidances found"}; ${feedbackIncluded ? "included recent story feedback as weak guidance" : "no story feedback found"}; ${includeEerieSignals ? "included eerie taste/safety guidance without forcing horror." : "did not force eerie preferences."}` : "No persisted reader profile was available; generated with the existing new-story inputs only."
     },
     prompt
   };
@@ -1341,7 +1350,9 @@ function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId,
         <p><span className="font-semibold text-paper/80">Last generation mode:</span> {lastNewStoryPersonalization.lastGenerationMode}</p>
         <p><span className="font-semibold text-paper/80">Last generation mood signal:</span> {lastNewStoryPersonalization.moodSignal}</p>
         <p><span className="font-semibold text-paper/80">Last generation genre signal:</span> {lastNewStoryPersonalization.genreSignal}</p>
-        <p><span className="font-semibold text-paper/80">Hard avoidances included:</span> {lastNewStoryPersonalization.hardAvoidancesIncluded ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">User hard avoidances included:</span> {lastNewStoryPersonalization.hardAvoidancesIncluded ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">User hard avoidances:</span> {lastNewStoryPersonalization.userHardAvoidancesSummary}</p>
+        <p><span className="font-semibold text-paper/80">Default/eerie safety guardrails:</span> {lastNewStoryPersonalization.defaultEerieSafetyGuardrailsSummary}</p>
         <p><span className="font-semibold text-paper/80">Eerie signals included:</span> {lastNewStoryPersonalization.eerieSignalsIncluded ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Feedback included in last new-story personalization:</span> {lastNewStoryPersonalization.feedbackIncluded ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Continuation story id included in last new-story request:</span> {lastNewStoryPersonalization.continuationStoryIdIncludedInLastNewStoryRequest ? "yes" : "no"}</p>
@@ -1526,7 +1537,7 @@ function EerieReaderProfileDiagnostics({ onClear, profile }: { onClear: () => vo
           <p><span className="font-semibold text-paper/80">Sleep-safe preference:</span> {formatPreferencePair(profile.sleepSafePreference)}</p>
           <p><span className="font-semibold text-paper/80">Preferred format:</span> {profile.preferredFormat}</p>
           <p><span className="font-semibold text-paper/80">Preferred duration:</span> {profile.preferredDurationMinutes} minutes</p>
-          <p><span className="font-semibold text-paper/80">Hard avoidances:</span> {profile.hardAvoidances.join(", ")}</p>
+          <p><span className="font-semibold text-paper/80">Default/eerie safety guardrails:</span> {DEFAULT_EERIE_SAFETY_GUARDRAILS.join(", ") || "none"}</p>
           <p><span className="font-semibold text-paper/80">Story card signal count:</span> {profile.storyCardSignals.length}</p>
           <p><span className="font-semibold text-paper/80">Updated:</span> {profile.updatedAt}</p>
         </div>
