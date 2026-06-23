@@ -190,6 +190,8 @@ export default function Home() {
   const [lastGenerationTrigger, setLastGenerationTrigger] = useState("none");
   const [generationSource, setGenerationSource] = useState<GenerationSource>(null);
   const [lastRequestIncludedContinuationStoryId, setLastRequestIncludedContinuationStoryId] = useState(false);
+  const [lastContinuationContextIncluded, setLastContinuationContextIncluded] = useState(false);
+  const [lastContinuationBlockedBecauseContextMissing, setLastContinuationBlockedBecauseContextMissing] = useState(false);
   const [lastNewStoryPersonalization, setLastNewStoryPersonalization] = useState<LastNewStoryPersonalization>(createEmptyLastNewStoryPersonalization());
   const [isStoryStartSelectionOpen, setIsStoryStartSelectionOpen] = useState(false);
   const activeGenerationRequestId = useRef(0);
@@ -264,11 +266,13 @@ export default function Home() {
     window.history.pushState(null, "", `${window.location.pathname}?view=${view}`);
   }
 
-  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null; presentation: Exclude<GeneratedStoryPresentation, null>; loadingMessage: string; signalSource: ReaderProfileEventSource; generationSource: Exclude<GenerationSource, null>; continuationStoryId: string }>) {
+  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null; presentation: Exclude<GeneratedStoryPresentation, null>; loadingMessage: string; signalSource: ReaderProfileEventSource; generationSource: Exclude<GenerationSource, null>; continuationStoryId: string; continuationContextIncluded: boolean }>) {
     const nextGenerationSource = overrides?.generationSource ?? "new-story";
     const continuationStoryId = nextGenerationSource === "continue-story" ? overrides?.continuationStoryId?.trim() ?? "" : "";
 
     if (nextGenerationSource === "continue-story" && !continuationStoryId) {
+      setLastContinuationContextIncluded(false);
+      setLastContinuationBlockedBecauseContextMissing(true);
       setError("Choose an active story before continuing it.");
       return;
     }
@@ -280,6 +284,8 @@ export default function Home() {
     setLastGenerationTrigger(overrides?.signalSource ?? "create");
     setGenerationSource(nextGenerationSource);
     setLastRequestIncludedContinuationStoryId(Boolean(continuationStoryId));
+    setLastContinuationContextIncluded(nextGenerationSource === "continue-story" && Boolean(overrides?.continuationContextIncluded));
+    setLastContinuationBlockedBecauseContextMissing(false);
     const personalization = buildNewStoryPersonalization({
       eerieProfile: eerieReaderProfile,
       genre: overrides?.genrePreset ?? genrePreset,
@@ -628,18 +634,34 @@ export default function Home() {
   }
 
   function handleContinueLatest(direction?: string) {
-    if (!latestStory) return;
-    recordReaderSignal({ eventType: "storyContinued", source: "continueSeries", storyId: latestStory.id, title: latestStory.title, genre: latestStory.genrePreset, wordCount: latestStory.wordCount });
+    const storyToContinue = currentGeneratedStory ?? latestStory;
+    const storyId = storyToContinue?.id?.trim() ?? "";
+    const storyText = storyToContinue?.story?.trim() ?? "";
+
+    if (!storyToContinue || !storyId || !storyText) {
+      setLastGenerationTrigger("continueSeries");
+      setLastRequestIncludedContinuationStoryId(Boolean(storyId));
+      setLastContinuationContextIncluded(false);
+      setLastContinuationBlockedBecauseContextMissing(true);
+      setStatusMessage("Open a saved story before continuing it. Continuation was not started because story context is missing.");
+      return;
+    }
+
+    recordReaderSignal({ eventType: "storyContinued", source: "continueSeries", storyId, title: storyToContinue.title, genre: storyToContinue.genrePreset, wordCount: storyToContinue.wordCount });
+    const priorChapterContext = truncateText(storyText, 9000);
     const continuationSeed = [
-      `Continue the latest story as the next chapter. Keep continuity with this prior chapter: ${truncateText(latestStory.story, 7000)}`,
+      "Continue this story with the next chapter. Do not rewrite, restart, summarize, or retell the existing chapter. Begin after the events already shown.",
+      `Active story id to continue: ${storyId}.`,
+      `Existing chapter title: ${storyToContinue.title}.`,
+      `Prior chapter context for continuity:\n${priorChapterContext}`,
       direction?.trim() ? `Reader direction for the next chapter: ${direction.trim()}` : "Continue directly from the strongest unresolved story pressure."
     ].join("\n\n");
     void handleGenerate({
-      worldBible: worldBible.content.trim() || `Existing story world inferred from ${latestStory.title}. Genre: ${latestStory.genrePreset}.`,
-      characterProfiles: characterProfiles.content.trim() || `Top cast: ${latestStory.charactersUsed.length ? latestStory.charactersUsed.join(", ") : "use the established characters from the prior chapter"}.`,
+      worldBible: worldBible.content.trim() || `Existing story world inferred from ${storyToContinue.title}. Genre: ${storyToContinue.genrePreset}.`,
+      characterProfiles: characterProfiles.content.trim() || `Top cast: ${storyToContinue.charactersUsed.length ? storyToContinue.charactersUsed.join(", ") : "use the established characters from the prior chapter"}.`,
       storySeed: continuationSeed,
-      storyRules: storyRules.content,
-      genrePreset: latestStory.genrePreset,
+      storyRules: [storyRules.content, "Continuation rule: write only the next chapter after the prior chapter context; do not rewrite, restart, summarize, or retell the prior chapter."].filter(Boolean).join("\n\n"),
+      genrePreset: storyToContinue.genrePreset,
       narrativeArchitecture,
       characterArc,
       endingType,
@@ -648,7 +670,8 @@ export default function Home() {
       loadingMessage: "Writing the next chapter…",
       signalSource: "continueSeries",
       generationSource: "continue-story",
-      continuationStoryId: latestStory.id
+      continuationStoryId: storyId,
+      continuationContextIncluded: true
     });
   }
 
@@ -924,7 +947,7 @@ export default function Home() {
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        <AppStateDiagnostics activeView={activeView} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} generationSource={generationSource} isGenerating={isGenerating} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} profile={readerProfile} />
+        <AppStateDiagnostics activeView={activeView} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} profile={readerProfile} />
         <ReaderProfileDiagnostics cloudSync={cloudReaderProfileSync} profile={readerProfile} onClear={handleClearReaderProfile} />
         <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
@@ -1239,7 +1262,7 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
   };
 }
 
-function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId, generationSource, isGenerating, lastGenerationTrigger, lastNewStoryPersonalization, lastRequestIncludedContinuationStoryId, profile }: { activeView: AppView; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; generationSource: GenerationSource; isGenerating: boolean; lastGenerationTrigger: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastRequestIncludedContinuationStoryId: boolean; profile: ReaderProfile }) {
+function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationTrigger, lastNewStoryPersonalization, lastRequestIncludedContinuationStoryId, profile }: { activeView: AppView; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationTrigger: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastRequestIncludedContinuationStoryId: boolean; profile: ReaderProfile }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
@@ -1255,6 +1278,8 @@ function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId,
         <p><span className="font-semibold text-paper/80">Current story feedback reasons:</span> {currentStoryFeedback?.reasons.length ? currentStoryFeedback.reasons.join(", ") : "none"}</p>
         <p><span className="font-semibold text-paper/80">Total story feedback signals:</span> {profile.storyFeedbackSignals?.length ?? 0}</p>
         <p><span className="font-semibold text-paper/80">Last request included continuation story ID:</span> {lastRequestIncludedContinuationStoryId ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">Continuation context included:</span> {lastContinuationContextIncluded ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">Continuation blocked because context missing:</span> {lastContinuationBlockedBecauseContextMissing ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Profile used in last new-story generation:</span> {lastNewStoryPersonalization.profileUsed ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Profile source used:</span> {lastNewStoryPersonalization.profileSourceUsed}</p>
         <p><span className="font-semibold text-paper/80">Profile confidence:</span> {lastNewStoryPersonalization.profileConfidence}</p>
