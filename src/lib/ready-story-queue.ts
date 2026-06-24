@@ -1,3 +1,4 @@
+import type { StorySparkCreatorKind, StorySparkProvenance } from "@/lib/story-spark-catalog";
 import type { GenerateStoryResponse, GenrePreset } from "@/lib/types";
 
 export const READY_STORY_QUEUE_STORAGE_KEY = "projectLantern.readyStoryQueue.v1";
@@ -28,6 +29,18 @@ export interface ReadyStoryQueueItem {
   generatedStoryId?: string;
   generatedAt?: string;
   generationError?: string;
+  sourceStorySparkId?: string;
+  sourceStorySparkTitle?: string;
+  creatorId?: string;
+  creatorDisplayName?: string;
+  creatorHandle?: string;
+  creatorCreditLine?: string;
+  creatorKind?: StorySparkCreatorKind;
+  provenance?: StorySparkProvenance;
+  ipMarking?: string;
+  sourceArchivePath?: string;
+  sourceArchiveTitle?: string;
+  tags?: string[];
 }
 
 export function createReadyStoryQueueItem(input: Omit<ReadyStoryQueueItem, "id" | "createdAt" | "updatedAt">, createdAt = new Date().toISOString()): ReadyStoryQueueItem {
@@ -61,6 +74,10 @@ export function persistSavedForLaterStoryQueue(items: ReadyStoryQueueItem[]): Re
 
 export function removeReadyStoryQueueItem(items: ReadyStoryQueueItem[], itemId: string): ReadyStoryQueueItem[] {
   return items.filter((item) => item.id !== itemId);
+}
+
+export function formatReadyStoryCreatorCredit(item: ReadyStoryQueueItem): string {
+  return item.creatorCreditLine || (item.creatorDisplayName ? `StorySpark by ${item.creatorDisplayName}` : "StorySpark creator unknown");
 }
 
 export function countPreparedReadyStoryQueueItems(items: ReadyStoryQueueItem[]): number {
@@ -139,7 +156,19 @@ function normalizeReadyStoryQueueItem(value: unknown, options?: { resetGeneratin
     generatedStory,
     generatedStoryId: normalizeQueueText(candidate?.generatedStoryId, 180),
     generatedAt: normalizeQueueText(candidate?.generatedAt, 80),
-    generationError: normalizeQueueText(candidate?.generationError, 500)
+    generationError: normalizeQueueText(candidate?.generationError, 500),
+    sourceStorySparkId: normalizeQueueText(candidate?.sourceStorySparkId, 180),
+    sourceStorySparkTitle: normalizeQueueText(candidate?.sourceStorySparkTitle, 180),
+    creatorId: normalizeQueueText(candidate?.creatorId, 180),
+    creatorDisplayName: normalizeQueueText(candidate?.creatorDisplayName, 120),
+    creatorHandle: normalizeQueueText(candidate?.creatorHandle, 80),
+    creatorCreditLine: normalizeQueueText(candidate?.creatorCreditLine, 180),
+    creatorKind: normalizeCreatorKind(candidate?.creatorKind),
+    provenance: normalizeProvenance(candidate?.provenance),
+    ipMarking: normalizeQueueText(candidate?.ipMarking, 180),
+    sourceArchivePath: normalizeQueueText(candidate?.sourceArchivePath, 300),
+    sourceArchiveTitle: normalizeQueueText(candidate?.sourceArchiveTitle, 180),
+    tags: normalizeQueueTags(candidate?.tags)
   };
 }
 
@@ -168,4 +197,19 @@ function createReadyStoryQueueItemId(title: string, createdAt: string): string {
 
 function normalizeQueueText(value: unknown, maxLength = 600): string {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+
+function normalizeCreatorKind(value: unknown): StorySparkCreatorKind | undefined {
+  return value === "founder" || value === "community" || value === "staff" || value === "system" ? value : undefined;
+}
+
+function normalizeProvenance(value: unknown): StorySparkProvenance | undefined {
+  return value === "human-created" || value === "community-created" || value === "system-seeded" ? value : undefined;
+}
+
+function normalizeQueueTags(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const tags = value.map((tag) => normalizeQueueText(tag, 80)).filter(Boolean).slice(0, 20);
+  return tags.length ? tags : undefined;
 }

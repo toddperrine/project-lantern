@@ -31,6 +31,8 @@ import {
 import {
   countPreparedReadyStoryQueueItems,
   createReadyStoryQueueItem,
+  formatReadyStoryCreatorCredit,
+  MAX_READY_STORY_QUEUE_ITEMS,
   persistReadyStoryQueue,
   persistSavedForLaterStoryQueue,
   readReadyStoryQueue,
@@ -40,6 +42,7 @@ import {
   type ReadyStoryQueueItem,
   type ReadyStoryQueueSignal
 } from "@/lib/ready-story-queue";
+import { STORY_SPARK_CATALOG, type StorySparkCatalogItem } from "@/lib/story-spark-catalog";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
 import type { EerieReaderProfile } from "@/lib/eerie-reader-profile";
@@ -169,32 +172,106 @@ const EMPTY_CLOUD_READER_PROFILE_SYNC: CloudReaderProfileSyncState = {
   localProfileExists: false
 };
 
-const SUGGESTED_STORY_STARTS: StoryStart[] = [
-  { title: "The Lighthouse Under Main Street", premise: "A night-shift archivist finds a working lighthouse buried beneath a landlocked town.", genre: "Speculative Mystery", mood: "Mystery", heroName: "Mara Venn", heroRole: "Archivist investigator", heroBio: "A careful town archivist who notices when public records change after midnight and cannot leave an impossible civic mystery alone.", worldName: "Bellwether Courthouse Archive", world: "A rain-polished mill town where civic records sometimes rewrite themselves after midnight.", seed: "Mara Venn discovers a salt-stained lighthouse staircase below the courthouse archive and hears a foghorn answering from the town square.", cast: "Mara Venn - careful town archivist with a talent for noticing altered records. Jules Ardent - former surveyor who remembers streets no map admits.", rules: "Keep the mystery concrete, civic, and emotional. Let the lighthouse reveal one cost before it offers any answer." },
-  { title: "Orchard of Borrowed Moons", premise: "A botanist tends trees that grow small moons, each carrying someone else's unfinished wish.", genre: "Contemporary Fantastical / Magical Realist", mood: "Wonder", heroName: "Iris Calder", heroRole: "Botanist caretaker", heroBio: "A patient botanist who trusts field notes and folklore in equal measure, especially when the orchard begins speaking in borrowed wishes.", worldName: "Calder Moon Orchard", world: "A hillside orchard outside a modern city where lunar fruit ripens only during power outages.", seed: "Iris Calder harvests a moon no larger than an apple and hears her missing brother's laugh inside its pale skin.", cast: "Iris Calder - patient botanist who trusts evidence and folklore in equal measure. Niko Vale - repair electrician who knows which outages are deliberate.", rules: "Favor luminous sensory detail, grounded relationships, and wonder with consequences." },
-  { title: "The Quiet Engine", premise: "A grieving mechanic repairs a machine that turns silence into messages from possible futures.", genre: "Literary Science Fiction", mood: "Emotional", heroName: "Samir Holt", heroRole: "Memory mechanic", heroBio: "A gifted mechanic avoiding a family loss until a banned listening engine makes every unsaid goodbye dangerously audible.", worldName: "North Pier Repair Yard", world: "A coastal repair yard where obsolete machines are preserved for the memories trapped in their parts.", seed: "Samir Holt restarts a banned listening engine and receives a message from a future in which he never says goodbye.", cast: "Samir Holt - gifted mechanic avoiding a family loss. Lena Quill - safety inspector who once helped shut the engine down.", rules: "Keep the science intimate. Every future message should force a present-tense choice." },
-  { title: "Map of the Seventh Door", premise: "A courier must cross seven impossible thresholds before sunrise to return a stolen city map.", genre: "Speculative Mystery", mood: "Adventure", heroName: "Talia Reed", heroRole: "Threshold courier", heroBio: "A quick courier with an old civic debt, fast enough for impossible routes and honest enough to fear what the seventh door knows.", worldName: "The Seven-Door City", world: "A layered city where doors can open into old decisions, lost districts, and rooms that remember names.", seed: "Talia Reed steals back a living map and learns the seventh door will only open for someone who has betrayed the city once.", cast: "Talia Reed - quick courier with an old civic debt. Rowan Saye - mapmaker whose loyalties change with every door.", rules: "Make each threshold active, surprising, and tied to Talia's choices rather than puzzle mechanics alone." }
-];
+function storySparkCatalogItemToStoryStart(item: StorySparkCatalogItem): StoryStart {
+  return {
+    title: item.title,
+    premise: item.premise,
+    genre: item.genre,
+    mood: item.mood as Mood,
+    heroName: item.heroName,
+    heroRole: item.heroRole,
+    heroBio: item.heroBio,
+    worldName: item.worldName,
+    world: item.world,
+    seed: item.seed,
+    cast: item.cast,
+    rules: item.rules
+  };
+}
 
+const SUGGESTED_STORY_STARTS: StoryStart[] = STORY_SPARK_CATALOG.map(storySparkCatalogItemToStoryStart);
 
 function createInitialReadyStoryQueue(): ReadyStoryQueueItem[] {
-  return SUGGESTED_STORY_STARTS.slice(0, 3).map((story) =>
-    createReadyStoryQueueItem({
-      title: story.title,
-      premise: story.premise,
-      genre: story.genre,
-      mood: story.mood,
-      heroName: story.heroName,
-      heroRole: story.heroRole,
-      heroBio: story.heroBio,
-      worldName: story.worldName,
-      world: story.world,
-      seed: story.seed,
-      cast: story.cast,
-      rules: story.rules
-    })
+  return STORY_SPARK_CATALOG.slice(0, 3).map(storySparkCatalogItemToReadyStoryQueueItem);
+}
+
+function storySparkCatalogItemToReadyStoryQueueItem(item: StorySparkCatalogItem): ReadyStoryQueueItem {
+  return createReadyStoryQueueItem({
+    title: item.title,
+    premise: item.premise,
+    genre: item.genre,
+    mood: item.mood,
+    heroName: item.heroName,
+    heroRole: item.heroRole,
+    heroBio: item.heroBio,
+    worldName: item.worldName,
+    world: item.world,
+    seed: item.seed,
+    cast: item.cast,
+    rules: item.rules,
+    sourceStorySparkId: item.id,
+    sourceStorySparkTitle: item.title,
+    creatorId: item.creator.id,
+    creatorDisplayName: item.creator.displayName,
+    creatorHandle: item.creator.handle,
+    creatorCreditLine: item.creator.creditLine,
+    creatorKind: item.creator.creatorKind,
+    provenance: item.provenance,
+    ipMarking: item.ipMarking,
+    sourceArchivePath: item.sourceArchivePath,
+    sourceArchiveTitle: item.sourceArchiveTitle,
+    tags: item.tags
+  });
+}
+
+const LEGACY_GENERIC_READY_QUEUE_TITLES = new Set([
+  "The Lighthouse Under Main Street",
+  "Orchard of Borrowed Moons",
+  "The Quiet Engine",
+  "Map of the Seventh Door"
+]);
+
+function shouldReplaceLegacyGenericReadyQueue(items: ReadyStoryQueueItem[]): boolean {
+  return Boolean(
+    items.length &&
+      items.every((item) => LEGACY_GENERIC_READY_QUEUE_TITLES.has(item.title)) &&
+      items.every((item) => !item.sourceStorySparkId)
   );
 }
+
+function fillReadyStoryQueueFromCatalog(
+  currentQueue: ReadyStoryQueueItem[],
+  savedForLaterQueue: ReadyStoryQueueItem[],
+  profile: ReaderProfile
+): ReadyStoryQueueItem[] {
+  const blockedStorySparkIds = new Set<string>();
+
+  for (const item of currentQueue) {
+    if (item.sourceStorySparkId) blockedStorySparkIds.add(item.sourceStorySparkId);
+  }
+
+  for (const item of savedForLaterQueue) {
+    if (item.sourceStorySparkId) blockedStorySparkIds.add(item.sourceStorySparkId);
+  }
+
+  for (const signal of profile.readyStoryQueueSignals ?? []) {
+    if (signal.signal !== "pass" && signal.signal !== "read") continue;
+    if (signal.storyCardId) blockedStorySparkIds.add(signal.storyCardId);
+  }
+
+  const nextQueue = [...currentQueue];
+
+  for (const catalogItem of STORY_SPARK_CATALOG) {
+    if (nextQueue.length >= MAX_READY_STORY_QUEUE_ITEMS) break;
+    if (blockedStorySparkIds.has(catalogItem.id)) continue;
+
+    nextQueue.push(storySparkCatalogItemToReadyStoryQueueItem(catalogItem));
+    blockedStorySparkIds.add(catalogItem.id);
+  }
+
+  return nextQueue.slice(0, MAX_READY_STORY_QUEUE_ITEMS);
+}
+
 
 function readMood(value: string): Mood {
   return MOODS.includes(value as Mood) ? value as Mood : "Mystery";
@@ -290,7 +367,8 @@ export default function Home() {
     if (enrichedProfile !== localProfile) persistReaderProfile(enrichedProfile);
     setReaderProfile(enrichedProfile);
     const storedReadyQueue = readReadyStoryQueue();
-    const seededReadyQueue = storedReadyQueue.length ? storedReadyQueue : createInitialReadyStoryQueue();
+    const shouldUseCatalogSeed = storedReadyQueue.length === 0 || shouldReplaceLegacyGenericReadyQueue(storedReadyQueue);
+    const seededReadyQueue = shouldUseCatalogSeed ? createInitialReadyStoryQueue() : storedReadyQueue;
     const persistedReadyQueue = persistReadyStoryQueue(seededReadyQueue);
     setReadyStoryQueue(persistedReadyQueue);
     setSavedForLaterStoryQueue(readSavedForLaterStoryQueue());
@@ -495,10 +573,10 @@ export default function Home() {
   }
 
 
-  function recordReadyStoryQueueSignal(item: ReadyStoryQueueItem, signal: ReadyStoryQueueSignal) {
+  function recordReadyStoryQueueSignal(item: ReadyStoryQueueItem, signal: ReadyStoryQueueSignal): ReaderProfile {
     const now = new Date().toISOString();
     const nextProfile = saveReadyStoryQueueSignal({
-      storyCardId: item.id,
+      storyCardId: item.sourceStorySparkId ?? item.id,
       storyTitle: item.title,
       signal,
       genre: item.genre,
@@ -511,10 +589,17 @@ export default function Home() {
     setReaderProfile(nextProfile);
     void syncReaderProfileToCloud(nextProfile);
     setLastReadyStoryQueueAction(`${signal}: ${item.title}`);
+    return nextProfile;
   }
 
-  function removeReadyQueueItemAndPersist(itemId: string) {
-    const nextQueue = persistReadyStoryQueue(removeReadyStoryQueueItem(readyStoryQueue, itemId));
+  function removeReadyQueueItemAndPersist(
+    itemId: string,
+    profileForBackfill = readerProfile,
+    savedForLaterQueueForBackfill = savedForLaterStoryQueue
+  ) {
+    const queueWithOpenSlot = removeReadyStoryQueueItem(readyStoryQueue, itemId);
+    const backfilledQueue = fillReadyStoryQueueFromCatalog(queueWithOpenSlot, savedForLaterQueueForBackfill, profileForBackfill);
+    const nextQueue = persistReadyStoryQueue(backfilledQueue);
     setReadyStoryQueue(nextQueue);
     return nextQueue;
   }
@@ -542,11 +627,11 @@ export default function Home() {
     };
   }
 
-  function openReadyStoryQueueItem(item: ReadyStoryQueueItem, removeItem: (itemId: string) => void) {
+  function openReadyStoryQueueItem(item: ReadyStoryQueueItem, removeItem: (itemId: string, profileForBackfill?: ReaderProfile) => void) {
     if (isGenerating || item.generationStatus === "generating") return;
 
-    recordReadyStoryQueueSignal(item, "read");
-    removeItem(item.id);
+    const nextProfile = recordReadyStoryQueueSignal(item, "read");
+    removeItem(item.id, nextProfile);
 
     if (item.generationStatus === "ready" && item.generatedStory) {
       const generatedStoryId = item.generatedStoryId || createStoryId(item.generatedStory.story);
@@ -604,22 +689,24 @@ export default function Home() {
   }
 
   function handlePassReadyStory(item: ReadyStoryQueueItem) {
-    recordReadyStoryQueueSignal(item, "pass");
-    removeReadyQueueItemAndPersist(item.id);
+    const nextProfile = recordReadyStoryQueueSignal(item, "pass");
+    removeReadyQueueItemAndPersist(item.id, nextProfile);
     setStatusMessage(`Passed ${item.title}.`);
   }
 
   function handleSaveReadyStoryForLater(item: ReadyStoryQueueItem) {
-    recordReadyStoryQueueSignal(item, "save_for_later");
-    removeReadyQueueItemAndPersist(item.id);
+    const nextProfile = recordReadyStoryQueueSignal(item, "save_for_later");
     const nextSaved = persistSavedForLaterStoryQueue(upsertSavedForLaterStoryQueueItem(savedForLaterStoryQueue, item));
     setSavedForLaterStoryQueue(nextSaved);
+    removeReadyQueueItemAndPersist(item.id, nextProfile, nextSaved);
     setStatusMessage(`Saved ${item.title} for later.`);
   }
 
   function handleMoveSavedForLaterStoryToWaitingQueue(item: ReadyStoryQueueItem) {
-    removeSavedForLaterQueueItemAndPersist(item.id);
-    const nextQueue = persistReadyStoryQueue([item, ...readyStoryQueue.filter((queueItem) => queueItem.id !== item.id)]);
+    const nextSaved = removeSavedForLaterQueueItemAndPersist(item.id);
+    const queueWithMovedItem = [item, ...readyStoryQueue.filter((queueItem) => queueItem.id !== item.id)].slice(0, MAX_READY_STORY_QUEUE_ITEMS);
+    const backfilledQueue = fillReadyStoryQueueFromCatalog(queueWithMovedItem, nextSaved, readerProfile);
+    const nextQueue = persistReadyStoryQueue(backfilledQueue);
     setReadyStoryQueue(nextQueue);
     setStatusMessage(`Moved ${item.title} back to the waiting queue.`);
   }
@@ -1448,6 +1535,8 @@ function ReadyStoryQueuePanel({
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lantern-gold">{item.mood} · {item.genre}</p>
                 <h3 className="mt-2 text-xl font-semibold leading-tight text-paper">{item.title}</h3>
                 <p className="mt-2 line-clamp-2 text-sm leading-6 text-paper/65">{item.premise}</p>
+                <p className="mt-2 text-xs font-semibold text-lantern-gold/80">{formatReadyStoryCreatorCredit(item)}</p>
+                <p className="mt-1 text-[0.7rem] uppercase tracking-[0.12em] text-paper/40">{item.provenance ?? "unknown provenance"} · {item.ipMarking ?? "unmarked"}</p>
                 <p className="mt-3 text-xs font-semibold text-lantern-gold/75">{preparationLabel}</p>
                 <p className="mt-2 text-xs text-paper/45">{item.heroName} · {item.heroRole} · {item.worldName}</p>
               </div>
@@ -1533,7 +1622,7 @@ function LibraryView(props: { cloudMessage: string; cloudProjects: CloudProjectS
 }
 
 function SavedForLaterStoryCard({ item, onMoveToWaitingQueue, onRead, onRemove }: { item: ReadyStoryQueueItem; onMoveToWaitingQueue: () => void; onRead: () => void; onRemove: () => void }) {
-  return <article className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><h3 className="text-lg font-semibold text-paper">{item.title}</h3><p className="mt-1 text-sm leading-6 text-paper/60">{item.genre} | {item.mood}</p></div><span className="w-fit rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-2 py-1 text-xs font-semibold text-lantern-gold">Saved for later</span></div><p className="mt-3 text-sm leading-6 text-paper/70">{item.premise}</p><dl className="mt-4 grid gap-2 text-sm text-paper/65 sm:grid-cols-3"><div><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/40">Hero</dt><dd className="mt-1 text-paper/75">{item.heroName}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/40">Role</dt><dd className="mt-1 text-paper/75">{item.heroRole}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/40">World</dt><dd className="mt-1 text-paper/75">{item.worldName}</dd></div></dl><div className="mt-4 flex flex-wrap gap-2"><SmallButton onClick={onRead}>Read</SmallButton><SmallButton onClick={onMoveToWaitingQueue}>Move back to waiting queue</SmallButton><SmallButton onClick={onRemove}>Remove</SmallButton></div></article>;
+  return <article className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><h3 className="text-lg font-semibold text-paper">{item.title}</h3><p className="mt-1 text-sm leading-6 text-paper/60">{item.genre} | {item.mood}</p></div><span className="w-fit rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-2 py-1 text-xs font-semibold text-lantern-gold">Saved for later</span></div><p className="mt-3 text-sm leading-6 text-paper/70">{item.premise}</p><p className="mt-2 text-xs font-semibold text-lantern-gold/80">{formatReadyStoryCreatorCredit(item)}</p><p className="mt-1 text-[0.7rem] uppercase tracking-[0.12em] text-paper/40">{item.provenance ?? "unknown provenance"} · {item.ipMarking ?? "unmarked"}</p><dl className="mt-4 grid gap-2 text-sm text-paper/65 sm:grid-cols-3"><div><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/40">Hero</dt><dd className="mt-1 text-paper/75">{item.heroName}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/40">Role</dt><dd className="mt-1 text-paper/75">{item.heroRole}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/40">World</dt><dd className="mt-1 text-paper/75">{item.worldName}</dd></div></dl><div className="mt-4 flex flex-wrap gap-2"><SmallButton onClick={onRead}>Read</SmallButton><SmallButton onClick={onMoveToWaitingQueue}>Move back to waiting queue</SmallButton><SmallButton onClick={onRemove}>Remove</SmallButton></div></article>;
 }
 
 function StoryLibraryCard({ badge, onDelete, onOpen, story }: { badge?: string; onDelete?: () => void; onOpen: () => void; story: LibraryStory }) {
@@ -1799,6 +1888,8 @@ function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId,
         <p><span className="font-semibold text-paper/80">Current story feedback reasons:</span> {currentStoryFeedback?.reasons.length ? currentStoryFeedback.reasons.join(", ") : "none"}</p>
         <p><span className="font-semibold text-paper/80">Total story feedback signals:</span> {profile.storyFeedbackSignals?.length ?? 0}</p>
         <p><span className="font-semibold text-paper/80">Ready story queue count:</span> {readyStoryQueue.length}</p>
+        <p><span className="font-semibold text-paper/80">StorySpark catalog count:</span> {STORY_SPARK_CATALOG.length}</p>
+        <p><span className="font-semibold text-paper/80">Ready queue StorySpark source count:</span> {readyStoryQueue.filter((item) => item.sourceStorySparkId).length}</p>
         <p><span className="font-semibold text-paper/80">Ready story prepared count:</span> {countPreparedReadyStoryQueueItems(readyStoryQueue)}</p>
         <p><span className="font-semibold text-paper/80">Ready story preparation status:</span> {lastReadyStoryPreparationStatus}</p>
         <p><span className="font-semibold text-paper/80">Last ready story preparation outcome:</span> {lastReadyStoryPreparationOutcome}</p>
