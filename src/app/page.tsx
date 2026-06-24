@@ -505,6 +505,12 @@ export default function Home() {
     return nextQueue;
   }
 
+  function removeSavedForLaterQueueItemAndPersist(itemId: string) {
+    const nextSaved = persistSavedForLaterStoryQueue(removeReadyStoryQueueItem(savedForLaterStoryQueue, itemId));
+    setSavedForLaterStoryQueue(nextSaved);
+    return nextSaved;
+  }
+
   function readyStoryQueueItemToStoryStart(item: ReadyStoryQueueItem): StoryStart {
     return {
       title: item.title,
@@ -522,11 +528,11 @@ export default function Home() {
     };
   }
 
-  function handleReadReadyStory(item: ReadyStoryQueueItem) {
+  function openReadyStoryQueueItem(item: ReadyStoryQueueItem, removeItem: (itemId: string) => void) {
     if (isGenerating || item.generationStatus === "generating") return;
 
     recordReadyStoryQueueSignal(item, "read");
-    removeReadyQueueItemAndPersist(item.id);
+    removeItem(item.id);
 
     if (item.generationStatus === "ready" && item.generatedStory) {
       const generatedStoryId = item.generatedStoryId || createStoryId(item.generatedStory.story);
@@ -575,6 +581,14 @@ export default function Home() {
     });
   }
 
+  function handleReadReadyStory(item: ReadyStoryQueueItem) {
+    openReadyStoryQueueItem(item, removeReadyQueueItemAndPersist);
+  }
+
+  function handleReadSavedForLaterStory(item: ReadyStoryQueueItem) {
+    openReadyStoryQueueItem(item, removeSavedForLaterQueueItemAndPersist);
+  }
+
   function handlePassReadyStory(item: ReadyStoryQueueItem) {
     recordReadyStoryQueueSignal(item, "pass");
     removeReadyQueueItemAndPersist(item.id);
@@ -587,6 +601,18 @@ export default function Home() {
     const nextSaved = persistSavedForLaterStoryQueue(upsertSavedForLaterStoryQueueItem(savedForLaterStoryQueue, item));
     setSavedForLaterStoryQueue(nextSaved);
     setStatusMessage(`Saved ${item.title} for later.`);
+  }
+
+  function handleMoveSavedForLaterStoryToWaitingQueue(item: ReadyStoryQueueItem) {
+    removeSavedForLaterQueueItemAndPersist(item.id);
+    const nextQueue = persistReadyStoryQueue([item, ...readyStoryQueue.filter((queueItem) => queueItem.id !== item.id)]);
+    setReadyStoryQueue(nextQueue);
+    setStatusMessage(`Moved ${item.title} back to the waiting queue.`);
+  }
+
+  function handleRemoveSavedForLaterStory(item: ReadyStoryQueueItem) {
+    removeSavedForLaterQueueItemAndPersist(item.id);
+    setStatusMessage(`Removed ${item.title} from saved for later.`);
   }
 
   function handleStartSomethingNew() {
@@ -1188,7 +1214,7 @@ export default function Home() {
         ) : null}
         {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : "Next Episode"} generationProfileSnapshot={storyResponse?.metadata.diagnostics.readerProfileSnapshot ?? storyResponse?.metadata.diagnostics.readerProfileGenerationSnapshot} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
         {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} /> : null}
-        {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onRefreshCloud={handleRefreshCloudProjects} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
+        {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onMoveSavedForLaterToWaitingQueue={handleMoveSavedForLaterStoryToWaitingQueue} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onReadSavedForLater={handleReadSavedForLaterStory} onRefreshCloud={handleRefreshCloudProjects} onRemoveSavedForLater={handleRemoveSavedForLaterStory} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedForLaterStoryQueue={savedForLaterStoryQueue} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
         {activeView === "characters" ? <CharactersView onOpenStory={handleStartRecommendation} /> : null}
@@ -1480,10 +1506,39 @@ function InputPanel({ artifactType, libraryArtifacts, onChange, onSave, onSelect
   return <section className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4"><h2 className="text-lg font-semibold text-paper">{title}</h2><select className="mt-3 w-full rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper" onChange={(event) => onSelect(artifactType, event.target.value)} value={value.libraryArtifactId ?? ""}><option value="">Choose saved item</option>{libraryArtifacts.map((artifact) => <option key={artifact.id} value={artifact.id}>{artifact.name}</option>)}</select><textarea className="mt-3 min-h-32 w-full rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm leading-6 text-paper outline-none focus:border-lantern-gold" onChange={(event) => onChange({ name: value.name || `${slugify(title)}.txt`, content: event.target.value, libraryArtifactId: value.libraryArtifactId })} placeholder={`Add ${title.toLowerCase()} text`} value={value.content} /><label className="mt-3 flex cursor-pointer items-center justify-center rounded-md border border-dashed border-lantern-gold/50 px-4 py-3 text-sm font-semibold text-lantern-gold"><span className="min-w-0 truncate">{value.name || "Upload .md or .txt"}</span><input className="sr-only" type="file" accept=".md,.txt,text/markdown,text/plain" onChange={handleFileChange} /></label><button className="mt-3 rounded-md border border-lantern-gold/45 px-3 py-2 text-xs font-semibold text-lantern-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={!value.content.trim()} onClick={() => onSave(artifactType, value)} type="button">Save to Library</button></section>;
 }
 
-function LibraryView(props: { cloudMessage: string; cloudProjects: CloudProjectSummary[]; currentStory: LibraryStory | null; isCloudLoading: boolean; onDeleteCloudProject: () => void; onDeleteProject: () => void; onDeleteStory: (storyId: string) => void; onLoadCloudProject: (projectId: string) => void; onLoadProject: (projectId: string) => void; onOpenCurrentStory: () => void; onProjectNameChange: (name: string) => void; onRefreshCloud: () => void; onRestoreStory: (story: SavedStory) => void; onSaveCloudProject: () => void; onSaveProject: () => void; onSaveStory: () => void; projectName: string; savedProjects: SavedProject[]; savedStories: SavedStory[]; selectedCloudProjectId: string; selectedProjectId: string; storyResponse: GenerateStoryResponse | null }) {
-  const { cloudMessage, cloudProjects, currentStory, isCloudLoading, onDeleteCloudProject, onDeleteProject, onDeleteStory, onLoadCloudProject, onLoadProject, onOpenCurrentStory, onProjectNameChange, onRefreshCloud, onRestoreStory, onSaveCloudProject, onSaveProject, onSaveStory, projectName, savedProjects, savedStories, selectedCloudProjectId, selectedProjectId, storyResponse } = props;
-  const hasStoryRows = Boolean(currentStory || savedStories.length);
-  return <section className="grid min-w-0 gap-5"><PageHeading eyebrow="Library" title="Story Library" body="Saved and recent stories live here as a separate destination." /><div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,420px)_1fr]"><section className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4"><h2 className="text-xl font-semibold text-paper">Library Tools</h2><p className="mt-1 text-sm leading-6 text-paper/65">Save stories and move project workspaces between local and cloud storage.</p><button className="mt-4 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={!storyResponse} onClick={onSaveStory} type="button">Save Current Story</button><label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-paper">Project Name</span><input className="rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper" onChange={(event) => onProjectNameChange(event.target.value)} placeholder="My story project" value={projectName} /></label><div className="mt-3 flex flex-wrap gap-2"><SmallButton onClick={onSaveProject}>Save Project</SmallButton><SmallButton disabled={!selectedProjectId} onClick={onDeleteProject}>Delete Project</SmallButton><SmallButton disabled={isCloudLoading} onClick={onRefreshCloud}>{isCloudLoading ? "Syncing..." : "Refresh Cloud"}</SmallButton><SmallButton disabled={isCloudLoading} onClick={onSaveCloudProject}>Save to Cloud</SmallButton><SmallButton disabled={isCloudLoading || !selectedCloudProjectId} onClick={onDeleteCloudProject}>Delete Cloud</SmallButton></div><SelectLibrary label="Load Project" onChange={onLoadProject} options={savedProjects.map((project) => ({ label: `${project.name} - ${formatDateTime(project.updatedAt)}`, value: project.id }))} value={selectedProjectId} /><SelectLibrary label="Load Cloud Project" onChange={onLoadCloudProject} options={cloudProjects.map((project) => ({ label: `${project.name} - ${formatDateTime(project.updatedAt)}`, value: project.id }))} value={selectedCloudProjectId} />{cloudMessage ? <p className="mt-3 rounded-md border border-lantern-gold/25 bg-paper/10 px-3 py-2 text-xs leading-5 text-paper/65">{cloudMessage}</p> : null}</section><section className="grid min-w-0 gap-3">{!hasStoryRows ? <EmptyPanel title="No saved or recent stories yet" body="Generate a story or save one locally and it will appear here." /> : null}{currentStory ? <StoryLibraryCard badge="Recent Story" onOpen={onOpenCurrentStory} story={currentStory} /> : null}{savedStories.map((story) => <StoryLibraryCard key={story.id} onDelete={() => onDeleteStory(story.id)} onOpen={() => onRestoreStory(story)} story={story} />)}</section></div></section>;
+function LibraryView(props: { cloudMessage: string; cloudProjects: CloudProjectSummary[]; currentStory: LibraryStory | null; isCloudLoading: boolean; onDeleteCloudProject: () => void; onDeleteProject: () => void; onDeleteStory: (storyId: string) => void; onLoadCloudProject: (projectId: string) => void; onLoadProject: (projectId: string) => void; onMoveSavedForLaterToWaitingQueue: (item: ReadyStoryQueueItem) => void; onOpenCurrentStory: () => void; onProjectNameChange: (name: string) => void; onReadSavedForLater: (item: ReadyStoryQueueItem) => void; onRefreshCloud: () => void; onRemoveSavedForLater: (item: ReadyStoryQueueItem) => void; onRestoreStory: (story: SavedStory) => void; onSaveCloudProject: () => void; onSaveProject: () => void; onSaveStory: () => void; projectName: string; savedForLaterStoryQueue: ReadyStoryQueueItem[]; savedProjects: SavedProject[]; savedStories: SavedStory[]; selectedCloudProjectId: string; selectedProjectId: string; storyResponse: GenerateStoryResponse | null }) {
+  const { cloudMessage, cloudProjects, currentStory, isCloudLoading, onDeleteCloudProject, onDeleteProject, onDeleteStory, onLoadCloudProject, onLoadProject, onMoveSavedForLaterToWaitingQueue, onOpenCurrentStory, onProjectNameChange, onReadSavedForLater, onRefreshCloud, onRemoveSavedForLater, onRestoreStory, onSaveCloudProject, onSaveProject, onSaveStory, projectName, savedForLaterStoryQueue, savedProjects, savedStories, selectedCloudProjectId, selectedProjectId, storyResponse } = props;
+  const hasStoryRows = Boolean(currentStory || savedStories.length || savedForLaterStoryQueue.length);
+
+  return (
+    <section className="grid min-w-0 gap-5">
+      <PageHeading eyebrow="Library" title="Story Library" body="Saved and recent stories live here as a separate destination." />
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,420px)_1fr]">
+        <section className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4">
+          <h2 className="text-xl font-semibold text-paper">Library Tools</h2>
+          <p className="mt-1 text-sm leading-6 text-paper/65">Save stories and move project workspaces between local and cloud storage.</p>
+          <button className="mt-4 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={!storyResponse} onClick={onSaveStory} type="button">Save Current Story</button>
+          <label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-paper">Project Name</span><input className="rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper" onChange={(event) => onProjectNameChange(event.target.value)} placeholder="My story project" value={projectName} /></label>
+          <div className="mt-3 flex flex-wrap gap-2"><SmallButton onClick={onSaveProject}>Save Project</SmallButton><SmallButton disabled={!selectedProjectId} onClick={onDeleteProject}>Delete Project</SmallButton><SmallButton disabled={isCloudLoading} onClick={onRefreshCloud}>{isCloudLoading ? "Syncing..." : "Refresh Cloud"}</SmallButton><SmallButton disabled={isCloudLoading} onClick={onSaveCloudProject}>Save to Cloud</SmallButton><SmallButton disabled={isCloudLoading || !selectedCloudProjectId} onClick={onDeleteCloudProject}>Delete Cloud</SmallButton></div>
+          <SelectLibrary label="Load Project" onChange={onLoadProject} options={savedProjects.map((project) => ({ label: `${project.name} - ${formatDateTime(project.updatedAt)}`, value: project.id }))} value={selectedProjectId} />
+          <SelectLibrary label="Load Cloud Project" onChange={onLoadCloudProject} options={cloudProjects.map((project) => ({ label: `${project.name} - ${formatDateTime(project.updatedAt)}`, value: project.id }))} value={selectedCloudProjectId} />
+          {cloudMessage ? <p className="mt-3 rounded-md border border-lantern-gold/25 bg-paper/10 px-3 py-2 text-xs leading-5 text-paper/65">{cloudMessage}</p> : null}
+        </section>
+        <section className="grid min-w-0 gap-3">
+          {!hasStoryRows ? <EmptyPanel title="No saved or recent stories yet" body="Generate a story or save one locally and it will appear here." /> : null}
+          {savedForLaterStoryQueue.length ? <section className="grid min-w-0 gap-3 rounded-md border border-lantern-gold/20 bg-lantern-gold/5 p-3"><div><h2 className="text-lg font-semibold text-paper">Saved for Later</h2><p className="mt-1 text-sm leading-6 text-paper/60">Ready story choices you saved from the desktop queue.</p></div>{savedForLaterStoryQueue.map((item) => <SavedForLaterStoryCard item={item} key={item.id} onMoveToWaitingQueue={() => onMoveSavedForLaterToWaitingQueue(item)} onRead={() => onReadSavedForLater(item)} onRemove={() => onRemoveSavedForLater(item)} />)}</section> : null}
+          {currentStory ? <StoryLibraryCard badge="Recent Story" onOpen={onOpenCurrentStory} story={currentStory} /> : null}
+          {savedStories.map((story) => <StoryLibraryCard key={story.id} onDelete={() => onDeleteStory(story.id)} onOpen={() => onRestoreStory(story)} story={story} />)}
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function SavedForLaterStoryCard({ item, onMoveToWaitingQueue, onRead, onRemove }: { item: ReadyStoryQueueItem; onMoveToWaitingQueue: () => void; onRead: () => void; onRemove: () => void }) {
+  const statusLabel = item.generationStatus === "ready" && item.generatedStory ? `${item.generatedStory.metadata.wordCount.toLocaleString()} words ready` : "Waiting to be opened";
+
+  return <article className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><h3 className="text-lg font-semibold text-paper">{item.title}</h3><p className="mt-1 text-sm leading-6 text-paper/60">Saved {formatDateTime(item.updatedAt)} | {item.genre} | {statusLabel}</p></div><span className="w-fit rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-2 py-1 text-xs font-semibold text-lantern-gold">Saved for later</span></div><p className="mt-3 text-sm leading-6 text-paper/70">{truncateText(item.premise, 220)}</p><div className="mt-4 flex flex-wrap gap-2"><SmallButton onClick={onRead}>Read</SmallButton><SmallButton onClick={onMoveToWaitingQueue}>Move back to waiting queue</SmallButton><SmallButton onClick={onRemove}>Remove</SmallButton></div></article>;
 }
 
 function StoryLibraryCard({ badge, onDelete, onOpen, story }: { badge?: string; onDelete?: () => void; onOpen: () => void; story: LibraryStory }) {
