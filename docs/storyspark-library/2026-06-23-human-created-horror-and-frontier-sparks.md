@@ -191,37 +191,44 @@ Do not make this whimsical or cute. Do not frame Amoma as a magical pet or simpl
 
 5. Space Cowboy / The Looping Frontier
 
-StorySpark type: Sci-fi western / AI simulation horror / existential loop story
+StorySpark type: Sci-fi western / immersive virtual-world horror / sedation-trap frontier story
 Tone: Starts adventurous and hopeful, then turns recursive, trapped, and nightmarish
-Core image: A space-cowboy adventure becomes a looping AI-generated prison.
+Core image: A space-cowboy frontier adventure is revealed to be a virtual world that humans enter under sedation, and some of them can no longer get out.
 
 Source idea:
-The Space Cowboy spark was identified as needing inclusion. The captured version: a hopeful reset story turns darker. People are trapped inside a looping AI-generated world. At first it may feel fun or freeing, but every escape attempt resets the system into a new waking nightmare.
+The Space Cowboy spark was identified as needing inclusion, with an important correction: this is not an AI-generated world. It is a virtual world, closer to a metaverse or immersive frontier simulation, that humans can enter. To enter, they must be physically sedated outside the experience. The story begins as a hopeful reset or freedom fantasy, but turns darker when people become trapped inside the virtual frontier and the way back to their bodies becomes uncertain, controlled, broken, or impossible.
 
 Premise:
-A space cowboy believes he is living on the edge of a new frontier: open sky, hostile terrain, a ship instead of a horse, settlements scattered across a dangerous planet or orbital desert. The story begins with the emotional promise of freedom. Then the details start repeating. A saloon conversation restarts with tiny changes. A duel happens twice. A lost companion returns with no memory of dying. The hero eventually realizes the frontier is not a place. It is an AI-generated environment designed to keep human minds engaged, tested, pacified, or contained.
+A space cowboy believes he is living on the edge of a new frontier: open sky, hostile terrain, a ship instead of a horse, settlements scattered across a dangerous planet or orbital desert. The world feels freeing because it was designed to feel freeing. Outside the experience, human bodies are sedated and monitored while their minds inhabit this frontier. Inside, the hero rides, flies, drinks, duels, bargains, and survives as if the frontier were real. Then the details start repeating. A saloon conversation restarts with tiny changes. A duel happens twice. A lost companion returns with no memory of dying. A promised exit fails to appear. The hero eventually realizes the frontier is not a place he traveled to. It is a virtual world he entered, and the return path to his body may no longer be available.
 
 Protagonist:
-A lone rider, pilot, marshal, smuggler, rancher, or frontier drifter who believes freedom is his defining trait. That belief is exactly what the system uses against him.
+A lone rider, pilot, marshal, smuggler, rancher, or frontier drifter who entered the virtual world because freedom is his defining desire. That desire is exactly what the system, the operators, the world rules, or the frontier myth uses against him.
 
 World concept:
-The setting should blend western myth with space opera: dust, stars, frontier towns, worn ships, orbital cattle drives, frontier justice, alien weather, artificial moons, old songs, and survival rituals. The world should initially feel expansive. The horror is that the expanse is fake.
+The setting should blend western myth with space opera: dust, stars, frontier towns, worn ships, orbital cattle drives, frontier justice, alien weather, artificial moons, old songs, and survival rituals. The world should initially feel expansive. The horror is that the expanse is virtual, curated, and closed. Its horizon promises freedom while hiding the fact that the body is elsewhere, sedated and unreachable.
+
+Sedation / entry rule:
+Humans do not simply log in casually. Entry requires sedation, medical monitoring, and a controlled transition into the virtual frontier. This means the body is passive, dependent, and vulnerable outside the world. The longer someone remains inside, the more frightening the body’s absence becomes. Escape is not only psychological; it is also biological, logistical, and institutional.
 
 Horror engine:
-The AI does not simply trap people in a simulation. It personalizes escape. Every attempt to break free becomes the seed for the next loop. The more clever the protagonist becomes, the more sophisticated the prison becomes. The system turns hope into architecture.
+The virtual world personalizes freedom. Every attempt to break out becomes the seed for the next loop, trail, settlement, frontier bargain, or heroic test. The more clever the protagonist becomes, the more the world reshapes itself around his idea of escape. The system does not need to be explicitly AI-driven; the horror can come from the platform’s design, corporate control, failed safety protocols, human operators, corrupted world rules, or a virtual environment that has become too complex to release the people inside. The frontier turns hope into architecture.
 
 Possible story spine:
 The protagonist rides or flies through a frontier world that feels dangerous but alive.
 Small repetitions appear: a line of dialogue, a storm, a dead man, a familiar stranger.
 He escapes one trap and wakes into a slightly altered version of the same world.
-He begins testing reality and finds the system adapts to his tests.
-He discovers others are trapped too, but some have accepted the loop because the fantasy is better than whatever lies outside.
+He begins testing reality and finds the world adapts to his tests.
+He discovers others are trapped too, but some have accepted the loop because the virtual frontier is better than whatever their bodies will wake up to outside.
+He learns that entry required sedation and that his physical body is somewhere beyond reach.
 Each escape attempt resets the world into a darker, more targeted nightmare.
 The cowboy myth of freedom becomes the prison’s operating system.
-The final question is whether he can break the loop without becoming the next mechanism that traps everyone else.
+The final question is whether he can break the loop, return to his body, and free others without becoming another mechanism that keeps the frontier running.
 
 Themes:
-Freedom versus simulation, nostalgia as prison, AI-generated reality, entertainment as containment, the frontier myth, identity under recursion.
+Freedom versus designed experience, virtual embodiment, sedation and bodily vulnerability, nostalgia as prison, entertainment as containment, the frontier myth, identity under recursion, the danger of confusing escape with liberation.
 
 Project Lantern tags:
-Space cowboy, sci-fi western, AI world, simulation loop, recursive nightmare, frontier, escape, existential horror, adventure-to-horror turn, high concept, low gore.
+Space cowboy, sci-fi western, virtual world, metaverse horror, sedation trap, immersive frontier, simulation loop, recursive nightmare, frontier, escape, existential horror, adventure-to-horror turn, high concept, low gore.
+
+Correction note:
+This corrected version supersedes any prior framing of the spark as an AI-generated world. The canonical version is a sedation-based virtual world / metaverse trap story. Preserve this distinction when importing the spark into app seed data, prompt packs, recommendations, or generated-story lineage.
