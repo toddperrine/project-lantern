@@ -32,6 +32,7 @@ import {
   countPreparedReadyStoryQueueItems,
   createReadyStoryQueueItem,
   formatReadyStoryCreatorCredit,
+  MAX_READY_STORY_QUEUE_ITEMS,
   persistReadyStoryQueue,
   persistSavedForLaterStoryQueue,
   readReadyStoryQueue,
@@ -236,6 +237,39 @@ function shouldReplaceLegacyGenericReadyQueue(items: ReadyStoryQueueItem[]): boo
       items.every((item) => LEGACY_GENERIC_READY_QUEUE_TITLES.has(item.title)) &&
       items.every((item) => !item.sourceStorySparkId)
   );
+}
+
+function fillReadyStoryQueueFromCatalog(
+  currentQueue: ReadyStoryQueueItem[],
+  savedForLaterQueue: ReadyStoryQueueItem[],
+  profile: ReaderProfile
+): ReadyStoryQueueItem[] {
+  const blockedStorySparkIds = new Set<string>();
+
+  for (const item of currentQueue) {
+    if (item.sourceStorySparkId) blockedStorySparkIds.add(item.sourceStorySparkId);
+  }
+
+  for (const item of savedForLaterQueue) {
+    if (item.sourceStorySparkId) blockedStorySparkIds.add(item.sourceStorySparkId);
+  }
+
+  for (const signal of profile.readyStoryQueueSignals ?? []) {
+    if (signal.signal !== "pass" && signal.signal !== "read") continue;
+    if (signal.storyCardId) blockedStorySparkIds.add(signal.storyCardId);
+  }
+
+  const nextQueue = [...currentQueue];
+
+  for (const catalogItem of STORY_SPARK_CATALOG) {
+    if (nextQueue.length >= MAX_READY_STORY_QUEUE_ITEMS) break;
+    if (blockedStorySparkIds.has(catalogItem.id)) continue;
+
+    nextQueue.push(storySparkCatalogItemToReadyStoryQueueItem(catalogItem));
+    blockedStorySparkIds.add(catalogItem.id);
+  }
+
+  return nextQueue.slice(0, MAX_READY_STORY_QUEUE_ITEMS);
 }
 
 
@@ -539,10 +573,10 @@ export default function Home() {
   }
 
 
-  function recordReadyStoryQueueSignal(item: ReadyStoryQueueItem, signal: ReadyStoryQueueSignal) {
+  function recordReadyStoryQueueSignal(item: ReadyStoryQueueItem, signal: ReadyStoryQueueSignal): ReaderProfile {
     const now = new Date().toISOString();
     const nextProfile = saveReadyStoryQueueSignal({
-      storyCardId: item.id,
+      storyCardId: item.sourceStorySparkId ?? item.id,
       storyTitle: item.title,
       signal,
       genre: item.genre,
@@ -555,10 +589,17 @@ export default function Home() {
     setReaderProfile(nextProfile);
     void syncReaderProfileToCloud(nextProfile);
     setLastReadyStoryQueueAction(`${signal}: ${item.title}`);
+    return nextProfile;
   }
 
-  function removeReadyQueueItemAndPersist(itemId: string) {
-    const nextQueue = persistReadyStoryQueue(removeReadyStoryQueueItem(readyStoryQueue, itemId));
+  function removeReadyQueueItemAndPersist(
+    itemId: string,
+    profileForBackfill = readerProfile,
+    savedForLaterQueueForBackfill = savedForLaterStoryQueue
+  ) {
+    const queueWithOpenSlot = removeReadyStoryQueueItem(readyStoryQueue, itemId);
+    const backfilledQueue = fillReadyStoryQueueFromCatalog(queueWithOpenSlot, savedForLaterQueueForBackfill, profileForBackfill);
+    const nextQueue = persistReadyStoryQueue(backfilledQueue);
     setReadyStoryQueue(nextQueue);
     return nextQueue;
   }
@@ -586,11 +627,11 @@ export default function Home() {
     };
   }
 
-  function openReadyStoryQueueItem(item: ReadyStoryQueueItem, removeItem: (itemId: string) => void) {
+  function openReadyStoryQueueItem(item: ReadyStoryQueueItem, removeItem: (itemId: string, profileForBackfill?: ReaderProfile) => void) {
     if (isGenerating || item.generationStatus === "generating") return;
 
-    recordReadyStoryQueueSignal(item, "read");
-    removeItem(item.id);
+    const nextProfile = recordReadyStoryQueueSignal(item, "read");
+    removeItem(item.id, nextProfile);
 
     if (item.generationStatus === "ready" && item.generatedStory) {
       const generatedStoryId = item.generatedStoryId || createStoryId(item.generatedStory.story);
@@ -648,22 +689,24 @@ export default function Home() {
   }
 
   function handlePassReadyStory(item: ReadyStoryQueueItem) {
-    recordReadyStoryQueueSignal(item, "pass");
-    removeReadyQueueItemAndPersist(item.id);
+    const nextProfile = recordReadyStoryQueueSignal(item, "pass");
+    removeReadyQueueItemAndPersist(item.id, nextProfile);
     setStatusMessage(`Passed ${item.title}.`);
   }
 
   function handleSaveReadyStoryForLater(item: ReadyStoryQueueItem) {
-    recordReadyStoryQueueSignal(item, "save_for_later");
-    removeReadyQueueItemAndPersist(item.id);
+    const nextProfile = recordReadyStoryQueueSignal(item, "save_for_later");
     const nextSaved = persistSavedForLaterStoryQueue(upsertSavedForLaterStoryQueueItem(savedForLaterStoryQueue, item));
     setSavedForLaterStoryQueue(nextSaved);
+    removeReadyQueueItemAndPersist(item.id, nextProfile, nextSaved);
     setStatusMessage(`Saved ${item.title} for later.`);
   }
 
   function handleMoveSavedForLaterStoryToWaitingQueue(item: ReadyStoryQueueItem) {
-    removeSavedForLaterQueueItemAndPersist(item.id);
-    const nextQueue = persistReadyStoryQueue([item, ...readyStoryQueue.filter((queueItem) => queueItem.id !== item.id)]);
+    const nextSaved = removeSavedForLaterQueueItemAndPersist(item.id);
+    const queueWithMovedItem = [item, ...readyStoryQueue.filter((queueItem) => queueItem.id !== item.id)].slice(0, MAX_READY_STORY_QUEUE_ITEMS);
+    const backfilledQueue = fillReadyStoryQueueFromCatalog(queueWithMovedItem, nextSaved, readerProfile);
+    const nextQueue = persistReadyStoryQueue(backfilledQueue);
     setReadyStoryQueue(nextQueue);
     setStatusMessage(`Moved ${item.title} back to the waiting queue.`);
   }
