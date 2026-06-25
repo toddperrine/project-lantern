@@ -1387,7 +1387,7 @@ function EpisodeReader({ eyebrow, feedback, generationBlockedBecauseUnsavedFeedb
       </div>
       <div className="min-w-0 whitespace-pre-wrap rounded-md border border-paper/10 bg-night-ink/70 p-4 text-base leading-8 text-paper/85 sm:p-5">{story.story}</div>
       {generationProfileSnapshot ? <GenerationProfileSnapshotPanel snapshot={generationProfileSnapshot} /> : null}
-      {story.id ? <StoryFeedbackPanel feedback={feedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} onDraftStateChange={onFeedbackDraftStateChange} onSave={(rating, reasons) => onFeedbackChange(story, rating, reasons)} /> : null}
+      {story.id ? <StoryFeedbackPanel feedback={feedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} onDraftStateChange={onFeedbackDraftStateChange} onSave={(rating, reasons) => onFeedbackChange(story, rating, reasons)} storyId={story.id} /> : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <button className="inline-flex items-center gap-2 rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={onContinue} type="button">{isGenerating ? <><span className="size-4 animate-spin rounded-full border-2 border-night-ink/30 border-t-night-ink" aria-hidden="true" />Writing the next chapter…</> : "Continue this story"}</button>
         <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-lantern-gold/50" onClick={onExport} type="button">Export</button>
@@ -1431,18 +1431,28 @@ function GenerationProfileSnapshotPanel({ snapshot }: { snapshot: ReaderProfileG
   );
 }
 
-function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback, onDraftStateChange, onSave }: { feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; onDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onSave: (rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void }) {
+function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback, onDraftStateChange, onSave, storyId }: { feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; onDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onSave: (rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void; storyId: string }) {
   const [draftRating, setDraftRating] = useState<StoryFeedbackRating | null>(feedback?.rating ?? null);
   const [draftReasons, setDraftReasons] = useState<StoryFeedbackReason[]>(feedback?.reasons ?? []);
   const [draftClearedAfterSave, setDraftClearedAfterSave] = useState(false);
+  const [clearedFeedbackStoryId, setClearedFeedbackStoryId] = useState<string | null>(null);
   const [inlineMessage, setInlineMessage] = useState<string>(feedback ? "Feedback saved to reader profile." : "");
 
   useEffect(() => {
+    if (feedback?.storyId && feedback.storyId === clearedFeedbackStoryId) {
+      setDraftRating(null);
+      setDraftReasons([]);
+      setDraftClearedAfterSave(true);
+      setInlineMessage("Feedback saved to reader profile.");
+      return;
+    }
+
     setDraftRating(feedback?.rating ?? null);
     setDraftReasons(feedback?.reasons ?? []);
     setDraftClearedAfterSave(false);
+    setClearedFeedbackStoryId(null);
     setInlineMessage(feedback ? "Feedback saved to reader profile." : "");
-  }, [feedback?.storyId]);
+  }, [clearedFeedbackStoryId, feedback?.storyId]);
 
   const hasUnsavedChanges = draftClearedAfterSave && !draftRating && draftReasons.length === 0 ? false : !areFeedbackDraftsEqual(draftRating, draftReasons, feedback);
   const saveBlockedBecauseRatingMissing = !draftRating;
@@ -1453,6 +1463,7 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
 
   function toggleReason(reason: StoryFeedbackReason) {
     setDraftClearedAfterSave(false);
+    setClearedFeedbackStoryId(null);
     setDraftReasons((currentReasons) => {
       if (currentReasons.includes(reason)) return currentReasons.filter((selectedReason) => selectedReason !== reason);
       const mutuallyExclusiveReason = getMutuallyExclusiveFeedbackReason(reason);
@@ -1469,6 +1480,7 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
     setDraftRating(null);
     setDraftReasons([]);
     setDraftClearedAfterSave(true);
+    setClearedFeedbackStoryId(storyId);
     setInlineMessage("Feedback saved to reader profile.");
   }
 
@@ -1484,7 +1496,7 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
             aria-pressed={draftRating === option.rating}
             className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${draftRating === option.rating ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper hover:border-lantern-gold/50"}`}
             key={option.rating}
-            onClick={() => { setDraftClearedAfterSave(false); setDraftRating(option.rating); }}
+            onClick={() => { setDraftClearedAfterSave(false); setClearedFeedbackStoryId(null); setDraftRating(option.rating); }}
             type="button"
           >
             {option.label}
