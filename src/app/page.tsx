@@ -23,6 +23,7 @@ import {
   getOrCreateReaderId,
   loadCanonicalReaderProfile,
   saveCanonicalReaderProfile,
+  applyFeedbackToReaderProfile,
   buildGenerationReaderProfileInput,
   mirrorCanonicalReaderProfilePreferences,
   readReaderProfile,
@@ -33,7 +34,8 @@ import {
   saveReadyStoryQueueSignal,
   DEFAULT_READER_SAFETY_GUARDRAILS,
   normalizeReaderTasteProfile,
-  STORY_FEEDBACK_SCORE_BY_RATING
+  STORY_FEEDBACK_SCORE_BY_RATING,
+  createFeedbackEventId
 } from "@/lib/reader-profile";
 import {
   countPreparedReadyStoryQueueItems,
@@ -1261,9 +1263,27 @@ export default function Home() {
     };
     const nextProfile = saveStoryFeedbackSignal(signal);
     setReaderProfile(nextProfile);
+
+    const feedbackEvent = {
+      id: createFeedbackEventId(),
+      storyId: story.id ?? null,
+      storyTitle: story.title ?? null,
+      rating,
+      reasons,
+      note: null,
+      createdAt: now,
+    };
+    const currentCanonicalProfile = loadCanonicalReaderProfile();
+    const savedForLaterCount = Math.max(currentCanonicalProfile.signals.savedForLaterCount ?? 0, nextProfile.readyStoryQueueSignals?.filter((item) => item.signal === "save_for_later").length ?? 0);
+    const nextCanonicalProfile = saveCanonicalReaderProfile(applyFeedbackToReaderProfile({
+      ...currentCanonicalProfile,
+      signals: { ...currentCanonicalProfile.signals, savedForLaterCount },
+    }, feedbackEvent));
+    setCanonicalReaderProfile(nextCanonicalProfile);
+
     void syncReaderProfileToCloud(nextProfile);
     setGenerationBlockedBecauseUnsavedFeedback(false);
-    setStatusMessage("Story feedback saved to your reader profile.");
+    setStatusMessage("Feedback saved to reader profile.");
   }
 
   function recordReaderSignal(event: ReaderProfileEventInput) {
@@ -1406,10 +1426,12 @@ function GenerationProfileSnapshotPanel({ snapshot }: { snapshot: ReaderProfileG
 function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback, onDraftStateChange, onSave }: { feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; onDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onSave: (rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void }) {
   const [draftRating, setDraftRating] = useState<StoryFeedbackRating | null>(feedback?.rating ?? null);
   const [draftReasons, setDraftReasons] = useState<StoryFeedbackReason[]>(feedback?.reasons ?? []);
+  const [inlineMessage, setInlineMessage] = useState<string>(feedback ? "Feedback saved to reader profile." : "");
 
   useEffect(() => {
     setDraftRating(feedback?.rating ?? null);
     setDraftReasons(feedback?.reasons ?? []);
+    setInlineMessage(feedback ? "Feedback saved to reader profile." : "");
   }, [feedback?.rating, feedback?.reasons, feedback?.storyId]);
 
   const hasUnsavedChanges = !areFeedbackDraftsEqual(draftRating, draftReasons, feedback);
@@ -1426,8 +1448,12 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
   }
 
   function saveFeedback() {
-    if (!draftRating) return;
+    if (!draftRating) {
+      setInlineMessage("Choose a rating before saving feedback.");
+      return;
+    }
     onSave(draftRating, draftReasons);
+    setInlineMessage("Feedback saved to reader profile.");
   }
 
   return (
@@ -1469,8 +1495,8 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
         </div>
       </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <button className="w-fit rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={!draftRating} onClick={saveFeedback} type="button">Save feedback</button>
-        <p className={`text-sm font-semibold ${hasUnsavedChanges ? "text-lantern-gold" : feedback ? "text-paper/70" : "text-paper/50"}`}>{hasUnsavedChanges ? "Unsaved feedback" : feedback ? "Feedback saved" : "Select a rating to save feedback."}</p>
+        <button className="w-fit rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink" onClick={saveFeedback} type="button">Save feedback</button>
+        <p className={`text-sm font-semibold ${inlineMessage === "Choose a rating before saving feedback." ? "text-lantern-gold" : hasUnsavedChanges ? "text-lantern-gold" : feedback ? "text-paper/70" : "text-paper/50"}`}>{inlineMessage || (hasUnsavedChanges ? "Unsaved feedback" : feedback ? "Feedback saved" : "Select a rating to save feedback.")}</p>
       </div>
       {generationBlockedBecauseUnsavedFeedback && hasUnsavedChanges ? <p className="text-sm font-semibold text-lantern-gold">Save feedback before starting another story.</p> : null}
     </section>
@@ -1976,13 +2002,14 @@ function ReaderProfileDiagnostics({ canonicalProfile, cloudSync, lastGenerationU
           <p><span className="font-semibold text-paper/80">Feedback signal count:</span> {canonicalProfile?.signals.feedbackSignalCount ?? 0}</p>
           <p><span className="font-semibold text-paper/80">Favorite count:</span> {canonicalProfile?.signals.favoriteCount ?? 0}</p>
           <p><span className="font-semibold text-paper/80">Saved for later count:</span> {canonicalProfile?.signals.savedForLaterCount ?? 0}</p>
+          <p><span className="font-semibold text-paper/80">Last feedback at:</span> {canonicalProfile?.signals.lastFeedbackAt || "never"}</p>
           <p><span className="font-semibold text-paper/80">Fallback/default status:</span> {canonicalProfile?.fallbackReason ?? (canonicalProfile?.source === "default" ? "default" : "none")}</p>
           <p><span className="font-semibold text-paper/80">Profile exists:</span> {profile.profileExists ? "yes" : "no"}</p>
           <p><span className="font-semibold text-paper/80">Profile ID:</span> {cloudSync.profileId || "pending"}</p>
           <p><span className="font-semibold text-paper/80">Local profile exists:</span> {cloudSync.localProfileExists ? "yes" : "no"}</p>
           <p><span className="font-semibold text-paper/80">Cloud profile status:</span> {cloudSync.status}</p>
           <p><span className="font-semibold text-paper/80">Last cloud save outcome:</span> {cloudSync.lastSaveOutcome}</p>
-          <p><span className="font-semibold text-paper/80">Last profile save status for feedback:</span> {profile.storyFeedbackSignals?.length ? cloudSync.status : "no feedback saved"}</p>
+          <p><span className="font-semibold text-paper/80">Last profile save status for feedback:</span> {canonicalProfile?.signals.feedbackSignalCount ? `local success${cloudSync.lastSaveOutcome ? ` / cloud ${cloudSync.lastSaveOutcome}` : ""}` : "no feedback saved"}</p>
           <p><span className="font-semibold text-paper/80">Last cloud sync:</span> {cloudSync.lastSyncAt || "never"}</p>
           <p><span className="font-semibold text-paper/80">Last cloud error:</span> {cloudSync.lastError || "none"}</p>
           <p><span className="font-semibold text-paper/80">Local updated:</span> {cloudSync.localUpdatedAt || profile.updatedAt || "never"}</p>
