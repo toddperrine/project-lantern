@@ -145,6 +145,8 @@ const STORY_FEEDBACK_REASON_OPTIONS: { reason: StoryFeedbackReason; label: strin
   { reason: "not_personal_enough", label: "Not personal enough" },
   { reason: "too_dark", label: "Too dark" },
   { reason: "not_dark_enough", label: "Not dark enough" },
+  { reason: "too_weird", label: "Too weird" },
+  { reason: "not_weird_enough", label: "Not weird enough" },
   { reason: "loved_tone", label: "Loved the tone" },
   { reason: "loved_character", label: "Loved a character" },
   { reason: "wanted_more", label: "Wanted more" },
@@ -1432,15 +1434,17 @@ function GenerationProfileSnapshotPanel({ snapshot }: { snapshot: ReaderProfileG
 function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback, onDraftStateChange, onSave }: { feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; onDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onSave: (rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void }) {
   const [draftRating, setDraftRating] = useState<StoryFeedbackRating | null>(feedback?.rating ?? null);
   const [draftReasons, setDraftReasons] = useState<StoryFeedbackReason[]>(feedback?.reasons ?? []);
+  const [draftClearedAfterSave, setDraftClearedAfterSave] = useState(false);
   const [inlineMessage, setInlineMessage] = useState<string>(feedback ? "Feedback saved to reader profile." : "");
 
   useEffect(() => {
     setDraftRating(feedback?.rating ?? null);
     setDraftReasons(feedback?.reasons ?? []);
+    setDraftClearedAfterSave(false);
     setInlineMessage(feedback ? "Feedback saved to reader profile." : "");
-  }, [feedback?.rating, feedback?.reasons, feedback?.storyId]);
+  }, [feedback?.storyId]);
 
-  const hasUnsavedChanges = !areFeedbackDraftsEqual(draftRating, draftReasons, feedback);
+  const hasUnsavedChanges = draftClearedAfterSave && !draftRating && draftReasons.length === 0 ? false : !areFeedbackDraftsEqual(draftRating, draftReasons, feedback);
   const saveBlockedBecauseRatingMissing = !draftRating;
 
   useEffect(() => {
@@ -1448,9 +1452,12 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
   }, [hasUnsavedChanges, onDraftStateChange, saveBlockedBecauseRatingMissing]);
 
   function toggleReason(reason: StoryFeedbackReason) {
-    setDraftReasons((currentReasons) => currentReasons.includes(reason)
-      ? currentReasons.filter((selectedReason) => selectedReason !== reason)
-      : [...currentReasons, reason]);
+    setDraftClearedAfterSave(false);
+    setDraftReasons((currentReasons) => {
+      if (currentReasons.includes(reason)) return currentReasons.filter((selectedReason) => selectedReason !== reason);
+      const mutuallyExclusiveReason = getMutuallyExclusiveFeedbackReason(reason);
+      return [...currentReasons.filter((selectedReason) => selectedReason !== mutuallyExclusiveReason), reason];
+    });
   }
 
   function saveFeedback() {
@@ -1459,6 +1466,9 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
       return;
     }
     onSave(draftRating, draftReasons);
+    setDraftRating(null);
+    setDraftReasons([]);
+    setDraftClearedAfterSave(true);
     setInlineMessage("Feedback saved to reader profile.");
   }
 
@@ -1474,7 +1484,7 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
             aria-pressed={draftRating === option.rating}
             className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${draftRating === option.rating ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper hover:border-lantern-gold/50"}`}
             key={option.rating}
-            onClick={() => setDraftRating(option.rating)}
+            onClick={() => { setDraftClearedAfterSave(false); setDraftRating(option.rating); }}
             type="button"
           >
             {option.label}
@@ -2221,6 +2231,14 @@ function EerieReaderProfileDiagnostics({ onClear, profile }: { onClear: () => vo
       </div>
     </details>
   );
+}
+
+function getMutuallyExclusiveFeedbackReason(reason: StoryFeedbackReason): StoryFeedbackReason | null {
+  if (reason === "too_dark") return "not_dark_enough";
+  if (reason === "not_dark_enough") return "too_dark";
+  if (reason === "too_weird") return "not_weird_enough";
+  if (reason === "not_weird_enough") return "too_weird";
+  return null;
 }
 
 function formatOptionalPreference(value: number | undefined): string {

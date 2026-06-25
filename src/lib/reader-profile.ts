@@ -45,6 +45,8 @@ export type StoryFeedbackReason =
   | "not_personal_enough"
   | "too_dark"
   | "not_dark_enough"
+  | "too_weird"
+  | "not_weird_enough"
   | "loved_tone"
   | "loved_character"
   | "wanted_more"
@@ -774,7 +776,7 @@ function isStoryFeedbackRating(value: unknown): value is StoryFeedbackRating {
 }
 
 function isStoryFeedbackReason(value: unknown): value is StoryFeedbackReason {
-  return value === "wrong_tone" || value === "too_generic" || value === "too_slow" || value === "confusing" || value === "not_personal_enough" || value === "too_dark" || value === "not_dark_enough" || value === "loved_tone" || value === "loved_character" || value === "wanted_more" || value === "felt_personal" || value === "surprising" || value === "comforting";
+  return value === "wrong_tone" || value === "too_generic" || value === "too_slow" || value === "confusing" || value === "not_personal_enough" || value === "too_dark" || value === "not_dark_enough" || value === "too_weird" || value === "not_weird_enough" || value === "loved_tone" || value === "loved_character" || value === "wanted_more" || value === "felt_personal" || value === "surprising" || value === "comforting";
 }
 
 function isStoryFeedbackGenerationMode(value: unknown): value is StoryFeedbackGenerationMode {
@@ -995,10 +997,19 @@ export function applyStoryFeedbackToReaderProfile(profile: CanonicalReaderProfil
     preferences[key] = clamp01((typeof preferences[key] === "number" ? preferences[key] : fallback) + delta);
   };
 
-  if (reasonMatches(reasons, "too dark")) { nudge("fearIntensity", -0.04, 0.45); nudge("sleepSafePreference", 0.03, 0.7); }
-  if (reasonMatches(reasons, "not dark enough")) nudge("fearIntensity", 0.04, 0.45);
-  if (reasonMatches(reasons, "too weird")) { nudge("weirdnessTolerance", -0.04, 0.45); nudge("ambiguityTolerance", -0.03, 0.6); }
-  if (reasonMatches(reasons, "not weird enough")) { nudge("weirdnessTolerance", 0.04, 0.45); nudge("ambiguityTolerance", 0.03, 0.6); }
+  const hasTooDark = reasonMatches(reasons, "too dark");
+  const hasNotDarkEnough = reasonMatches(reasons, "not dark enough");
+  const hasTooWeird = reasonMatches(reasons, "too weird");
+  const hasNotWeirdEnough = reasonMatches(reasons, "not weird enough");
+  const diagnosticNotes: string[] = [];
+
+  if (hasTooDark && hasNotDarkEnough) diagnosticNotes.push("contradictory feedback ignored for darkness");
+  else if (hasTooDark) { nudge("fearIntensity", -0.04, 0.45); nudge("sleepSafePreference", 0.03, 0.7); }
+  else if (hasNotDarkEnough) nudge("fearIntensity", 0.04, 0.45);
+
+  if (hasTooWeird && hasNotWeirdEnough) diagnosticNotes.push("contradictory feedback ignored for weirdness");
+  else if (hasTooWeird) { nudge("weirdnessTolerance", -0.04, 0.45); nudge("ambiguityTolerance", -0.03, 0.6); }
+  else if (hasNotWeirdEnough) { nudge("weirdnessTolerance", 0.04, 0.45); nudge("ambiguityTolerance", 0.03, 0.6); }
   if (reasonMatches(reasons, "too gory")) { nudge("goreTolerance", -0.05, 0.15); nudge("sleepSafePreference", 0.03, 0.7); }
 
   const learned = normalizeCanonicalLearnedPreferences(profile.learned);
@@ -1008,7 +1019,8 @@ export function applyStoryFeedbackToReaderProfile(profile: CanonicalReaderProfil
   if (reasonMatches(reasons, "wanted more") || feedback.rating === "favorite" || feedback.rating === "great") learned.continuationPreference = clamp01((learned.continuationPreference ?? 0) + (reasonMatches(reasons, "wanted more") ? 0.05 : 0.02));
   learned.confidence = clamp01((learned.confidence ?? 0) + 0.03);
 
-  const recentFeedback = [feedback, ...(profile.recentFeedback ?? [])].slice(0, MAX_CANONICAL_RECENT_FEEDBACK);
+  const feedbackForDiagnostics = diagnosticNotes.length ? { ...feedback, note: [feedback.note, ...diagnosticNotes].filter(Boolean).join("; ") } : feedback;
+  const recentFeedback = [feedbackForDiagnostics, ...(profile.recentFeedback ?? [])].slice(0, MAX_CANONICAL_RECENT_FEEDBACK);
   const appliedSignalIds = [signalId, ...(profile.appliedSignalIds ?? []).filter((id) => id !== signalId)].slice(0, MAX_CANONICAL_APPLIED_FEEDBACK_SIGNAL_IDS);
 
   return {
