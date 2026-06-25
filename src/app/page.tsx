@@ -145,6 +145,8 @@ const STORY_FEEDBACK_REASON_OPTIONS: { reason: StoryFeedbackReason; label: strin
   { reason: "not_personal_enough", label: "Not personal enough" },
   { reason: "too_dark", label: "Too dark" },
   { reason: "not_dark_enough", label: "Not dark enough" },
+  { reason: "too_weird", label: "Too weird" },
+  { reason: "not_weird_enough", label: "Not weird enough" },
   { reason: "loved_tone", label: "Loved the tone" },
   { reason: "loved_character", label: "Loved a character" },
   { reason: "wanted_more", label: "Wanted more" },
@@ -1271,7 +1273,13 @@ export default function Home() {
       rating,
       reasons,
       note: null,
-      createdAt: now,
+      createdAt: signal.createdAt,
+      storyMetadata: {
+        genres: [story.genrePreset],
+        tones: story.genrePreset ? [story.genrePreset] : [],
+        format: generatedStoryPresentation === "continuation" ? "episode" : "story",
+        durationMinutes: Math.max(1, Math.round((story.wordCount || 0) / 180)),
+      },
     };
     const currentCanonicalProfile = loadCanonicalReaderProfile();
     const savedForLaterCount = Math.max(currentCanonicalProfile.signals.savedForLaterCount ?? 0, nextProfile.readyStoryQueueSignals?.filter((item) => item.signal === "save_for_later").length ?? 0);
@@ -1379,7 +1387,7 @@ function EpisodeReader({ eyebrow, feedback, generationBlockedBecauseUnsavedFeedb
       </div>
       <div className="min-w-0 whitespace-pre-wrap rounded-md border border-paper/10 bg-night-ink/70 p-4 text-base leading-8 text-paper/85 sm:p-5">{story.story}</div>
       {generationProfileSnapshot ? <GenerationProfileSnapshotPanel snapshot={generationProfileSnapshot} /> : null}
-      {story.id ? <StoryFeedbackPanel feedback={feedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} onDraftStateChange={onFeedbackDraftStateChange} onSave={(rating, reasons) => onFeedbackChange(story, rating, reasons)} /> : null}
+      {story.id ? <StoryFeedbackPanel feedback={feedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} onDraftStateChange={onFeedbackDraftStateChange} onSave={(rating, reasons) => onFeedbackChange(story, rating, reasons)} storyId={story.id} /> : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <button className="inline-flex items-center gap-2 rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={onContinue} type="button">{isGenerating ? <><span className="size-4 animate-spin rounded-full border-2 border-night-ink/30 border-t-night-ink" aria-hidden="true" />Writing the next chapter…</> : "Continue this story"}</button>
         <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-lantern-gold/50" onClick={onExport} type="button">Export</button>
@@ -1423,18 +1431,30 @@ function GenerationProfileSnapshotPanel({ snapshot }: { snapshot: ReaderProfileG
   );
 }
 
-function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback, onDraftStateChange, onSave }: { feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; onDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onSave: (rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void }) {
+function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback, onDraftStateChange, onSave, storyId }: { feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; onDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onSave: (rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void; storyId: string }) {
   const [draftRating, setDraftRating] = useState<StoryFeedbackRating | null>(feedback?.rating ?? null);
   const [draftReasons, setDraftReasons] = useState<StoryFeedbackReason[]>(feedback?.reasons ?? []);
+  const [draftClearedAfterSave, setDraftClearedAfterSave] = useState(false);
+  const [clearedFeedbackStoryId, setClearedFeedbackStoryId] = useState<string | null>(null);
   const [inlineMessage, setInlineMessage] = useState<string>(feedback ? "Feedback saved to reader profile." : "");
 
   useEffect(() => {
+    if (feedback?.storyId && feedback.storyId === clearedFeedbackStoryId) {
+      setDraftRating(null);
+      setDraftReasons([]);
+      setDraftClearedAfterSave(true);
+      setInlineMessage("Feedback saved to reader profile.");
+      return;
+    }
+
     setDraftRating(feedback?.rating ?? null);
     setDraftReasons(feedback?.reasons ?? []);
+    setDraftClearedAfterSave(false);
+    setClearedFeedbackStoryId(null);
     setInlineMessage(feedback ? "Feedback saved to reader profile." : "");
-  }, [feedback?.rating, feedback?.reasons, feedback?.storyId]);
+  }, [clearedFeedbackStoryId, feedback?.storyId]);
 
-  const hasUnsavedChanges = !areFeedbackDraftsEqual(draftRating, draftReasons, feedback);
+  const hasUnsavedChanges = draftClearedAfterSave && !draftRating && draftReasons.length === 0 ? false : !areFeedbackDraftsEqual(draftRating, draftReasons, feedback);
   const saveBlockedBecauseRatingMissing = !draftRating;
 
   useEffect(() => {
@@ -1442,9 +1462,13 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
   }, [hasUnsavedChanges, onDraftStateChange, saveBlockedBecauseRatingMissing]);
 
   function toggleReason(reason: StoryFeedbackReason) {
-    setDraftReasons((currentReasons) => currentReasons.includes(reason)
-      ? currentReasons.filter((selectedReason) => selectedReason !== reason)
-      : [...currentReasons, reason]);
+    setDraftClearedAfterSave(false);
+    setClearedFeedbackStoryId(null);
+    setDraftReasons((currentReasons) => {
+      if (currentReasons.includes(reason)) return currentReasons.filter((selectedReason) => selectedReason !== reason);
+      const mutuallyExclusiveReason = getMutuallyExclusiveFeedbackReason(reason);
+      return [...currentReasons.filter((selectedReason) => selectedReason !== mutuallyExclusiveReason), reason];
+    });
   }
 
   function saveFeedback() {
@@ -1453,6 +1477,10 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
       return;
     }
     onSave(draftRating, draftReasons);
+    setDraftRating(null);
+    setDraftReasons([]);
+    setDraftClearedAfterSave(true);
+    setClearedFeedbackStoryId(storyId);
     setInlineMessage("Feedback saved to reader profile.");
   }
 
@@ -1468,7 +1496,7 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
             aria-pressed={draftRating === option.rating}
             className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${draftRating === option.rating ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper hover:border-lantern-gold/50"}`}
             key={option.rating}
-            onClick={() => setDraftRating(option.rating)}
+            onClick={() => { setDraftClearedAfterSave(false); setClearedFeedbackStoryId(null); setDraftRating(option.rating); }}
             type="button"
           >
             {option.label}
@@ -2000,6 +2028,13 @@ function ReaderProfileDiagnostics({ canonicalProfile, cloudSync, lastGenerationU
           <p><span className="font-semibold text-paper/80">Hard avoidances:</span> {canonicalProfile?.preferences.hardAvoidances.length ? canonicalProfile.preferences.hardAvoidances.join(", ") : "none"}</p>
           <p><span className="font-semibold text-paper/80">Story card signal count:</span> {canonicalProfile?.signals.storyCardSignalCount ?? 0}</p>
           <p><span className="font-semibold text-paper/80">Feedback signal count:</span> {canonicalProfile?.signals.feedbackSignalCount ?? 0}</p>
+          <p><span className="font-semibold text-paper/80">Last feedback signal id:</span> {canonicalProfile?.signals.lastFeedbackSignalId ?? "none"}</p>
+          <p><span className="font-semibold text-paper/80">Last feedback reason:</span> {canonicalProfile?.signals.lastFeedbackReason ?? "none"}</p>
+          <p><span className="font-semibold text-paper/80">Learned confidence:</span> {formatOptionalPreference(canonicalProfile?.learned?.confidence)}</p>
+          <p><span className="font-semibold text-paper/80">Continuation preference:</span> {formatOptionalPreference(canonicalProfile?.learned?.continuationPreference)}</p>
+          <p><span className="font-semibold text-paper/80">Learned genres:</span> {formatLearnedScores(canonicalProfile?.learned?.genres)}</p>
+          <p><span className="font-semibold text-paper/80">Learned tones:</span> {formatLearnedScores(canonicalProfile?.learned?.tones)}</p>
+          <p><span className="font-semibold text-paper/80">Applied feedback signal ids:</span> {canonicalProfile?.appliedSignalIds?.length ?? 0}</p>
           <p><span className="font-semibold text-paper/80">Favorite count:</span> {canonicalProfile?.signals.favoriteCount ?? 0}</p>
           <p><span className="font-semibold text-paper/80">Saved for later count:</span> {canonicalProfile?.signals.savedForLaterCount ?? 0}</p>
           <p><span className="font-semibold text-paper/80">Last feedback at:</span> {canonicalProfile?.signals.lastFeedbackAt || "never"}</p>
@@ -2210,8 +2245,21 @@ function EerieReaderProfileDiagnostics({ onClear, profile }: { onClear: () => vo
   );
 }
 
+function getMutuallyExclusiveFeedbackReason(reason: StoryFeedbackReason): StoryFeedbackReason | null {
+  if (reason === "too_dark") return "not_dark_enough";
+  if (reason === "not_dark_enough") return "too_dark";
+  if (reason === "too_weird") return "not_weird_enough";
+  if (reason === "not_weird_enough") return "too_weird";
+  return null;
+}
+
 function formatOptionalPreference(value: number | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "not available";
+}
+
+function formatLearnedScores(scores: Record<string, number> | undefined): string {
+  const entries = Object.entries(scores ?? {}).slice(0, 5);
+  return entries.length ? entries.map(([key, value]) => `${key} ${value.toFixed(2)}`).join(", ") : "none";
 }
 
 function formatPreferencePair(preference: { value: number; confidence: number }): string {
