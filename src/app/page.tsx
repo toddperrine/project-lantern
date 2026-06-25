@@ -24,6 +24,7 @@ import {
   loadCanonicalReaderProfile,
   saveCanonicalReaderProfile,
   buildGenerationReaderProfileInput,
+  mirrorCanonicalReaderProfilePreferences,
   readReaderProfile,
   readerProfileExistsInLocalStorage,
   recordReaderProfileEvent,
@@ -364,7 +365,6 @@ export default function Home() {
     setDemoStory(browserSavedStories.length === 0 ? readDemoLatestStory() : null);
     getOrCreateReaderId();
     const canonicalProfile = loadCanonicalReaderProfile();
-    setCanonicalReaderProfile(canonicalProfile);
     const profileId = readOrCreateReaderProfileId();
     const localProfile = readReaderProfile();
     const localEerieProfile = readEerieReaderProfile();
@@ -375,6 +375,8 @@ export default function Home() {
         })
       : localProfile;
     if (enrichedProfile !== localProfile) persistReaderProfile(enrichedProfile);
+    const mirroredCanonicalProfile = mirrorCanonicalReaderProfilePreferences(canonicalProfile, enrichedProfile, localEerieProfile);
+    setCanonicalReaderProfile(mirroredCanonicalProfile);
     setReaderProfile(enrichedProfile);
     const storedReadyQueue = readReadyStoryQueue();
     const shouldUseCatalogSeed = storedReadyQueue.length === 0 || shouldReplaceLegacyGenericReadyQueue(storedReadyQueue);
@@ -464,7 +466,7 @@ export default function Home() {
     setLastRequestIncludedContinuationStoryId(Boolean(continuationStoryId));
     setLastContinuationContextIncluded(nextGenerationSource === "continue-story" && Boolean(overrides?.continuationContextIncluded));
     setLastContinuationBlockedBecauseContextMissing(false);
-    const activeCanonicalProfile = loadCanonicalReaderProfile();
+    const activeCanonicalProfile = mirrorCanonicalReaderProfilePreferences(loadCanonicalReaderProfile(), readReaderProfile(), eerieReaderProfile);
     setCanonicalReaderProfile(activeCanonicalProfile);
     const personalization = buildNewStoryPersonalization({
       eerieProfile: eerieReaderProfile,
@@ -516,7 +518,8 @@ export default function Home() {
       setStoryResponse(normalizedResponse);
       setCurrentStoryId(generatedStoryId);
       setGeneratedStoryPresentation(overrides?.presentation ?? "first-episode");
-      const canonicalAfterGeneration = saveCanonicalReaderProfile({ ...activeCanonicalProfile, updatedAt: new Date().toISOString(), signals: { ...activeCanonicalProfile.signals, lastStoryGeneratedAt: new Date().toISOString() } });
+      const generatedAt = new Date().toISOString();
+      const canonicalAfterGeneration = saveCanonicalReaderProfile({ ...activeCanonicalProfile, updatedAt: generatedAt, signals: { ...activeCanonicalProfile.signals, lastStoryGeneratedAt: generatedAt, lastGenerationUsedCanonicalProfile: true } });
       setCanonicalReaderProfile(canonicalAfterGeneration);
       recordReaderSignal({ eventType: "storyGenerated", source: overrides?.signalSource ?? "create", storyId: generatedStoryId, title: savedStory.title, genre: savedStory.genrePreset, wordCount: savedStory.wordCount });
       recordReaderSignal({ eventType: "storyOpened", source: overrides?.signalSource ?? "create", storyId: generatedStoryId, title: savedStory.title, genre: savedStory.genrePreset, wordCount: savedStory.wordCount });
@@ -1320,7 +1323,7 @@ export default function Home() {
         {error ? <Status tone="error">{error}</Status> : null}
 
         <AppStateDiagnostics activeView={activeView} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
-        <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} generationUsingCanonicalProfile={lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed ?? false} onClear={handleClearReaderProfile} profile={readerProfile} />
+        <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
         <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
         {activeView === "mood-intake" ? (
@@ -1941,7 +1944,7 @@ function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId,
   );
 }
 
-function ReaderProfileDiagnostics({ canonicalProfile, cloudSync, generationUsingCanonicalProfile, onClear, profile }: { canonicalProfile: CanonicalReaderProfile | null; cloudSync: CloudReaderProfileSyncState; generationUsingCanonicalProfile: boolean; onClear: () => void; profile: ReaderProfile }) {
+function ReaderProfileDiagnostics({ canonicalProfile, cloudSync, lastGenerationUsedCanonicalProfile, onClear, profile }: { canonicalProfile: CanonicalReaderProfile | null; cloudSync: CloudReaderProfileSyncState; lastGenerationUsedCanonicalProfile: boolean; onClear: () => void; profile: ReaderProfile }) {
   const topMood = getTopCount(profile.moodCounts);
   const topGenre = getTopCount(profile.genreCounts);
   const tasteProfile = profile.tasteProfile;
@@ -1957,7 +1960,7 @@ function ReaderProfileDiagnostics({ canonicalProfile, cloudSync, generationUsing
           <p><span className="font-semibold text-paper/80">Canonical profile exists:</span> {canonicalProfile ? "yes" : "no"}</p>
           <p><span className="font-semibold text-paper/80">Profile source:</span> {canonicalProfile?.source ?? "default"}</p>
           <p><span className="font-semibold text-paper/80">Cloud sync:</span> {cloudSync.status === "synced" ? "success" : cloudSync.status === "unavailable" || cloudSync.status === "not found" ? "not configured" : cloudSync.status === "pending" ? "pending" : "failed"}</p>
-          <p><span className="font-semibold text-paper/80">Generation using canonical profile:</span> {generationUsingCanonicalProfile ? "yes" : "no"}</p>
+          <p><span className="font-semibold text-paper/80">Last generation used canonical profile:</span> {lastGenerationUsedCanonicalProfile ? "yes" : "no"}</p>
           <p><span className="font-semibold text-paper/80">Profile updated:</span> {canonicalProfile?.updatedAt || "never"}</p>
           <p><span className="font-semibold text-paper/80">Onboarding mode:</span> {canonicalProfile?.onboarding?.mode ?? "unknown"}</p>
           <p><span className="font-semibold text-paper/80">Preferred format:</span> {canonicalProfile?.preferences.preferredFormat ?? canonicalProfile?.onboarding?.preferredFormat ?? "not available"}</p>
