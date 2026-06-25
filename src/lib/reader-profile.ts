@@ -1,4 +1,6 @@
-export const READER_PROFILE_STORAGE_KEY = "projectLantern.readerProfile.v1";
+export const CANONICAL_READER_PROFILE_STORAGE_KEY = "projectLantern.readerProfile.v1";
+export const READER_ID_STORAGE_KEY = "projectLantern.readerId.v1";
+export const READER_PROFILE_STORAGE_KEY = "projectLantern.readerInteractionProfile.v1";
 export const READER_PROFILE_ID_STORAGE_KEY = "projectLantern.readerProfileId.v1";
 export const READER_PROFILE_SCHEMA_VERSION = 1;
 export const MAX_READER_MOOD_HISTORY = 10;
@@ -59,6 +61,23 @@ export type ReaderTasteProfileSource =
   | "manual"
   | "legacy-eerie-profile";
 export type ReaderFormatPreference = "read" | "listen" | "both";
+export type CanonicalPreferredFormat = "story" | "chapter" | "both";
+export type CanonicalReaderProfileSource = "local" | "cloud" | "merged" | "default";
+
+export type CanonicalReaderProfile = {
+  readerId: string;
+  version: 1;
+  createdAt: string;
+  updatedAt: string;
+  source: CanonicalReaderProfileSource;
+  onboarding?: { mode?: "completed" | "skip" | "unknown"; lastMood?: string | null; preferredDuration?: string | null; preferredFormat?: CanonicalPreferredFormat | null };
+  preferences: {
+    fearIntensity?: number; weirdnessTolerance?: number; supernaturalAffinity?: number; ambiguityTolerance?: number; goreTolerance?: number; sleepSafePreference?: number;
+    preferredFormat?: CanonicalPreferredFormat | null; preferredDuration?: string | null; hardAvoidances: string[];
+  };
+  signals: { storyCardSignalCount: number; feedbackSignalCount: number; favoriteCount: number; savedForLaterCount: number; lastFeedbackAt?: string | null; lastStoryGeneratedAt?: string | null };
+  fallbackReason?: string | null;
+};
 export type ReaderTasteProfileConfidence = "low" | "medium" | "high";
 
 export interface ReaderWeightedPreference {
@@ -799,4 +818,75 @@ function normalizeFreeText(value: unknown): string {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 600);
+}
+
+function nowIso() { return new Date().toISOString(); }
+
+function createAnonymousReaderId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `anon_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
+export function getOrCreateReaderId(): string {
+  if (typeof window === "undefined") return "server";
+  try {
+    const existing = window.localStorage.getItem(READER_ID_STORAGE_KEY);
+    if (existing && existing.trim()) return existing;
+    const next = createAnonymousReaderId();
+    window.localStorage.setItem(READER_ID_STORAGE_KEY, next);
+    return next;
+  } catch { return createAnonymousReaderId(); }
+}
+
+function safeJsonParse<T>(raw: string | null): T | null { if (!raw) return null; try { return JSON.parse(raw) as T; } catch { return null; } }
+function isRecord(value: unknown): value is Record<string, unknown> { return Boolean(value && typeof value === "object" && !Array.isArray(value)); }
+function readNumber(value: unknown): number | undefined { return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : undefined; }
+function readWeightedNumber(value: unknown): number | undefined { return isRecord(value) ? readNumber(value.value) : readNumber(value); }
+function toCanonicalFormat(value: unknown): CanonicalPreferredFormat | null { if (value === "story" || value === "chapter" || value === "both") return value; if (value === "read") return "story"; return null; }
+function readStringOrNull(value: unknown): string | null { return typeof value === "string" && value.trim() ? value.trim() : null; }
+function readStringArray(value: unknown): string[] { return Array.isArray(value) ? dedupe(value.filter((item): item is string => typeof item === "string")) : []; }
+function defaultCanonicalProfile(readerId: string, fallbackReason?: string): CanonicalReaderProfile { const ts = nowIso(); return { readerId, version: 1, createdAt: ts, updatedAt: ts, source: "default", onboarding: { mode: "unknown", lastMood: null, preferredDuration: null, preferredFormat: null }, preferences: { preferredFormat: null, preferredDuration: null, hardAvoidances: [] }, signals: { storyCardSignalCount: 0, feedbackSignalCount: 0, favoriteCount: 0, savedForLaterCount: 0, lastFeedbackAt: null, lastStoryGeneratedAt: null }, fallbackReason: fallbackReason ?? null }; }
+
+function canonicalFromEerie(value: Record<string, unknown>, readerId: string): CanonicalReaderProfile {
+  const fallback = defaultCanonicalProfile(readerId);
+  const ts = readStringOrNull(value.updatedAt) ?? fallback.updatedAt;
+  return { ...fallback, createdAt: readStringOrNull(value.createdAt) ?? fallback.createdAt, updatedAt: ts, source: "local", onboarding: { mode: value.onboardingMode === "full" || value.onboardingMode === "short" ? "completed" : value.onboardingMode === "skip" ? "skip" : "unknown", preferredFormat: toCanonicalFormat(value.preferredFormat), preferredDuration: value.preferredDurationMinutes ? `${value.preferredDurationMinutes} minutes` : null }, preferences: { fearIntensity: readWeightedNumber(value.fearIntensity), weirdnessTolerance: readWeightedNumber(value.weirdnessTolerance), supernaturalAffinity: readWeightedNumber(value.supernaturalAffinity), ambiguityTolerance: readWeightedNumber(value.ambiguityTolerance), goreTolerance: readWeightedNumber(value.goreTolerance), sleepSafePreference: readWeightedNumber(value.sleepSafePreference), preferredFormat: toCanonicalFormat(value.preferredFormat), preferredDuration: value.preferredDurationMinutes ? `${value.preferredDurationMinutes} minutes` : null, hardAvoidances: readStringArray(value.hardAvoidances) }, signals: { ...fallback.signals, storyCardSignalCount: Array.isArray(value.storyCardSignals) ? value.storyCardSignals.length : 0 } };
+}
+
+function canonicalFromLegacyReaderProfile(profile: ReaderProfile, readerId: string): CanonicalReaderProfile {
+  const taste = profile.tasteProfile;
+  return { ...defaultCanonicalProfile(readerId), createdAt: profile.createdAt || nowIso(), updatedAt: profile.updatedAt || nowIso(), source: profile.profileExists ? "local" : "default", onboarding: { mode: profile.latestMood ? "completed" : "unknown", lastMood: profile.latestMood?.mood ?? null, preferredDuration: taste?.preferredDurationMinutes ? `${taste.preferredDurationMinutes} minutes` : null, preferredFormat: toCanonicalFormat(taste?.preferredFormat) }, preferences: { fearIntensity: taste?.fearIntensity.value, weirdnessTolerance: taste?.weirdnessTolerance.value, supernaturalAffinity: taste?.supernaturalAffinity.value, ambiguityTolerance: taste?.ambiguityTolerance.value, goreTolerance: taste?.goreTolerance.value, sleepSafePreference: taste?.sleepSafePreference.value, preferredFormat: toCanonicalFormat(taste?.preferredFormat), preferredDuration: taste?.preferredDurationMinutes ? `${taste.preferredDurationMinutes} minutes` : null, hardAvoidances: taste?.userHardAvoidances ?? [] }, signals: { storyCardSignalCount: profile.readyStoryQueueSignals?.length ?? 0, feedbackSignalCount: profile.storyFeedbackSignals?.length ?? 0, favoriteCount: profile.storyFeedbackSignals?.filter((s) => s.rating === "favorite").length ?? 0, savedForLaterCount: profile.readyStoryQueueSignals?.filter((s) => s.signal === "save_for_later").length ?? 0, lastFeedbackAt: [...(profile.storyFeedbackSignals ?? [])].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0]?.updatedAt ?? null, lastStoryGeneratedAt: profile.recentEvents.find((event) => event.eventType === "storyGenerated")?.timestamp ?? null } };
+}
+
+function normalizeCanonicalReaderProfile(value: unknown, readerId: string): CanonicalReaderProfile | null {
+  if (!isRecord(value) || value.version !== 1 || !isRecord(value.preferences) || !isRecord(value.signals)) return null;
+  const fallback = defaultCanonicalProfile(readerId);
+  return { readerId, version: 1, createdAt: readStringOrNull(value.createdAt) ?? fallback.createdAt, updatedAt: readStringOrNull(value.updatedAt) ?? fallback.updatedAt, source: value.source === "cloud" || value.source === "merged" || value.source === "local" || value.source === "default" ? value.source : "default", onboarding: isRecord(value.onboarding) ? { mode: value.onboarding.mode === "completed" || value.onboarding.mode === "skip" || value.onboarding.mode === "unknown" ? value.onboarding.mode : "unknown", lastMood: readStringOrNull(value.onboarding.lastMood), preferredDuration: readStringOrNull(value.onboarding.preferredDuration), preferredFormat: toCanonicalFormat(value.onboarding.preferredFormat) } : fallback.onboarding, preferences: { fearIntensity: readNumber(value.preferences.fearIntensity), weirdnessTolerance: readNumber(value.preferences.weirdnessTolerance), supernaturalAffinity: readNumber(value.preferences.supernaturalAffinity), ambiguityTolerance: readNumber(value.preferences.ambiguityTolerance), goreTolerance: readNumber(value.preferences.goreTolerance), sleepSafePreference: readNumber(value.preferences.sleepSafePreference), preferredFormat: toCanonicalFormat(value.preferences.preferredFormat), preferredDuration: readStringOrNull(value.preferences.preferredDuration), hardAvoidances: readStringArray(value.preferences.hardAvoidances) }, signals: { storyCardSignalCount: normalizeCount(value.signals.storyCardSignalCount), feedbackSignalCount: normalizeCount(value.signals.feedbackSignalCount), favoriteCount: normalizeCount(value.signals.favoriteCount), savedForLaterCount: normalizeCount(value.signals.savedForLaterCount), lastFeedbackAt: readStringOrNull(value.signals.lastFeedbackAt), lastStoryGeneratedAt: readStringOrNull(value.signals.lastStoryGeneratedAt) }, fallbackReason: readStringOrNull(value.fallbackReason) };
+}
+
+export function loadCanonicalReaderProfile(): CanonicalReaderProfile {
+  const readerId = getOrCreateReaderId();
+  if (typeof window === "undefined") return defaultCanonicalProfile(readerId);
+  const raw = safeJsonParse<unknown>(window.localStorage.getItem(CANONICAL_READER_PROFILE_STORAGE_KEY));
+  const canonical = normalizeCanonicalReaderProfile(raw, readerId);
+  if (canonical) return canonical;
+  if (raw && isRecord(raw) && raw.schemaVersion === READER_PROFILE_SCHEMA_VERSION) return saveCanonicalReaderProfile(canonicalFromLegacyReaderProfile(normalizeReaderProfile(raw), readerId));
+  const eerie = safeJsonParse<unknown>(window.localStorage.getItem("projectLantern.eerieReaderProfile.v1"));
+  if (isRecord(eerie)) return saveCanonicalReaderProfile(canonicalFromEerie(eerie, readerId));
+  return saveCanonicalReaderProfile(defaultCanonicalProfile(readerId, raw ? "corrupt-canonical-profile" : undefined));
+}
+
+export function saveCanonicalReaderProfile(profile: CanonicalReaderProfile): CanonicalReaderProfile {
+  const normalized = normalizeCanonicalReaderProfile(profile, profile.readerId || getOrCreateReaderId()) ?? defaultCanonicalProfile(profile.readerId || getOrCreateReaderId(), "corrupt-canonical-profile");
+  if (typeof window !== "undefined") { try { window.localStorage.setItem(CANONICAL_READER_PROFILE_STORAGE_KEY, JSON.stringify(normalized)); } catch {} }
+  return normalized;
+}
+
+export function mergeReaderProfiles(localProfile: CanonicalReaderProfile, cloudProfile: CanonicalReaderProfile): CanonicalReaderProfile {
+  const newer = cloudProfile.updatedAt >= localProfile.updatedAt ? cloudProfile : localProfile;
+  return saveCanonicalReaderProfile({ ...newer, readerId: localProfile.readerId || cloudProfile.readerId, source: "merged", preferences: { ...localProfile.preferences, ...cloudProfile.preferences, hardAvoidances: dedupe([...(localProfile.preferences.hardAvoidances ?? []), ...(cloudProfile.preferences.hardAvoidances ?? [])]) }, signals: { storyCardSignalCount: Math.max(localProfile.signals.storyCardSignalCount, cloudProfile.signals.storyCardSignalCount), feedbackSignalCount: Math.max(localProfile.signals.feedbackSignalCount, cloudProfile.signals.feedbackSignalCount), favoriteCount: Math.max(localProfile.signals.favoriteCount, cloudProfile.signals.favoriteCount), savedForLaterCount: Math.max(localProfile.signals.savedForLaterCount, cloudProfile.signals.savedForLaterCount), lastFeedbackAt: [localProfile.signals.lastFeedbackAt, cloudProfile.signals.lastFeedbackAt].filter(Boolean).sort().pop() ?? null, lastStoryGeneratedAt: [localProfile.signals.lastStoryGeneratedAt, cloudProfile.signals.lastStoryGeneratedAt].filter(Boolean).sort().pop() ?? null }, updatedAt: [localProfile.updatedAt, cloudProfile.updatedAt].sort().pop() ?? nowIso() });
+}
+
+export function buildGenerationReaderProfileInput(profile: CanonicalReaderProfile): object {
+  return { readerId: profile.readerId, canonicalProfileVersion: profile.version, generationUsingCanonicalProfile: true, preferredDuration: profile.preferences.preferredDuration ?? profile.onboarding?.preferredDuration ?? null, preferredFormat: profile.preferences.preferredFormat ?? profile.onboarding?.preferredFormat ?? null, hardAvoidances: profile.preferences.hardAvoidances, fearIntensity: profile.preferences.fearIntensity, weirdnessTolerance: profile.preferences.weirdnessTolerance, supernaturalAffinity: profile.preferences.supernaturalAffinity, ambiguityTolerance: profile.preferences.ambiguityTolerance, goreTolerance: profile.preferences.goreTolerance, sleepSafePreference: profile.preferences.sleepSafePreference, signals: profile.signals };
 }
