@@ -1271,7 +1271,13 @@ export default function Home() {
       rating,
       reasons,
       note: null,
-      createdAt: now,
+      createdAt: signal.createdAt,
+      storyMetadata: {
+        genres: [story.genrePreset],
+        tones: story.genrePreset ? [story.genrePreset] : [],
+        format: generatedStoryPresentation === "continuation" ? "episode" : "story",
+        durationMinutes: Math.max(1, Math.round((story.wordCount || 0) / 180)),
+      },
     };
     const currentCanonicalProfile = loadCanonicalReaderProfile();
     const savedForLaterCount = Math.max(currentCanonicalProfile.signals.savedForLaterCount ?? 0, nextProfile.readyStoryQueueSignals?.filter((item) => item.signal === "save_for_later").length ?? 0);
@@ -2000,6 +2006,13 @@ function ReaderProfileDiagnostics({ canonicalProfile, cloudSync, lastGenerationU
           <p><span className="font-semibold text-paper/80">Hard avoidances:</span> {canonicalProfile?.preferences.hardAvoidances.length ? canonicalProfile.preferences.hardAvoidances.join(", ") : "none"}</p>
           <p><span className="font-semibold text-paper/80">Story card signal count:</span> {canonicalProfile?.signals.storyCardSignalCount ?? 0}</p>
           <p><span className="font-semibold text-paper/80">Feedback signal count:</span> {canonicalProfile?.signals.feedbackSignalCount ?? 0}</p>
+          <p><span className="font-semibold text-paper/80">Last feedback signal id:</span> {canonicalProfile?.signals.lastFeedbackSignalId ?? "none"}</p>
+          <p><span className="font-semibold text-paper/80">Last feedback reason:</span> {canonicalProfile?.signals.lastFeedbackReason ?? "none"}</p>
+          <p><span className="font-semibold text-paper/80">Learned confidence:</span> {formatOptionalPreference(canonicalProfile?.learned?.confidence)}</p>
+          <p><span className="font-semibold text-paper/80">Continuation preference:</span> {formatOptionalPreference(canonicalProfile?.learned?.continuationPreference)}</p>
+          <p><span className="font-semibold text-paper/80">Learned genres:</span> {formatLearnedScores(canonicalProfile?.learned?.genres)}</p>
+          <p><span className="font-semibold text-paper/80">Learned tones:</span> {formatLearnedScores(canonicalProfile?.learned?.tones)}</p>
+          <p><span className="font-semibold text-paper/80">Applied feedback signal ids:</span> {canonicalProfile?.appliedSignalIds?.length ?? 0}</p>
           <p><span className="font-semibold text-paper/80">Favorite count:</span> {canonicalProfile?.signals.favoriteCount ?? 0}</p>
           <p><span className="font-semibold text-paper/80">Saved for later count:</span> {canonicalProfile?.signals.savedForLaterCount ?? 0}</p>
           <p><span className="font-semibold text-paper/80">Last feedback at:</span> {canonicalProfile?.signals.lastFeedbackAt || "never"}</p>
@@ -2212,6 +2225,11 @@ function EerieReaderProfileDiagnostics({ onClear, profile }: { onClear: () => vo
 
 function formatOptionalPreference(value: number | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "not available";
+}
+
+function formatLearnedScores(scores: Record<string, number> | undefined): string {
+  const entries = Object.entries(scores ?? {}).slice(0, 5);
+  return entries.length ? entries.map(([key, value]) => `${key} ${value.toFixed(2)}`).join(", ") : "none";
 }
 
 function formatPreferencePair(preference: { value: number; confidence: number }): string {
