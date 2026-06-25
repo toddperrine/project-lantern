@@ -63,6 +63,16 @@ export type ReaderTasteProfileSource =
 export type ReaderFormatPreference = "read" | "listen" | "both";
 export type CanonicalPreferredFormat = "story" | "chapter" | "both";
 export type CanonicalReaderProfileSource = "local" | "cloud" | "merged" | "default";
+export type ReaderFeedbackRating = StoryFeedbackRating;
+export type ReaderFeedbackEvent = {
+  id: string;
+  storyId?: string | null;
+  storyTitle?: string | null;
+  rating: ReaderFeedbackRating;
+  reasons: string[];
+  note?: string | null;
+  createdAt: string;
+};
 
 export type CanonicalReaderProfile = {
   readerId: string;
@@ -77,6 +87,7 @@ export type CanonicalReaderProfile = {
   };
   signals: { storyCardSignalCount: number; feedbackSignalCount: number; favoriteCount: number; savedForLaterCount: number; lastFeedbackAt?: string | null; lastStoryGeneratedAt?: string | null; lastGenerationUsedCanonicalProfile?: boolean };
   fallbackReason?: string | null;
+  recentFeedback?: ReaderFeedbackEvent[];
 };
 export type ReaderTasteProfileConfidence = "low" | "medium" | "high";
 
@@ -845,6 +856,19 @@ function readWeightedNumber(value: unknown): number | undefined { return isRecor
 function toCanonicalFormat(value: unknown): CanonicalPreferredFormat | null { if (value === "story" || value === "chapter" || value === "both") return value; if (value === "read") return "story"; return null; }
 function readStringOrNull(value: unknown): string | null { return typeof value === "string" && value.trim() ? value.trim() : null; }
 function readStringArray(value: unknown): string[] { return Array.isArray(value) ? dedupe(value.filter((item): item is string => typeof item === "string")) : []; }
+function isReaderFeedbackRating(value: unknown): value is ReaderFeedbackRating { return value === "missed" || value === "not_quite" || value === "good" || value === "great" || value === "favorite"; }
+function normalizeReaderFeedbackEvent(value: unknown): ReaderFeedbackEvent | null {
+  if (!isRecord(value) || !isReaderFeedbackRating(value.rating)) return null;
+  const id = readStringOrNull(value.id);
+  const createdAt = readStringOrNull(value.createdAt);
+  if (!id || !createdAt) return null;
+  return { id, storyId: readStringOrNull(value.storyId), storyTitle: readStringOrNull(value.storyTitle), rating: value.rating, reasons: readStringArray(value.reasons), note: readStringOrNull(value.note), createdAt };
+}
+function normalizeRecentFeedback(value: unknown): ReaderFeedbackEvent[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const feedback = value.map(normalizeReaderFeedbackEvent).filter((event): event is ReaderFeedbackEvent => Boolean(event)).slice(0, 25);
+  return feedback.length ? feedback : undefined;
+}
 function defaultCanonicalProfile(readerId: string, fallbackReason?: string): CanonicalReaderProfile { const ts = nowIso(); return { readerId, version: 1, createdAt: ts, updatedAt: ts, source: "default", onboarding: { mode: "unknown", lastMood: null, preferredDuration: null, preferredFormat: null }, preferences: { preferredFormat: null, preferredDuration: null, hardAvoidances: [] }, signals: { storyCardSignalCount: 0, feedbackSignalCount: 0, favoriteCount: 0, savedForLaterCount: 0, lastFeedbackAt: null, lastStoryGeneratedAt: null, lastGenerationUsedCanonicalProfile: false }, fallbackReason: fallbackReason ?? null }; }
 
 function canonicalFromEerie(value: Record<string, unknown>, readerId: string): CanonicalReaderProfile {
@@ -861,7 +885,7 @@ function canonicalFromLegacyReaderProfile(profile: ReaderProfile, readerId: stri
 function normalizeCanonicalReaderProfile(value: unknown, readerId: string): CanonicalReaderProfile | null {
   if (!isRecord(value) || value.version !== 1 || !isRecord(value.preferences) || !isRecord(value.signals)) return null;
   const fallback = defaultCanonicalProfile(readerId);
-  return { readerId, version: 1, createdAt: readStringOrNull(value.createdAt) ?? fallback.createdAt, updatedAt: readStringOrNull(value.updatedAt) ?? fallback.updatedAt, source: value.source === "cloud" || value.source === "merged" || value.source === "local" || value.source === "default" ? value.source : "default", onboarding: isRecord(value.onboarding) ? { mode: value.onboarding.mode === "completed" || value.onboarding.mode === "skip" || value.onboarding.mode === "unknown" ? value.onboarding.mode : "unknown", lastMood: readStringOrNull(value.onboarding.lastMood), preferredDuration: readStringOrNull(value.onboarding.preferredDuration), preferredFormat: toCanonicalFormat(value.onboarding.preferredFormat) } : fallback.onboarding, preferences: { fearIntensity: readNumber(value.preferences.fearIntensity), weirdnessTolerance: readNumber(value.preferences.weirdnessTolerance), supernaturalAffinity: readNumber(value.preferences.supernaturalAffinity), ambiguityTolerance: readNumber(value.preferences.ambiguityTolerance), goreTolerance: readNumber(value.preferences.goreTolerance), sleepSafePreference: readNumber(value.preferences.sleepSafePreference), preferredFormat: toCanonicalFormat(value.preferences.preferredFormat), preferredDuration: readStringOrNull(value.preferences.preferredDuration), hardAvoidances: readStringArray(value.preferences.hardAvoidances) }, signals: { storyCardSignalCount: normalizeCount(value.signals.storyCardSignalCount), feedbackSignalCount: normalizeCount(value.signals.feedbackSignalCount), favoriteCount: normalizeCount(value.signals.favoriteCount), savedForLaterCount: normalizeCount(value.signals.savedForLaterCount), lastFeedbackAt: readStringOrNull(value.signals.lastFeedbackAt), lastStoryGeneratedAt: readStringOrNull(value.signals.lastStoryGeneratedAt), lastGenerationUsedCanonicalProfile: Boolean(value.signals.lastGenerationUsedCanonicalProfile) }, fallbackReason: readStringOrNull(value.fallbackReason) };
+  return { readerId, version: 1, createdAt: readStringOrNull(value.createdAt) ?? fallback.createdAt, updatedAt: readStringOrNull(value.updatedAt) ?? fallback.updatedAt, source: value.source === "cloud" || value.source === "merged" || value.source === "local" || value.source === "default" ? value.source : "default", onboarding: isRecord(value.onboarding) ? { mode: value.onboarding.mode === "completed" || value.onboarding.mode === "skip" || value.onboarding.mode === "unknown" ? value.onboarding.mode : "unknown", lastMood: readStringOrNull(value.onboarding.lastMood), preferredDuration: readStringOrNull(value.onboarding.preferredDuration), preferredFormat: toCanonicalFormat(value.onboarding.preferredFormat) } : fallback.onboarding, preferences: { fearIntensity: readNumber(value.preferences.fearIntensity), weirdnessTolerance: readNumber(value.preferences.weirdnessTolerance), supernaturalAffinity: readNumber(value.preferences.supernaturalAffinity), ambiguityTolerance: readNumber(value.preferences.ambiguityTolerance), goreTolerance: readNumber(value.preferences.goreTolerance), sleepSafePreference: readNumber(value.preferences.sleepSafePreference), preferredFormat: toCanonicalFormat(value.preferences.preferredFormat), preferredDuration: readStringOrNull(value.preferences.preferredDuration), hardAvoidances: readStringArray(value.preferences.hardAvoidances) }, signals: { storyCardSignalCount: normalizeCount(value.signals.storyCardSignalCount), feedbackSignalCount: normalizeCount(value.signals.feedbackSignalCount), favoriteCount: normalizeCount(value.signals.favoriteCount), savedForLaterCount: normalizeCount(value.signals.savedForLaterCount), lastFeedbackAt: readStringOrNull(value.signals.lastFeedbackAt), lastStoryGeneratedAt: readStringOrNull(value.signals.lastStoryGeneratedAt), lastGenerationUsedCanonicalProfile: Boolean(value.signals.lastGenerationUsedCanonicalProfile) }, fallbackReason: readStringOrNull(value.fallbackReason), recentFeedback: normalizeRecentFeedback(value.recentFeedback) };
 }
 
 export function loadCanonicalReaderProfile(): CanonicalReaderProfile {
@@ -884,7 +908,7 @@ export function saveCanonicalReaderProfile(profile: CanonicalReaderProfile): Can
 
 export function mergeReaderProfiles(localProfile: CanonicalReaderProfile, cloudProfile: CanonicalReaderProfile): CanonicalReaderProfile {
   const newer = cloudProfile.updatedAt >= localProfile.updatedAt ? cloudProfile : localProfile;
-  return saveCanonicalReaderProfile({ ...newer, readerId: localProfile.readerId || cloudProfile.readerId, source: "merged", preferences: { ...localProfile.preferences, ...cloudProfile.preferences, hardAvoidances: dedupe([...(localProfile.preferences.hardAvoidances ?? []), ...(cloudProfile.preferences.hardAvoidances ?? [])]) }, signals: { storyCardSignalCount: Math.max(localProfile.signals.storyCardSignalCount, cloudProfile.signals.storyCardSignalCount), feedbackSignalCount: Math.max(localProfile.signals.feedbackSignalCount, cloudProfile.signals.feedbackSignalCount), favoriteCount: Math.max(localProfile.signals.favoriteCount, cloudProfile.signals.favoriteCount), savedForLaterCount: Math.max(localProfile.signals.savedForLaterCount, cloudProfile.signals.savedForLaterCount), lastFeedbackAt: [localProfile.signals.lastFeedbackAt, cloudProfile.signals.lastFeedbackAt].filter(Boolean).sort().pop() ?? null, lastStoryGeneratedAt: [localProfile.signals.lastStoryGeneratedAt, cloudProfile.signals.lastStoryGeneratedAt].filter(Boolean).sort().pop() ?? null, lastGenerationUsedCanonicalProfile: Boolean(localProfile.signals.lastGenerationUsedCanonicalProfile || cloudProfile.signals.lastGenerationUsedCanonicalProfile) }, updatedAt: [localProfile.updatedAt, cloudProfile.updatedAt].sort().pop() ?? nowIso() });
+  return saveCanonicalReaderProfile({ ...newer, readerId: localProfile.readerId || cloudProfile.readerId, source: "merged", recentFeedback: [...(localProfile.recentFeedback ?? []), ...(cloudProfile.recentFeedback ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 25), preferences: { ...localProfile.preferences, ...cloudProfile.preferences, hardAvoidances: dedupe([...(localProfile.preferences.hardAvoidances ?? []), ...(cloudProfile.preferences.hardAvoidances ?? [])]) }, signals: { storyCardSignalCount: Math.max(localProfile.signals.storyCardSignalCount, cloudProfile.signals.storyCardSignalCount), feedbackSignalCount: Math.max(localProfile.signals.feedbackSignalCount, cloudProfile.signals.feedbackSignalCount), favoriteCount: Math.max(localProfile.signals.favoriteCount, cloudProfile.signals.favoriteCount), savedForLaterCount: Math.max(localProfile.signals.savedForLaterCount, cloudProfile.signals.savedForLaterCount), lastFeedbackAt: [localProfile.signals.lastFeedbackAt, cloudProfile.signals.lastFeedbackAt].filter(Boolean).sort().pop() ?? null, lastStoryGeneratedAt: [localProfile.signals.lastStoryGeneratedAt, cloudProfile.signals.lastStoryGeneratedAt].filter(Boolean).sort().pop() ?? null, lastGenerationUsedCanonicalProfile: Boolean(localProfile.signals.lastGenerationUsedCanonicalProfile || cloudProfile.signals.lastGenerationUsedCanonicalProfile) }, updatedAt: [localProfile.updatedAt, cloudProfile.updatedAt].sort().pop() ?? nowIso() });
 }
 
 export function mirrorCanonicalReaderProfilePreferences(profile: CanonicalReaderProfile, legacyProfile: ReaderProfile, eerieProfile?: unknown): CanonicalReaderProfile {
@@ -916,6 +940,27 @@ export function mirrorCanonicalReaderProfilePreferences(profile: CanonicalReader
   return saveCanonicalReaderProfile({ ...profile, source: profile.source === "default" ? source.source : profile.source, preferences, signals });
 }
 
+export function createFeedbackEventId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `feedback_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
+export function applyFeedbackToReaderProfile(profile: CanonicalReaderProfile, feedback: ReaderFeedbackEvent): CanonicalReaderProfile {
+  const recentFeedback = [feedback, ...(profile.recentFeedback ?? [])].slice(0, 25);
+  return {
+    ...profile,
+    updatedAt: new Date().toISOString(),
+    signals: {
+      ...profile.signals,
+      feedbackSignalCount: (profile.signals.feedbackSignalCount ?? 0) + 1,
+      favoriteCount: feedback.rating === "favorite" ? (profile.signals.favoriteCount ?? 0) + 1 : (profile.signals.favoriteCount ?? 0),
+      savedForLaterCount: profile.signals.savedForLaterCount ?? 0,
+      lastFeedbackAt: feedback.createdAt,
+    },
+    recentFeedback,
+  };
+}
+
 export function buildGenerationReaderProfileInput(profile: CanonicalReaderProfile): object {
-  return { readerId: profile.readerId, canonicalProfileVersion: profile.version, generationUsingCanonicalProfile: true, preferredDuration: profile.preferences.preferredDuration ?? profile.onboarding?.preferredDuration ?? null, preferredFormat: profile.preferences.preferredFormat ?? profile.onboarding?.preferredFormat ?? null, hardAvoidances: profile.preferences.hardAvoidances, fearIntensity: profile.preferences.fearIntensity, weirdnessTolerance: profile.preferences.weirdnessTolerance, supernaturalAffinity: profile.preferences.supernaturalAffinity, ambiguityTolerance: profile.preferences.ambiguityTolerance, goreTolerance: profile.preferences.goreTolerance, sleepSafePreference: profile.preferences.sleepSafePreference, signals: profile.signals };
+  return { readerId: profile.readerId, canonicalProfileVersion: profile.version, generationUsingCanonicalProfile: true, preferredDuration: profile.preferences.preferredDuration ?? profile.onboarding?.preferredDuration ?? null, preferredFormat: profile.preferences.preferredFormat ?? profile.onboarding?.preferredFormat ?? null, hardAvoidances: profile.preferences.hardAvoidances, fearIntensity: profile.preferences.fearIntensity, weirdnessTolerance: profile.preferences.weirdnessTolerance, supernaturalAffinity: profile.preferences.supernaturalAffinity, ambiguityTolerance: profile.preferences.ambiguityTolerance, goreTolerance: profile.preferences.goreTolerance, sleepSafePreference: profile.preferences.sleepSafePreference, signals: profile.signals, feedbackSummary: { feedbackSignalCount: profile.signals.feedbackSignalCount, favoriteCount: profile.signals.favoriteCount, savedForLaterCount: profile.signals.savedForLaterCount, recentRatings: profile.recentFeedback?.slice(0, 5).map((event) => ({ rating: event.rating, reasons: event.reasons, storyTitle: event.storyTitle ?? null })) ?? [] } };
 }
