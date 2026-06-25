@@ -12,12 +12,19 @@ import {
 } from "@/lib/eerie-reader-profile";
 import {
   READER_PROFILE_STORAGE_KEY,
+  CANONICAL_READER_PROFILE_STORAGE_KEY,
+  READER_ID_STORAGE_KEY,
   READER_PROFILE_ID_STORAGE_KEY,
   clearReaderProfile,
   createEmptyReaderProfile,
   persistReaderProfile,
   normalizeReaderProfile,
   readOrCreateReaderProfileId,
+  getOrCreateReaderId,
+  loadCanonicalReaderProfile,
+  saveCanonicalReaderProfile,
+  buildGenerationReaderProfileInput,
+  mirrorCanonicalReaderProfilePreferences,
   readReaderProfile,
   readerProfileExistsInLocalStorage,
   recordReaderProfileEvent,
@@ -46,7 +53,7 @@ import { STORY_SPARK_CATALOG, type StorySparkCatalogItem } from "@/lib/story-spa
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
 import type { EerieReaderProfile } from "@/lib/eerie-reader-profile";
-import type { ReaderEnergyLevel, ReaderIntensityLevel, ReaderMoodDraft, ReaderMoodSnapshot, ReaderProfile, ReaderProfileEventInput, ReaderProfileEventSource, StoryFeedbackGenerationMode, StoryFeedbackRating, StoryFeedbackReason, StoryFeedbackSignal } from "@/lib/reader-profile";
+import type { CanonicalReaderProfile, ReaderEnergyLevel, ReaderIntensityLevel, ReaderMoodDraft, ReaderMoodSnapshot, ReaderProfile, ReaderProfileEventInput, ReaderProfileEventSource, StoryFeedbackGenerationMode, StoryFeedbackRating, StoryFeedbackReason, StoryFeedbackSignal } from "@/lib/reader-profile";
 import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture, ReaderProfileGenerationSnapshot } from "@/lib/types";
 import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
 import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
@@ -314,6 +321,7 @@ export default function Home() {
   const [continueDirection, setContinueDirection] = useState("");
   const [isDirectionOpen, setIsDirectionOpen] = useState(false);
   const [readerProfile, setReaderProfile] = useState<ReaderProfile>(createEmptyReaderProfile());
+  const [canonicalReaderProfile, setCanonicalReaderProfile] = useState<CanonicalReaderProfile | null>(null);
   const [cloudReaderProfileSync, setCloudReaderProfileSync] = useState<CloudReaderProfileSyncState>(EMPTY_CLOUD_READER_PROFILE_SYNC);
   const [eerieReaderProfile, setEerieReaderProfile] = useState<EerieReaderProfile>(createDefaultEerieReaderProfile());
   const [pendingStoryStart, setPendingStoryStart] = useState<StoryStart | null>(null);
@@ -355,6 +363,8 @@ export default function Home() {
     setSavedStories(browserSavedStories);
     setSavedProjects(readSavedProjects());
     setDemoStory(browserSavedStories.length === 0 ? readDemoLatestStory() : null);
+    getOrCreateReaderId();
+    const canonicalProfile = loadCanonicalReaderProfile();
     const profileId = readOrCreateReaderProfileId();
     const localProfile = readReaderProfile();
     const localEerieProfile = readEerieReaderProfile();
@@ -365,6 +375,8 @@ export default function Home() {
         })
       : localProfile;
     if (enrichedProfile !== localProfile) persistReaderProfile(enrichedProfile);
+    const mirroredCanonicalProfile = mirrorCanonicalReaderProfilePreferences(canonicalProfile, enrichedProfile, localEerieProfile);
+    setCanonicalReaderProfile(mirroredCanonicalProfile);
     setReaderProfile(enrichedProfile);
     const storedReadyQueue = readReadyStoryQueue();
     const shouldUseCatalogSeed = storedReadyQueue.length === 0 || shouldReplaceLegacyGenericReadyQueue(storedReadyQueue);
@@ -454,6 +466,8 @@ export default function Home() {
     setLastRequestIncludedContinuationStoryId(Boolean(continuationStoryId));
     setLastContinuationContextIncluded(nextGenerationSource === "continue-story" && Boolean(overrides?.continuationContextIncluded));
     setLastContinuationBlockedBecauseContextMissing(false);
+    const activeCanonicalProfile = mirrorCanonicalReaderProfilePreferences(loadCanonicalReaderProfile(), readReaderProfile(), eerieReaderProfile);
+    setCanonicalReaderProfile(activeCanonicalProfile);
     const personalization = buildNewStoryPersonalization({
       eerieProfile: eerieReaderProfile,
       genre: overrides?.genrePreset ?? genrePreset,
@@ -461,7 +475,8 @@ export default function Home() {
       profile: readReaderProfile(),
       source: getReaderProfileSource(cloudReaderProfileSync),
       trigger: overrides?.signalSource ?? "create",
-      continuationStoryId
+      continuationStoryId,
+      canonicalProfile: activeCanonicalProfile
     });
     setLastNewStoryPersonalization(personalization.diagnostics);
     setIsGenerating(true);
@@ -483,6 +498,7 @@ export default function Home() {
           readerMood: overrides?.readerMood ?? readerProfile.latestMood ?? null,
           ...(personalization.prompt ? { personalizationContext: personalization.prompt } : {}),
           readerProfileGenerationSnapshot: personalization.snapshot,
+          readerProfileInput: buildGenerationReaderProfileInput(activeCanonicalProfile),
           ...(continuationStoryId ? { continuationStoryId } : {})
         })
       });
@@ -502,6 +518,9 @@ export default function Home() {
       setStoryResponse(normalizedResponse);
       setCurrentStoryId(generatedStoryId);
       setGeneratedStoryPresentation(overrides?.presentation ?? "first-episode");
+      const generatedAt = new Date().toISOString();
+      const canonicalAfterGeneration = saveCanonicalReaderProfile({ ...activeCanonicalProfile, updatedAt: generatedAt, signals: { ...activeCanonicalProfile.signals, lastStoryGeneratedAt: generatedAt, lastGenerationUsedCanonicalProfile: true } });
+      setCanonicalReaderProfile(canonicalAfterGeneration);
       recordReaderSignal({ eventType: "storyGenerated", source: overrides?.signalSource ?? "create", storyId: generatedStoryId, title: savedStory.title, genre: savedStory.genrePreset, wordCount: savedStory.wordCount });
       recordReaderSignal({ eventType: "storyOpened", source: overrides?.signalSource ?? "create", storyId: generatedStoryId, title: savedStory.title, genre: savedStory.genrePreset, wordCount: savedStory.wordCount });
       setIsStoryStartSelectionOpen(false);
@@ -1304,7 +1323,7 @@ export default function Home() {
         {error ? <Status tone="error">{error}</Status> : null}
 
         <AppStateDiagnostics activeView={activeView} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
-        <ReaderProfileDiagnostics cloudSync={cloudReaderProfileSync} profile={readerProfile} onClear={handleClearReaderProfile} />
+        <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
         <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
         {activeView === "mood-intake" ? (
@@ -1744,7 +1763,7 @@ function shouldMirrorEerieProfileToReaderTasteProfile(profile: ReaderProfile): b
   return !profile.tasteProfile || profile.tasteProfile.source === "default";
 }
 
-function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre, mode, profile, source, trigger }: { continuationStoryId: string; eerieProfile: EerieReaderProfile; genre: GenrePreset; mode: Exclude<GenerationSource, null>; profile: ReaderProfile; source: ProfileSourceUsed; trigger: ReaderProfileEventSource; }): { diagnostics: LastNewStoryPersonalization; prompt: string; snapshot: ReaderProfileGenerationSnapshot } {
+function buildNewStoryPersonalization({ canonicalProfile, continuationStoryId, eerieProfile, genre, mode, profile, source, trigger }: { canonicalProfile: CanonicalReaderProfile; continuationStoryId: string; eerieProfile: EerieReaderProfile; genre: GenrePreset; mode: Exclude<GenerationSource, null>; profile: ReaderProfile; source: ProfileSourceUsed; trigger: ReaderProfileEventSource; }): { diagnostics: LastNewStoryPersonalization; prompt: string; snapshot: ReaderProfileGenerationSnapshot } {
   if (mode === "continue-story") {
     const snapshot = createReaderProfileGenerationSnapshot({
       defaultSafetyGuardrails: DEFAULT_READER_SAFETY_GUARDRAILS,
@@ -1756,7 +1775,8 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
       profileSource: "none",
       profileUsed: false,
       tasteProfile: profile.tasteProfile ?? null,
-      userHardAvoidances: []
+      userHardAvoidances: [],
+      canonicalProfile
     });
 
     return {
@@ -1820,7 +1840,8 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
     profileSource: profileUsed ? profileSource : "none",
     profileUsed,
     tasteProfile,
-    userHardAvoidances
+    userHardAvoidances,
+    canonicalProfile
   });
 
   return {
@@ -1846,7 +1867,7 @@ function buildNewStoryPersonalization({ continuationStoryId, eerieProfile, genre
   };
 }
 
-function createReaderProfileGenerationSnapshot({ defaultSafetyGuardrails, feedbackIncluded, genreSignal, mode, moodSignal, profile, profileSource, profileUsed, tasteProfile, userHardAvoidances }: { defaultSafetyGuardrails: string[]; feedbackIncluded: boolean; genreSignal: string; mode: Exclude<GenerationSource, null>; moodSignal: string; profile: ReaderProfile; profileSource: ProfileSourceUsed; profileUsed: boolean; tasteProfile: ReaderProfile["tasteProfile"] | null; userHardAvoidances: string[]; }): ReaderProfileGenerationSnapshot {
+function createReaderProfileGenerationSnapshot({ canonicalProfile, defaultSafetyGuardrails, feedbackIncluded, genreSignal, mode, moodSignal, profile, profileSource, profileUsed, tasteProfile, userHardAvoidances }: { canonicalProfile: CanonicalReaderProfile; defaultSafetyGuardrails: string[]; feedbackIncluded: boolean; genreSignal: string; mode: Exclude<GenerationSource, null>; moodSignal: string; profile: ReaderProfile; profileSource: ProfileSourceUsed; profileUsed: boolean; tasteProfile: ReaderProfile["tasteProfile"] | null; userHardAvoidances: string[]; }): ReaderProfileGenerationSnapshot {
   const feedbackSignals = profile.storyFeedbackSignals ?? [];
   const latestFeedback = [...feedbackSignals].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
 
@@ -1868,6 +1889,8 @@ function createReaderProfileGenerationSnapshot({ defaultSafetyGuardrails, feedba
     defaultSafetyGuardrailsSummary: defaultSafetyGuardrails.length ? defaultSafetyGuardrails.join(", ") : "none",
     moodSignal,
     genreSignal,
+    canonicalReaderProfileUsed: true,
+    canonicalReaderProfileInput: buildGenerationReaderProfileInput(canonicalProfile),
     generatedAt: new Date().toISOString()
   };
 }
@@ -1921,7 +1944,7 @@ function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId,
   );
 }
 
-function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: CloudReaderProfileSyncState; onClear: () => void; profile: ReaderProfile }) {
+function ReaderProfileDiagnostics({ canonicalProfile, cloudSync, lastGenerationUsedCanonicalProfile, onClear, profile }: { canonicalProfile: CanonicalReaderProfile | null; cloudSync: CloudReaderProfileSyncState; lastGenerationUsedCanonicalProfile: boolean; onClear: () => void; profile: ReaderProfile }) {
   const topMood = getTopCount(profile.moodCounts);
   const topGenre = getTopCount(profile.genreCounts);
   const tasteProfile = profile.tasteProfile;
@@ -1931,6 +1954,29 @@ function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: 
       <summary className="cursor-pointer font-semibold text-paper/75">Reader profile diagnostics</summary>
       <div className="mt-3 grid gap-3">
         <div className="grid gap-1 sm:grid-cols-2">
+          <p><span className="font-semibold text-paper/80">Reader ID:</span> {canonicalProfile?.readerId ? "present" : "missing"}</p>
+          <p><span className="font-semibold text-paper/80">Reader ID storage key:</span> {READER_ID_STORAGE_KEY}</p>
+          <p><span className="font-semibold text-paper/80">Canonical profile key:</span> {CANONICAL_READER_PROFILE_STORAGE_KEY}</p>
+          <p><span className="font-semibold text-paper/80">Canonical profile exists:</span> {canonicalProfile ? "yes" : "no"}</p>
+          <p><span className="font-semibold text-paper/80">Profile source:</span> {canonicalProfile?.source ?? "default"}</p>
+          <p><span className="font-semibold text-paper/80">Cloud sync:</span> {cloudSync.status === "synced" ? "success" : cloudSync.status === "unavailable" || cloudSync.status === "not found" ? "not configured" : cloudSync.status === "pending" ? "pending" : "failed"}</p>
+          <p><span className="font-semibold text-paper/80">Last generation used canonical profile:</span> {lastGenerationUsedCanonicalProfile ? "yes" : "no"}</p>
+          <p><span className="font-semibold text-paper/80">Profile updated:</span> {canonicalProfile?.updatedAt || "never"}</p>
+          <p><span className="font-semibold text-paper/80">Onboarding mode:</span> {canonicalProfile?.onboarding?.mode ?? "unknown"}</p>
+          <p><span className="font-semibold text-paper/80">Preferred format:</span> {canonicalProfile?.preferences.preferredFormat ?? canonicalProfile?.onboarding?.preferredFormat ?? "not available"}</p>
+          <p><span className="font-semibold text-paper/80">Preferred duration:</span> {canonicalProfile?.preferences.preferredDuration ?? canonicalProfile?.onboarding?.preferredDuration ?? "not available"}</p>
+          <p><span className="font-semibold text-paper/80">Fear intensity:</span> {formatOptionalPreference(canonicalProfile?.preferences.fearIntensity)}</p>
+          <p><span className="font-semibold text-paper/80">Weirdness tolerance:</span> {formatOptionalPreference(canonicalProfile?.preferences.weirdnessTolerance)}</p>
+          <p><span className="font-semibold text-paper/80">Supernatural affinity:</span> {formatOptionalPreference(canonicalProfile?.preferences.supernaturalAffinity)}</p>
+          <p><span className="font-semibold text-paper/80">Ambiguity tolerance:</span> {formatOptionalPreference(canonicalProfile?.preferences.ambiguityTolerance)}</p>
+          <p><span className="font-semibold text-paper/80">Gore tolerance:</span> {formatOptionalPreference(canonicalProfile?.preferences.goreTolerance)}</p>
+          <p><span className="font-semibold text-paper/80">Sleep-safe preference:</span> {formatOptionalPreference(canonicalProfile?.preferences.sleepSafePreference)}</p>
+          <p><span className="font-semibold text-paper/80">Hard avoidances:</span> {canonicalProfile?.preferences.hardAvoidances.length ? canonicalProfile.preferences.hardAvoidances.join(", ") : "none"}</p>
+          <p><span className="font-semibold text-paper/80">Story card signal count:</span> {canonicalProfile?.signals.storyCardSignalCount ?? 0}</p>
+          <p><span className="font-semibold text-paper/80">Feedback signal count:</span> {canonicalProfile?.signals.feedbackSignalCount ?? 0}</p>
+          <p><span className="font-semibold text-paper/80">Favorite count:</span> {canonicalProfile?.signals.favoriteCount ?? 0}</p>
+          <p><span className="font-semibold text-paper/80">Saved for later count:</span> {canonicalProfile?.signals.savedForLaterCount ?? 0}</p>
+          <p><span className="font-semibold text-paper/80">Fallback/default status:</span> {canonicalProfile?.fallbackReason ?? (canonicalProfile?.source === "default" ? "default" : "none")}</p>
           <p><span className="font-semibold text-paper/80">Profile exists:</span> {profile.profileExists ? "yes" : "no"}</p>
           <p><span className="font-semibold text-paper/80">Profile ID:</span> {cloudSync.profileId || "pending"}</p>
           <p><span className="font-semibold text-paper/80">Local profile exists:</span> {cloudSync.localProfileExists ? "yes" : "no"}</p>
@@ -1978,7 +2024,7 @@ function ReaderProfileDiagnostics({ cloudSync, onClear, profile }: { cloudSync: 
         <details className="rounded-md border border-paper/10 bg-night-ink p-3">
           <summary className="cursor-pointer font-semibold text-paper/75">Raw JSON</summary>
           <pre className="mt-3 max-h-72 overflow-auto text-[0.7rem] leading-5 text-paper/70">
-            {JSON.stringify({ storageKey: READER_PROFILE_STORAGE_KEY, profileIdStorageKey: READER_PROFILE_ID_STORAGE_KEY, cloudSync, ...profile }, null, 2)}
+            {JSON.stringify({ canonicalProfile, readerIdStorageKey: READER_ID_STORAGE_KEY, canonicalProfileStorageKey: CANONICAL_READER_PROFILE_STORAGE_KEY, storageKey: READER_PROFILE_STORAGE_KEY, profileIdStorageKey: READER_PROFILE_ID_STORAGE_KEY, cloudSync, ...profile }, null, 2)}
           </pre>
         </details>
         <button className="w-fit rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper hover:border-lantern-gold/50" onClick={onClear} type="button">Clear reader profile</button>
@@ -2135,6 +2181,10 @@ function EerieReaderProfileDiagnostics({ onClear, profile }: { onClear: () => vo
       </div>
     </details>
   );
+}
+
+function formatOptionalPreference(value: number | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "not available";
 }
 
 function formatPreferencePair(preference: { value: number; confidence: number }): string {

@@ -167,6 +167,8 @@ function normalizeReaderProfileGenerationSnapshot(
     defaultSafetyGuardrailsSummary: normalizeDiagnosticString(snapshot.defaultSafetyGuardrailsSummary),
     moodSignal: normalizeDiagnosticString(snapshot.moodSignal),
     genreSignal: normalizeDiagnosticString(snapshot.genreSignal),
+    canonicalReaderProfileUsed: Boolean(snapshot.canonicalReaderProfileUsed),
+    canonicalReaderProfileInput: snapshot.canonicalReaderProfileInput && typeof snapshot.canonicalReaderProfileInput === "object" ? snapshot.canonicalReaderProfileInput : undefined,
     generatedAt: normalizeDiagnosticString(snapshot.generatedAt) || new Date().toISOString()
   };
 }

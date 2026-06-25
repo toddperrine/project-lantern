@@ -54,6 +54,8 @@ export type ReaderProfileGenerationSnapshot = {
   defaultSafetyGuardrailsSummary: string;
   moodSignal: string;
   genreSignal: string;
+  canonicalReaderProfileUsed?: boolean;
+  canonicalReaderProfileInput?: object;
   generatedAt: string;
 };
 
@@ -71,6 +73,7 @@ export type GenerateStoryRequest = {
   personalizationContext?: string;
   continuationStoryId?: string;
   readerProfileGenerationSnapshot?: ReaderProfileGenerationSnapshot;
+  readerProfileInput?: object;
 };
 
 export type StoryMetadata = {
@@ -142,4 +145,5 @@ export type StoryDiagnostics = {
   finalAcceptedBlueprintSceneCount?: number;
   readerProfileSnapshot?: ReaderProfileGenerationSnapshot;
   readerProfileGenerationSnapshot?: ReaderProfileGenerationSnapshot;
+  readerProfileInput?: object;
 };
