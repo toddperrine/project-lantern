@@ -52,6 +52,7 @@ import {
   type ReadyStoryQueueSignal
 } from "@/lib/ready-story-queue";
 import { STORY_SPARK_CATALOG, type StorySparkCatalogItem } from "@/lib/story-spark-catalog";
+import { createGenerationIdentity, type GenerationIdentity, type GenerationMode } from "@/lib/generation-identity";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
 import type { EerieReaderProfile } from "@/lib/eerie-reader-profile";
@@ -70,6 +71,7 @@ type MoodIntakeMode = "story-start" | "generate" | null;
 type MoodIntakeFormState = ReaderMoodDraft;
 type GeneratedStoryPresentation = "first-episode" | "continuation" | null;
 type GenerationSource = "new-story" | "continue-story" | null;
+type LastGenerationIdentityDiagnostics = { identity: GenerationIdentity | null; continuationContextIncluded: boolean; newSeriesCreated: boolean; trigger: string; activeCommittedStoryId: string; activeCommittedSeriesId: string; pendingGenerationMode: GenerationMode | "none"; lastGenerationCancelledOrAborted: boolean };
 type ProfileSourceUsed = "local" | "cloud" | "default" | "none";
 type LastNewStoryPersonalization = {
   profileUsed: boolean;
@@ -88,6 +90,7 @@ type LastNewStoryPersonalization = {
   latestStoryFeedbackSummary: string;
   summary: string;
   responseSnapshot?: ReaderProfileGenerationSnapshot;
+  identityDiagnostics: LastGenerationIdentityDiagnostics;
 };
 type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" | "not found";
 type CloudReaderProfileSyncState = {
@@ -334,6 +337,10 @@ export default function Home() {
   const [generatedStoryPresentation, setGeneratedStoryPresentation] = useState<GeneratedStoryPresentation>(null);
   const [lastGenerationTrigger, setLastGenerationTrigger] = useState("none");
   const [generationSource, setGenerationSource] = useState<GenerationSource>(null);
+  const [activeCommittedStoryId, setActiveCommittedStoryId] = useState("");
+  const [activeCommittedSeriesId, setActiveCommittedSeriesId] = useState("");
+  const [pendingGenerationMode, setPendingGenerationMode] = useState<GenerationMode | "none">("none");
+  const [lastGenerationCancelledOrAborted, setLastGenerationCancelledOrAborted] = useState(false);
   const [lastRequestIncludedContinuationStoryId, setLastRequestIncludedContinuationStoryId] = useState(false);
   const [lastContinuationContextIncluded, setLastContinuationContextIncluded] = useState(false);
   const [lastContinuationBlockedBecauseContextMissing, setLastContinuationBlockedBecauseContextMissing] = useState(false);
@@ -365,6 +372,11 @@ export default function Home() {
     const browserSavedStories = readSavedStories();
     setInputArtifacts(readInputArtifacts());
     setSavedStories(browserSavedStories);
+    const latestSavedStory = browserSavedStories[0];
+    if (latestSavedStory) {
+      setActiveCommittedStoryId(latestSavedStory.id);
+      setActiveCommittedSeriesId(latestSavedStory.seriesId ?? latestSavedStory.id);
+    }
     setSavedProjects(readSavedProjects());
     setDemoStory(browserSavedStories.length === 0 ? readDemoLatestStory() : null);
     getOrCreateReaderId();
@@ -405,10 +417,13 @@ export default function Home() {
 
   function cancelActiveGeneration() {
     activeGenerationRequestId.current += 1;
+    const hadActiveGeneration = Boolean(activeGenerationAbortController.current) || isGenerating;
     activeGenerationAbortController.current?.abort();
     activeGenerationAbortController.current = null;
     setIsGenerating(false);
     setGenerationSource(null);
+    setPendingGenerationMode("none");
+    if (hadActiveGeneration) setLastGenerationCancelledOrAborted(true);
   }
 
   function handleStopGeneration() {
@@ -447,9 +462,9 @@ export default function Home() {
     window.history.pushState(null, "", `${window.location.pathname}?view=${view}`);
   }
 
-  async function handleGenerate(overrides?: Partial<{ worldBible: string; characterProfiles: string; storySeed: string; storyRules: string; genrePreset: GenrePreset; narrativeArchitecture: NarrativeArchitecture; characterArc: CharacterArc; endingType: EndingType; lengthTarget: LengthTarget; readerMood: ReaderMoodSnapshot | null; presentation: Exclude<GeneratedStoryPresentation, null>; loadingMessage: string; signalSource: ReaderProfileEventSource; generationSource: Exclude<GenerationSource, null>; continuationStoryId: string; continuationContextIncluded: boolean }>) {
-    const nextGenerationSource = overrides?.generationSource ?? "new-story";
-    const continuationStoryId = nextGenerationSource === "continue-story" ? overrides?.continuationStoryId?.trim() ?? "" : "";
+  async function handleGenerate(overrides: { generationMode: GenerationMode; worldBible?: string; characterProfiles?: string; storySeed?: string; storyRules?: string; genrePreset?: GenrePreset; narrativeArchitecture?: NarrativeArchitecture; characterArc?: CharacterArc; endingType?: EndingType; lengthTarget?: LengthTarget; readerMood?: ReaderMoodSnapshot | null; presentation?: Exclude<GeneratedStoryPresentation, null>; loadingMessage?: string; signalSource?: ReaderProfileEventSource; generationSource?: Exclude<GenerationSource, null>; continuationStoryId?: string; continuationContextIncluded?: boolean; selectedSeriesId?: string | null; sourceStoryId?: string | null }) {
+    const nextGenerationSource = overrides.generationSource ?? (overrides.generationMode === "continue_series" ? "continue-story" : "new-story");
+    const continuationStoryId = nextGenerationSource === "continue-story" ? overrides.continuationStoryId?.trim() ?? "" : "";
 
     if (nextGenerationSource === "continue-story" && !continuationStoryId) {
       setLastContinuationContextIncluded(false);
@@ -463,12 +478,15 @@ export default function Home() {
     activeGenerationAbortController.current?.abort();
     const abortController = new AbortController();
     activeGenerationAbortController.current = abortController;
+    const generationIdentity = createGenerationIdentity({ generationMode: overrides.generationMode, activeStoryId: activeCommittedStoryId || currentStoryId || null, activeSeriesId: activeCommittedSeriesId || (storyResponse?.metadata.diagnostics.seriesId ?? null), selectedSeriesId: overrides.selectedSeriesId ?? null, sourceStoryId: overrides.sourceStoryId ?? null });
     setError("");
-    setStatusMessage(overrides?.loadingMessage ?? "");
-    setLastGenerationTrigger(overrides?.signalSource ?? "create");
+    setStatusMessage(overrides.loadingMessage ?? "");
+    setLastGenerationTrigger(overrides.signalSource ?? "create");
     setGenerationSource(nextGenerationSource);
+    setPendingGenerationMode(overrides.generationMode);
+    setLastGenerationCancelledOrAborted(false);
     setLastRequestIncludedContinuationStoryId(Boolean(continuationStoryId));
-    setLastContinuationContextIncluded(nextGenerationSource === "continue-story" && Boolean(overrides?.continuationContextIncluded));
+    setLastContinuationContextIncluded(Boolean(overrides.continuationContextIncluded));
     setLastContinuationBlockedBecauseContextMissing(false);
     const activeCanonicalProfile = mirrorCanonicalReaderProfilePreferences(loadCanonicalReaderProfile(), readReaderProfile(), eerieReaderProfile);
     setCanonicalReaderProfile(activeCanonicalProfile);
@@ -478,7 +496,7 @@ export default function Home() {
       mode: nextGenerationSource,
       profile: readReaderProfile(),
       source: getReaderProfileSource(cloudReaderProfileSync),
-      trigger: overrides?.signalSource ?? "create",
+      trigger: overrides.signalSource ?? "create",
       continuationStoryId,
       canonicalProfile: activeCanonicalProfile
     });
@@ -499,6 +517,10 @@ export default function Home() {
           characterArc: overrides?.characterArc ?? characterArc,
           endingType: overrides?.endingType ?? endingType,
           lengthTarget: overrides?.lengthTarget ?? lengthTarget,
+          generationMode: overrides.generationMode,
+          generationIdentity,
+          continuationContextIncluded: Boolean(overrides.continuationContextIncluded),
+          generationTrigger: getGenerationTriggerLabel(overrides.generationMode, overrides.signalSource ?? "create"),
           readerMood: overrides?.readerMood ?? readerProfile.latestMood ?? null,
           ...(personalization.prompt ? { personalizationContext: personalization.prompt } : {}),
           readerProfileGenerationSnapshot: personalization.snapshot,
@@ -512,20 +534,40 @@ export default function Home() {
       const normalizedResponse = normalizeGenerateStoryResponse(payload);
       setLastNewStoryPersonalization((current) => ({
         ...current,
-        responseSnapshot: normalizedResponse.metadata.diagnostics.readerProfileSnapshot ?? normalizedResponse.metadata.diagnostics.readerProfileGenerationSnapshot
+        responseSnapshot: normalizedResponse.metadata.diagnostics.readerProfileSnapshot ?? normalizedResponse.metadata.diagnostics.readerProfileGenerationSnapshot,
+        identityDiagnostics: {
+          identity: {
+            generationMode: normalizedResponse.metadata.diagnostics.generationMode,
+            storyId: normalizedResponse.metadata.diagnostics.storyId,
+            seriesId: normalizedResponse.metadata.diagnostics.seriesId,
+            parentSeriesId: normalizedResponse.metadata.diagnostics.parentSeriesId ?? null,
+            sourceStoryId: normalizedResponse.metadata.diagnostics.sourceStoryId ?? null,
+            createdAt: generationIdentity.createdAt
+          },
+          continuationContextIncluded: normalizedResponse.metadata.diagnostics.continuationContextIncluded,
+          newSeriesCreated: normalizedResponse.metadata.diagnostics.newSeriesCreated,
+          trigger: normalizedResponse.metadata.diagnostics.generationTrigger,
+          activeCommittedStoryId: normalizedResponse.metadata.diagnostics.storyId,
+          activeCommittedSeriesId: normalizedResponse.metadata.diagnostics.seriesId,
+          pendingGenerationMode: "none",
+          lastGenerationCancelledOrAborted: false
+        }
       }));
-      const generatedStoryId = createStoryId(normalizedResponse.story);
+      const generatedStoryId = normalizedResponse.metadata.diagnostics.storyId || generationIdentity.storyId;
       const savedStory = createSavedStory(normalizedResponse, generatedStoryId);
       const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
       persistSavedStories(nextSavedStories);
       setSavedStories(nextSavedStories);
       setStoryResponse(normalizedResponse);
       setCurrentStoryId(generatedStoryId);
+      setActiveCommittedStoryId(generatedStoryId);
+      setActiveCommittedSeriesId(normalizedResponse.metadata.diagnostics.seriesId);
       setGeneratedStoryPresentation(overrides?.presentation ?? "first-episode");
       const generatedAt = new Date().toISOString();
       const canonicalAfterGeneration = saveCanonicalReaderProfile({ ...activeCanonicalProfile, updatedAt: generatedAt, signals: { ...activeCanonicalProfile.signals, lastStoryGeneratedAt: generatedAt, lastGenerationUsedCanonicalProfile: true } });
       setCanonicalReaderProfile(canonicalAfterGeneration);
-      recordReaderSignal({ eventType: "storyGenerated", source: overrides?.signalSource ?? "create", storyId: generatedStoryId, title: savedStory.title, genre: savedStory.genrePreset, wordCount: savedStory.wordCount });
+      if (overrides.generationMode === "new_story") { recordReaderSignal({ eventType: "storyGenerated", source: "startSomethingNew", storyId: generatedStoryId, title: savedStory.title, genre: savedStory.genrePreset, wordCount: savedStory.wordCount }); }
+      else { recordReaderSignal({ eventType: "storyGenerated", source: overrides.signalSource ?? "create", storyId: generatedStoryId, title: savedStory.title, genre: savedStory.genrePreset, wordCount: savedStory.wordCount }); }
       recordReaderSignal({ eventType: "storyOpened", source: overrides?.signalSource ?? "create", storyId: generatedStoryId, title: savedStory.title, genre: savedStory.genrePreset, wordCount: savedStory.wordCount });
       setIsStoryStartSelectionOpen(false);
       clearDemoLatestStory();
@@ -541,6 +583,7 @@ export default function Home() {
         activeGenerationAbortController.current = null;
         setIsGenerating(false);
         setGenerationSource(null);
+        setPendingGenerationMode("none");
       }
     }
   }
@@ -563,6 +606,7 @@ export default function Home() {
     setStatusMessage(`Generating ${story.title} from your reader pulse.`);
 
     void handleGenerate({
+      generationMode: "new_story",
       worldBible: story.world,
       characterProfiles: story.cast,
       storySeed: story.seed,
@@ -664,6 +708,8 @@ export default function Home() {
       setSavedStories(nextSavedStories);
       setStoryResponse(item.generatedStory);
       setCurrentStoryId(generatedStoryId);
+      setActiveCommittedStoryId(generatedStoryId);
+      setActiveCommittedSeriesId(item.generatedStory.metadata.diagnostics.seriesId);
       setGeneratedStoryPresentation("first-episode");
       setIsStoryStartSelectionOpen(false);
       setPendingStoryStart(null);
@@ -686,6 +732,7 @@ export default function Home() {
     setMoodIntakeMode(null);
 
     void handleGenerate({
+      generationMode: "new_story",
       worldBible: storyStart.world,
       characterProfiles: storyStart.cast,
       storySeed: storyStart.seed,
@@ -753,6 +800,7 @@ export default function Home() {
     navigateToView("home", { preserveGeneration: true });
 
     void handleGenerate({
+      generationMode: "new_story",
       worldBible: storyStart.world,
       characterProfiles: storyStart.cast,
       storySeed: storyStart.seed,
@@ -784,7 +832,7 @@ export default function Home() {
     );
 
     if (approvedCurrentMood) {
-      void handleGenerate({ readerMood: readerProfile.latestMood ?? null, signalSource: "create", generationSource: "new-story" });
+      void handleGenerate({ generationMode: "new_story", readerMood: readerProfile.latestMood ?? null, signalSource: "create", generationSource: "new-story" });
       return;
     }
 
@@ -813,6 +861,7 @@ export default function Home() {
       setGeneratedStoryPresentation("first-episode");
       setStatusMessage(`Generating ${storyStartToApply.title} from your reader pulse.`);
       void handleGenerate({
+        generationMode: "new_story",
         worldBible: storyStartToApply.world,
         characterProfiles: storyStartToApply.cast,
         storySeed: storyStartToApply.seed,
@@ -839,7 +888,7 @@ export default function Home() {
 
     if (modeToComplete === "generate") {
       setStatusMessage("Reader pulse saved. Generating story.");
-      void handleGenerate({ readerMood: latestMood, signalSource: "create", generationSource: "new-story" });
+      void handleGenerate({ generationMode: "new_story", readerMood: latestMood, signalSource: "create", generationSource: "new-story" });
       return;
     }
 
@@ -1005,6 +1054,9 @@ export default function Home() {
       direction?.trim() ? `Reader direction for the next chapter: ${direction.trim()}` : "Continue directly from the strongest unresolved story pressure."
     ].join("\n\n");
     void handleGenerate({
+      generationMode: "continue_series",
+      selectedSeriesId: getContinuationSeriesId(storyToContinue, storyId, storyResponse, activeCommittedStoryId, activeCommittedSeriesId),
+      sourceStoryId: storyId,
       worldBible: worldBible.content.trim() || `Existing story world inferred from ${storyToContinue.title}. Genre: ${storyToContinue.genrePreset}.`,
       characterProfiles: characterProfiles.content.trim() || `Top cast: ${storyToContinue.charactersUsed.length ? storyToContinue.charactersUsed.join(", ") : "use the established characters from the prior chapter"}.`,
       storySeed: continuationSeed,
@@ -1036,6 +1088,8 @@ export default function Home() {
     cancelActiveGeneration();
     setStoryResponse(savedStoryToResponse(story));
     setCurrentStoryId(story.id);
+    setActiveCommittedStoryId(story.id);
+    setActiveCommittedSeriesId(story.seriesId ?? story.id);
     setGeneratedStoryPresentation(null);
     clearDemoLatestStory();
     setDemoStory(null);
@@ -1350,7 +1404,7 @@ export default function Home() {
         {isGenerating ? <StopGenerationControl onStop={handleStopGeneration} /> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        <AppStateDiagnostics activeView={activeView} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
+        <AppStateDiagnostics activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationTrigger={lastGenerationTrigger} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
         <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
         <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
 
@@ -1777,7 +1831,8 @@ function createEmptyLastNewStoryPersonalization(): LastNewStoryPersonalization {
     continuationStoryIdIncludedInLastNewStoryRequest: false,
     feedbackIncluded: false,
     latestStoryFeedbackSummary: "No prior story feedback available.",
-    summary: "No new-story generation personalization has been applied yet."
+    summary: "No new-story generation personalization has been applied yet.",
+    identityDiagnostics: { identity: null, continuationContextIncluded: false, newSeriesCreated: false, trigger: "none", activeCommittedStoryId: "none", activeCommittedSeriesId: "none", pendingGenerationMode: "none", lastGenerationCancelledOrAborted: false }
   };
 }
 
@@ -1913,6 +1968,7 @@ function buildNewStoryPersonalization({ canonicalProfile, continuationStoryId, e
       eerieSignalsIncluded: profileUsed,
       continuationStoryIdIncludedInLastNewStoryRequest: Boolean(continuationStoryId),
       feedbackIncluded: profileUsed && feedbackIncluded,
+      identityDiagnostics: createEmptyLastNewStoryPersonalization().identityDiagnostics,
       latestStoryFeedbackSummary: feedbackSummary,
       summary: profileUsed ? `Used ${confidence}-confidence reader profile ${confidence === "low" ? "lightly" : "as preference guidance"}: favored ${topGenre ?? genre} and ${topMood ?? profile.latestMood?.mood ?? "available mood"} mood; ${userHardAvoidances.length ? "included user hard avoidances" : "no user hard avoidances found"}; ${feedbackIncluded ? "included recent story feedback as weak guidance" : "no story feedback found"}; ${includeEerieSignals ? "included taste profile guidance without forcing horror." : "did not force eerie preferences."}` : "No persisted reader profile was available; generated with the existing new-story inputs only."
     },
@@ -1949,7 +2005,21 @@ function createReaderProfileGenerationSnapshot({ canonicalProfile, defaultSafety
   };
 }
 
-function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationTrigger, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, profile, readyStoryQueue, savedForLaterStoryQueue }: { activeView: AppView; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationTrigger: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; profile: ReaderProfile; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[] }) {
+function getContinuationSeriesId(story: LibraryStory, storyId: string, storyResponse: GenerateStoryResponse | null, activeCommittedStoryId: string, activeCommittedSeriesId: string): string {
+  if (activeCommittedStoryId && activeCommittedSeriesId && storyId === activeCommittedStoryId) return activeCommittedSeriesId;
+  if (storyResponse?.metadata.diagnostics.storyId === storyId) return storyResponse.metadata.diagnostics.seriesId;
+  if ("seriesId" in story && typeof story.seriesId === "string" && story.seriesId.trim()) return story.seriesId;
+  return storyId;
+}
+
+function getGenerationTriggerLabel(generationMode: GenerationMode, source: ReaderProfileEventSource): "Start Something New" | "Continue Series" | "Retry/Rewrite" | "Create" {
+  if (generationMode === "new_story" && source === "startSomethingNew") return "Start Something New";
+  if (generationMode === "continue_series") return "Continue Series";
+  if (generationMode === "rewrite_retry") return "Retry/Rewrite";
+  return "Create";
+}
+
+function AppStateDiagnostics({ activeView, activeCommittedSeriesId, activeCommittedStoryId, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationTrigger, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readyStoryQueue, savedForLaterStoryQueue }: { activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationTrigger: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[] }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
@@ -1959,6 +2029,10 @@ function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId,
         <p><span className="font-semibold text-paper/80">Last generation trigger/source:</span> {lastGenerationTrigger}</p>
         <p><span className="font-semibold text-paper/80">Active generation source:</span> {generationSource ?? "none"}</p>
         <p><span className="font-semibold text-paper/80">Current story ID:</span> {currentStoryId || "none"}</p>
+        <p><span className="font-semibold text-paper/80">Active committed storyId:</span> {activeCommittedStoryId || "none"}</p>
+        <p><span className="font-semibold text-paper/80">Active committed seriesId:</span> {activeCommittedSeriesId || "none"}</p>
+        <p><span className="font-semibold text-paper/80">Pending generation mode:</span> {pendingGenerationMode}</p>
+        <p><span className="font-semibold text-paper/80">Last generation cancelled/aborted:</span> {lastGenerationCancelledOrAborted ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Current story feedback available:</span> {currentStoryId ? "yes" : "no - current story id is missing"}</p>
         <p><span className="font-semibold text-paper/80">Current story feedback saved:</span> {currentStoryFeedback ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Current story feedback rating:</span> {currentStoryFeedback?.rating ?? "none"}</p>
@@ -1981,7 +2055,13 @@ function AppStateDiagnostics({ activeView, currentStoryFeedback, currentStoryId,
         <p><span className="font-semibold text-paper/80">Profile used in last new-story generation:</span> {lastNewStoryPersonalization.profileUsed ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Profile source used:</span> {lastNewStoryPersonalization.profileSourceUsed}</p>
         <p><span className="font-semibold text-paper/80">Profile confidence:</span> {lastNewStoryPersonalization.profileConfidence}</p>
-        <p><span className="font-semibold text-paper/80">Last generation mode:</span> {lastNewStoryPersonalization.lastGenerationMode}</p>
+        <p><span className="font-semibold text-paper/80">Last generation mode:</span> {lastNewStoryPersonalization.identityDiagnostics.identity?.generationMode ?? lastNewStoryPersonalization.lastGenerationMode}</p>
+        <p><span className="font-semibold text-paper/80">Last generation storyId:</span> {lastNewStoryPersonalization.identityDiagnostics.identity?.storyId ?? "none"}</p>
+        <p><span className="font-semibold text-paper/80">Last generation seriesId:</span> {lastNewStoryPersonalization.identityDiagnostics.identity?.seriesId ?? "none"}</p>
+        <p><span className="font-semibold text-paper/80">Last generation sourceStoryId:</span> {lastNewStoryPersonalization.identityDiagnostics.identity?.sourceStoryId ?? "none"}</p>
+        <p><span className="font-semibold text-paper/80">Last generation parentSeriesId:</span> {lastNewStoryPersonalization.identityDiagnostics.identity?.parentSeriesId ?? "none"}</p>
+        <p><span className="font-semibold text-paper/80">Last generation created new series:</span> {lastNewStoryPersonalization.identityDiagnostics.newSeriesCreated ? "yes" : "no"}</p>
+        <p><span className="font-semibold text-paper/80">Last generation trigger:</span> {lastNewStoryPersonalization.identityDiagnostics.trigger}</p>
         <p><span className="font-semibold text-paper/80">Last generation mood signal:</span> {lastNewStoryPersonalization.moodSignal}</p>
         <p><span className="font-semibold text-paper/80">Last generation genre signal:</span> {lastNewStoryPersonalization.genreSignal}</p>
         <p><span className="font-semibold text-paper/80">User hard avoidances included:</span> {lastNewStoryPersonalization.hardAvoidancesIncluded ? "yes" : "no"}</p>

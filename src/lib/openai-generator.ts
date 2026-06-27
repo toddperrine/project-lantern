@@ -228,6 +228,14 @@ export function getOpenAIDiagnostics(overrides: Partial<StoryDiagnostics> = {}):
     partialBeatNormalizationUsed: false,
     missingBeatRepairAttempted: false,
     finalAcceptedBlueprintSceneCount: undefined,
+    generationMode: "new_story",
+    storyId: "unassigned",
+    seriesId: "unassigned",
+    sourceStoryId: null,
+    parentSeriesId: null,
+    continuationContextIncluded: false,
+    newSeriesCreated: true,
+    generationTrigger: "Create",
     ...overrides
   };
 }
@@ -384,7 +392,15 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
         repairBlueprintCompleteBeatCount: blueprintResult.repairBlueprintCompleteBeatCount,
         partialBeatNormalizationUsed: blueprintResult.partialBeatNormalizationUsed,
         missingBeatRepairAttempted: blueprintResult.missingBeatRepairAttempted,
-        finalAcceptedBlueprintSceneCount: blueprintResult.finalAcceptedBlueprintSceneCount
+        finalAcceptedBlueprintSceneCount: blueprintResult.finalAcceptedBlueprintSceneCount,
+        generationMode: input.generationIdentity.generationMode,
+        storyId: input.generationIdentity.storyId,
+        seriesId: input.generationIdentity.seriesId,
+        sourceStoryId: input.generationIdentity.sourceStoryId ?? null,
+        parentSeriesId: input.generationIdentity.parentSeriesId ?? null,
+        continuationContextIncluded: input.continuationContextIncluded,
+        newSeriesCreated: input.generationMode === "new_story",
+        generationTrigger: input.generationTrigger
       })
     }
   };
