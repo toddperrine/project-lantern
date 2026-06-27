@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getBuildInfo } from "@/lib/build-info";
 import { generateFallbackStory } from "@/lib/fallback-generator";
+import { createGenerationIdentity } from "@/lib/generation-identity";
 import { generateOpenAIStoryWithLongFloor } from "@/lib/long-floor-generator";
 import { getOpenAIDiagnostics, hasOpenAIKey } from "@/lib/openai-generator";
 import { formatReaderMoodForPrompt, isReaderMoodSnapshot } from "@/lib/reader-profile";
@@ -59,6 +60,16 @@ export async function POST(request: Request) {
     characterArc: body.characterArc!,
     endingType: body.endingType!,
     lengthTarget: body.lengthTarget!,
+    generationMode: body.generationMode!,
+    generationIdentity: createGenerationIdentity({
+      generationMode: body.generationMode!,
+      activeStoryId: typeof body.generationIdentity?.sourceStoryId === "string" ? body.generationIdentity.sourceStoryId : null,
+      activeSeriesId: typeof body.generationIdentity?.seriesId === "string" ? body.generationIdentity.seriesId : null,
+      selectedSeriesId: typeof body.generationIdentity?.seriesId === "string" ? body.generationIdentity.seriesId : null,
+      sourceStoryId: typeof body.generationIdentity?.sourceStoryId === "string" ? body.generationIdentity.sourceStoryId : null
+    }),
+    continuationContextIncluded: Boolean(body.continuationContextIncluded),
+    generationTrigger: body.generationTrigger!,
     readerMood,
     personalizationContext: body.personalizationContext?.trim() || undefined,
     readerProfileGenerationSnapshot
@@ -75,7 +86,8 @@ export async function POST(request: Request) {
             narrativeArchitecture: input.narrativeArchitecture,
             characterArc: input.characterArc,
             endingType: input.endingType,
-            lengthTarget: formatLengthTarget(input.lengthTarget)
+            lengthTarget: formatLengthTarget(input.lengthTarget),
+            ...buildRequestGenerationDiagnostics(input)
           })
         ), input.readerProfileGenerationSnapshot),
         generationStartedAt
@@ -207,7 +219,8 @@ function withServerGenerationDuration(
         commitSha: buildInfo.commitSha,
         buildTimestamp: buildInfo.buildTimestamp,
         readerProfileSnapshot: response.metadata.diagnostics.readerProfileSnapshot ?? response.metadata.diagnostics.readerProfileGenerationSnapshot,
-        readerProfileGenerationSnapshot: response.metadata.diagnostics.readerProfileGenerationSnapshot
+        readerProfileGenerationSnapshot: response.metadata.diagnostics.readerProfileGenerationSnapshot,
+        ...buildGenerationIdentityDiagnostics(response.metadata.diagnostics)
       }
     }
   };
@@ -225,6 +238,7 @@ function buildOpenAIFallbackResponse(input: GenerateStoryRequest, fallbackReason
       characterArc: input.characterArc,
       endingType: input.endingType,
       lengthTarget: formatLengthTarget(input.lengthTarget),
+      ...buildRequestGenerationDiagnostics(input),
       timedOutEarly: false,
       stoppedReason: "openai-error",
       blueprintGenerated: false,
@@ -293,6 +307,18 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
     return "Choose a valid length target.";
   }
 
+  if (!body.generationMode || !["new_story", "continue_series", "rewrite_retry"].includes(body.generationMode)) {
+    return "Generation mode is required.";
+  }
+
+  if (!body.generationIdentity || body.generationIdentity.generationMode !== body.generationMode) {
+    return "Generation identity is required and must match generation mode.";
+  }
+
+  if (!body.generationTrigger) {
+    return "Generation trigger is required.";
+  }
+
   const readerMoodPrompt = formatReaderMoodForPrompt(body.readerMood);
   const contextLength =
     body.worldBible.length +
@@ -307,6 +333,32 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
   }
 
   return null;
+}
+
+function buildRequestGenerationDiagnostics(input: GenerateStoryRequest): Pick<GenerateStoryResponse["metadata"]["diagnostics"], "generationMode" | "storyId" | "seriesId" | "sourceStoryId" | "parentSeriesId" | "continuationContextIncluded" | "newSeriesCreated" | "generationTrigger"> {
+  return {
+    generationMode: input.generationIdentity.generationMode,
+    storyId: input.generationIdentity.storyId,
+    seriesId: input.generationIdentity.seriesId,
+    sourceStoryId: input.generationIdentity.sourceStoryId ?? null,
+    parentSeriesId: input.generationIdentity.parentSeriesId ?? null,
+    continuationContextIncluded: input.continuationContextIncluded,
+    newSeriesCreated: input.generationMode === "new_story",
+    generationTrigger: input.generationTrigger
+  };
+}
+
+function buildGenerationIdentityDiagnostics(diagnostics: GenerateStoryResponse["metadata"]["diagnostics"]) {
+  return {
+    generationMode: diagnostics.generationMode,
+    storyId: diagnostics.storyId,
+    seriesId: diagnostics.seriesId,
+    sourceStoryId: diagnostics.sourceStoryId ?? null,
+    parentSeriesId: diagnostics.parentSeriesId ?? null,
+    continuationContextIncluded: diagnostics.continuationContextIncluded,
+    newSeriesCreated: diagnostics.newSeriesCreated,
+    generationTrigger: diagnostics.generationTrigger
+  };
 }
 
 function buildStoryRules(storyRules: string | undefined, readerMood: GenerateStoryRequest["readerMood"] = null, personalizationContext?: string): string {

@@ -1,3 +1,4 @@
+import type { GenerationIdentity, GenerationMode } from "@/lib/generation-identity";
 import type { ReaderMoodSnapshot } from "@/lib/reader-profile";
 export const GENRE_PRESETS = [
   "Speculative Mystery",
@@ -69,6 +70,10 @@ export type GenerateStoryRequest = {
   characterArc: CharacterArc;
   endingType: EndingType;
   lengthTarget: LengthTarget;
+  generationMode: GenerationMode;
+  generationIdentity: GenerationIdentity;
+  continuationContextIncluded: boolean;
+  generationTrigger: "Start Something New" | "Continue Series" | "Retry/Rewrite" | "Create";
   readerMood?: ReaderMoodSnapshot | null;
   personalizationContext?: string;
   continuationStoryId?: string;
@@ -146,4 +151,12 @@ export type StoryDiagnostics = {
   readerProfileSnapshot?: ReaderProfileGenerationSnapshot;
   readerProfileGenerationSnapshot?: ReaderProfileGenerationSnapshot;
   readerProfileInput?: object;
+  generationMode: GenerationMode;
+  storyId: string;
+  seriesId: string;
+  sourceStoryId?: string | null;
+  parentSeriesId?: string | null;
+  continuationContextIncluded: boolean;
+  newSeriesCreated: boolean;
+  generationTrigger: string;
 };

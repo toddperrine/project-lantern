@@ -34,6 +34,10 @@ export type SavedStory = {
   endingType: EndingType;
   lengthTarget: string;
   diagnosticsNotice: string | null;
+  seriesId?: string;
+  parentSeriesId?: string | null;
+  sourceStoryId?: string | null;
+  generationMode?: StoryDiagnostics["generationMode"];
   coverImageUrl?: string;
   coverImage?: string;
   heroImageUrl?: string;
@@ -208,6 +212,10 @@ export function createSavedStory(response: GenerateStoryResponse, storyId = crea
     endingType: diagnostics.endingType,
     lengthTarget: diagnostics.lengthTarget,
     diagnosticsNotice: diagnostics.notice ?? diagnostics.underTargetNotice,
+    seriesId: diagnostics.seriesId,
+    parentSeriesId: diagnostics.parentSeriesId ?? null,
+    sourceStoryId: diagnostics.sourceStoryId ?? null,
+    generationMode: diagnostics.generationMode,
     feedback
   };
 }
@@ -232,7 +240,15 @@ export function savedStoryToResponse(savedStory: SavedStory): GenerateStoryRespo
     underTargetNotice: null,
     blueprintGenerated: false,
     blueprintSceneCount: 0,
-    blueprintFailedReason: null
+    blueprintFailedReason: null,
+    generationMode: savedStory.generationMode ?? "new_story",
+    storyId: savedStory.id,
+    seriesId: savedStory.seriesId ?? savedStory.id,
+    sourceStoryId: savedStory.sourceStoryId ?? null,
+    parentSeriesId: savedStory.parentSeriesId ?? null,
+    continuationContextIncluded: false,
+    newSeriesCreated: savedStory.generationMode !== "continue_series",
+    generationTrigger: "Restored local save"
   };
 
   return {
