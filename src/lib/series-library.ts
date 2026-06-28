@@ -110,3 +110,17 @@ export function groupStoriesBySeries<TStory extends LibraryStoryForSeries>(stori
       return a.title.localeCompare(b.title);
     });
 }
+
+export function findNextSavedEpisodeInSeries<TStory extends LibraryStoryForSeries>(stories: TStory[], currentStoryId: string): SeriesEpisode<TStory> | null {
+  const trimmedCurrentStoryId = currentStoryId.trim();
+  if (!trimmedCurrentStoryId) return null;
+
+  const groups = groupStoriesBySeries(stories);
+
+  for (const group of groups) {
+    const currentIndex = group.episodes.findIndex((episode) => episode.storyId === trimmedCurrentStoryId || episode.story.id === trimmedCurrentStoryId);
+    if (currentIndex >= 0) return group.episodes[currentIndex + 1] ?? null;
+  }
+
+  return null;
+}

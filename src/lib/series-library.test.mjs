@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const { groupStoriesBySeries } = await import("./series-library.ts");
+const { findNextSavedEpisodeInSeries, groupStoriesBySeries } = await import("./series-library.ts");
 
 test("groups same-series stories into ordered episode numbers and separates other series", () => {
   const groups = groupStoriesBySeries([
@@ -41,4 +41,29 @@ test("treats a story without seriesId as a standalone one-episode group", () => 
 test("falls back to first episode title when no hero or protagonist exists", () => {
   const groups = groupStoriesBySeries([{ id: "story-id", seriesId: "series-id", title: "A Lonely Door" }]);
   assert.equal(groups[0].title, "Series starting with: A Lonely Door");
+});
+
+test("finds the next saved episode in the current series", () => {
+  const stories = [
+    { id: "episode-1", seriesId: "calder", title: "First", createdAt: "2026-01-01T00:00:00.000Z" },
+    { id: "other-series", seriesId: "amoma", title: "Other", createdAt: "2026-01-01T12:00:00.000Z" },
+    { id: "episode-3", seriesId: "calder", title: "Third", createdAt: "2026-01-03T00:00:00.000Z" },
+    { id: "episode-2", seriesId: "calder", title: "Second", createdAt: "2026-01-02T00:00:00.000Z" }
+  ];
+
+  assert.equal(findNextSavedEpisodeInSeries(stories, "episode-1")?.story.id, "episode-2");
+  assert.equal(findNextSavedEpisodeInSeries(stories, "episode-1")?.episodeNumber, 2);
+  assert.equal(findNextSavedEpisodeInSeries(stories, "episode-2")?.story.id, "episode-3");
+  assert.equal(findNextSavedEpisodeInSeries(stories, "episode-2")?.episodeNumber, 3);
+  assert.equal(findNextSavedEpisodeInSeries(stories, "episode-3"), null);
+});
+
+test("does not cross series or invent a next episode for standalone fallback stories", () => {
+  const stories = [
+    { id: "standalone", title: "Standalone", createdAt: "2026-01-01T00:00:00.000Z" },
+    { id: "other", seriesId: "other-series", title: "Other", createdAt: "2026-01-02T00:00:00.000Z" }
+  ];
+
+  assert.equal(findNextSavedEpisodeInSeries(stories, "standalone"), null);
+  assert.equal(findNextSavedEpisodeInSeries(stories, "other"), null);
 });
