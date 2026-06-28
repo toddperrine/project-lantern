@@ -124,3 +124,11 @@ export function findNextSavedEpisodeInSeries<TStory extends LibraryStoryForSerie
 
   return null;
 }
+
+
+export function findLibraryStoryById<TStory extends LibraryStoryForSeries>(stories: TStory[], storyId: string): TStory | null {
+  const trimmedStoryId = storyId.trim();
+  if (!trimmedStoryId) return null;
+
+  return stories.find((story, index) => getEffectiveStoryId(story, index) === trimmedStoryId || story.id === trimmedStoryId) ?? null;
+}

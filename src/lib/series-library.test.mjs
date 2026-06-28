@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const { findNextSavedEpisodeInSeries, groupStoriesBySeries } = await import("./series-library.ts");
+const { findLibraryStoryById, findNextSavedEpisodeInSeries, groupStoriesBySeries } = await import("./series-library.ts");
 
 test("groups same-series stories into ordered episode numbers and separates other series", () => {
   const groups = groupStoriesBySeries([
@@ -66,4 +66,20 @@ test("does not cross series or invent a next episode for standalone fallback sto
 
   assert.equal(findNextSavedEpisodeInSeries(stories, "standalone"), null);
   assert.equal(findNextSavedEpisodeInSeries(stories, "other"), null);
+});
+
+
+test("finds exact saved stories by clicked id", () => {
+  const stories = [
+    { id: "story-1", seriesId: "series", title: "Episode 1", createdAt: "2026-01-01T00:00:00.000Z" },
+    { id: "story-2", seriesId: "series", title: "Episode 2", createdAt: "2026-01-02T00:00:00.000Z" },
+    { id: "story-3", seriesId: "series", title: "Episode 3", createdAt: "2026-01-03T00:00:00.000Z" }
+  ];
+
+  assert.equal(findLibraryStoryById(stories, "story-1")?.id, "story-1");
+  assert.equal(findLibraryStoryById(stories, "story-2")?.id, "story-2");
+  assert.equal(findLibraryStoryById(stories, "story-3")?.id, "story-3");
+  assert.equal(findNextSavedEpisodeInSeries(stories, "story-1")?.story.id, "story-2");
+  assert.equal(findNextSavedEpisodeInSeries(stories, "story-2")?.story.id, "story-3");
+  assert.equal(findNextSavedEpisodeInSeries(stories, "story-3"), null);
 });
