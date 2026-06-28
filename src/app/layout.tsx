@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense, type ReactNode } from "react";
 import { ContinueSeriesEntry } from "./continue-series-entry";
 import { MobileShellRuntime } from "./mobile-shell-runtime";
+import { AuthProvider } from "@/lib/auth";
 import { ProjectLanternShell } from "./project-lantern-shell";
 import "./globals.css";
 import "./mobile-shell.css";
@@ -24,7 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ProjectLanternShell><Suspense>{children}</Suspense></ProjectLanternShell>
+        <AuthProvider><ProjectLanternShell><Suspense>{children}</Suspense></ProjectLanternShell></AuthProvider>
         <MobileShellRuntime />
         <ContinueSeriesEntry />
       </body>
