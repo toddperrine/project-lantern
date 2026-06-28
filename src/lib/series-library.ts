@@ -132,3 +132,8 @@ export function findLibraryStoryById<TStory extends LibraryStoryForSeries>(stori
 
   return stories.find((story, index) => getEffectiveStoryId(story, index) === trimmedStoryId || story.id === trimmedStoryId) ?? null;
 }
+
+
+export function findLibraryStoryBySavedId<TStory extends { id: string }>(stories: TStory[], storyId: string): TStory | null {
+  return stories.find((story) => story.id === storyId) ?? null;
+}

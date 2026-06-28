@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const { findLibraryStoryById, findNextSavedEpisodeInSeries, groupStoriesBySeries } = await import("./series-library.ts");
+const { findLibraryStoryById, findLibraryStoryBySavedId, findNextSavedEpisodeInSeries, groupStoriesBySeries } = await import("./series-library.ts");
 
 test("groups same-series stories into ordered episode numbers and separates other series", () => {
   const groups = groupStoriesBySeries([
@@ -82,4 +82,24 @@ test("finds exact saved stories by clicked id", () => {
   assert.equal(findNextSavedEpisodeInSeries(stories, "story-1")?.story.id, "story-2");
   assert.equal(findNextSavedEpisodeInSeries(stories, "story-2")?.story.id, "story-3");
   assert.equal(findNextSavedEpisodeInSeries(stories, "story-3"), null);
+});
+
+
+test("finds exact saved stories by saved id without current story shadowing", () => {
+  const savedStories = [
+    { id: "story-1", seriesId: "series", title: "Episode 1", createdAt: "2026-01-01T00:00:00.000Z" },
+    { id: "story-2", seriesId: "series", title: "Episode 2", createdAt: "2026-01-02T00:00:00.000Z" },
+    { id: "story-3", seriesId: "series", title: "Episode 3", createdAt: "2026-01-03T00:00:00.000Z" }
+  ];
+  const currentStory = { id: "story-3", seriesId: "series", title: "Current Episode 3", createdAt: "2026-01-04T00:00:00.000Z" };
+  const mixedStories = [currentStory, ...savedStories];
+
+  assert.equal(findLibraryStoryBySavedId(savedStories, "story-1")?.title, "Episode 1");
+  assert.equal(findLibraryStoryBySavedId(savedStories, "story-2")?.title, "Episode 2");
+  assert.equal(findLibraryStoryBySavedId(savedStories, "story-3")?.title, "Episode 3");
+  assert.equal(findLibraryStoryBySavedId(mixedStories, "story-1")?.title, "Episode 1");
+  assert.equal(findLibraryStoryBySavedId(mixedStories, "story-2")?.title, "Episode 2");
+  assert.equal(findNextSavedEpisodeInSeries(savedStories, "story-1")?.story.id, "story-2");
+  assert.equal(findNextSavedEpisodeInSeries(savedStories, "story-2")?.story.id, "story-3");
+  assert.equal(findNextSavedEpisodeInSeries(savedStories, "story-3"), null);
 });
