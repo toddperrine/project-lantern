@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCognitoAuthConfigured, requireAuthenticatedCognitoUser } from "@/lib/cognito-server-auth";
 import {
   CloudSavedStoryPersistenceError,
   getCloudSavedStoryConfigError,
@@ -14,12 +15,14 @@ type RouteContext = { params: { id: string } };
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, { params }: RouteContext) {
-  const configError = getCloudSavedStoryConfigError();
+export async function GET(request: Request, { params }: RouteContext) {
+  const authUser = await getRouteAuthUser(request);
+  if (authUser instanceof NextResponse) return authUser;
+  const configError = getCloudSavedStoryConfigError(authUser?.sub);
   if (configError) return cloudConfigErrorResponse("Cloud story list", "Cloud saved story persistence is not configured.");
 
   try {
-    const stories = await listCloudSavedStories(params.id);
+    const stories = await listCloudSavedStories(params.id, authUser?.sub);
     if (!stories) return NextResponse.json({ error: "Cloud story list failed because the selected project was not found.", action: "Cloud story list", diagnostic: "missing-project" }, { status: 404 });
     return NextResponse.json({ stories });
   } catch (error) {
@@ -28,7 +31,9 @@ export async function GET(_request: Request, { params }: RouteContext) {
 }
 
 export async function POST(request: Request, { params }: RouteContext) {
-  const configError = getCloudSavedStoryConfigError();
+  const authUser = await getRouteAuthUser(request);
+  if (authUser instanceof NextResponse) return authUser;
+  const configError = getCloudSavedStoryConfigError(authUser?.sub);
   if (configError) return cloudConfigErrorResponse("Cloud story save", "Cloud saved story persistence is not configured.");
 
   let body: unknown;
@@ -44,7 +49,7 @@ export async function POST(request: Request, { params }: RouteContext) {
   }
 
   try {
-    const story = await saveCloudSavedStory(params.id, storyInput);
+    const story = await saveCloudSavedStory(params.id, storyInput, authUser?.sub);
     if (!story) return NextResponse.json({ error: "Cloud story save failed because the selected project was not found.", action: "Cloud story save", diagnostic: "missing-project" }, { status: 404 });
     return NextResponse.json({ story }, { status: 201 });
   } catch (error) {
@@ -111,4 +116,11 @@ function cloudPersistenceErrorResponse(error: unknown, action: string) {
     },
     { status: 502 }
   );
+}
+
+async function getRouteAuthUser(request: Request) {
+  if (!isCognitoAuthConfigured()) return null;
+  const authUser = await requireAuthenticatedCognitoUser(request);
+  if (!authUser) return NextResponse.json({ error: "Sign in is required for authenticated Story Library data.", diagnostic: "auth-required" }, { status: 401 });
+  return authUser;
 }

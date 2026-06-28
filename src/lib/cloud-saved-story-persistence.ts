@@ -1,7 +1,6 @@
 import "server-only";
 
 import { createHash, createHmac, randomUUID } from "node:crypto";
-import { getCloudProject } from "./cloud-project-persistence";
 
 export type CloudSavedStoryRole = "origin" | "continuation" | "branch" | "revision" | "memoir-chapter";
 export type CloudSavedStoryCanonStatus = "draft" | "canon" | "alternate" | "archived";
@@ -130,8 +129,8 @@ export class CloudSavedStoryPersistenceError extends Error {
   }
 }
 
-export function getCloudSavedStoryConfigError(): CloudSavedStoryConfigError | null {
-  const missingVariables = getMissingDynamoDbVariables();
+export function getCloudSavedStoryConfigError(authenticatedOwnerId?: string): CloudSavedStoryConfigError | null {
+  const missingVariables = getMissingDynamoDbVariables(authenticatedOwnerId);
   return missingVariables.length ? new CloudSavedStoryConfigError(missingVariables) : null;
 }
 
@@ -143,11 +142,8 @@ export function isCloudSavedStoryCanonStatus(value: unknown): value is CloudSave
   return value === "draft" || value === "canon" || value === "alternate" || value === "archived";
 }
 
-export async function listCloudSavedStories(projectId: string): Promise<CloudSavedStoryRecord[] | null> {
-  const projectExists = await getCloudProject(projectId);
-  if (!projectExists) return null;
-
-  const config = getDynamoDbConfig();
+export async function listCloudSavedStories(projectId: string, authenticatedOwnerId?: string): Promise<CloudSavedStoryRecord[] | null> {
+  const config = getDynamoDbConfig(authenticatedOwnerId);
   const response = await dynamoDbRequest<{ Items?: DynamoDbItem[] }>(config, "Query", {
     TableName: config.tableName,
     KeyConditionExpression: "ownerId = :ownerId AND begins_with(projectId, :storyPrefix)",
@@ -163,8 +159,8 @@ export async function listCloudSavedStories(projectId: string): Promise<CloudSav
     .sort(compareStorySequence);
 }
 
-export async function getCloudSavedStory(projectId: string, storyId: string): Promise<CloudSavedStoryRecord | null> {
-  const config = getDynamoDbConfig();
+export async function getCloudSavedStory(projectId: string, storyId: string, authenticatedOwnerId?: string): Promise<CloudSavedStoryRecord | null> {
+  const config = getDynamoDbConfig(authenticatedOwnerId);
   const response = await dynamoDbRequest<{ Item?: DynamoDbItem }>(config, "GetItem", {
     TableName: config.tableName,
     Key: storyKey(config, projectId, storyId)
@@ -174,11 +170,11 @@ export async function getCloudSavedStory(projectId: string, storyId: string): Pr
   return itemToCloudSavedStoryRecord(response.Item);
 }
 
-export async function saveCloudSavedStory(projectId: string, input: CloudSavedStoryInput): Promise<CloudSavedStoryRecord | null> {
-  const existingStories = await listCloudSavedStories(projectId);
+export async function saveCloudSavedStory(projectId: string, input: CloudSavedStoryInput, authenticatedOwnerId?: string): Promise<CloudSavedStoryRecord | null> {
+  const existingStories = await listCloudSavedStories(projectId, authenticatedOwnerId);
   if (!existingStories) return null;
 
-  const config = getDynamoDbConfig();
+  const config = getDynamoDbConfig(authenticatedOwnerId);
   const now = new Date().toISOString();
   const sequenceNumber = normalizeSequenceNumber(input.sequenceNumber) ?? getNextSequenceNumber(existingStories);
   const storyId = input.storyId?.trim() || randomUUID();
@@ -211,11 +207,11 @@ export async function saveCloudSavedStory(projectId: string, input: CloudSavedSt
   return record;
 }
 
-export async function updateCloudSavedStory(projectId: string, storyId: string, input: CloudSavedStoryPatchInput): Promise<CloudSavedStoryRecord | null> {
-  const existingStory = await getCloudSavedStory(projectId, storyId);
+export async function updateCloudSavedStory(projectId: string, storyId: string, input: CloudSavedStoryPatchInput, authenticatedOwnerId?: string): Promise<CloudSavedStoryRecord | null> {
+  const existingStory = await getCloudSavedStory(projectId, storyId, authenticatedOwnerId);
   if (!existingStory) return null;
 
-  const config = getDynamoDbConfig();
+  const config = getDynamoDbConfig(authenticatedOwnerId);
   const updatedStory = applyStoryPatch(existingStory, input);
 
   await dynamoDbRequest(config, "PutItem", {
@@ -226,16 +222,16 @@ export async function updateCloudSavedStory(projectId: string, storyId: string, 
   return updatedStory;
 }
 
-export async function deleteCloudSavedStory(projectId: string, storyId: string): Promise<void> {
-  const config = getDynamoDbConfig();
+export async function deleteCloudSavedStory(projectId: string, storyId: string, authenticatedOwnerId?: string): Promise<void> {
+  const config = getDynamoDbConfig(authenticatedOwnerId);
   await dynamoDbRequest(config, "DeleteItem", {
     TableName: config.tableName,
     Key: storyKey(config, projectId, storyId)
   });
 }
 
-function getDynamoDbConfig(): DynamoDbConfig {
-  const missingVariables = getMissingDynamoDbVariables();
+function getDynamoDbConfig(authenticatedOwnerId?: string): DynamoDbConfig {
+  const missingVariables = getMissingDynamoDbVariables(authenticatedOwnerId);
   if (missingVariables.length) throw new CloudSavedStoryConfigError(missingVariables);
 
   return {
@@ -243,14 +239,14 @@ function getDynamoDbConfig(): DynamoDbConfig {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
     tableName: process.env.PROJECTS_TABLE_NAME!,
-    ownerId: process.env.PROJECTS_OWNER_ID!
+    ownerId: authenticatedOwnerId?.trim() || process.env.PROJECTS_OWNER_ID!
   };
 }
 
-function getMissingDynamoDbVariables(): string[] {
-  return ["AWS_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "PROJECTS_TABLE_NAME", "PROJECTS_OWNER_ID"].filter(
-    (key) => !process.env[key]?.trim()
-  );
+function getMissingDynamoDbVariables(authenticatedOwnerId?: string): string[] {
+  const required = ["AWS_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "PROJECTS_TABLE_NAME"];
+  if (!authenticatedOwnerId?.trim()) required.push("PROJECTS_OWNER_ID");
+  return required.filter((key) => !process.env[key]?.trim());
 }
 
 function storyKey(config: DynamoDbConfig, projectId: string, storyId: string): DynamoDbItem {

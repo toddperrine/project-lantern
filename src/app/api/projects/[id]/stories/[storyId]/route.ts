@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCognitoAuthConfigured, requireAuthenticatedCognitoUser } from "@/lib/cognito-server-auth";
 import {
   CloudSavedStoryPersistenceError,
   deleteCloudSavedStory,
@@ -15,12 +16,14 @@ type RouteContext = { params: { id: string; storyId: string } };
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, { params }: RouteContext) {
-  const configError = getCloudSavedStoryConfigError();
+export async function GET(request: Request, { params }: RouteContext) {
+  const authUser = await getRouteAuthUser(request);
+  if (authUser instanceof NextResponse) return authUser;
+  const configError = getCloudSavedStoryConfigError(authUser?.sub);
   if (configError) return cloudConfigErrorResponse(configError.missingVariables);
 
   try {
-    const story = await getCloudSavedStory(params.id, params.storyId);
+    const story = await getCloudSavedStory(params.id, params.storyId, authUser?.sub);
     if (!story) return NextResponse.json({ error: "Story not found." }, { status: 404 });
     return NextResponse.json({ story });
   } catch (error) {
@@ -28,12 +31,14 @@ export async function GET(_request: Request, { params }: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, { params }: RouteContext) {
-  const configError = getCloudSavedStoryConfigError();
+export async function DELETE(request: Request, { params }: RouteContext) {
+  const authUser = await getRouteAuthUser(request);
+  if (authUser instanceof NextResponse) return authUser;
+  const configError = getCloudSavedStoryConfigError(authUser?.sub);
   if (configError) return cloudConfigErrorResponse(configError.missingVariables);
 
   try {
-    await deleteCloudSavedStory(params.id, params.storyId);
+    await deleteCloudSavedStory(params.id, params.storyId, authUser?.sub);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return cloudPersistenceErrorResponse(error);
@@ -41,7 +46,9 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
 }
 
 export async function PATCH(request: Request, { params }: RouteContext) {
-  const configError = getCloudSavedStoryConfigError();
+  const authUser = await getRouteAuthUser(request);
+  if (authUser instanceof NextResponse) return authUser;
+  const configError = getCloudSavedStoryConfigError(authUser?.sub);
   if (configError) return cloudConfigErrorResponse(configError.missingVariables);
 
   let body: unknown;
@@ -57,7 +64,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   }
 
   try {
-    const story = await updateCloudSavedStory(params.id, params.storyId, storyPatch);
+    const story = await updateCloudSavedStory(params.id, params.storyId, storyPatch, authUser?.sub);
     if (!story) return NextResponse.json({ error: "Story not found." }, { status: 404 });
     return NextResponse.json({ story });
   } catch (error) {
@@ -162,4 +169,11 @@ function cloudPersistenceErrorResponse(error: unknown) {
     return NextResponse.json({ error: message, ...error.details }, { status: 502 });
   }
   return NextResponse.json({ error: message }, { status: 502 });
+}
+
+async function getRouteAuthUser(request: Request) {
+  if (!isCognitoAuthConfigured()) return null;
+  const authUser = await requireAuthenticatedCognitoUser(request);
+  if (!authUser) return NextResponse.json({ error: "Sign in is required for authenticated Story Library data.", diagnostic: "auth-required" }, { status: 401 });
+  return authUser;
 }
