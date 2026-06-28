@@ -2,7 +2,7 @@
 
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-export type AuthStatus = "signed_out" | "code_sent" | "signed_in" | "error";
+export type AuthStatus = "signed_out" | "signed_in" | "resetting_password" | "reset_code_sent" | "new_password_required" | "error";
 export type CurrentUser = { id: string; email: string };
 
 type TokenSet = { accessToken: string; idToken: string; refreshToken?: string; expiresAt: number };
@@ -12,19 +12,22 @@ type AuthContextValue = {
   authStatus: AuthStatus;
   currentUser: CurrentUser | null;
   emailPendingVerification: string;
+  resetEmail: string;
   errorMessage: string;
   region: string;
   profileLibraryMode: "anonymous" | "authenticated";
-  authFlow: "USER_AUTH";
-  preferredChallenge: "EMAIL_OTP";
+  authMode: "email_password";
+  authFlow: "USER_PASSWORD_AUTH";
   lastAuthStep: string;
   appActionsGated: boolean;
-  sendCode: (email: string) => Promise<void>;
-  verifyCode: (code: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  beginPasswordReset: (email: string) => Promise<void>;
+  confirmPasswordReset: (code: string, newPassword: string) => Promise<void>;
+  completeNewPassword: (newPassword: string) => Promise<void>;
   signOut: () => void;
 };
 
-type CognitoInitiateAuthResponse = { Session?: string; ChallengeName?: string; AvailableChallenges?: string[]; AuthenticationResult?: { AccessToken: string; IdToken: string; RefreshToken?: string; ExpiresIn?: number } };
+type CognitoInitiateAuthResponse = { Session?: string; ChallengeName?: string; ChallengeParameters?: Record<string, string>; AuthenticationResult?: { AccessToken: string; IdToken: string; RefreshToken?: string; ExpiresIn?: number } };
 
 type JwtPayload = { sub?: string; email?: string; username?: string; exp?: number };
 
@@ -32,8 +35,9 @@ const AUTH_SESSION_STORAGE_KEY = "projectLantern.auth.cognitoSession.v1";
 const COGNITO_USER_POOL_ID = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID ?? "";
 const COGNITO_APP_CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_APP_CLIENT_ID ?? "";
 const COGNITO_REGION = process.env.NEXT_PUBLIC_COGNITO_REGION ?? "";
-const AUTH_FLOW = "USER_AUTH" as const;
-const PREFERRED_CHALLENGE = "EMAIL_OTP" as const;
+const AUTH_FLOW = "USER_PASSWORD_AUTH" as const;
+const AUTH_MODE = "email_password" as const;
+const INVITE_ONLY_ERROR = "This private alpha is invite-only. Use an approved email address.";
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function cognitoEndpoint(region: string) {
@@ -47,7 +51,11 @@ async function callCognito<T>(target: string, body: Record<string, unknown>): Pr
     body: JSON.stringify(body)
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof payload.message === "string" ? payload.message : `Cognito ${target} failed.`);
+  if (!response.ok) {
+    const message = typeof payload.message === "string" ? payload.message : `Cognito ${target} failed.`;
+    const code = typeof payload.__type === "string" ? payload.__type.split("#").pop() : "";
+    throw new Error(code ? `${code}: ${message}` : message);
+  }
   return payload as T;
 }
 
@@ -59,6 +67,22 @@ function decodeJwt(token: string): JwtPayload {
   } catch {
     return {};
   }
+}
+
+
+function isInviteOnlyError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /UserNotFoundException|NotAuthorizedException|InvalidParameterException|CodeMismatchException|ExpiredCodeException/i.test(message);
+}
+
+function isPasswordResetRequired(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /PasswordResetRequiredException|reset.+password/i.test(message);
+}
+
+function authErrorMessage(error: unknown, fallback: string) {
+  if (isInviteOnlyError(error)) return INVITE_ONLY_ERROR;
+  return error instanceof Error ? error.message : fallback;
 }
 
 function readStoredSession(): StoredSession | null {
@@ -77,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>("signed_out");
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [emailPendingVerification, setEmailPendingVerification] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
   const [challengeSession, setChallengeSession] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [lastAuthStep, setLastAuthStep] = useState("not_started");
@@ -90,64 +115,110 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const storeSession = useCallback((result: NonNullable<CognitoInitiateAuthResponse["AuthenticationResult"]>, fallbackEmail: string) => {
+    if (!result.IdToken || !result.AccessToken) throw new Error("Cognito did not return an authenticated session.");
+    const payload = decodeJwt(result.IdToken);
+    const currentUser = { id: payload.sub ?? fallbackEmail, email: payload.email ?? fallbackEmail };
+    const expiresAt = payload.exp ? payload.exp * 1000 : Date.now() + (result.ExpiresIn ?? 3600) * 1000;
+    window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({ currentUser, tokens: { accessToken: result.AccessToken, idToken: result.IdToken, refreshToken: result.RefreshToken, expiresAt } } satisfies StoredSession));
+    setCurrentUser(currentUser);
+    setChallengeSession("");
+    setResetEmail("");
+    setEmailPendingVerification("");
+    setAuthStatus("signed_in");
+  }, []);
+
   const signOut = useCallback(() => {
     window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
     setCurrentUser(null);
     setEmailPendingVerification("");
+    setResetEmail("");
     setChallengeSession("");
     setErrorMessage("");
     setAuthStatus("signed_out");
     setLastAuthStep("signed_out");
   }, []);
 
-  const sendCode = useCallback(async (email: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     if (!authConfigured) return;
     setErrorMessage("");
     const normalizedEmail = email.trim().toLowerCase();
     try {
-      const result = await callCognito<CognitoInitiateAuthResponse>("InitiateAuth", {
-        AuthFlow: AUTH_FLOW,
-        ClientId: COGNITO_APP_CLIENT_ID,
-        AuthParameters: { USERNAME: normalizedEmail, PREFERRED_CHALLENGE: PREFERRED_CHALLENGE }
-      });
+      const result = await callCognito<CognitoInitiateAuthResponse>("InitiateAuth", { AuthFlow: AUTH_FLOW, ClientId: COGNITO_APP_CLIENT_ID, AuthParameters: { USERNAME: normalizedEmail, PASSWORD: password } });
       setEmailPendingVerification(normalizedEmail);
-      setChallengeSession(result.Session ?? "");
-      setLastAuthStep(result.ChallengeName ?? (result.AvailableChallenges?.join(",") || "code_sent"));
-      setAuthStatus("code_sent");
+      if (result.ChallengeName === "NEW_PASSWORD_REQUIRED") {
+        setChallengeSession(result.Session ?? "");
+        setLastAuthStep("NEW_PASSWORD_REQUIRED");
+        setAuthStatus("new_password_required");
+        return;
+      }
+      if (!result.AuthenticationResult) throw new Error("Cognito did not return an authenticated session.");
+      storeSession(result.AuthenticationResult, normalizedEmail);
+      setLastAuthStep("signed_in");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to send Cognito email code.");
-      setLastAuthStep("send_code_error");
+      if (isPasswordResetRequired(error)) {
+        setResetEmail(normalizedEmail);
+        setAuthStatus("resetting_password");
+        setLastAuthStep("password_reset_required");
+        return;
+      }
+      setErrorMessage(authErrorMessage(error, "Unable to sign in."));
+      setLastAuthStep("sign_in_error");
+      setAuthStatus("error");
+    }
+  }, [authConfigured, storeSession]);
+
+  const beginPasswordReset = useCallback(async (email: string) => {
+    if (!authConfigured) return;
+    setErrorMessage("");
+    const normalizedEmail = email.trim().toLowerCase();
+    setResetEmail(normalizedEmail);
+    setAuthStatus("resetting_password");
+    if (!normalizedEmail) {
+      setLastAuthStep("password_reset_started");
+      return;
+    }
+    try {
+      await callCognito("ForgotPassword", { ClientId: COGNITO_APP_CLIENT_ID, Username: normalizedEmail });
+      setLastAuthStep("reset_code_sent");
+      setAuthStatus("reset_code_sent");
+    } catch (error) {
+      setErrorMessage(authErrorMessage(error, "Unable to request a password reset code."));
+      setLastAuthStep("reset_request_error");
       setAuthStatus("error");
     }
   }, [authConfigured]);
 
-  const verifyCode = useCallback(async (code: string) => {
+  const confirmPasswordReset = useCallback(async (code: string, newPassword: string) => {
+    if (!authConfigured || !resetEmail) return;
+    setErrorMessage("");
+    try {
+      await callCognito("ConfirmForgotPassword", { ClientId: COGNITO_APP_CLIENT_ID, Username: resetEmail, ConfirmationCode: code.trim(), Password: newPassword });
+      setLastAuthStep("password_reset_confirmed");
+      setAuthStatus("signed_out");
+    } catch (error) {
+      setErrorMessage(authErrorMessage(error, "Unable to set the new password."));
+      setLastAuthStep("reset_confirm_error");
+      setAuthStatus("error");
+    }
+  }, [authConfigured, resetEmail]);
+
+  const completeNewPassword = useCallback(async (newPassword: string) => {
     if (!authConfigured || !emailPendingVerification || !challengeSession) return;
     setErrorMessage("");
     try {
-      const result = await callCognito<CognitoInitiateAuthResponse>("RespondToAuthChallenge", {
-        ClientId: COGNITO_APP_CLIENT_ID,
-        ChallengeName: PREFERRED_CHALLENGE,
-        Session: challengeSession,
-        ChallengeResponses: { USERNAME: emailPendingVerification, EMAIL_OTP_CODE: code.trim() }
-      });
-      if (!result.AuthenticationResult?.IdToken || !result.AuthenticationResult.AccessToken) throw new Error("Cognito did not return an authenticated session.");
-      const payload = decodeJwt(result.AuthenticationResult.IdToken);
-      const currentUser = { id: payload.sub ?? emailPendingVerification, email: payload.email ?? emailPendingVerification };
-      const expiresAt = payload.exp ? payload.exp * 1000 : Date.now() + (result.AuthenticationResult.ExpiresIn ?? 3600) * 1000;
-      window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({ currentUser, tokens: { accessToken: result.AuthenticationResult.AccessToken, idToken: result.AuthenticationResult.IdToken, refreshToken: result.AuthenticationResult.RefreshToken, expiresAt } } satisfies StoredSession));
-      setCurrentUser(currentUser);
-      setChallengeSession("");
-      setLastAuthStep(result.ChallengeName ?? "signed_in");
-      setAuthStatus("signed_in");
+      const result = await callCognito<CognitoInitiateAuthResponse>("RespondToAuthChallenge", { ClientId: COGNITO_APP_CLIENT_ID, ChallengeName: "NEW_PASSWORD_REQUIRED", Session: challengeSession, ChallengeResponses: { USERNAME: emailPendingVerification, NEW_PASSWORD: newPassword } });
+      if (!result.AuthenticationResult) throw new Error("Cognito did not return an authenticated session.");
+      storeSession(result.AuthenticationResult, emailPendingVerification);
+      setLastAuthStep("new_password_completed");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to verify Cognito email code.");
-      setLastAuthStep("verify_code_error");
-      setAuthStatus("error");
+      setErrorMessage(authErrorMessage(error, "Unable to set the new password."));
+      setLastAuthStep("new_password_error");
+      setAuthStatus("new_password_required");
     }
-  }, [authConfigured, challengeSession, emailPendingVerification]);
+  }, [authConfigured, challengeSession, emailPendingVerification, storeSession]);
 
-  const value = useMemo<AuthContextValue>(() => ({ authConfigured, authStatus, currentUser, emailPendingVerification, errorMessage, region: COGNITO_REGION || "not configured", profileLibraryMode: currentUser ? "authenticated" : "anonymous", authFlow: AUTH_FLOW, preferredChallenge: PREFERRED_CHALLENGE, lastAuthStep, appActionsGated: authConfigured && !currentUser, sendCode, signOut, verifyCode }), [authConfigured, authStatus, currentUser, emailPendingVerification, errorMessage, lastAuthStep, sendCode, signOut, verifyCode]);
+  const value = useMemo<AuthContextValue>(() => ({ authConfigured, authStatus, currentUser, emailPendingVerification, resetEmail, errorMessage, region: COGNITO_REGION || "not configured", profileLibraryMode: currentUser ? "authenticated" : "anonymous", authMode: AUTH_MODE, authFlow: AUTH_FLOW, lastAuthStep, appActionsGated: authConfigured && !currentUser, signIn, beginPasswordReset, confirmPasswordReset, completeNewPassword, signOut }), [authConfigured, authStatus, currentUser, emailPendingVerification, resetEmail, errorMessage, lastAuthStep, signIn, beginPasswordReset, confirmPasswordReset, completeNewPassword, signOut]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

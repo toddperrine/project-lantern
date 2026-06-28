@@ -1471,7 +1471,7 @@ export default function Home() {
       <AppStateDiagnostics activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
       <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
       <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
-      <AuthDiagnostics appActionsGated={authState.appActionsGated} authConfigured={authState.authConfigured} authFlow={authState.authFlow} authStatus={authState.authStatus} currentUserEmail={authState.currentUser?.email ?? ""} lastAuthStep={authState.lastAuthStep} preferredChallenge={authState.preferredChallenge} profileLibraryMode={authState.profileLibraryMode} region={authState.region} />
+      <AuthDiagnostics appActionsGated={authState.appActionsGated} authConfigured={authState.authConfigured} authFlow={authState.authFlow} authMode={authState.authMode} authStatus={authState.authStatus} cognitoUserId={authState.currentUser?.id ?? ""} currentUserEmail={authState.currentUser?.email ?? ""} lastAuthStep={authState.lastAuthStep} profileLibraryMode={authState.profileLibraryMode} region={authState.region} />
     </>
   );
 
@@ -1573,55 +1573,111 @@ export default function Home() {
 
 function AuthShell() {
   const auth = useAuth();
-  const [email, setEmail] = useState(auth.currentUser?.email ?? auth.emailPendingVerification);
-  const [code, setCode] = useState("");
+  const [email, setEmail] = useState(auth.currentUser?.email ?? auth.resetEmail);
+  const [password, setPassword] = useState("");
+  const [resetCode, setResetCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordMismatch, setPasswordMismatch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSendCode(event: FormEvent<HTMLFormElement>) {
+  async function handleSignIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
-    await auth.sendCode(email);
+    await auth.signIn(email, password);
+    setPassword("");
     setIsSubmitting(false);
   }
 
-  async function handleVerifyCode(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleRequestReset(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
     setIsSubmitting(true);
-    await auth.verifyCode(code);
-    setCode("");
+    await auth.beginPasswordReset(email || auth.resetEmail);
     setIsSubmitting(false);
   }
+
+  async function handleConfirmReset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setPasswordMismatch("New passwords do not match.");
+      return;
+    }
+    setPasswordMismatch("");
+    setIsSubmitting(true);
+    await auth.confirmPasswordReset(resetCode, newPassword);
+    setResetCode("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setIsSubmitting(false);
+  }
+
+  async function handleCompleteNewPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setPasswordMismatch("New passwords do not match.");
+      return;
+    }
+    setPasswordMismatch("");
+    setIsSubmitting(true);
+    await auth.completeNewPassword(newPassword);
+    setNewPassword("");
+    setConfirmPassword("");
+    setIsSubmitting(false);
+  }
+
+  const showResetForm = auth.authStatus === "resetting_password" || auth.authStatus === "reset_code_sent";
 
   return (
     <section className="grid gap-3 rounded-xl border border-lantern-gold/20 bg-paper/5 p-4 text-sm text-paper/75 md:max-w-xl" aria-label="Reader account">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-lantern-gold">Reader account</p>
-        <p className="mt-1 text-paper/65">Sign in with an email code so Project Lantern can recognize you across devices. Story generation and personalization require sign-in when Cognito is configured.</p>
+        <p className="mt-1 text-paper/65">Sign in with an approved email and password. Story generation and personalization require sign-in when Cognito is configured.</p>
       </div>
 
       {!auth.authConfigured ? (
-        <Status tone="info">Auth is not configured. Add NEXT_PUBLIC_COGNITO_USER_POOL_ID, NEXT_PUBLIC_COGNITO_APP_CLIENT_ID, and NEXT_PUBLIC_COGNITO_REGION to enable Cognito email OTP sign-in.</Status>
+        <Status tone="info">Auth is not configured. Add NEXT_PUBLIC_COGNITO_USER_POOL_ID, NEXT_PUBLIC_COGNITO_APP_CLIENT_ID, and NEXT_PUBLIC_COGNITO_REGION to enable Cognito email/password sign-in.</Status>
       ) : auth.authStatus === "signed_in" && auth.currentUser ? (
         <div className="grid gap-3">
           <p><span className="font-semibold text-paper">Signed in:</span> {auth.currentUser.email}</p>
           <button className="min-h-11 w-full rounded-xl border border-paper/15 bg-paper/10 px-4 py-2 font-semibold text-paper md:w-fit" onClick={auth.signOut} type="button">Sign out</button>
         </div>
-      ) : auth.authStatus === "code_sent" || auth.emailPendingVerification ? (
-        <form className="grid gap-3" onSubmit={handleVerifyCode}>
+      ) : auth.authStatus === "new_password_required" ? (
+        <form className="grid gap-3" onSubmit={handleCompleteNewPassword}>
+          <p className="text-paper/70">Set a new password for {auth.emailPendingVerification || email} to finish signing in.</p>
+          <PasswordFields confirmPassword={confirmPassword} newPassword={newPassword} onConfirmPasswordChange={setConfirmPassword} onNewPasswordChange={setNewPassword} />
+          {passwordMismatch ? <Status tone="error">{passwordMismatch}</Status> : null}
+          <button className="min-h-12 rounded-xl bg-lantern-gold px-4 py-3 font-semibold text-night-ink disabled:opacity-60" disabled={isSubmitting} type="submit">{isSubmitting ? "Saving…" : "Set password"}</button>
+        </form>
+      ) : showResetForm ? (
+        <form className="grid gap-3" onSubmit={auth.authStatus === "reset_code_sent" ? handleConfirmReset : handleRequestReset}>
           <label className="grid gap-1">
-            <span className="font-semibold text-paper/80">Code sent to {auth.emailPendingVerification}</span>
-            <input className="min-h-12 rounded-xl border border-paper/15 bg-night-ink/80 px-3 text-base text-paper outline-none focus:border-lantern-gold" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} placeholder="Enter code" required />
+            <span className="font-semibold text-paper/80">Approved email</span>
+            <input className="min-h-12 rounded-xl border border-paper/15 bg-night-ink/80 px-3 text-base text-paper outline-none focus:border-lantern-gold" type="email" autoComplete="email" value={email || auth.resetEmail} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required />
           </label>
-          <button className="min-h-12 rounded-xl bg-lantern-gold px-4 py-3 font-semibold text-night-ink disabled:opacity-60" disabled={isSubmitting} type="submit">{isSubmitting ? "Verifying…" : "Verify"}</button>
-          <button className="text-left text-xs font-semibold text-lantern-gold" onClick={() => void auth.sendCode(auth.emailPendingVerification)} type="button">Send a new code</button>
+          {auth.authStatus === "reset_code_sent" ? (
+            <>
+              <label className="grid gap-1">
+                <span className="font-semibold text-paper/80">Reset code</span>
+                <input className="min-h-12 rounded-xl border border-paper/15 bg-night-ink/80 px-3 text-base text-paper outline-none focus:border-lantern-gold" inputMode="numeric" autoComplete="one-time-code" value={resetCode} onChange={(event) => setResetCode(event.target.value)} placeholder="Enter email recovery code" required />
+              </label>
+              <PasswordFields confirmPassword={confirmPassword} newPassword={newPassword} onConfirmPasswordChange={setConfirmPassword} onNewPasswordChange={setNewPassword} />
+              {passwordMismatch ? <Status tone="error">{passwordMismatch}</Status> : null}
+            </>
+          ) : null}
+          <button className="min-h-12 rounded-xl bg-lantern-gold px-4 py-3 font-semibold text-night-ink disabled:opacity-60" disabled={isSubmitting} type="submit">{isSubmitting ? "Working…" : auth.authStatus === "reset_code_sent" ? "Confirm new password" : "Send password reset code"}</button>
         </form>
       ) : (
-        <form className="grid gap-3" onSubmit={handleSendCode}>
+        <form className="grid gap-3" onSubmit={handleSignIn}>
           <label className="grid gap-1">
             <span className="font-semibold text-paper/80">Email</span>
             <input className="min-h-12 rounded-xl border border-paper/15 bg-night-ink/80 px-3 text-base text-paper outline-none focus:border-lantern-gold" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required />
           </label>
-          <button className="min-h-12 rounded-xl bg-lantern-gold px-4 py-3 font-semibold text-night-ink disabled:opacity-60" disabled={isSubmitting} type="submit">{isSubmitting ? "Sending…" : "Send code"}</button>
+          <label className="grid gap-1">
+            <span className="font-semibold text-paper/80">Password</span>
+            <input className="min-h-12 rounded-xl border border-paper/15 bg-night-ink/80 px-3 text-base text-paper outline-none focus:border-lantern-gold" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" required />
+          </label>
+          <button className="min-h-12 rounded-xl bg-lantern-gold px-4 py-3 font-semibold text-night-ink disabled:opacity-60" disabled={isSubmitting} type="submit">{isSubmitting ? "Signing in…" : "Sign in"}</button>
+          <button className="text-left text-xs font-semibold text-lantern-gold" onClick={() => void handleRequestReset()} type="button">Set or reset password</button>
         </form>
       )}
       {auth.authStatus === "error" && auth.errorMessage ? <Status tone="error">{auth.errorMessage}</Status> : null}
@@ -1629,18 +1685,34 @@ function AuthShell() {
   );
 }
 
-function AuthDiagnostics({ appActionsGated, authConfigured, authFlow, authStatus, currentUserEmail, lastAuthStep, preferredChallenge, profileLibraryMode, region }: { appActionsGated: boolean; authConfigured: boolean; authFlow: "USER_AUTH"; authStatus: AuthStatus; currentUserEmail: string; lastAuthStep: string; preferredChallenge: "EMAIL_OTP"; profileLibraryMode: "anonymous" | "authenticated"; region: string }) {
+function PasswordFields({ confirmPassword, newPassword, onConfirmPasswordChange, onNewPasswordChange }: { confirmPassword: string; newPassword: string; onConfirmPasswordChange: (value: string) => void; onNewPasswordChange: (value: string) => void }) {
+  return (
+    <>
+      <label className="grid gap-1">
+        <span className="font-semibold text-paper/80">New password</span>
+        <input className="min-h-12 rounded-xl border border-paper/15 bg-night-ink/80 px-3 text-base text-paper outline-none focus:border-lantern-gold" type="password" autoComplete="new-password" value={newPassword} onChange={(event) => onNewPasswordChange(event.target.value)} placeholder="New password" required />
+      </label>
+      <label className="grid gap-1">
+        <span className="font-semibold text-paper/80">Confirm new password</span>
+        <input className="min-h-12 rounded-xl border border-paper/15 bg-night-ink/80 px-3 text-base text-paper outline-none focus:border-lantern-gold" type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => onConfirmPasswordChange(event.target.value)} placeholder="Confirm new password" required />
+      </label>
+    </>
+  );
+}
+
+function AuthDiagnostics({ appActionsGated, authConfigured, authFlow, authMode, authStatus, cognitoUserId, currentUserEmail, lastAuthStep, profileLibraryMode, region }: { appActionsGated: boolean; authConfigured: boolean; authFlow: "USER_PASSWORD_AUTH"; authMode: "email_password"; authStatus: AuthStatus; cognitoUserId: string; currentUserEmail: string; lastAuthStep: string; profileLibraryMode: "anonymous" | "authenticated"; region: string }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">Auth diagnostics</summary>
       <div className="mt-3 grid gap-1 sm:grid-cols-2">
         <p><span className="font-semibold text-paper/80">Auth configured:</span> {authConfigured ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">Auth status:</span> {authStatus}</p>
+        <p><span className="font-semibold text-paper/80">Auth mode:</span> {authMode}</p>
         <p><span className="font-semibold text-paper/80">Auth flow used:</span> {authFlow}</p>
-        <p><span className="font-semibold text-paper/80">Preferred challenge:</span> {preferredChallenge}</p>
         <p><span className="font-semibold text-paper/80">Last Cognito auth step:</span> {lastAuthStep}</p>
         <p><span className="font-semibold text-paper/80">App actions gated:</span> {appActionsGated ? "yes - sign-in required" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Current user email:</span> {currentUserEmail || "none"}</p>
+        <p><span className="font-semibold text-paper/80">Cognito user id/sub:</span> {cognitoUserId || "none"}</p>
         <p><span className="font-semibold text-paper/80">Cognito region:</span> {region}</p>
         <p><span className="font-semibold text-paper/80">Profile/library mode:</span> {profileLibraryMode}</p>
       </div>
