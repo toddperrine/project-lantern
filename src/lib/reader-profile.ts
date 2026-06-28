@@ -332,8 +332,8 @@ export function clearReaderProfile(): ReaderProfile {
   return createEmptyReaderProfile();
 }
 
-export function saveReaderMoodSnapshot(draft: ReaderMoodDraft): ReaderProfile {
-  const currentProfile = readReaderProfile();
+export function saveReaderMoodSnapshot(draft: ReaderMoodDraft, profile?: ReaderProfile, persist = true): ReaderProfile {
+  const currentProfile = profile ? normalizeReaderProfile(profile) : readReaderProfile();
   const now = createNextReaderProfileUpdatedAt(currentProfile.updatedAt);
   const snapshot: ReaderMoodSnapshot = {
     id: createReaderMoodSnapshotId(now),
@@ -363,12 +363,12 @@ export function saveReaderMoodSnapshot(draft: ReaderMoodDraft): ReaderProfile {
     ].slice(0, MAX_READER_MOOD_HISTORY),
   };
 
-  persistReaderProfile(nextProfile);
+  if (persist) persistReaderProfile(nextProfile);
   return nextProfile;
 }
 
-export function recordReaderProfileEvent(event: ReaderProfileEventInput): ReaderProfile {
-  const currentProfile = readReaderProfile();
+export function recordReaderProfileEvent(event: ReaderProfileEventInput, profile?: ReaderProfile, persist = true): ReaderProfile {
+  const currentProfile = profile ? normalizeReaderProfile(profile) : readReaderProfile();
   const eventTimestamp = event.timestamp ?? createNextReaderProfileUpdatedAt(currentProfile.updatedAt);
   const updatedAt = createNextReaderProfileUpdatedAt(currentProfile.updatedAt, eventTimestamp);
   const normalizedEvent = normalizeReaderProfileEvent({ ...event, timestamp: eventTimestamp });
@@ -384,12 +384,12 @@ export function recordReaderProfileEvent(event: ReaderProfileEventInput): Reader
     recentEvents: [normalizedEvent, ...currentProfile.recentEvents.filter(isReaderProfileEvent)].slice(0, MAX_READER_PROFILE_EVENTS),
   };
 
-  persistReaderProfile(nextProfile);
+  if (persist) persistReaderProfile(nextProfile);
   return nextProfile;
 }
 
-export function saveStoryFeedbackSignal(nextSignal: StoryFeedbackSignal): ReaderProfile {
-  const currentProfile = readReaderProfile();
+export function saveStoryFeedbackSignal(nextSignal: StoryFeedbackSignal, profile?: ReaderProfile, persist = true): ReaderProfile {
+  const currentProfile = profile ? normalizeReaderProfile(profile) : readReaderProfile();
   const now = createNextReaderProfileUpdatedAt(currentProfile.updatedAt, nextSignal.updatedAt);
   const existingSignal = currentProfile.storyFeedbackSignals?.find(
     (signal) => signal.storyId === nextSignal.storyId,
@@ -412,12 +412,12 @@ export function saveStoryFeedbackSignal(nextSignal: StoryFeedbackSignal): Reader
     ),
   };
 
-  persistReaderProfile(nextProfile);
+  if (persist) persistReaderProfile(nextProfile);
   return nextProfile;
 }
 
-export function saveReadyStoryQueueSignal(nextSignal: ReadyStoryQueueLearningSignal): ReaderProfile {
-  const currentProfile = readReaderProfile();
+export function saveReadyStoryQueueSignal(nextSignal: ReadyStoryQueueLearningSignal, profile?: ReaderProfile, persist = true): ReaderProfile {
+  const currentProfile = profile ? normalizeReaderProfile(profile) : readReaderProfile();
   const updatedAt = createNextReaderProfileUpdatedAt(currentProfile.updatedAt, nextSignal.updatedAt || nextSignal.createdAt);
   const normalizedSignal = normalizeReadyStoryQueueLearningSignal({
     ...nextSignal,
@@ -440,7 +440,7 @@ export function saveReadyStoryQueueSignal(nextSignal: ReadyStoryQueueLearningSig
     ].slice(0, MAX_READY_STORY_QUEUE_SIGNALS)
   };
 
-  persistReaderProfile(nextProfile);
+  if (persist) persistReaderProfile(nextProfile);
   return nextProfile;
 }
 
@@ -896,6 +896,10 @@ function canonicalFromEerie(value: Record<string, unknown>, readerId: string): C
 function canonicalFromLegacyReaderProfile(profile: ReaderProfile, readerId: string): CanonicalReaderProfile {
   const taste = profile.tasteProfile;
   return { ...defaultCanonicalProfile(readerId), createdAt: profile.createdAt || nowIso(), updatedAt: profile.updatedAt || nowIso(), source: profile.profileExists ? "local" : "default", onboarding: { mode: profile.latestMood ? "completed" : "unknown", lastMood: profile.latestMood?.mood ?? null, preferredDuration: taste?.preferredDurationMinutes ? `${taste.preferredDurationMinutes} minutes` : null, preferredFormat: toCanonicalFormat(taste?.preferredFormat) }, preferences: { fearIntensity: taste?.fearIntensity.value, weirdnessTolerance: taste?.weirdnessTolerance.value, supernaturalAffinity: taste?.supernaturalAffinity.value, ambiguityTolerance: taste?.ambiguityTolerance.value, goreTolerance: taste?.goreTolerance.value, sleepSafePreference: taste?.sleepSafePreference.value, preferredFormat: toCanonicalFormat(taste?.preferredFormat), preferredDuration: taste?.preferredDurationMinutes ? `${taste.preferredDurationMinutes} minutes` : null, hardAvoidances: taste?.userHardAvoidances ?? [] }, signals: { storyCardSignalCount: profile.readyStoryQueueSignals?.length ?? 0, feedbackSignalCount: profile.storyFeedbackSignals?.length ?? 0, favoriteCount: profile.storyFeedbackSignals?.filter((s) => s.rating === "favorite").length ?? 0, savedForLaterCount: profile.readyStoryQueueSignals?.filter((s) => s.signal === "save_for_later").length ?? 0, lastFeedbackAt: [...(profile.storyFeedbackSignals ?? [])].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0]?.updatedAt ?? null, lastStoryGeneratedAt: profile.recentEvents.find((event) => event.eventType === "storyGenerated")?.timestamp ?? null } };
+}
+
+export function canonicalReaderProfileFromReaderProfile(profile: ReaderProfile, readerId: string, source: CanonicalReaderProfile["source"] = "cloud"): CanonicalReaderProfile {
+  return { ...canonicalFromLegacyReaderProfile(profile, readerId), source };
 }
 
 function normalizeCanonicalReaderProfile(value: unknown, readerId: string): CanonicalReaderProfile | null {
