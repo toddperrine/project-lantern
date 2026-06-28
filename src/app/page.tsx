@@ -1957,7 +1957,7 @@ function SeriesLibraryGroup({ group, onDeleteStory, onOpenSavedStoryById }: { gr
         ))}
         </div>
       </article>
-      <article className="hidden min-w-0 max-w-full rounded-md border border-paper/12 bg-paper/10 p-4 md:block">
+      <article className="hidden min-w-0 max-w-full rounded-md border border-paper/12 bg-paper/10 p-4 md:block" data-mobile-library-desktop-group="true">
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 max-w-full">
           <h3 className="break-words text-lg font-semibold text-paper">{group.title}</h3>

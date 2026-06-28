@@ -675,3 +675,9 @@
     white-space: normal !important;
   }
 }
+
+@media (max-width: 767px) {
+  .project-lantern-shell main[data-mobile-active-view="library"] [data-mobile-library-desktop-group="true"] {
+    display: none !important;
+  }
+}
