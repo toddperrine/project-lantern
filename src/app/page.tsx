@@ -1928,7 +1928,7 @@ function LibraryView(props: { cloudMessage: string; cloudProjects: CloudProjectS
   const seriesGroups = groupStoriesBySeries(libraryStoryRows.map((row) => row.story)).map((group) => ({ ...group, episodes: group.episodes.map((episode) => ({ ...episode, row: libraryStoryRows[episode.originalIndex] })) }));
   const hasGeneratedStoryRows = seriesGroups.length > 0;
 
-  return <section className="grid min-w-0 gap-5"><PageHeading eyebrow="Library" title="Story Library" body="Saved and recent stories live here as a separate destination." /><div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,420px)_1fr]"><section className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4"><h2 className="text-xl font-semibold text-paper">Library Tools</h2><p className="mt-1 text-sm leading-6 text-paper/65">Save stories and move project workspaces between local and cloud storage.</p><button className="mt-4 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={!storyResponse} onClick={onSaveStory} type="button">Save Current Story</button><label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-paper">Project Name</span><input className="rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper" onChange={(event) => onProjectNameChange(event.target.value)} placeholder="My story project" value={projectName} /></label><div className="mt-3 flex flex-wrap gap-2"><SmallButton onClick={onSaveProject}>Save Project</SmallButton><SmallButton disabled={!selectedProjectId} onClick={onDeleteProject}>Delete Project</SmallButton><SmallButton disabled={isCloudLoading} onClick={onRefreshCloud}>{isCloudLoading ? "Syncing..." : "Refresh Cloud"}</SmallButton><SmallButton disabled={isCloudLoading} onClick={onSaveCloudProject}>Save to Cloud</SmallButton><SmallButton disabled={isCloudLoading || !selectedCloudProjectId} onClick={onDeleteCloudProject}>Delete Cloud</SmallButton></div><SelectLibrary label="Load Project" onChange={onLoadProject} options={savedProjects.map((project) => ({ label: `${project.name} - ${formatDateTime(project.updatedAt)}`, value: project.id }))} value={selectedProjectId} /><SelectLibrary label="Load Cloud Project" onChange={onLoadCloudProject} options={cloudProjects.map((project) => ({ label: `${project.name} - ${formatDateTime(project.updatedAt)}`, value: project.id }))} value={selectedCloudProjectId} />{cloudMessage ? <p className="mt-3 rounded-md border border-lantern-gold/25 bg-paper/10 px-3 py-2 text-xs leading-5 text-paper/65">{cloudMessage}</p> : null}</section><section className="grid min-w-0 gap-3"><section className="grid min-w-0 gap-3 rounded-md border border-lantern-gold/20 bg-lantern-gold/5 p-4"><div><h2 className="text-lg font-semibold text-paper">Saved for later</h2><p className="mt-1 text-sm leading-6 text-paper/60">Ready story choices you saved from the desktop queue.</p></div>{savedForLaterStoryQueue.length ? savedForLaterStoryQueue.map((item) => <SavedForLaterStoryCard item={item} key={item.id} onMoveToWaitingQueue={() => onMoveSavedForLaterToWaitingQueue(item)} onRead={() => onReadSavedForLater(item)} onRemove={() => onRemoveSavedForLater(item)} />) : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved-for-later stories yet.</p>}</section>{!hasGeneratedStoryRows ? <EmptyPanel title="No saved or recent stories yet" body="Generate a story or save one locally and it will appear here." /> : null}{seriesGroups.map((group) => <SeriesLibraryGroup key={group.seriesId} group={group} onDeleteStory={onDeleteStory} onOpenSavedStoryById={onOpenSavedStoryById} />)}</section></div></section>;
+  return <section className="grid min-w-0 gap-5 pb-8 md:pb-0"><PageHeading eyebrow="Library" title="Story Library" body="Saved and recent stories live here as a separate destination." /><div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,420px)_1fr]"><section className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4"><h2 className="text-xl font-semibold text-paper">Library Tools</h2><p className="mt-1 text-sm leading-6 text-paper/65">Save stories and move project workspaces between local and cloud storage.</p><button className="mt-4 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={!storyResponse} onClick={onSaveStory} type="button">Save Current Story</button><label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-paper">Project Name</span><input className="rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper" onChange={(event) => onProjectNameChange(event.target.value)} placeholder="My story project" value={projectName} /></label><div className="mt-3 flex flex-wrap gap-2"><SmallButton onClick={onSaveProject}>Save Project</SmallButton><SmallButton disabled={!selectedProjectId} onClick={onDeleteProject}>Delete Project</SmallButton><SmallButton disabled={isCloudLoading} onClick={onRefreshCloud}>{isCloudLoading ? "Syncing..." : "Refresh Cloud"}</SmallButton><SmallButton disabled={isCloudLoading} onClick={onSaveCloudProject}>Save to Cloud</SmallButton><SmallButton disabled={isCloudLoading || !selectedCloudProjectId} onClick={onDeleteCloudProject}>Delete Cloud</SmallButton></div><SelectLibrary label="Load Project" onChange={onLoadProject} options={savedProjects.map((project) => ({ label: `${project.name} - ${formatDateTime(project.updatedAt)}`, value: project.id }))} value={selectedProjectId} /><SelectLibrary label="Load Cloud Project" onChange={onLoadCloudProject} options={cloudProjects.map((project) => ({ label: `${project.name} - ${formatDateTime(project.updatedAt)}`, value: project.id }))} value={selectedCloudProjectId} />{cloudMessage ? <p className="mt-3 rounded-md border border-lantern-gold/25 bg-paper/10 px-3 py-2 text-xs leading-5 text-paper/65">{cloudMessage}</p> : null}</section><section className="grid min-w-0 gap-3"><section className="grid min-w-0 gap-3 rounded-md border border-lantern-gold/20 bg-lantern-gold/5 p-4"><div><h2 className="text-lg font-semibold text-paper">Saved for later</h2><p className="mt-1 text-sm leading-6 text-paper/60">Ready story choices you saved from the desktop queue.</p></div>{savedForLaterStoryQueue.length ? savedForLaterStoryQueue.map((item) => <SavedForLaterStoryCard item={item} key={item.id} onMoveToWaitingQueue={() => onMoveSavedForLaterToWaitingQueue(item)} onRead={() => onReadSavedForLater(item)} onRemove={() => onRemoveSavedForLater(item)} />) : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved-for-later stories yet.</p>}</section>{!hasGeneratedStoryRows ? <EmptyPanel title="No saved or recent stories yet" body="Generate a story or save one locally and it will appear here." /> : null}{seriesGroups.map((group) => <SeriesLibraryGroup key={group.seriesId} group={group} onDeleteStory={onDeleteStory} onOpenSavedStoryById={onOpenSavedStoryById} />)}</section></div></section>;
 }
 
 type LibraryStoryRow = { story: SavedStory; kind: "saved" };
@@ -1938,7 +1938,26 @@ function SeriesLibraryGroup({ group, onDeleteStory, onOpenSavedStoryById }: { gr
   const updatedLabel = group.lastUpdatedAt ? `Last updated ${formatDateTime(group.lastUpdatedAt)}` : "Not updated yet";
 
   return (
-    <article className="min-w-0 max-w-full rounded-md border border-paper/12 bg-paper/10 p-4">
+    <>
+      <article className="grid w-full min-w-0 max-w-full gap-4 rounded-xl border border-paper/12 bg-paper/10 p-4 md:hidden" data-mobile-library-series-group="true">
+        <div className="min-w-0 max-w-full">
+          <h3 className="break-words text-xl font-semibold leading-tight text-paper">{group.title}</h3>
+          <p className="mt-1 break-words text-sm leading-6 text-paper/60">
+            {group.episodeCount} {group.episodeCount === 1 ? "Episode" : "Episodes"} | {updatedLabel}
+          </p>
+        </div>
+
+        <div className="grid w-full min-w-0 max-w-full gap-3">
+        {group.episodes.map((episode) => (
+          <MobileLibraryEpisodeCard
+            episode={episode}
+            key={episode.story.id}
+            onOpenSavedStoryById={onOpenSavedStoryById}
+          />
+        ))}
+        </div>
+      </article>
+      <article className="hidden min-w-0 max-w-full rounded-md border border-paper/12 bg-paper/10 p-4 md:block" data-mobile-library-desktop-group="true">
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 max-w-full">
           <h3 className="break-words text-lg font-semibold text-paper">{group.title}</h3>
@@ -1949,27 +1968,19 @@ function SeriesLibraryGroup({ group, onDeleteStory, onOpenSavedStoryById }: { gr
         <span className="w-fit rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-2 py-1 text-xs font-semibold text-lantern-gold">Series</span>
       </div>
 
-      <div className="mt-4 grid min-w-0 max-w-full gap-3 md:hidden">
-        {group.episodes.map((episode) => (
-          <MobileLibraryEpisodeCard
-            episode={episode}
-            key={episode.story.id}
-            onOpenSavedStoryById={onOpenSavedStoryById}
-          />
-        ))}
-      </div>
-
-      <div className="mt-4 hidden min-w-0 gap-3 md:grid">
-        {group.episodes.map((episode) => <StoryLibraryCard badge={`Episode ${episode.episodeNumber}`} key={episode.story.id} onDelete={() => onDeleteStory(episode.story.id)} onOpen={() => onOpenSavedStoryById(episode.story.id)} story={episode.story} />)}
-      </div>
-    </article>
+        <div className="mt-4 grid min-w-0 gap-3">
+          {group.episodes.map((episode) => <StoryLibraryCard badge={`Episode ${episode.episodeNumber}`} key={episode.story.id} onDelete={() => onDeleteStory(episode.story.id)} onOpen={() => onOpenSavedStoryById(episode.story.id)} story={episode.story} />)}
+        </div>
+      </article>
+    </>
   );
 }
 
 function MobileLibraryEpisodeCard({ episode, onOpenSavedStoryById }: { episode: SeriesEpisode<LibraryStory> & { row: LibraryStoryRow }; onOpenSavedStoryById: (storyId: string) => void }) {
   return (
     <button
-      className="w-full min-w-0 max-w-full rounded-xl border border-paper/10 bg-paper/5 p-4 text-left"
+      className="grid min-h-11 w-full min-w-0 max-w-full gap-2 rounded-xl border border-paper/10 bg-night-ink/70 p-4 text-left"
+      data-mobile-library-episode-card="true"
       key={episode.story.id}
       onClick={() => onOpenSavedStoryById(episode.story.id)}
       type="button"
@@ -1977,11 +1988,14 @@ function MobileLibraryEpisodeCard({ episode, onOpenSavedStoryById }: { episode: 
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
         Episode {episode.episodeNumber}
       </p>
-      <h4 className="mt-1 break-words text-base font-semibold leading-snug text-paper">
+      <h4 className="break-words text-lg font-semibold leading-snug text-paper">
         {episode.story.title}
       </h4>
-      <p className="mt-2 line-clamp-3 break-words text-sm leading-6 text-paper/70">
+      <p className="line-clamp-3 break-words text-sm leading-6 text-paper/70">
         {episode.story.story}
+      </p>
+      <p className="text-xs leading-5 text-paper/45">
+        {formatDateTime(episode.story.createdAt)} · {episode.story.wordCount.toLocaleString()} words · {episode.story.genrePreset}
       </p>
     </button>
   );
