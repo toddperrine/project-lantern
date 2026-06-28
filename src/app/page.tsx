@@ -1434,6 +1434,55 @@ export default function Home() {
             navigateHome();
           }}
         />
+        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? (
+          <section
+            className="grid min-w-0 gap-3 rounded-xl border border-paper/10 bg-night-ink/90 p-4 md:hidden"
+            data-mobile-home-actions="true"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-lantern-gold">
+              Home
+            </p>
+            <h1 className="text-2xl font-semibold leading-tight text-paper">
+              What do you want to do?
+            </h1>
+
+            <button
+              className="min-h-12 w-full rounded-xl bg-lantern-gold px-4 py-3 text-base font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isGenerating}
+              onClick={handleStartSomethingNew}
+              type="button"
+            >
+              {isNewStoryGenerating ? "Writing…" : "Start Something New"}
+            </button>
+
+            {latestStory ? (
+              <button
+                className="min-h-12 w-full rounded-xl border border-paper/15 bg-paper/10 px-4 py-3 text-base font-semibold text-paper disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isGenerating}
+                onClick={() => handleContinueLatest()}
+                type="button"
+              >
+                Continue Latest Episode
+              </button>
+            ) : null}
+
+            <button
+              className="min-h-12 w-full rounded-xl border border-paper/15 bg-paper/10 px-4 py-3 text-base font-semibold text-paper"
+              onClick={() => navigateToView("library")}
+              type="button"
+            >
+              Story Library
+            </button>
+
+            <button
+              className="min-h-12 w-full rounded-xl border border-paper/15 bg-paper/10 px-4 py-3 text-base font-semibold text-paper"
+              onClick={() => navigateToView("create")}
+              type="button"
+            >
+              Create
+            </button>
+          </section>
+        ) : null}
         <header className="hidden min-w-0 flex-col gap-5 border-b border-paper/10 pb-6 md:flex md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold sm:tracking-[0.22em]">Lantyrn</p>
@@ -1457,12 +1506,12 @@ export default function Home() {
           />
         ) : null}
         {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={generatedStoryPresentation === "saved-episode" ? handleSavedEpisodeNext : handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : generatedStoryPresentation === "saved-episode" ? "Saved Episode" : "Next Episode"} continueLabel={generatedStoryPresentation === "saved-episode" ? "Next Episode" : "Continue this story"} episodeNumber={currentSeriesEpisode?.episodeNumber ?? null} generationProfileSnapshot={storyResponse?.metadata.diagnostics.readerProfileSnapshot ?? storyResponse?.metadata.diagnostics.readerProfileGenerationSnapshot} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
-        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onOpenCreate={() => navigateToView("create")} onOpenLibrary={() => navigateToView("library")} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} /> : null}
+        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <div className="hidden md:block"><HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onOpenCreate={() => navigateToView("create")} onOpenLibrary={() => navigateToView("library")} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} /></div> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onMoveSavedForLaterToWaitingQueue={handleMoveSavedForLaterStoryToWaitingQueue} onOpenSavedStoryById={handleRestoreStoryById} onProjectNameChange={setProjectName} onReadSavedForLater={handleReadSavedForLaterStory} onRefreshCloud={handleRefreshCloudProjects} onRemoveSavedForLater={handleRemoveSavedForLaterStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedForLaterStoryQueue={savedForLaterStoryQueue} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
         {activeView === "characters" ? <CharactersView onOpenStory={handleStartRecommendation} /> : null}
-        <MobileDeveloperDiagnostics>{diagnosticsPanels}</MobileDeveloperDiagnostics>
+        {activeView !== "home" ? <MobileDeveloperDiagnostics>{diagnosticsPanels}</MobileDeveloperDiagnostics> : null}
       </section>
       <MobileBottomNav activeView={activeView} onChange={navigateToView} />
     </main>
