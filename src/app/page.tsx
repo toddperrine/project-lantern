@@ -1415,8 +1415,16 @@ export default function Home() {
   const isNewStoryGenerating = isGenerating && generationSource === "new-story";
   const isContinuationGenerating = isGenerating && generationSource === "continue-story";
 
+  const diagnosticsPanels = (
+    <>
+      <AppStateDiagnostics activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
+      <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
+      <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
+    </>
+  );
+
   return (
-    <main className="min-h-dvh w-full overflow-x-clip px-3 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] pt-3 text-paper sm:px-4 md:px-8 md:pb-7 md:pt-7">
+    <main className="min-h-dvh w-full max-w-full overflow-x-hidden px-3 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] pt-3 text-paper sm:px-4 md:px-8 md:pb-7 md:pt-7">
       <section className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-5 md:gap-6">
         <MobileTopHeader
           onGoHome={() => {
@@ -1439,9 +1447,7 @@ export default function Home() {
         {isGenerating ? <StopGenerationControl onStop={handleStopGeneration} /> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        <AppStateDiagnostics activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
-        <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
-        <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
+        <div className="hidden min-w-0 gap-5 md:grid">{diagnosticsPanels}</div>
 
         {activeView === "mood-intake" ? (
           <MoodIntakeView
@@ -1456,6 +1462,11 @@ export default function Home() {
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
         {activeView === "characters" ? <CharactersView onOpenStory={handleStartRecommendation} /> : null}
+
+        <details className="min-w-0 overflow-hidden rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65 md:hidden">
+          <summary className="cursor-pointer font-semibold text-paper/75">Developer diagnostics</summary>
+          <div className="mt-3 grid min-w-0 gap-3">{diagnosticsPanels}</div>
+        </details>
       </section>
       <MobileBottomNav activeView={activeView} onChange={navigateToView} />
     </main>
