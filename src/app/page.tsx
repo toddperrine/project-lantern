@@ -25,6 +25,7 @@ import {
   saveCanonicalReaderProfile,
   applyFeedbackToReaderProfile,
   buildGenerationReaderProfileInput,
+  canonicalReaderProfileFromReaderProfile,
   mirrorCanonicalReaderProfilePreferences,
   readReaderProfile,
   readerProfileExistsInLocalStorage,
@@ -115,6 +116,22 @@ type CloudReaderProfileSyncState = {
   cloudProfileExists: boolean;
   lastLoadStatus: string;
   lastBlockedProfileAction: string;
+  lastApiPath: string;
+  lastApiAction: string;
+  lastSanitizedErrorName: string;
+  lastSanitizedErrorCode: string;
+  initializedDefaultCloudProfile: boolean;
+};
+type ReaderProfileApiDiagnostic = {
+  apiPath?: string;
+  action?: string;
+  authTokenPresent?: boolean;
+  resolvedOwnerId?: string;
+  initializedDefaultCloudProfile?: boolean;
+  result?: string;
+  sanitizedErrorName?: string | null;
+  sanitizedErrorCode?: string | number | null;
+  operation?: string;
 };
 type ReaderProfileSaveResponse = {
   profile?: ReaderProfile | null;
@@ -122,6 +139,8 @@ type ReaderProfileSaveResponse = {
   error?: string;
   cloudProfileExists?: boolean;
   ownerId?: string;
+  initializedDefaultCloudProfile?: boolean;
+  diagnostic?: ReaderProfileApiDiagnostic;
 };
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
@@ -205,7 +224,12 @@ const EMPTY_CLOUD_READER_PROFILE_SYNC: CloudReaderProfileSyncState = {
   source: "legacy local",
   cloudProfileExists: false,
   lastLoadStatus: "not loaded",
-  lastBlockedProfileAction: "none"
+  lastBlockedProfileAction: "none",
+  lastApiPath: "none",
+  lastApiAction: "none",
+  lastSanitizedErrorName: "none",
+  lastSanitizedErrorCode: "none",
+  initializedDefaultCloudProfile: false
 };
 
 function storySparkCatalogItemToStoryStart(item: StorySparkCatalogItem): StoryStart {
@@ -475,20 +499,26 @@ export default function Home() {
       const response = await fetch(`/api/reader-profile`, { cache: "no-store", headers: authHeaders() });
       const payload = await response.json().catch(() => ({})) as ReaderProfileSaveResponse;
       if (response.status === 503) {
-        updateCloudReaderProfileSync({ profileId, status: "unavailable", lastLoadStatus: "unavailable", lastSaveOutcome: "unavailable", lastError: payload.error ?? "Reader profile cloud persistence is unavailable.", localProfileExists: readerProfileExistsInLocalStorage() });
+        updateCloudReaderProfileSync({ profileId, status: "unavailable", lastLoadStatus: "unavailable", lastSaveOutcome: "unavailable", lastError: payload.error ?? "Reader profile cloud persistence is unavailable.", localProfileExists: readerProfileExistsInLocalStorage(), ...cloudDiagnosticUpdate(payload.diagnostic) });
         return;
       }
-      if (!response.ok) throw new Error(payload.error ?? "Reader profile cloud load failed.");
+      if (!response.ok) {
+        updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? authState.currentUser.id, source: "authenticated cloud", status: "error", lastLoadStatus: "error", lastError: payload.error ?? "Reader profile cloud load failed.", localProfileExists: readerProfileExistsInLocalStorage(), ...cloudDiagnosticUpdate(payload.diagnostic) });
+        return;
+      }
       const cloudProfile = normalizeCloudReaderProfile(payload.profile);
       if (cloudProfile) {
         setReaderProfile(cloudProfile);
-        updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? authState.currentUser.id, source: "authenticated cloud", status: "synced", cloudUpdatedAt: cloudProfile.updatedAt, localUpdatedAt: cloudProfile.updatedAt, cloudProfileExists: true, lastLoadStatus: "loaded", lastError: "" });
+        setCanonicalReaderProfile(canonicalReaderProfileFromReaderProfile(cloudProfile, authState.currentUser.id, "cloud"));
+        updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? authState.currentUser.id, source: "authenticated cloud", status: "synced", cloudUpdatedAt: cloudProfile.updatedAt, localUpdatedAt: cloudProfile.updatedAt, cloudProfileExists: true, lastLoadStatus: "success", lastError: "", initializedDefaultCloudProfile: false, ...cloudDiagnosticUpdate(payload.diagnostic) });
         return;
       }
       const defaultProfile = createEmptyReaderProfile();
       setReaderProfile(defaultProfile);
-      updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? authState.currentUser.id, source: "authenticated cloud", status: "not found", cloudProfileExists: false, lastLoadStatus: "not found; initialized default", localUpdatedAt: defaultProfile.updatedAt, lastError: "" });
+      setCanonicalReaderProfile(canonicalReaderProfileFromReaderProfile(defaultProfile, authState.currentUser.id, "cloud"));
+      updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? authState.currentUser.id, source: "authenticated cloud", status: "not found", cloudProfileExists: false, lastLoadStatus: "not_found_then_initializing", localUpdatedAt: defaultProfile.updatedAt, lastError: "", initializedDefaultCloudProfile: true, ...cloudDiagnosticUpdate(payload.diagnostic) });
       await saveReaderProfileToCloud(profileId, defaultProfile);
+      updateCloudReaderProfileSync({ status: "synced", cloudProfileExists: true, lastLoadStatus: "not_found_then_initialized", lastError: "", initializedDefaultCloudProfile: true });
     } catch (caughtError) {
       updateCloudReaderProfileSync({ profileId, ownerId: authState.currentUser.id, source: "authenticated cloud", status: "error", lastLoadStatus: "error", lastError: formatErrorMessage(caughtError), localProfileExists: readerProfileExistsInLocalStorage() });
     }
@@ -616,13 +646,16 @@ export default function Home() {
     setLastRequestIncludedContinuationStoryId(Boolean(continuationStoryId));
     setLastContinuationContextIncluded(Boolean(overrides.continuationContextIncluded));
     setLastContinuationBlockedBecauseContextMissing(false);
-    const activeCanonicalProfile = mirrorCanonicalReaderProfilePreferences(loadCanonicalReaderProfile(), readReaderProfile(), eerieReaderProfile);
+    const activeReaderProfile = authState.currentUser ? readerProfile : readReaderProfile();
+    const activeCanonicalProfile = authState.currentUser
+      ? canonicalReaderProfileFromReaderProfile(activeReaderProfile, authState.currentUser.id, "cloud")
+      : mirrorCanonicalReaderProfilePreferences(loadCanonicalReaderProfile(), activeReaderProfile, eerieReaderProfile);
     setCanonicalReaderProfile(activeCanonicalProfile);
     const personalization = buildNewStoryPersonalization({
       eerieProfile: eerieReaderProfile,
       genre: overrides?.genrePreset ?? genrePreset,
       mode: nextGenerationSource,
-      profile: readReaderProfile(),
+      profile: activeReaderProfile,
       source: getReaderProfileSource(cloudReaderProfileSync),
       trigger: overrides.signalSource ?? "create",
       continuationStoryId,
@@ -693,7 +726,8 @@ export default function Home() {
         setReaderScrollDiagnostics((current) => ({ ...current, continuationLoaded: "yes", scrollResetAttempted: "pending", scrollTargetUsed: "pending" }));
       }
       const generatedAt = new Date().toISOString();
-      const canonicalAfterGeneration = saveCanonicalReaderProfile({ ...activeCanonicalProfile, updatedAt: generatedAt, signals: { ...activeCanonicalProfile.signals, lastStoryGeneratedAt: generatedAt, lastGenerationUsedCanonicalProfile: true } });
+      const canonicalAfterGenerationDraft = { ...activeCanonicalProfile, updatedAt: generatedAt, signals: { ...activeCanonicalProfile.signals, lastStoryGeneratedAt: generatedAt, lastGenerationUsedCanonicalProfile: true } };
+      const canonicalAfterGeneration = authState.currentUser ? canonicalAfterGenerationDraft : saveCanonicalReaderProfile(canonicalAfterGenerationDraft);
       setCanonicalReaderProfile(canonicalAfterGeneration);
       if (overrides.generationMode === "new_story") { recordReaderSignal({ eventType: "storyGenerated", source: "startSomethingNew", storyId: generatedStoryId, title: savedStory.title, genre: savedStory.genrePreset, wordCount: savedStory.wordCount }); }
       else { recordReaderSignal({ eventType: "storyGenerated", source: overrides.signalSource ?? "create", storyId: generatedStoryId, title: savedStory.title, genre: savedStory.genrePreset, wordCount: savedStory.wordCount }); }
@@ -1108,20 +1142,23 @@ export default function Home() {
     const payload = (await response.json().catch(() => ({}))) as ReaderProfileSaveResponse;
 
     if (response.status === 503) {
-      updateCloudReaderProfileSync({ profileId, status: "unavailable", lastSaveOutcome: "unavailable", lastError: payload.error ?? "Reader profile cloud persistence is unavailable.", localUpdatedAt: profile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+      updateCloudReaderProfileSync({ profileId, status: "unavailable", lastSaveOutcome: "unavailable", lastError: payload.error ?? "Reader profile cloud persistence is unavailable.", localUpdatedAt: profile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage(), ...cloudDiagnosticUpdate(payload.diagnostic) });
       return;
     }
 
-    if (!response.ok) throw new Error(payload.error ?? "Reader profile cloud save failed.");
+    if (!response.ok) {
+      updateCloudReaderProfileSync({ profileId, status: "error", lastSaveOutcome: "error", lastError: payload.error ?? "Reader profile cloud save failed.", localUpdatedAt: profile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage(), ...cloudDiagnosticUpdate(payload.diagnostic) });
+      throw new Error(payload.error ?? "Reader profile cloud save failed.");
+    }
 
     const savedProfile = normalizeCloudReaderProfile(payload.profile);
     if (payload.cloudProfileSaveStatus === "stale-write-ignored") {
-      updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? cloudReaderProfileSync.ownerId, source: authState.currentUser ? "authenticated cloud" : "auth-disabled fallback", status: "synced", lastSaveOutcome: "stale-write-ignored", lastSyncAt: new Date().toISOString(), lastError: "", localUpdatedAt: profile.updatedAt, cloudProfileExists: Boolean(savedProfile), ...(savedProfile ? { cloudUpdatedAt: savedProfile.updatedAt } : {}), localProfileExists: readerProfileExistsInLocalStorage() });
+      updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? cloudReaderProfileSync.ownerId, source: authState.currentUser ? "authenticated cloud" : "auth-disabled fallback", status: "synced", lastSaveOutcome: "stale-write-ignored", lastSyncAt: new Date().toISOString(), lastError: "", localUpdatedAt: profile.updatedAt, cloudProfileExists: Boolean(savedProfile), ...(savedProfile ? { cloudUpdatedAt: savedProfile.updatedAt } : {}), localProfileExists: readerProfileExistsInLocalStorage(), ...cloudDiagnosticUpdate(payload.diagnostic) });
       return;
     }
 
     const cloudProfile = savedProfile ?? profile;
-    updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? cloudReaderProfileSync.ownerId, source: authState.currentUser ? "authenticated cloud" : "auth-disabled fallback", status: "synced", lastSaveOutcome: "saved", lastSyncAt: new Date().toISOString(), lastError: "", localUpdatedAt: cloudProfile.updatedAt, cloudUpdatedAt: cloudProfile.updatedAt, cloudProfileExists: true, localProfileExists: readerProfileExistsInLocalStorage() });
+    updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? cloudReaderProfileSync.ownerId, source: authState.currentUser ? "authenticated cloud" : "auth-disabled fallback", status: "synced", lastSaveOutcome: "saved", lastSyncAt: new Date().toISOString(), lastError: "", localUpdatedAt: cloudProfile.updatedAt, cloudUpdatedAt: cloudProfile.updatedAt, cloudProfileExists: true, localProfileExists: readerProfileExistsInLocalStorage(), ...cloudDiagnosticUpdate(payload.diagnostic) });
   }
 
   async function deleteCloudReaderProfile(profileId: string) {
@@ -1141,6 +1178,18 @@ export default function Home() {
 
   function updateCloudReaderProfileSync(update: Partial<CloudReaderProfileSyncState>) {
     setCloudReaderProfileSync((current) => ({ ...current, ...update }));
+  }
+
+  function cloudDiagnosticUpdate(diagnostic: ReaderProfileApiDiagnostic | undefined): Partial<CloudReaderProfileSyncState> {
+    if (!diagnostic) return {};
+    return {
+      lastApiPath: diagnostic.apiPath ?? "unknown",
+      lastApiAction: diagnostic.action ?? "unknown",
+      ownerId: diagnostic.resolvedOwnerId ?? cloudReaderProfileSync.ownerId,
+      initializedDefaultCloudProfile: Boolean(diagnostic.initializedDefaultCloudProfile),
+      lastSanitizedErrorName: diagnostic.sanitizedErrorName ? String(diagnostic.sanitizedErrorName) : "none",
+      lastSanitizedErrorCode: diagnostic.sanitizedErrorCode === null || diagnostic.sanitizedErrorCode === undefined ? "none" : String(diagnostic.sanitizedErrorCode)
+    };
   }
 
   function handleLoadDemoStory() {
@@ -1543,12 +1592,13 @@ export default function Home() {
         durationMinutes: Math.max(1, Math.round((story.wordCount || 0) / 180)),
       },
     };
-    const currentCanonicalProfile = loadCanonicalReaderProfile();
+    const currentCanonicalProfile = authState.currentUser ? canonicalReaderProfileFromReaderProfile(readerProfile, authState.currentUser.id, "cloud") : loadCanonicalReaderProfile();
     const savedForLaterCount = Math.max(currentCanonicalProfile.signals.savedForLaterCount ?? 0, nextProfile.readyStoryQueueSignals?.filter((item) => item.signal === "save_for_later").length ?? 0);
-    const nextCanonicalProfile = saveCanonicalReaderProfile(applyFeedbackToReaderProfile({
+    const nextCanonicalProfileDraft = applyFeedbackToReaderProfile({
       ...currentCanonicalProfile,
       signals: { ...currentCanonicalProfile.signals, savedForLaterCount },
-    }, feedbackEvent));
+    }, feedbackEvent);
+    const nextCanonicalProfile = authState.currentUser ? { ...nextCanonicalProfileDraft, source: "cloud" as const } : saveCanonicalReaderProfile(nextCanonicalProfileDraft);
     setCanonicalReaderProfile(nextCanonicalProfile);
 
     void syncReaderProfileToCloud(nextProfile);
@@ -2718,10 +2768,13 @@ function ReaderProfileDiagnostics({ canonicalProfile, cloudSync, lastGenerationU
           <p><span className="font-semibold text-paper/80">Canonical profile key:</span> {CANONICAL_READER_PROFILE_STORAGE_KEY}</p>
           <p><span className="font-semibold text-paper/80">Canonical profile exists:</span> {canonicalProfile ? "yes" : "no"}</p>
           <p><span className="font-semibold text-paper/80">Profile source:</span> {cloudSync.source}</p>
-          <p><span className="font-semibold text-paper/80">Canonical profile source:</span> {canonicalProfile?.source ?? "default"}</p>
+          <p><span className="font-semibold text-paper/80">Canonical/effective profile source:</span> {cloudSync.source === "authenticated cloud" ? "authenticated cloud" : canonicalProfile?.source ?? "default"}</p>
           <p><span className="font-semibold text-paper/80">Active Reader Profile owner id:</span> {cloudSync.ownerId}</p>
           <p><span className="font-semibold text-paper/80">Cloud profile exists for current user:</span> {cloudSync.cloudProfileExists ? "yes" : "no"}</p>
           <p><span className="font-semibold text-paper/80">Last cloud profile load status:</span> {cloudSync.lastLoadStatus}</p>
+          <p><span className="font-semibold text-paper/80">Initialized default cloud profile:</span> {cloudSync.initializedDefaultCloudProfile ? "yes" : "no"}</p>
+          <p><span className="font-semibold text-paper/80">Last profile API path/action:</span> {cloudSync.lastApiPath} / {cloudSync.lastApiAction}</p>
+          <p><span className="font-semibold text-paper/80">Last sanitized profile API error:</span> {cloudSync.lastSanitizedErrorName}{cloudSync.lastSanitizedErrorCode !== "none" ? ` (${cloudSync.lastSanitizedErrorCode})` : ""}</p>
           <p><span className="font-semibold text-paper/80">Profile action blocked signed out:</span> {cloudSync.lastBlockedProfileAction}</p>
           <p><span className="font-semibold text-paper/80">Cloud sync:</span> {cloudSync.status === "synced" ? "success" : cloudSync.status === "unavailable" || cloudSync.status === "not found" ? "not configured" : cloudSync.status === "pending" ? "pending" : "failed"}</p>
           <p><span className="font-semibold text-paper/80">Last generation used canonical profile:</span> {lastGenerationUsedCanonicalProfile ? "yes" : "no"}</p>
@@ -2753,8 +2806,8 @@ function ReaderProfileDiagnostics({ canonicalProfile, cloudSync, lastGenerationU
           <p><span className="font-semibold text-paper/80">Profile ID:</span> {cloudSync.profileId || "pending"}</p>
           <p><span className="font-semibold text-paper/80">Local profile exists:</span> {cloudSync.localProfileExists ? "yes" : "no"}</p>
           <p><span className="font-semibold text-paper/80">Cloud profile status:</span> {cloudSync.status}</p>
-          <p><span className="font-semibold text-paper/80">Last cloud save outcome:</span> {cloudSync.lastSaveOutcome}</p>
-          <p><span className="font-semibold text-paper/80">Last profile save status for feedback:</span> {canonicalProfile?.signals.feedbackSignalCount ? `local success${cloudSync.lastSaveOutcome ? ` / cloud ${cloudSync.lastSaveOutcome}` : ""}` : "no feedback saved"}</p>
+          <p><span className="font-semibold text-paper/80">Last cloud save status:</span> {cloudSync.lastSaveOutcome === "saved" ? "success" : cloudSync.lastSaveOutcome}</p>
+          <p><span className="font-semibold text-paper/80">Last profile save status for feedback:</span> {canonicalProfile?.signals.feedbackSignalCount ? `profile updated${cloudSync.lastSaveOutcome ? ` / cloud ${cloudSync.lastSaveOutcome === "saved" ? "success" : cloudSync.lastSaveOutcome}` : ""}` : "no feedback saved"}</p>
           <p><span className="font-semibold text-paper/80">Last cloud sync:</span> {cloudSync.lastSyncAt || "never"}</p>
           <p><span className="font-semibold text-paper/80">Last cloud error:</span> {cloudSync.lastError || "none"}</p>
           <p><span className="font-semibold text-paper/80">Local updated:</span> {cloudSync.localUpdatedAt || profile.updatedAt || "never"}</p>

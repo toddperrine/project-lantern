@@ -23,12 +23,21 @@ type CloudReaderProfileRecord = {
   profile: ReaderProfile;
 };
 
+export type CloudReaderProfileErrorDetails = {
+  operation: string;
+  awsErrorName: string | null;
+  awsErrorMessage: string;
+  httpStatusCode: number | null;
+};
+
 type DynamoDbConfig = {
   region: string;
   accessKeyId: string;
   secretAccessKey: string;
   tableName: string;
   ownerId: string;
+  keyOwnerId: string;
+  persistenceMode: "authenticated-owner-bridge" | "auth-disabled-fallback";
 };
 
 export class CloudReaderProfileConfigError extends Error {
@@ -42,9 +51,12 @@ export class CloudReaderProfileConfigError extends Error {
 }
 
 export class CloudReaderProfilePersistenceError extends Error {
-  constructor(message = "DynamoDB reader profile request failed.") {
-    super(message);
+  details: CloudReaderProfileErrorDetails;
+
+  constructor(details: CloudReaderProfileErrorDetails) {
+    super(details.awsErrorMessage || `DynamoDB ${details.operation} reader profile request failed.`);
     this.name = "CloudReaderProfilePersistenceError";
+    this.details = details;
   }
 }
 
@@ -83,7 +95,7 @@ export async function saveCloudReaderProfile(profileId: string, profile: ReaderP
 
   await dynamoDbRequest(config, "PutItem", {
     TableName: config.tableName,
-    Item: toDynamoDbItem(record),
+    Item: toDynamoDbItem(toCloudReaderProfileItem(record, config)),
     ConditionExpression: "attribute_not_exists(#updatedAt) OR #updatedAt <= :nextUpdatedAt",
     ExpressionAttributeNames: {
       "#updatedAt": "updatedAt"
@@ -118,7 +130,9 @@ function getDynamoDbConfig(authenticatedOwnerId?: string): DynamoDbConfig {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
     tableName: process.env.PROJECTS_TABLE_NAME!,
-    ownerId: authenticatedOwnerId?.trim() || process.env.PROJECTS_OWNER_ID!
+    ownerId: authenticatedOwnerId?.trim() || process.env.PROJECTS_OWNER_ID!,
+    keyOwnerId: process.env.PROJECTS_OWNER_ID?.trim() || authenticatedOwnerId!.trim(),
+    persistenceMode: authenticatedOwnerId?.trim() ? "authenticated-owner-bridge" : "auth-disabled-fallback"
   };
 }
 
@@ -132,10 +146,22 @@ function readerProfileProjectId(profileId: string): string {
   return `reader-profile#${profileId}`;
 }
 
+function readerProfileSortKey(config: DynamoDbConfig, profileId: string): string {
+  return config.persistenceMode === "authenticated-owner-bridge" ? `reader#${config.ownerId}#${readerProfileProjectId(profileId)}` : readerProfileProjectId(profileId);
+}
+
 function readerProfileKey(config: DynamoDbConfig, profileId: string): DynamoDbItem {
   return {
-    ownerId: { S: config.ownerId },
-    projectId: { S: readerProfileProjectId(profileId) }
+    ownerId: { S: config.keyOwnerId },
+    projectId: { S: readerProfileSortKey(config, profileId) }
+  };
+}
+
+function toCloudReaderProfileItem(record: CloudReaderProfileRecord, config: DynamoDbConfig): CloudReaderProfileRecord {
+  return {
+    ...record,
+    ownerId: config.keyOwnerId,
+    projectId: readerProfileSortKey(config, record.profileId)
   };
 }
 
@@ -166,7 +192,12 @@ async function dynamoDbRequest<T = unknown>(config: DynamoDbConfig, action: stri
       throw new CloudReaderProfileStaleWriteError();
     }
 
-    throw new CloudReaderProfilePersistenceError(getAwsErrorMessage(parsed) ?? `DynamoDB ${action} reader profile request failed.`);
+    throw new CloudReaderProfilePersistenceError({
+      operation: action,
+      awsErrorName: getAwsErrorName(parsed, response.headers.get("x-amzn-errortype")),
+      awsErrorMessage: getAwsErrorMessage(parsed) ?? `DynamoDB ${action} reader profile request failed.`,
+      httpStatusCode: response.status || null
+    });
   }
   return parsed as T;
 }
@@ -219,6 +250,12 @@ function getAwsErrorCode(payload: unknown): string | null {
   if (typeof rawCode !== "string" || !rawCode.trim()) return null;
 
   return rawCode.split("#").pop()?.split(":").pop() ?? rawCode;
+}
+
+function getAwsErrorName(payload: unknown, headerValue: string | null): string | null {
+  const fromHeader = headerValue?.split(":")[0]?.split("#").pop();
+  if (fromHeader?.trim()) return fromHeader.trim();
+  return getAwsErrorCode(payload);
 }
 
 function toAmzDate(date: Date): string { return date.toISOString().replace(/[:-]|\.\d{3}/g, ""); }
