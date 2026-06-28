@@ -23,6 +23,7 @@ type AuthContextValue = {
   authFlow: "USER_PASSWORD_AUTH";
   lastAuthStep: string;
   appActionsGated: boolean;
+  getAccessToken: () => string;
   signIn: (email: string, password: string) => Promise<void>;
   beginPasswordReset: (email: string) => Promise<void>;
   confirmPasswordReset: (code: string, newPassword: string) => Promise<void>;
@@ -263,7 +264,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [authConfigured, challengeSession, clearMessages, emailPendingVerification, recordError, storeSession]);
 
-  const value = useMemo<AuthContextValue>(() => ({ authConfigured, authStatus, currentUser, emailPendingVerification, resetEmail, errorMessage, successMessage, lastCognitoErrorCode, resetFlowState, region: COGNITO_REGION || "not configured", profileLibraryMode: currentUser ? "authenticated" : "anonymous", authMode: AUTH_MODE, authFlow: AUTH_FLOW, lastAuthStep, appActionsGated: authConfigured && !currentUser, signIn, beginPasswordReset, confirmPasswordReset, completeNewPassword, signOut }), [authConfigured, authStatus, currentUser, emailPendingVerification, resetEmail, errorMessage, successMessage, lastCognitoErrorCode, resetFlowState, lastAuthStep, signIn, beginPasswordReset, confirmPasswordReset, completeNewPassword, signOut]);
+  const getAccessToken = useCallback(() => readStoredSession()?.tokens.accessToken ?? "", []);
+
+  const value = useMemo<AuthContextValue>(() => ({ authConfigured, authStatus, currentUser, emailPendingVerification, resetEmail, errorMessage, successMessage, lastCognitoErrorCode, resetFlowState, region: COGNITO_REGION || "not configured", profileLibraryMode: currentUser ? "authenticated" : "anonymous", authMode: AUTH_MODE, authFlow: AUTH_FLOW, lastAuthStep, appActionsGated: authConfigured && !currentUser, getAccessToken, signIn, beginPasswordReset, confirmPasswordReset, completeNewPassword, signOut }), [authConfigured, authStatus, currentUser, emailPendingVerification, resetEmail, errorMessage, successMessage, lastCognitoErrorCode, resetFlowState, lastAuthStep, getAccessToken, signIn, beginPasswordReset, confirmPasswordReset, completeNewPassword, signOut]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

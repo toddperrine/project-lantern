@@ -67,6 +67,10 @@ import { useAuth, type AuthStatus } from "@/lib/auth";
 type AppView = "home" | "library" | "worlds" | "create" | "characters" | "mood-intake";
 type Mood = "Mystery" | "Wonder" | "Emotional" | "Adventure" | "Strange" | "Hopeful" | "Dark" | "Reflective";
 type CloudProjectSummary = Pick<SavedProject, "id" | "name" | "createdAt" | "updatedAt">;
+type LibrarySource = "authenticated cloud" | "legacy local" | "auth-disabled fallback";
+type LibraryDiagnosticsState = { source: LibrarySource; loadedCount: number; latestSaveOwnerId: string; lastBlockedAction: string; };
+type CloudSavedStoryRecordResponse = { ownerId?: string; storyId?: string; title: string; story: string; metadata?: Record<string, unknown>; createdAt: string; updatedAt?: string; sequenceNumber?: number; sequenceLabel?: string; storyRole?: string; canonStatus?: string; isFavorite?: boolean; favoriteAt?: string | null; continuationOfStoryId?: string; branchOfStoryId?: string };
+type CloudSavedStoryResponse = { story?: CloudSavedStoryRecordResponse; stories?: CloudSavedStoryRecordResponse[] };
 type StoryStart = { title: string; premise: string; genre: GenrePreset; mood: Mood; heroName: string; heroRole: string; heroBio: string; worldName: string; world: string; seed: string; cast: string; rules: string };
 type LibraryStory = SavedStory | { id: string; storyId?: string; seriesId?: string; sourceStoryId?: string | null; parentSeriesId?: string | null; generationMode?: GenerationMode; title: string; story: string; wordCount: number; createdAt: string; genrePreset: GenrePreset; charactersUsed: string[]; rulesReferenced: string[] };
 type StoryBrief = { hook: string; recap: string; changed: string; tension: string; nextHook: string; heroName: string; heroRole: string; struggle: string };
@@ -129,6 +133,8 @@ const EMPTY_MOOD_INTAKE_FORM: MoodIntakeFormState = {
   avoidances: "",
   needRightNow: ""
 };
+const AUTHENTICATED_STORY_LIBRARY_PROJECT_ID = "story-library";
+
 const NAV_ITEMS: { label: string; view: AppView }[] = [
   { label: "Home", view: "home" },
   { label: "Story Library", view: "library" },
@@ -319,6 +325,8 @@ export default function Home() {
   const [currentStoryId, setCurrentStoryId] = useState("");
   const [inputArtifacts, setInputArtifacts] = useState<InputArtifact[]>([]);
   const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
+  const [legacyLocalStoryCount, setLegacyLocalStoryCount] = useState(0);
+  const [libraryDiagnostics, setLibraryDiagnostics] = useState<LibraryDiagnosticsState>({ source: "legacy local", loadedCount: 0, latestSaveOwnerId: "none", lastBlockedAction: "none" });
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [demoStory, setDemoStory] = useState<SavedStory | null>(null);
   const [cloudProjects, setCloudProjects] = useState<CloudProjectSummary[]>([]);
@@ -379,7 +387,11 @@ export default function Home() {
   useEffect(() => {
     const browserSavedStories = readSavedStories();
     setInputArtifacts(readInputArtifacts());
-    setSavedStories(browserSavedStories);
+    setLegacyLocalStoryCount(browserSavedStories.length);
+    if (!authState.authConfigured) {
+      setSavedStories(browserSavedStories);
+      setLibraryDiagnostics((current) => ({ ...current, source: "auth-disabled fallback", loadedCount: browserSavedStories.length }));
+    }
     const latestSavedStory = browserSavedStories[0];
     if (latestSavedStory) {
       setActiveCommittedStoryId(latestSavedStory.id);
@@ -414,6 +426,16 @@ export default function Home() {
     void handleRefreshCloudProjects();
   }, []);
 
+  useEffect(() => {
+    if (!authState.authConfigured) return;
+    if (!authState.currentUser) {
+      setSavedStories([]);
+      setLibraryDiagnostics((current) => ({ ...current, source: legacyLocalStoryCount ? "legacy local" : "authenticated cloud", loadedCount: 0, latestSaveOwnerId: "none" }));
+      return;
+    }
+    void loadAuthenticatedStoryLibrary();
+  }, [authState.authConfigured, authState.currentUser?.id]);
+
   const hasRealLatestStory = Boolean(storyResponse || savedStories.length);
   const latestStory = useMemo<LibraryStory | null>(() => {
     if (storyResponse) return responseToLibraryStory(storyResponse, currentStoryId || createStoryId(storyResponse.story));
@@ -423,6 +445,49 @@ export default function Home() {
   const currentGeneratedStory = useMemo(() => storyResponse ? responseToLibraryStory(storyResponse, currentStoryId || createStoryId(storyResponse.story)) : null, [currentStoryId, storyResponse]);
   const currentSeriesEpisode = useMemo(() => findEpisodeInLibrarySeries(savedStories, currentStoryId), [currentStoryId, savedStories]);
   const canGenerate = Boolean(worldBible.content.trim() && characterProfiles.content.trim() && storySeed.content.trim() && !isGenerating);
+
+  function authHeaders(): HeadersInit {
+    const token = authState.getAccessToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  async function loadAuthenticatedStoryLibrary() {
+    if (!authState.currentUser) return;
+    try {
+      const payload = await fetchCloudJson<CloudSavedStoryResponse>(`/api/projects/${AUTHENTICATED_STORY_LIBRARY_PROJECT_ID}/stories`, { headers: authHeaders() });
+      const stories = Array.isArray(payload.stories) ? payload.stories.map(cloudRecordToSavedStory) : [];
+      setSavedStories(stories);
+      setLibraryDiagnostics((current) => ({ ...current, source: "authenticated cloud", loadedCount: stories.length }));
+    } catch (caughtError) {
+      setSavedStories([]);
+      setStatusMessage(`Story Library unavailable: ${formatCaughtError(caughtError)}`);
+      setLibraryDiagnostics((current) => ({ ...current, source: "authenticated cloud", loadedCount: 0 }));
+    }
+  }
+
+  async function saveStoryToAuthenticatedLibrary(savedStory: SavedStory): Promise<SavedStory> {
+    if (!authState.authConfigured) {
+      const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
+      persistSavedStories(nextSavedStories);
+      setSavedStories(nextSavedStories);
+      setLibraryDiagnostics((current) => ({ ...current, source: "auth-disabled fallback", loadedCount: nextSavedStories.length, latestSaveOwnerId: "auth-disabled-fallback" }));
+      return savedStory;
+    }
+    if (!authState.currentUser) {
+      setLibraryDiagnostics((current) => ({ ...current, lastBlockedAction: "save while signed out" }));
+      throw new Error("Sign in is required to save stories to the authenticated Library.");
+    }
+    const payload = await fetchCloudJson<CloudSavedStoryResponse>(`/api/projects/${AUTHENTICATED_STORY_LIBRARY_PROJECT_ID}/stories`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ story: savedStoryToCloudInput(savedStory) })
+    });
+    const cloudStory = payload.story ? cloudRecordToSavedStory(payload.story) : savedStory;
+    const nextSavedStories = [cloudStory, ...savedStories.filter((story) => story.id !== cloudStory.id)].slice(0, 25);
+    setSavedStories(nextSavedStories);
+    setLibraryDiagnostics((current) => ({ ...current, source: "authenticated cloud", loadedCount: nextSavedStories.length, latestSaveOwnerId: authState.currentUser?.id ?? "none" }));
+    return cloudStory;
+  }
 
   function cancelActiveGeneration() {
     activeGenerationRequestId.current += 1;
@@ -475,6 +540,7 @@ export default function Home() {
   function requireSignInForAppAction(actionLabel = "that action"): boolean {
     if (!authState.appActionsGated) return false;
     navigateHome({ preserveGeneration: true });
+    if (/library|saved story|saved episode/i.test(actionLabel)) setLibraryDiagnostics((current) => ({ ...current, lastBlockedAction: actionLabel }));
     setStatusMessage(`Sign in with your email before ${actionLabel}.`);
     return true;
   }
@@ -572,10 +638,7 @@ export default function Home() {
         }
       }));
       const generatedStoryId = normalizedResponse.metadata.diagnostics.storyId || generationIdentity.storyId;
-      const savedStory = createSavedStory(normalizedResponse, generatedStoryId);
-      const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
-      persistSavedStories(nextSavedStories);
-      setSavedStories(nextSavedStories);
+      const savedStory = await saveStoryToAuthenticatedLibrary(createSavedStory(normalizedResponse, generatedStoryId));
       setStoryResponse(normalizedResponse);
       setCurrentStoryId(generatedStoryId);
       setActiveCommittedStoryId(generatedStoryId);
@@ -717,7 +780,7 @@ export default function Home() {
     };
   }
 
-  function openReadyStoryQueueItem(item: ReadyStoryQueueItem, removeItem: (itemId: string, profileForBackfill?: ReaderProfile) => void) {
+  async function openReadyStoryQueueItem(item: ReadyStoryQueueItem, removeItem: (itemId: string, profileForBackfill?: ReaderProfile) => void) {
     if (requireSignInForAppAction("opening a recommended story")) return;
     if (isGenerating || item.generationStatus === "generating") return;
 
@@ -726,10 +789,7 @@ export default function Home() {
 
     if (item.generationStatus === "ready" && item.generatedStory) {
       const generatedStoryId = item.generatedStoryId || createStoryId(item.generatedStory.story);
-      const savedStory = createSavedStory(item.generatedStory, generatedStoryId);
-      const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
-      persistSavedStories(nextSavedStories);
-      setSavedStories(nextSavedStories);
+      const savedStory = await saveStoryToAuthenticatedLibrary(createSavedStory(item.generatedStory, generatedStoryId));
       setStoryResponse(item.generatedStory);
       setCurrentStoryId(generatedStoryId);
       setActiveCommittedStoryId(generatedStoryId);
@@ -775,11 +835,11 @@ export default function Home() {
   }
 
   function handleReadReadyStory(item: ReadyStoryQueueItem) {
-    openReadyStoryQueueItem(item, removeReadyQueueItemAndPersist);
+    void openReadyStoryQueueItem(item, removeReadyQueueItemAndPersist);
   }
 
   function handleReadSavedForLaterStory(item: ReadyStoryQueueItem) {
-    openReadyStoryQueueItem(item, removeSavedForLaterQueueItemAndPersist);
+    void openReadyStoryQueueItem(item, removeSavedForLaterQueueItemAndPersist);
   }
 
   function handlePassReadyStory(item: ReadyStoryQueueItem) {
@@ -1121,14 +1181,18 @@ export default function Home() {
     handleContinueStory(story);
   }
 
-  function handleSaveStory() {
-    if (requireSignInForAppAction("saving to the library")) return;
+  async function handleSaveStory() {
+    if (requireSignInForAppAction("saving to the library")) {
+      setLibraryDiagnostics((current) => ({ ...current, lastBlockedAction: "save while signed out" }));
+      return;
+    }
     if (!storyResponse) return;
-    const savedStory = createSavedStory(storyResponse, currentStoryId || createStoryId(storyResponse.story));
-    const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
-    persistSavedStories(nextSavedStories);
-    setSavedStories(nextSavedStories);
-    setStatusMessage("Story saved locally in this browser.");
+    try {
+      await saveStoryToAuthenticatedLibrary(createSavedStory(storyResponse, currentStoryId || createStoryId(storyResponse.story)));
+      setStatusMessage(authState.authConfigured ? "Story saved to your account Library." : "Story saved locally in this browser.");
+    } catch (caughtError) {
+      setStatusMessage(formatCaughtError(caughtError));
+    }
   }
 
   function handleRestoreStory(story: SavedStory) {
@@ -1160,10 +1224,23 @@ export default function Home() {
     handleRestoreStory(story);
   }
 
-  function handleDeleteStory(storyId: string) {
+  async function handleDeleteStory(storyId: string) {
     const nextStories = savedStories.filter((story) => story.id !== storyId);
-    persistSavedStories(nextStories);
+    if (!authState.authConfigured) persistSavedStories(nextStories);
+    else if (authState.currentUser) {
+      try {
+        await fetchCloudJson(`/api/projects/${AUTHENTICATED_STORY_LIBRARY_PROJECT_ID}/stories/${encodeURIComponent(storyId)}`, { method: "DELETE", headers: authHeaders() });
+      } catch (caughtError) {
+        setStatusMessage(`Delete failed: ${formatCaughtError(caughtError)}`);
+        return;
+      }
+    } else {
+      setLibraryDiagnostics((current) => ({ ...current, lastBlockedAction: "delete while signed out" }));
+      setStatusMessage("Sign in is required to delete authenticated Library stories.");
+      return;
+    }
     setSavedStories(nextStories);
+    setLibraryDiagnostics((current) => ({ ...current, loadedCount: nextStories.length }));
     setStatusMessage("Saved story deleted.");
   }
 
@@ -1471,7 +1548,7 @@ export default function Home() {
       <AppStateDiagnostics activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
       <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
       <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
-      <AuthDiagnostics appActionsGated={authState.appActionsGated} authConfigured={authState.authConfigured} authFlow={authState.authFlow} authMode={authState.authMode} authStatus={authState.authStatus} cognitoUserId={authState.currentUser?.id ?? ""} currentUserEmail={authState.currentUser?.email ?? ""} lastAuthStep={authState.lastAuthStep} lastCognitoErrorCode={authState.lastCognitoErrorCode} profileLibraryMode={authState.profileLibraryMode} region={authState.region} resetFlowState={authState.resetFlowState} />
+      <AuthDiagnostics appActionsGated={authState.appActionsGated} authConfigured={authState.authConfigured} authFlow={authState.authFlow} authMode={authState.authMode} authStatus={authState.authStatus} cognitoUserId={authState.currentUser?.id ?? ""} currentUserEmail={authState.currentUser?.email ?? ""} lastAuthStep={authState.lastAuthStep} lastCognitoErrorCode={authState.lastCognitoErrorCode} libraryDiagnostics={libraryDiagnostics} profileLibraryMode={authState.profileLibraryMode} region={authState.region} resetFlowState={authState.resetFlowState} />
     </>
   );
 
@@ -1702,7 +1779,7 @@ function PasswordFields({ confirmPassword, newPassword, onConfirmPasswordChange,
   );
 }
 
-function AuthDiagnostics({ appActionsGated, authConfigured, authFlow, authMode, authStatus, cognitoUserId, currentUserEmail, lastAuthStep, lastCognitoErrorCode, profileLibraryMode, region, resetFlowState }: { appActionsGated: boolean; authConfigured: boolean; authFlow: "USER_PASSWORD_AUTH"; authMode: "email_password"; authStatus: AuthStatus; cognitoUserId: string; currentUserEmail: string; lastAuthStep: string; lastCognitoErrorCode: string; profileLibraryMode: "anonymous" | "authenticated"; region: string; resetFlowState: string }) {
+function AuthDiagnostics({ appActionsGated, authConfigured, authFlow, authMode, authStatus, cognitoUserId, currentUserEmail, lastAuthStep, lastCognitoErrorCode, libraryDiagnostics, profileLibraryMode, region, resetFlowState }: { appActionsGated: boolean; authConfigured: boolean; authFlow: "USER_PASSWORD_AUTH"; authMode: "email_password"; authStatus: AuthStatus; cognitoUserId: string; currentUserEmail: string; lastAuthStep: string; lastCognitoErrorCode: string; libraryDiagnostics: LibraryDiagnosticsState; profileLibraryMode: "anonymous" | "authenticated"; region: string; resetFlowState: string }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">Auth diagnostics</summary>
@@ -1719,6 +1796,11 @@ function AuthDiagnostics({ appActionsGated, authConfigured, authFlow, authMode, 
         <p><span className="font-semibold text-paper/80">Cognito user id/sub:</span> {cognitoUserId || "none"}</p>
         <p><span className="font-semibold text-paper/80">Cognito region:</span> {region}</p>
         <p><span className="font-semibold text-paper/80">Profile/library mode:</span> {profileLibraryMode}</p>
+        <p><span className="font-semibold text-paper/80">Active Library owner id:</span> {cognitoUserId || (authConfigured ? "none" : "auth-disabled fallback")}</p>
+        <p><span className="font-semibold text-paper/80">Library source:</span> {libraryDiagnostics.source}</p>
+        <p><span className="font-semibold text-paper/80">Stories loaded for current user:</span> {libraryDiagnostics.loadedCount}</p>
+        <p><span className="font-semibold text-paper/80">Latest save owner id:</span> {libraryDiagnostics.latestSaveOwnerId}</p>
+        <p><span className="font-semibold text-paper/80">Last blocked Library action:</span> {libraryDiagnostics.lastBlockedAction}</p>
       </div>
     </details>
   );
@@ -2903,9 +2985,12 @@ function EmptyPanel({ body, title }: { body: string; title: string }) { return <
 function SelectControl({ label, value, options, onChange }: { label: string; value: string; options: readonly string[] | readonly { value: string; label: string }[]; onChange: (value: string) => void }) { return <label className="flex min-w-0 flex-col gap-2"><span className="text-sm font-semibold text-paper">{label}</span><select className="rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => { const optionValue = typeof option === "string" ? option : option.value; const optionLabel = typeof option === "string" ? option : option.label; return <option key={optionValue} value={optionValue}>{optionLabel}</option>; })}</select></label>; }
 function SelectLibrary({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: { label: string; value: string }[]; value: string }) { return <label className="mt-4 flex min-w-0 flex-col gap-2"><span className="text-sm font-semibold text-paper">{label}</span><select className="rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper" onChange={(event) => onChange(event.target.value)} value={value}><option value="">Choose one</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>; }
 
+function savedStoryToCloudInput(story: SavedStory) { return { storyId: story.id, title: story.title, story: story.story, metadata: story }; }
+function cloudRecordToSavedStory(record: CloudSavedStoryRecordResponse): SavedStory { const metadata = record.metadata && typeof record.metadata === "object" ? record.metadata as Partial<SavedStory> : {}; return { ...metadata, id: record.storyId || metadata.id || createStoryId(record.story, record.createdAt), title: record.title || metadata.title || createStoryTitle(record.story), story: record.story, createdAt: metadata.createdAt || record.createdAt, wordCount: typeof metadata.wordCount === "number" ? metadata.wordCount : countWords(record.story), generatorSource: metadata.generatorSource || "cloud", charactersUsed: Array.isArray(metadata.charactersUsed) ? metadata.charactersUsed : [], rulesReferenced: Array.isArray(metadata.rulesReferenced) ? metadata.rulesReferenced : [], genrePreset: metadata.genrePreset || "Speculative Mystery", narrativeArchitecture: metadata.narrativeArchitecture || "Revelation Story", characterArc: metadata.characterArc || "Positive Change Arc", endingType: metadata.endingType || "Resolution with Residue", lengthTarget: metadata.lengthTarget || "Standard", diagnosticsNotice: metadata.diagnosticsNotice ?? null } as SavedStory; }
 function responseToLibraryStory(response: GenerateStoryResponse, id: string): LibraryStory { return { id, storyId: response.metadata.diagnostics.storyId, seriesId: response.metadata.diagnostics.seriesId, sourceStoryId: response.metadata.diagnostics.sourceStoryId ?? null, parentSeriesId: response.metadata.diagnostics.parentSeriesId ?? null, generationMode: response.metadata.diagnostics.generationMode, title: createStoryTitle(response.story), story: response.story, wordCount: response.metadata.wordCount, createdAt: response.metadata.generationStartedAt ?? new Date().toISOString(), genrePreset: response.metadata.diagnostics.genrePreset, charactersUsed: response.metadata.charactersUsed, rulesReferenced: response.metadata.rulesReferenced }; }
 function normalizeGenerateStoryResponse(payload: unknown): GenerateStoryResponse { const normalizedPayload = normalizeStoryPayload(payload) as Partial<GenerateStoryResponse>; const story = normalizeStoryText(normalizedPayload.story); if (!story || !normalizedPayload.metadata) throw new Error("Story generation returned an invalid response."); return { ...normalizedPayload, story, metadata: { ...normalizedPayload.metadata, wordCount: countWords(story) } } as GenerateStoryResponse; }
-async function fetchCloudJson<T>(input: string, init?: RequestInit): Promise<T> { const response = await fetch(input, { ...init, cache: "no-store" }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(typeof payload?.error === "string" ? payload.error : "Cloud project request failed."); return payload as T; }
+async function fetchCloudJson<T>(input: string, init?: RequestInit): Promise<T> { const response = await fetch(input, { ...init, cache: "no-store" }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(formatCloudApiError(payload, input)); return payload as T; }
+function formatCloudApiError(payload: unknown, fallbackPath: string): string { const value = payload && typeof payload === "object" ? payload as Record<string, unknown> : {}; const diagnostic = value.diagnostic && typeof value.diagnostic === "object" ? value.diagnostic as Record<string, unknown> : {}; const parts = [typeof value.error === "string" ? value.error : "Cloud request failed."]; const apiPath = typeof diagnostic.apiPath === "string" ? diagnostic.apiPath : fallbackPath; parts.push(`path=${apiPath}`); if ("authTokenPresent" in diagnostic) parts.push(`authTokenPresent=${diagnostic.authTokenPresent ? "true" : "false"}`); if (typeof diagnostic.resolvedOwnerId === "string") parts.push(`owner=${diagnostic.resolvedOwnerId}`); if (typeof diagnostic.persistenceMode === "string") parts.push(`mode=${diagnostic.persistenceMode}`); if (typeof diagnostic.sanitizedErrorName === "string") parts.push(`error=${diagnostic.sanitizedErrorName}`); if (typeof diagnostic.sanitizedErrorCode === "number") parts.push(`code=${diagnostic.sanitizedErrorCode}`); return parts.join(" "); }
 function countWords(text: string): number { return text.trim().split(/\s+/).filter(Boolean).length; }
 function createStoryId(story: string, createdAt = new Date().toISOString()): string { return `${createdAt}-${story.length}`.replace(/[^a-zA-Z0-9_-]/g, "-"); }
 function createStoryTitle(story: string): string { const firstLine = story.split(/\n+/).find((line) => line.trim())?.trim() ?? "Generated Story"; const firstSentence = firstLine.split(/[.!?]/)[0]?.trim() || firstLine; return truncateText(firstSentence.replace(/^#+\s*/, ""), 72) || "Generated Story"; }
