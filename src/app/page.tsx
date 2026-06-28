@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   DEFAULT_EERIE_SAFETY_GUARDRAILS,
@@ -62,6 +62,7 @@ import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, Leng
 import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
 import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
 import { APP_VERSION } from "@/lib/build-info";
+import { useAuth, type AuthStatus } from "@/lib/auth";
 
 type AppView = "home" | "library" | "worlds" | "create" | "characters" | "mood-intake";
 type Mood = "Mystery" | "Wonder" | "Emotional" | "Adventure" | "Strange" | "Hopeful" | "Dark" | "Reflective";
@@ -301,6 +302,7 @@ function formatLatestReadyStoryQueueSignal(signals: ReaderProfile["readyStoryQue
 }
 
 export default function Home() {
+  const authState = useAuth();
   const searchParams = useSearchParams();
   const [activeView, setActiveView] = useState<AppView>(readAppView(searchParams.get("view")) ?? "home");
   const [activeMood, setActiveMood] = useState<Mood>("Mystery");
@@ -1444,6 +1446,7 @@ export default function Home() {
       <AppStateDiagnostics activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
       <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
       <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
+      <AuthDiagnostics authConfigured={authState.authConfigured} authStatus={authState.authStatus} currentUserEmail={authState.currentUser?.email ?? ""} profileLibraryMode={authState.profileLibraryMode} region={authState.region} />
     </>
   );
 
@@ -1516,6 +1519,7 @@ export default function Home() {
           <NavTabs activeView={activeView} onChange={navigateToView} />
         </header>
 
+        <AuthShell />
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {isGenerating ? <StopGenerationControl onStop={handleStopGeneration} /> : null}
         {error ? <Status tone="error">{error}</Status> : null}
@@ -1539,6 +1543,79 @@ export default function Home() {
       </section>
       <MobileBottomNav activeView={activeView} onChange={navigateToView} />
     </main>
+  );
+}
+
+function AuthShell() {
+  const auth = useAuth();
+  const [email, setEmail] = useState(auth.currentUser?.email ?? auth.emailPendingVerification);
+  const [code, setCode] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSendCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    await auth.sendCode(email);
+    setIsSubmitting(false);
+  }
+
+  async function handleVerifyCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    await auth.verifyCode(code);
+    setCode("");
+    setIsSubmitting(false);
+  }
+
+  return (
+    <section className="grid gap-3 rounded-xl border border-lantern-gold/20 bg-paper/5 p-4 text-sm text-paper/75 md:max-w-xl" aria-label="Reader account">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-lantern-gold">Reader account</p>
+        <p className="mt-1 text-paper/65">Sign in with an email code so Project Lantern can recognize you across devices.</p>
+      </div>
+
+      {!auth.authConfigured ? (
+        <Status tone="info">Auth is not configured. Add NEXT_PUBLIC_COGNITO_USER_POOL_ID, NEXT_PUBLIC_COGNITO_APP_CLIENT_ID, and NEXT_PUBLIC_COGNITO_REGION to enable Cognito email OTP sign-in.</Status>
+      ) : auth.authStatus === "signed_in" && auth.currentUser ? (
+        <div className="grid gap-3">
+          <p><span className="font-semibold text-paper">Signed in:</span> {auth.currentUser.email}</p>
+          <button className="min-h-11 w-full rounded-xl border border-paper/15 bg-paper/10 px-4 py-2 font-semibold text-paper md:w-fit" onClick={auth.signOut} type="button">Sign out</button>
+        </div>
+      ) : auth.authStatus === "code_sent" || auth.emailPendingVerification ? (
+        <form className="grid gap-3" onSubmit={handleVerifyCode}>
+          <label className="grid gap-1">
+            <span className="font-semibold text-paper/80">Code sent to {auth.emailPendingVerification}</span>
+            <input className="min-h-12 rounded-xl border border-paper/15 bg-night-ink/80 px-3 text-base text-paper outline-none focus:border-lantern-gold" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} placeholder="Enter code" required />
+          </label>
+          <button className="min-h-12 rounded-xl bg-lantern-gold px-4 py-3 font-semibold text-night-ink disabled:opacity-60" disabled={isSubmitting} type="submit">{isSubmitting ? "Verifying…" : "Verify"}</button>
+          <button className="text-left text-xs font-semibold text-lantern-gold" onClick={() => void auth.sendCode(auth.emailPendingVerification)} type="button">Send a new code</button>
+        </form>
+      ) : (
+        <form className="grid gap-3" onSubmit={handleSendCode}>
+          <label className="grid gap-1">
+            <span className="font-semibold text-paper/80">Email</span>
+            <input className="min-h-12 rounded-xl border border-paper/15 bg-night-ink/80 px-3 text-base text-paper outline-none focus:border-lantern-gold" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required />
+          </label>
+          <button className="min-h-12 rounded-xl bg-lantern-gold px-4 py-3 font-semibold text-night-ink disabled:opacity-60" disabled={isSubmitting} type="submit">{isSubmitting ? "Sending…" : "Send code"}</button>
+        </form>
+      )}
+      {auth.authStatus === "error" && auth.errorMessage ? <Status tone="error">{auth.errorMessage}</Status> : null}
+    </section>
+  );
+}
+
+function AuthDiagnostics({ authConfigured, authStatus, currentUserEmail, profileLibraryMode, region }: { authConfigured: boolean; authStatus: AuthStatus; currentUserEmail: string; profileLibraryMode: "anonymous" | "authenticated"; region: string }) {
+  return (
+    <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
+      <summary className="cursor-pointer font-semibold text-paper/75">Auth diagnostics</summary>
+      <div className="mt-3 grid gap-1 sm:grid-cols-2">
+        <p><span className="font-semibold text-paper/80">Auth configured:</span> {authConfigured ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">Auth status:</span> {authStatus}</p>
+        <p><span className="font-semibold text-paper/80">Current user email:</span> {currentUserEmail || "none"}</p>
+        <p><span className="font-semibold text-paper/80">Cognito region:</span> {region}</p>
+        <p><span className="font-semibold text-paper/80">Profile/library mode:</span> {profileLibraryMode}</p>
+      </div>
+    </details>
   );
 }
 
