@@ -624,6 +624,7 @@ function markLibraryPage() {
     article.dataset.mobileDestination = "library";
   });
   storyCards[0]?.parentElement?.setAttribute("data-mobile-library-story-list", "true");
+  main.dataset.mobileLibraryLayoutPath = "stacked-cards";
 }
 
 function markCompactDestinationCards() {
