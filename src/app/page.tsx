@@ -1935,7 +1935,56 @@ type LibraryStoryRow = { story: SavedStory; kind: "saved" };
 type LibrarySeriesGroupWithRows = Omit<LibrarySeriesGroup<LibraryStory>, "episodes"> & { episodes: Array<SeriesEpisode<LibraryStory> & { row: LibraryStoryRow }> };
 
 function SeriesLibraryGroup({ group, onDeleteStory, onOpenSavedStoryById }: { group: LibrarySeriesGroupWithRows; onDeleteStory: (storyId: string) => void; onOpenSavedStoryById: (storyId: string) => void }) {
-  return <article className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><h3 className="text-lg font-semibold text-paper">{group.title}</h3><p className="mt-1 text-sm leading-6 text-paper/60">{group.episodeCount} {group.episodeCount === 1 ? "Episode" : "Episodes"}{group.lastUpdatedAt ? ` | Last updated ${formatDateTime(group.lastUpdatedAt)}` : ""}</p></div><span className="w-fit rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-2 py-1 text-xs font-semibold text-lantern-gold">Series</span></div><div className="mt-4 grid min-w-0 gap-3">{group.episodes.map((episode) => <StoryLibraryCard badge={`Episode ${episode.episodeNumber}`} key={episode.story.id} onDelete={() => onDeleteStory(episode.story.id)} onOpen={() => onOpenSavedStoryById(episode.story.id)} story={episode.story} />)}</div></article>;
+  const updatedLabel = group.lastUpdatedAt ? `Last updated ${formatDateTime(group.lastUpdatedAt)}` : "Not updated yet";
+
+  return (
+    <article className="min-w-0 max-w-full rounded-md border border-paper/12 bg-paper/10 p-4">
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 max-w-full">
+          <h3 className="break-words text-lg font-semibold text-paper">{group.title}</h3>
+          <p className="mt-1 break-words text-sm leading-6 text-paper/60">
+            {group.episodeCount} {group.episodeCount === 1 ? "Episode" : "Episodes"} | {updatedLabel}
+          </p>
+        </div>
+        <span className="w-fit rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-2 py-1 text-xs font-semibold text-lantern-gold">Series</span>
+      </div>
+
+      <div className="mt-4 grid min-w-0 max-w-full gap-3 md:hidden">
+        {group.episodes.map((episode) => (
+          <MobileLibraryEpisodeCard
+            episode={episode}
+            key={episode.story.id}
+            onOpenSavedStoryById={onOpenSavedStoryById}
+          />
+        ))}
+      </div>
+
+      <div className="mt-4 hidden min-w-0 gap-3 md:grid">
+        {group.episodes.map((episode) => <StoryLibraryCard badge={`Episode ${episode.episodeNumber}`} key={episode.story.id} onDelete={() => onDeleteStory(episode.story.id)} onOpen={() => onOpenSavedStoryById(episode.story.id)} story={episode.story} />)}
+      </div>
+    </article>
+  );
+}
+
+function MobileLibraryEpisodeCard({ episode, onOpenSavedStoryById }: { episode: SeriesEpisode<LibraryStory> & { row: LibraryStoryRow }; onOpenSavedStoryById: (storyId: string) => void }) {
+  return (
+    <button
+      className="w-full min-w-0 max-w-full rounded-xl border border-paper/10 bg-paper/5 p-4 text-left"
+      key={episode.story.id}
+      onClick={() => onOpenSavedStoryById(episode.story.id)}
+      type="button"
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
+        Episode {episode.episodeNumber}
+      </p>
+      <h4 className="mt-1 break-words text-base font-semibold leading-snug text-paper">
+        {episode.story.title}
+      </h4>
+      <p className="mt-2 line-clamp-3 break-words text-sm leading-6 text-paper/70">
+        {episode.story.story}
+      </p>
+    </button>
+  );
 }
 
 function SavedForLaterStoryCard({ item, onMoveToWaitingQueue, onRead, onRemove }: { item: ReadyStoryQueueItem; onMoveToWaitingQueue: () => void; onRead: () => void; onRemove: () => void }) {
