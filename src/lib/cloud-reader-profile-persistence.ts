@@ -55,8 +55,8 @@ export class CloudReaderProfileStaleWriteError extends Error {
   }
 }
 
-export async function getCloudReaderProfile(profileId: string): Promise<ReaderProfile | null> {
-  const config = getDynamoDbConfig();
+export async function getCloudReaderProfile(profileId: string, authenticatedOwnerId?: string): Promise<ReaderProfile | null> {
+  const config = getDynamoDbConfig(authenticatedOwnerId);
   const response = await dynamoDbRequest<{ Item?: DynamoDbItem }>(config, "GetItem", {
     TableName: config.tableName,
     Key: readerProfileKey(config, profileId)
@@ -66,8 +66,8 @@ export async function getCloudReaderProfile(profileId: string): Promise<ReaderPr
   return itemToCloudReaderProfileRecord(response.Item)?.profile ?? null;
 }
 
-export async function saveCloudReaderProfile(profileId: string, profile: ReaderProfile): Promise<ReaderProfile> {
-  const config = getDynamoDbConfig();
+export async function saveCloudReaderProfile(profileId: string, profile: ReaderProfile, authenticatedOwnerId?: string): Promise<ReaderProfile> {
+  const config = getDynamoDbConfig(authenticatedOwnerId);
   const normalizedProfile = normalizeReaderProfile(profile);
   const now = new Date().toISOString();
   const record: CloudReaderProfileRecord = {
@@ -96,20 +96,20 @@ export async function saveCloudReaderProfile(profileId: string, profile: ReaderP
   return normalizedProfile;
 }
 
-export async function deleteCloudReaderProfile(profileId: string): Promise<void> {
-  const config = getDynamoDbConfig();
+export async function deleteCloudReaderProfile(profileId: string, authenticatedOwnerId?: string): Promise<void> {
+  const config = getDynamoDbConfig(authenticatedOwnerId);
   await dynamoDbRequest(config, "DeleteItem", {
     TableName: config.tableName,
     Key: readerProfileKey(config, profileId)
   });
 }
 
-export function getCloudReaderProfileConfigError(): Error | null {
+export function getCloudReaderProfileConfigError(_authenticatedOwnerId?: string): Error | null {
   const missingVariables = getMissingDynamoDbVariables();
   return missingVariables.length ? new CloudReaderProfileConfigError(missingVariables) : null;
 }
 
-function getDynamoDbConfig(): DynamoDbConfig {
+function getDynamoDbConfig(authenticatedOwnerId?: string): DynamoDbConfig {
   const missingVariables = getMissingDynamoDbVariables();
   if (missingVariables.length) throw new CloudReaderProfileConfigError(missingVariables);
 
@@ -118,7 +118,7 @@ function getDynamoDbConfig(): DynamoDbConfig {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
     tableName: process.env.PROJECTS_TABLE_NAME!,
-    ownerId: process.env.PROJECTS_OWNER_ID!
+    ownerId: authenticatedOwnerId?.trim() || process.env.PROJECTS_OWNER_ID!
   };
 }
 
