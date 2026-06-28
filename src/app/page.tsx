@@ -471,7 +471,16 @@ export default function Home() {
     window.history.pushState(null, "", `${window.location.pathname}?view=${view}`);
   }
 
+
+  function requireSignInForAppAction(actionLabel = "that action"): boolean {
+    if (!authState.appActionsGated) return false;
+    navigateHome({ preserveGeneration: true });
+    setStatusMessage(`Sign in with your email before ${actionLabel}.`);
+    return true;
+  }
+
   async function handleGenerate(overrides: { generationMode: GenerationMode; worldBible?: string; characterProfiles?: string; storySeed?: string; storyRules?: string; genrePreset?: GenrePreset; narrativeArchitecture?: NarrativeArchitecture; characterArc?: CharacterArc; endingType?: EndingType; lengthTarget?: LengthTarget; readerMood?: ReaderMoodSnapshot | null; presentation?: Exclude<GeneratedStoryPresentation, null>; loadingMessage?: string; signalSource?: ReaderProfileEventSource; generationSource?: Exclude<GenerationSource, null>; continuationStoryId?: string; continuationContextIncluded?: boolean; selectedSeriesId?: string | null; sourceStoryId?: string | null }) {
+    if (requireSignInForAppAction(overrides.generationMode === "continue_series" ? "continuing a series" : "starting generation")) return;
     const nextGenerationSource = overrides.generationSource ?? (overrides.generationMode === "continue_series" ? "continue-story" : "new-story");
     const continuationStoryId = nextGenerationSource === "continue-story" ? overrides.continuationStoryId?.trim() ?? "" : "";
 
@@ -654,6 +663,7 @@ export default function Home() {
 
 
   function recordReadyStoryQueueSignal(item: ReadyStoryQueueItem, signal: ReadyStoryQueueSignal): ReaderProfile {
+    if (requireSignInForAppAction("updating recommendations")) return readerProfile;
     const now = new Date().toISOString();
     const nextProfile = saveReadyStoryQueueSignal({
       storyCardId: item.sourceStorySparkId ?? item.id,
@@ -708,6 +718,7 @@ export default function Home() {
   }
 
   function openReadyStoryQueueItem(item: ReadyStoryQueueItem, removeItem: (itemId: string, profileForBackfill?: ReaderProfile) => void) {
+    if (requireSignInForAppAction("opening a recommended story")) return;
     if (isGenerating || item.generationStatus === "generating") return;
 
     const nextProfile = recordReadyStoryQueueSignal(item, "read");
@@ -772,12 +783,14 @@ export default function Home() {
   }
 
   function handlePassReadyStory(item: ReadyStoryQueueItem) {
+    if (requireSignInForAppAction("training recommendations")) return;
     const nextProfile = recordReadyStoryQueueSignal(item, "pass");
     removeReadyQueueItemAndPersist(item.id, nextProfile);
     setStatusMessage(`Passed ${item.title}.`);
   }
 
   function handleSaveReadyStoryForLater(item: ReadyStoryQueueItem) {
+    if (requireSignInForAppAction("saving a recommendation")) return;
     const nextProfile = recordReadyStoryQueueSignal(item, "save_for_later");
     const nextSaved = persistSavedForLaterStoryQueue(upsertSavedForLaterStoryQueueItem(savedForLaterStoryQueue, item));
     setSavedForLaterStoryQueue(nextSaved);
@@ -800,6 +813,7 @@ export default function Home() {
   }
 
   function handleStartSomethingNew() {
+    if (requireSignInForAppAction("starting a new story")) return;
     if (isGenerating) return;
 
     const storyStart = suggestedStarts[0] ?? SUGGESTED_STORY_STARTS[0];
@@ -833,11 +847,13 @@ export default function Home() {
 
 
   function handleMoodSelect(mood: Mood) {
+    if (requireSignInForAppAction("personalizing recommendations")) return;
     setActiveMood(mood);
     recordReaderSignal({ eventType: "moodSelected", mood });
   }
 
   function handleCreateGenerateClick() {
+    if (requireSignInForAppAction("generating a story")) return;
     if (isGenerating) return;
 
     const approvedCurrentMood = Boolean(
@@ -856,6 +872,7 @@ export default function Home() {
   }
 
   function handleMoodIntakeSubmit(draft: ReaderMoodDraft) {
+    if (requireSignInForAppAction("saving reader preferences")) return;
     const nextProfile = saveReaderMoodSnapshot(draft);
     const latestMood = nextProfile.latestMood ?? null;
     const signaledProfile = recordReaderProfileEvent({ eventType: "moodSelected", mood: latestMood?.mood || draft.mood });
@@ -1105,6 +1122,7 @@ export default function Home() {
   }
 
   function handleSaveStory() {
+    if (requireSignInForAppAction("saving to the library")) return;
     if (!storyResponse) return;
     const savedStory = createSavedStory(storyResponse, currentStoryId || createStoryId(storyResponse.story));
     const nextSavedStories = [savedStory, ...savedStories.filter((story) => story.id !== savedStory.id)].slice(0, 25);
@@ -1114,6 +1132,7 @@ export default function Home() {
   }
 
   function handleRestoreStory(story: SavedStory) {
+    if (requireSignInForAppAction("opening a saved story")) return;
     cancelActiveGeneration();
     setStoryResponse(savedStoryToResponse(story));
     setCurrentStoryId(story.id);
@@ -1160,6 +1179,7 @@ export default function Home() {
   }
 
   function handleSaveProject() {
+    if (requireSignInForAppAction("saving a project")) return;
     const trimmedName = projectName.trim();
     if (!trimmedName) return setError("Add a project name before saving this workspace.");
     const now = new Date().toISOString();
@@ -1215,6 +1235,7 @@ export default function Home() {
   }
 
   async function handleSaveCloudProject() {
+    if (requireSignInForAppAction("saving to cloud")) return;
     const trimmedName = projectName.trim();
     if (!trimmedName) return setError("Add a project name before saving to cloud projects.");
     const now = new Date().toISOString();
@@ -1337,12 +1358,14 @@ export default function Home() {
   }
 
   function handleReaderContinue() {
+    if (requireSignInForAppAction("continuing a series")) return;
     if (blockGenerationForUnsavedFeedback()) return;
     setReaderScrollDiagnostics((current) => ({ ...current, nextEpisodeClicked: "yes", continuationLoaded: "pending", scrollResetAttempted: "pending", scrollTargetUsed: "pending" }));
     handleContinueLatest();
   }
 
   function handleSavedEpisodeNext() {
+    if (requireSignInForAppAction("continuing a saved episode")) return;
     const currentId = currentStoryId.trim();
     if (!currentId) {
       handleReaderContinue();
@@ -1366,6 +1389,7 @@ export default function Home() {
   }
 
   function handleStoryFeedbackChange(story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) {
+    if (requireSignInForAppAction("saving story feedback")) return;
     if (!story.id) return;
     const now = new Date().toISOString();
     const existingSignal = readerProfile.storyFeedbackSignals?.find((signal) => signal.storyId === story.id);
@@ -1411,6 +1435,7 @@ export default function Home() {
   }
 
   function recordReaderSignal(event: ReaderProfileEventInput) {
+    if (requireSignInForAppAction("updating reader signals")) return;
     const nextProfile = recordReaderProfileEvent(event);
     setReaderProfile(nextProfile);
     void syncReaderProfileToCloud(nextProfile);
@@ -1446,7 +1471,7 @@ export default function Home() {
       <AppStateDiagnostics activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
       <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
       <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
-      <AuthDiagnostics authConfigured={authState.authConfigured} authStatus={authState.authStatus} currentUserEmail={authState.currentUser?.email ?? ""} profileLibraryMode={authState.profileLibraryMode} region={authState.region} />
+      <AuthDiagnostics appActionsGated={authState.appActionsGated} authConfigured={authState.authConfigured} authFlow={authState.authFlow} authStatus={authState.authStatus} currentUserEmail={authState.currentUser?.email ?? ""} lastAuthStep={authState.lastAuthStep} preferredChallenge={authState.preferredChallenge} profileLibraryMode={authState.profileLibraryMode} region={authState.region} />
     </>
   );
 
@@ -1475,7 +1500,7 @@ export default function Home() {
 
             <button
               className="min-h-12 w-full rounded-xl bg-lantern-gold px-4 py-3 text-base font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isGenerating}
+              disabled={isGenerating || authState.appActionsGated}
               onClick={handleStartSomethingNew}
               type="button"
             >
@@ -1485,7 +1510,7 @@ export default function Home() {
             {latestStory ? (
               <button
                 className="min-h-12 w-full rounded-xl border border-paper/15 bg-paper/10 px-4 py-3 text-base font-semibold text-paper disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={isGenerating}
+                disabled={isGenerating || authState.appActionsGated}
                 onClick={() => handleContinueLatest()}
                 type="button"
               >
@@ -1571,7 +1596,7 @@ function AuthShell() {
     <section className="grid gap-3 rounded-xl border border-lantern-gold/20 bg-paper/5 p-4 text-sm text-paper/75 md:max-w-xl" aria-label="Reader account">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-lantern-gold">Reader account</p>
-        <p className="mt-1 text-paper/65">Sign in with an email code so Project Lantern can recognize you across devices.</p>
+        <p className="mt-1 text-paper/65">Sign in with an email code so Project Lantern can recognize you across devices. Story generation and personalization require sign-in when Cognito is configured.</p>
       </div>
 
       {!auth.authConfigured ? (
@@ -1604,13 +1629,17 @@ function AuthShell() {
   );
 }
 
-function AuthDiagnostics({ authConfigured, authStatus, currentUserEmail, profileLibraryMode, region }: { authConfigured: boolean; authStatus: AuthStatus; currentUserEmail: string; profileLibraryMode: "anonymous" | "authenticated"; region: string }) {
+function AuthDiagnostics({ appActionsGated, authConfigured, authFlow, authStatus, currentUserEmail, lastAuthStep, preferredChallenge, profileLibraryMode, region }: { appActionsGated: boolean; authConfigured: boolean; authFlow: "USER_AUTH"; authStatus: AuthStatus; currentUserEmail: string; lastAuthStep: string; preferredChallenge: "EMAIL_OTP"; profileLibraryMode: "anonymous" | "authenticated"; region: string }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">Auth diagnostics</summary>
       <div className="mt-3 grid gap-1 sm:grid-cols-2">
         <p><span className="font-semibold text-paper/80">Auth configured:</span> {authConfigured ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">Auth status:</span> {authStatus}</p>
+        <p><span className="font-semibold text-paper/80">Auth flow used:</span> {authFlow}</p>
+        <p><span className="font-semibold text-paper/80">Preferred challenge:</span> {preferredChallenge}</p>
+        <p><span className="font-semibold text-paper/80">Last Cognito auth step:</span> {lastAuthStep}</p>
+        <p><span className="font-semibold text-paper/80">App actions gated:</span> {appActionsGated ? "yes - sign-in required" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Current user email:</span> {currentUserEmail || "none"}</p>
         <p><span className="font-semibold text-paper/80">Cognito region:</span> {region}</p>
         <p><span className="font-semibold text-paper/80">Profile/library mode:</span> {profileLibraryMode}</p>
