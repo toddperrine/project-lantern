@@ -681,3 +681,22 @@
     display: none !important;
   }
 }
+
+@media (max-width: 767px) {
+  .project-lantern-shell main[data-mobile-active-view="library"] [data-mobile-library-card-actions="true"] {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0.65rem !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .project-lantern-shell main[data-mobile-active-view="library"] [data-mobile-library-card-actions="true"] button {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 2.75rem !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+  }
+}
