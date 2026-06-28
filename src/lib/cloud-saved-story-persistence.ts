@@ -101,6 +101,8 @@ type DynamoDbConfig = {
   secretAccessKey: string;
   tableName: string;
   ownerId: string;
+  keyOwnerId: string;
+  persistenceMode: "authenticated-owner-bridge" | "auth-disabled-fallback";
 };
 
 type CloudSavedStoryItem = Omit<CloudSavedStoryRecord, "projectId"> & {
@@ -148,8 +150,8 @@ export async function listCloudSavedStories(projectId: string, authenticatedOwne
     TableName: config.tableName,
     KeyConditionExpression: "ownerId = :ownerId AND begins_with(projectId, :storyPrefix)",
     ExpressionAttributeValues: {
-      ":ownerId": { S: config.ownerId },
-      ":storyPrefix": { S: storySortKeyPrefix(projectId) }
+      ":ownerId": { S: config.keyOwnerId },
+      ":storyPrefix": { S: storySortKeyPrefix(config, projectId) }
     }
   });
 
@@ -201,7 +203,7 @@ export async function saveCloudSavedStory(projectId: string, input: CloudSavedSt
 
   await dynamoDbRequest(config, "PutItem", {
     TableName: config.tableName,
-    Item: toDynamoDbItem(toCloudSavedStoryItem(record))
+    Item: toDynamoDbItem(toCloudSavedStoryItem(record, config))
   });
 
   return record;
@@ -216,7 +218,7 @@ export async function updateCloudSavedStory(projectId: string, storyId: string, 
 
   await dynamoDbRequest(config, "PutItem", {
     TableName: config.tableName,
-    Item: toDynamoDbItem(toCloudSavedStoryItem(updatedStory))
+    Item: toDynamoDbItem(toCloudSavedStoryItem(updatedStory, config))
   });
 
   return updatedStory;
@@ -239,36 +241,37 @@ function getDynamoDbConfig(authenticatedOwnerId?: string): DynamoDbConfig {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
     tableName: process.env.PROJECTS_TABLE_NAME!,
-    ownerId: authenticatedOwnerId?.trim() || process.env.PROJECTS_OWNER_ID!
+    ownerId: authenticatedOwnerId?.trim() || process.env.PROJECTS_OWNER_ID!,
+    keyOwnerId: process.env.PROJECTS_OWNER_ID?.trim() || authenticatedOwnerId!.trim(),
+    persistenceMode: authenticatedOwnerId?.trim() ? "authenticated-owner-bridge" : "auth-disabled-fallback"
   };
 }
 
-function getMissingDynamoDbVariables(authenticatedOwnerId?: string): string[] {
-  const required = ["AWS_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "PROJECTS_TABLE_NAME"];
-  if (!authenticatedOwnerId?.trim()) required.push("PROJECTS_OWNER_ID");
-  return required.filter((key) => !process.env[key]?.trim());
+function getMissingDynamoDbVariables(_authenticatedOwnerId?: string): string[] {
+  return ["AWS_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "PROJECTS_TABLE_NAME", "PROJECTS_OWNER_ID"].filter((key) => !process.env[key]?.trim());
 }
 
 function storyKey(config: DynamoDbConfig, projectId: string, storyId: string): DynamoDbItem {
   return {
-    ownerId: { S: config.ownerId },
-    projectId: { S: storySortKey(projectId, storyId) }
+    ownerId: { S: config.keyOwnerId },
+    projectId: { S: storySortKey(config, projectId, storyId) }
   };
 }
 
-function storySortKeyPrefix(projectId: string): string {
-  return `${projectId}#story#`;
+function storySortKeyPrefix(config: DynamoDbConfig, projectId: string): string {
+  return config.persistenceMode === "authenticated-owner-bridge" ? `reader#${config.ownerId}#${projectId}#story#` : `${projectId}#story#`;
 }
 
-function storySortKey(projectId: string, storyId: string): string {
-  return `${storySortKeyPrefix(projectId)}${storyId}`;
+function storySortKey(config: DynamoDbConfig, projectId: string, storyId: string): string {
+  return `${storySortKeyPrefix(config, projectId)}${storyId}`;
 }
 
-function toCloudSavedStoryItem(record: CloudSavedStoryRecord): CloudSavedStoryItem {
+function toCloudSavedStoryItem(record: CloudSavedStoryRecord, config: DynamoDbConfig): CloudSavedStoryItem {
   return {
     ...record,
+    ownerId: config.keyOwnerId,
     cloudProjectId: record.projectId,
-    projectId: storySortKey(record.projectId, record.storyId),
+    projectId: storySortKey(config, record.projectId, record.storyId),
     itemType: "saved-story"
   };
 }
@@ -330,7 +333,7 @@ function itemToCloudSavedStoryRecord(item: DynamoDbItem): CloudSavedStoryRecord 
   if (!value.createdAt || !value.updatedAt || typeof value.sequenceNumber !== "number" || !value.sequenceLabel || !isCloudSavedStoryRole(value.storyRole)) return null;
 
   return {
-    ownerId: value.ownerId,
+    ownerId: readAuthenticatedOwnerId(value) ?? value.ownerId,
     projectId: value.cloudProjectId,
     storyId: value.storyId,
     title: value.title,
@@ -349,6 +352,12 @@ function itemToCloudSavedStoryRecord(item: DynamoDbItem): CloudSavedStoryRecord 
     ...(typeof value.continuationOfStoryId === "string" && value.continuationOfStoryId ? { continuationOfStoryId: value.continuationOfStoryId } : {}),
     ...(typeof value.branchOfStoryId === "string" && value.branchOfStoryId ? { branchOfStoryId: value.branchOfStoryId } : {})
   };
+}
+
+function readAuthenticatedOwnerId(value: Partial<CloudSavedStoryItem>): string | null {
+  const sortKey = typeof value.projectId === "string" ? value.projectId : "";
+  const match = sortKey.match(/^reader#([^#]+)#/);
+  return match?.[1] ?? null;
 }
 
 function applyStoryPatch(story: CloudSavedStoryRecord, input: CloudSavedStoryPatchInput): CloudSavedStoryRecord {

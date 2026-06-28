@@ -24,9 +24,9 @@ export async function GET(request: Request, { params }: RouteContext) {
   try {
     const stories = await listCloudSavedStories(params.id, authUser?.sub);
     if (!stories) return NextResponse.json({ error: "Cloud story list failed because the selected project was not found.", action: "Cloud story list", diagnostic: "missing-project" }, { status: 404 });
-    return NextResponse.json({ stories });
+    return NextResponse.json({ stories, diagnostic: routeDiagnostic(request, authUser?.sub) });
   } catch (error) {
-    return cloudPersistenceErrorResponse(error, "Cloud story list");
+    return cloudPersistenceErrorResponse(error, "Cloud story list", request, authUser?.sub);
   }
 }
 
@@ -51,9 +51,9 @@ export async function POST(request: Request, { params }: RouteContext) {
   try {
     const story = await saveCloudSavedStory(params.id, storyInput, authUser?.sub);
     if (!story) return NextResponse.json({ error: "Cloud story save failed because the selected project was not found.", action: "Cloud story save", diagnostic: "missing-project" }, { status: 404 });
-    return NextResponse.json({ story }, { status: 201 });
+    return NextResponse.json({ story, diagnostic: routeDiagnostic(request, authUser?.sub) }, { status: 201 });
   } catch (error) {
-    return cloudPersistenceErrorResponse(error, "Cloud story save");
+    return cloudPersistenceErrorResponse(error, "Cloud story save", request, authUser?.sub);
   }
 }
 
@@ -106,13 +106,19 @@ function cloudConfigErrorResponse(action: string, error: string) {
   );
 }
 
-function cloudPersistenceErrorResponse(error: unknown, action: string) {
-  const diagnostic = error instanceof CloudSavedStoryPersistenceError ? "cloud-request-failed" : "cloud-unexpected-error";
+function cloudPersistenceErrorResponse(error: unknown, action: string, request: Request, ownerId?: string) {
+  const details = error instanceof CloudSavedStoryPersistenceError ? error.details : null;
   return NextResponse.json(
     {
       error: `${action} failed. Cloud persistence could not complete the request.`,
       action,
-      diagnostic
+      diagnostic: {
+        ...routeDiagnostic(request, ownerId),
+        result: details ? "cloud-request-failed" : "cloud-unexpected-error",
+        sanitizedErrorName: details?.awsErrorName ?? (error instanceof Error ? error.name : "UnknownError"),
+        sanitizedErrorCode: details?.httpStatusCode ?? null,
+        operation: details?.operation ?? "unknown"
+      }
     },
     { status: 502 }
   );
@@ -123,4 +129,13 @@ async function getRouteAuthUser(request: Request) {
   const authUser = await requireAuthenticatedCognitoUser(request);
   if (!authUser) return NextResponse.json({ error: "Sign in is required for authenticated Story Library data.", diagnostic: "auth-required" }, { status: 401 });
   return authUser;
+}
+
+function routeDiagnostic(request: Request, ownerId?: string) {
+  return {
+    apiPath: new URL(request.url).pathname,
+    authTokenPresent: Boolean(request.headers.get("authorization")?.match(/^Bearer\s+.+/i)),
+    resolvedOwnerId: ownerId ?? "none",
+    persistenceMode: ownerId ? "authenticated-owner-bridge" : "auth-disabled-fallback"
+  };
 }
