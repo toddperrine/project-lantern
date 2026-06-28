@@ -414,6 +414,8 @@ export default function Home() {
   }, [currentStoryId, demoStory, savedStories, storyResponse]);
   const suggestedStarts = useMemo(() => sortStoryStartsByMood(activeMood), [activeMood]);
   const currentGeneratedStory = useMemo(() => storyResponse ? responseToLibraryStory(storyResponse, currentStoryId || createStoryId(storyResponse.story)) : null, [currentStoryId, storyResponse]);
+  const libraryStoriesForSeriesNavigation = useMemo(() => getLibraryStoriesForSeriesNavigation({ savedStories, currentStory: currentGeneratedStory }), [currentGeneratedStory, savedStories]);
+  const currentSeriesEpisode = useMemo(() => findEpisodeInLibrarySeries(libraryStoriesForSeriesNavigation, currentStoryId), [currentStoryId, libraryStoriesForSeriesNavigation]);
   const canGenerate = Boolean(worldBible.content.trim() && characterProfiles.content.trim() && storySeed.content.trim() && !isGenerating);
 
   function cancelActiveGeneration() {
@@ -1306,9 +1308,9 @@ export default function Home() {
       return;
     }
 
-    const nextSavedEpisode = findNextSavedEpisodeInSeries(savedStories, currentId);
+    const nextSavedEpisode = findNextSavedEpisodeInSeries(libraryStoriesForSeriesNavigation, currentId);
     if (nextSavedEpisode) {
-      handleRestoreStory(nextSavedEpisode.story);
+      handleRestoreStory(nextSavedEpisode.story as SavedStory);
       setStatusMessage(`Opened Episode ${nextSavedEpisode.episodeNumber}.`);
       return;
     }
@@ -1433,7 +1435,7 @@ export default function Home() {
             pendingStoryTitle={pendingStoryStart?.title ?? null}
           />
         ) : null}
-        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={generatedStoryPresentation === "saved-episode" ? handleSavedEpisodeNext : handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : generatedStoryPresentation === "saved-episode" ? "Saved Episode" : "Next Episode"} continueLabel={generatedStoryPresentation === "saved-episode" ? "Next Episode" : "Continue this story"} generationProfileSnapshot={storyResponse?.metadata.diagnostics.readerProfileSnapshot ?? storyResponse?.metadata.diagnostics.readerProfileGenerationSnapshot} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
+        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={generatedStoryPresentation === "saved-episode" ? handleSavedEpisodeNext : handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : generatedStoryPresentation === "saved-episode" ? "Saved Episode" : "Next Episode"} continueLabel={generatedStoryPresentation === "saved-episode" ? "Next Episode" : "Continue this story"} episodeNumber={currentSeriesEpisode?.episodeNumber ?? null} generationProfileSnapshot={storyResponse?.metadata.diagnostics.readerProfileSnapshot ?? storyResponse?.metadata.diagnostics.readerProfileGenerationSnapshot} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
         {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} currentStory={currentGeneratedStory} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onMoveSavedForLaterToWaitingQueue={handleMoveSavedForLaterStoryToWaitingQueue} onOpenCurrentStory={handleOpenCurrentStory} onProjectNameChange={setProjectName} onReadSavedForLater={handleReadSavedForLaterStory} onRefreshCloud={handleRefreshCloudProjects} onRemoveSavedForLater={handleRemoveSavedForLaterStory} onRestoreStory={handleRestoreStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedForLaterStoryQueue={savedForLaterStoryQueue} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
@@ -1449,12 +1451,13 @@ function StopGenerationControl({ onStop }: { onStop: () => void }) {
   return <div className="rounded-md border border-red-300/30 bg-red-950/30 px-4 py-3"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-semibold text-paper">Story generation is running.</p><button className="w-fit rounded-md border border-red-300/60 bg-red-300 px-4 py-2 text-sm font-semibold text-red-950 transition hover:bg-red-200" onClick={onStop} type="button">Stop generating</button></div></div>;
 }
 
-function EpisodeReader({ continueLabel = "Continue this story", eyebrow, feedback, generationBlockedBecauseUnsavedFeedback, generationProfileSnapshot, isGenerating, onContinue, onExport, onFeedbackChange, onFeedbackDraftStateChange, onStartDifferent, source, story }: { continueLabel?: string; eyebrow: string; feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; generationProfileSnapshot?: ReaderProfileGenerationSnapshot; isGenerating: boolean; onContinue: () => void; onExport: () => void; onFeedbackChange: (story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void; onFeedbackDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
+function EpisodeReader({ continueLabel = "Continue this story", episodeNumber, eyebrow, feedback, generationBlockedBecauseUnsavedFeedback, generationProfileSnapshot, isGenerating, onContinue, onExport, onFeedbackChange, onFeedbackDraftStateChange, onStartDifferent, source, story }: { continueLabel?: string; episodeNumber?: number | null; eyebrow: string; feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; generationProfileSnapshot?: ReaderProfileGenerationSnapshot; isGenerating: boolean; onContinue: () => void; onExport: () => void; onFeedbackChange: (story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void; onFeedbackDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
   return (
     <article className="grid min-w-0 gap-5 rounded-md border border-lantern-gold/25 bg-paper/10 p-4 shadow-soft sm:p-6">
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">{eyebrow}</p>
         <h2 className="mt-2 text-3xl font-semibold leading-tight text-paper md:text-5xl">{story.title}</h2>
+        {episodeNumber ? <p className="mt-2 text-sm font-semibold uppercase tracking-[0.14em] text-lantern-gold">Episode {episodeNumber}</p> : null}
         <p className="mt-3 text-sm leading-6 text-paper/60">{story.wordCount.toLocaleString()} words | {story.genrePreset} | {source}</p>
       </div>
       <div className="min-w-0 whitespace-pre-wrap rounded-md border border-paper/10 bg-night-ink/70 p-4 text-base leading-8 text-paper/85 sm:p-5">{story.story}</div>
@@ -1759,9 +1762,35 @@ function InputPanel({ artifactType, libraryArtifacts, onChange, onSave, onSelect
   return <section className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4"><h2 className="text-lg font-semibold text-paper">{title}</h2><select className="mt-3 w-full rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper" onChange={(event) => onSelect(artifactType, event.target.value)} value={value.libraryArtifactId ?? ""}><option value="">Choose saved item</option>{libraryArtifacts.map((artifact) => <option key={artifact.id} value={artifact.id}>{artifact.name}</option>)}</select><textarea className="mt-3 min-h-32 w-full rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm leading-6 text-paper outline-none focus:border-lantern-gold" onChange={(event) => onChange({ name: value.name || `${slugify(title)}.txt`, content: event.target.value, libraryArtifactId: value.libraryArtifactId })} placeholder={`Add ${title.toLowerCase()} text`} value={value.content} /><label className="mt-3 flex cursor-pointer items-center justify-center rounded-md border border-dashed border-lantern-gold/50 px-4 py-3 text-sm font-semibold text-lantern-gold"><span className="min-w-0 truncate">{value.name || "Upload .md or .txt"}</span><input className="sr-only" type="file" accept=".md,.txt,text/markdown,text/plain" onChange={handleFileChange} /></label><button className="mt-3 rounded-md border border-lantern-gold/45 px-3 py-2 text-xs font-semibold text-lantern-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={!value.content.trim()} onClick={() => onSave(artifactType, value)} type="button">Save to Library</button></section>;
 }
 
+function getLibraryStoriesForSeriesNavigation(args: { savedStories: SavedStory[]; currentStory: LibraryStory | null }): LibraryStory[] {
+  const storiesById = new Map<string, LibraryStory>();
+
+  for (const story of args.savedStories) {
+    storiesById.set(story.id, story);
+  }
+
+  if (args.currentStory?.id) {
+    storiesById.set(args.currentStory.id, args.currentStory);
+  }
+
+  return Array.from(storiesById.values());
+}
+
+function findEpisodeInLibrarySeries(stories: LibraryStory[], currentStoryId: string): SeriesEpisode<LibraryStory> | null {
+  const trimmedCurrentStoryId = currentStoryId.trim();
+  if (!trimmedCurrentStoryId) return null;
+
+  for (const group of groupStoriesBySeries(stories)) {
+    const currentEpisode = group.episodes.find((episode) => episode.storyId === trimmedCurrentStoryId || episode.story.id === trimmedCurrentStoryId);
+    if (currentEpisode) return currentEpisode;
+  }
+
+  return null;
+}
+
 function LibraryView(props: { cloudMessage: string; cloudProjects: CloudProjectSummary[]; currentStory: LibraryStory | null; isCloudLoading: boolean; onDeleteCloudProject: () => void; onDeleteProject: () => void; onDeleteStory: (storyId: string) => void; onLoadCloudProject: (projectId: string) => void; onLoadProject: (projectId: string) => void; onMoveSavedForLaterToWaitingQueue: (item: ReadyStoryQueueItem) => void; onOpenCurrentStory: () => void; onProjectNameChange: (name: string) => void; onReadSavedForLater: (item: ReadyStoryQueueItem) => void; onRefreshCloud: () => void; onRemoveSavedForLater: (item: ReadyStoryQueueItem) => void; onRestoreStory: (story: SavedStory) => void; onSaveCloudProject: () => void; onSaveProject: () => void; onSaveStory: () => void; projectName: string; savedForLaterStoryQueue: ReadyStoryQueueItem[]; savedProjects: SavedProject[]; savedStories: SavedStory[]; selectedCloudProjectId: string; selectedProjectId: string; storyResponse: GenerateStoryResponse | null }) {
   const { cloudMessage, cloudProjects, currentStory, isCloudLoading, onDeleteCloudProject, onDeleteProject, onDeleteStory, onLoadCloudProject, onLoadProject, onMoveSavedForLaterToWaitingQueue, onOpenCurrentStory, onProjectNameChange, onReadSavedForLater, onRefreshCloud, onRemoveSavedForLater, onRestoreStory, onSaveCloudProject, onSaveProject, onSaveStory, projectName, savedForLaterStoryQueue, savedProjects, savedStories, selectedCloudProjectId, selectedProjectId, storyResponse } = props;
-  const libraryStoryRows = [...(currentStory ? [{ story: currentStory, kind: "current" as const }] : []), ...savedStories.map((story) => ({ story, kind: "saved" as const }))];
+  const libraryStoryRows = getLibraryStoriesForSeriesNavigation({ savedStories, currentStory }).map((story) => ({ story, kind: currentStory?.id === story.id ? "current" as const : "saved" as const }));
   const seriesGroups = groupStoriesBySeries(libraryStoryRows.map((row) => row.story)).map((group) => ({ ...group, episodes: group.episodes.map((episode) => ({ ...episode, row: libraryStoryRows[episode.originalIndex] })) }));
   const hasGeneratedStoryRows = seriesGroups.length > 0;
 
