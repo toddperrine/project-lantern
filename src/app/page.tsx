@@ -61,6 +61,7 @@ import type { CanonicalReaderProfile, ReaderEnergyLevel, ReaderIntensityLevel, R
 import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture, ReaderProfileGenerationSnapshot } from "@/lib/types";
 import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
 import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
+import { APP_VERSION } from "@/lib/build-info";
 
 type AppView = "home" | "library" | "worlds" | "create" | "characters" | "mood-intake";
 type Mood = "Mystery" | "Wonder" | "Emotional" | "Adventure" | "Strange" | "Hopeful" | "Dark" | "Reflective";
@@ -1414,6 +1415,13 @@ export default function Home() {
   const currentStoryFeedback = currentStoryId ? readerProfile.storyFeedbackSignals?.find((signal) => signal.storyId === currentStoryId) ?? null : null;
   const isNewStoryGenerating = isGenerating && generationSource === "new-story";
   const isContinuationGenerating = isGenerating && generationSource === "continue-story";
+  const diagnosticsPanels = (
+    <>
+      <AppStateDiagnostics activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
+      <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
+      <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
+    </>
+  );
 
   return (
     <main className="min-h-screen overflow-x-hidden px-3 pb-24 pt-3 text-paper sm:px-4 md:px-8 md:py-7">
@@ -1439,9 +1447,7 @@ export default function Home() {
         {isGenerating ? <StopGenerationControl onStop={handleStopGeneration} /> : null}
         {error ? <Status tone="error">{error}</Status> : null}
 
-        <AppStateDiagnostics activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} />
-        <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
-        <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
+        <div className="hidden min-w-0 gap-3 md:grid">{diagnosticsPanels}</div>
 
         {activeView === "mood-intake" ? (
           <MoodIntakeView
@@ -1451,11 +1457,12 @@ export default function Home() {
           />
         ) : null}
         {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={generatedStoryPresentation === "saved-episode" ? handleSavedEpisodeNext : handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : generatedStoryPresentation === "saved-episode" ? "Saved Episode" : "Next Episode"} continueLabel={generatedStoryPresentation === "saved-episode" ? "Next Episode" : "Continue this story"} episodeNumber={currentSeriesEpisode?.episodeNumber ?? null} generationProfileSnapshot={storyResponse?.metadata.diagnostics.readerProfileSnapshot ?? storyResponse?.metadata.diagnostics.readerProfileGenerationSnapshot} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
-        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} /> : null}
+        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onOpenCreate={() => navigateToView("create")} onOpenLibrary={() => navigateToView("library")} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} /> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onMoveSavedForLaterToWaitingQueue={handleMoveSavedForLaterStoryToWaitingQueue} onOpenSavedStoryById={handleRestoreStoryById} onProjectNameChange={setProjectName} onReadSavedForLater={handleReadSavedForLaterStory} onRefreshCloud={handleRefreshCloudProjects} onRemoveSavedForLater={handleRemoveSavedForLaterStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedForLaterStoryQueue={savedForLaterStoryQueue} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
         {activeView === "characters" ? <CharactersView onOpenStory={handleStartRecommendation} /> : null}
+        <MobileDeveloperDiagnostics>{diagnosticsPanels}</MobileDeveloperDiagnostics>
       </section>
       <MobileBottomNav activeView={activeView} onChange={navigateToView} />
     </main>
@@ -1620,16 +1627,94 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
   );
 }
 
-function HomeView(props: { activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; isContinuationGenerating: boolean; isNewStoryGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onPassReadyStory: (item: ReadyStoryQueueItem) => void; onReadReadyStory: (item: ReadyStoryQueueItem) => void; onSaveReadyStoryForLater: (item: ReadyStoryQueueItem) => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
-  const { activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, isContinuationGenerating, isNewStoryGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onPassReadyStory, onReadReadyStory, onSaveReadyStoryForLater, onStartNewStory, onStartRecommendation, onToggleDirection, readyStoryQueue, savedForLaterStoryQueue, showStoryStartOptions, suggestedStarts } = props;
+
+function HomePrimaryActions({
+  hasLatestStory,
+  isGenerating,
+  isNewStoryGenerating,
+  onContinueLatest,
+  onOpenCreate,
+  onOpenLibrary,
+  onStartNewStory,
+}: {
+  hasLatestStory: boolean;
+  isGenerating: boolean;
+  isNewStoryGenerating: boolean;
+  onContinueLatest: () => void;
+  onOpenCreate: () => void;
+  onOpenLibrary: () => void;
+  onStartNewStory: () => void;
+}) {
+  return (
+    <section className="grid min-w-0 max-w-full gap-3 rounded-xl border border-paper/10 bg-paper/10 p-4 md:p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-lantern-gold">Home</p>
+      <h1 className="break-words text-2xl font-semibold leading-tight text-paper md:text-3xl">What do you want to do?</h1>
+
+      <button
+        className="min-h-12 w-full rounded-xl bg-lantern-gold px-4 py-3 text-base font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-60 md:w-fit"
+        disabled={isGenerating}
+        onClick={onStartNewStory}
+        type="button"
+      >
+        {isNewStoryGenerating ? "Writing…" : "Start Something New"}
+      </button>
+
+      {hasLatestStory ? (
+        <button
+          className="min-h-12 w-full rounded-xl border border-paper/15 bg-paper/10 px-4 py-3 text-base font-semibold text-paper disabled:cursor-not-allowed disabled:opacity-60 md:w-fit"
+          disabled={isGenerating}
+          onClick={onContinueLatest}
+          type="button"
+        >
+          Continue Latest Episode
+        </button>
+      ) : null}
+
+      <button
+        className="min-h-12 w-full rounded-xl border border-paper/15 bg-paper/10 px-4 py-3 text-base font-semibold text-paper md:w-fit"
+        onClick={onOpenLibrary}
+        type="button"
+      >
+        Story Library
+      </button>
+
+      <button
+        className="min-h-12 w-full rounded-xl border border-paper/15 bg-paper/10 px-4 py-3 text-base font-semibold text-paper md:w-fit"
+        onClick={onOpenCreate}
+        type="button"
+      >
+        Create
+      </button>
+    </section>
+  );
+}
+
+function MobileDeveloperDiagnostics({ children }: { children: ReactNode }) {
+  return (
+    <details className="mt-4 min-w-0 max-w-full overflow-hidden rounded-xl border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65 md:hidden">
+      <summary className="cursor-pointer font-semibold text-paper/75">Developer diagnostics</summary>
+      <div className="mt-3 grid min-w-0 gap-3 overflow-auto">{children}</div>
+    </details>
+  );
+}
+
+function HomeView(props: { activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; isContinuationGenerating: boolean; isNewStoryGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onPassReadyStory: (item: ReadyStoryQueueItem) => void; onReadReadyStory: (item: ReadyStoryQueueItem) => void; onSaveReadyStoryForLater: (item: ReadyStoryQueueItem) => void; onOpenCreate: () => void; onOpenLibrary: () => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
+  const { activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, isContinuationGenerating, isNewStoryGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onPassReadyStory, onReadReadyStory, onSaveReadyStoryForLater, onOpenCreate, onOpenLibrary, onStartNewStory, onStartRecommendation, onToggleDirection, readyStoryQueue, savedForLaterStoryQueue, showStoryStartOptions, suggestedStarts } = props;
   const [isRecapOpen, setIsRecapOpen] = useState(false);
   const storyBrief = latestStory ? createStoryBrief(latestStory) : null;
 
   return (
-    <div className="grid min-w-0 gap-6 md:gap-8">
-      <div className="md:hidden">
-        <MobileHomeView activeMood={activeMood} brief={storyBrief} canUseDemoStory={canUseDemoStory} hasDemoStory={hasDemoStory} isContinuationGenerating={isContinuationGenerating} isGenerating={isGenerating} isNewStoryGenerating={isNewStoryGenerating} isRecapOpen={isRecapOpen} latestStory={latestStory} onClearDemoStory={onClearDemoStory} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onLoadDemoStory={onLoadDemoStory} onMoodSelect={onMoodSelect} onOpenRecap={() => setIsRecapOpen(true)} onStartNewStory={onStartNewStory} onStartRecommendation={onStartRecommendation} showStoryStartOptions={showStoryStartOptions} suggestedStarts={suggestedStarts} />
-      </div>
+    <div className="grid min-w-0 max-w-full gap-6 overflow-x-hidden md:gap-8">
+      <HomePrimaryActions
+        hasLatestStory={Boolean(latestStory)}
+        isGenerating={isGenerating}
+        isNewStoryGenerating={isNewStoryGenerating}
+        onContinueLatest={() => onContinue()}
+        onOpenCreate={onOpenCreate}
+        onOpenLibrary={onOpenLibrary}
+        onStartNewStory={onStartNewStory}
+      />
+      {latestStory && storyBrief ? <div className="md:hidden"><MobileCurrentStoryCard brief={storyBrief} isGenerating={isContinuationGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onOpenRecap={() => setIsRecapOpen(true)} story={latestStory} /></div> : null}
       <div className="hidden md:grid md:min-w-0 md:gap-8">
         {latestStory && storyBrief ? <CurrentStoryCard brief={storyBrief} direction={continueDirection} isDirectionOpen={isDirectionOpen} isGenerating={isContinuationGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onDirectionChange={onDirectionChange} onExportStory={onExportStory} onOpenRecap={() => setIsRecapOpen(true)} onToggleDirection={onToggleDirection} story={latestStory} /> : null}
         <ReadyStoryQueuePanel isGenerating={isGenerating} items={readyStoryQueue} onPass={onPassReadyStory} onRead={onReadReadyStory} onSaveForLater={onSaveReadyStoryForLater} savedForLaterCount={savedForLaterStoryQueue.length} />
@@ -2427,11 +2512,14 @@ function MobileTopHeader({ onGoHome }: { onGoHome: () => void }) {
           onGoHome();
         }}
       >
-        <img
-          alt="Lantyrn"
-          className="block h-8 w-32 min-w-0 object-contain [filter:invert(96%)_sepia(9%)_saturate(363%)_hue-rotate(352deg)_brightness(102%)_contrast(93%)]"
-          src="/artwork/lantyrn-wordmark.svg"
-        />
+        <span className="grid place-items-center">
+          <img
+            alt="Lantyrn"
+            className="block h-8 w-32 min-w-0 object-contain [filter:invert(96%)_sepia(9%)_saturate(363%)_hue-rotate(352deg)_brightness(102%)_contrast(93%)]"
+            src="/artwork/lantyrn-wordmark.svg"
+          />
+          <span className="mt-0.5 text-center text-[0.65rem] font-semibold leading-none text-paper/45">v{APP_VERSION}</span>
+        </span>
       </a>
 
       <button
