@@ -53,7 +53,7 @@ import {
   type ReadyStoryQueueSignal
 } from "@/lib/ready-story-queue";
 import { STORY_SPARK_CATALOG, type StorySparkCatalogItem } from "@/lib/story-spark-catalog";
-import { STORY_TYPE_CHIPS, getStoryTypeStartCopy, type StoryTypeChip, type StoryTypeChipId } from "@/lib/story-types";
+import { STORY_TYPE_CHIPS, getStoryTypePrimaryCategory, getStoryTypeStartCopy, type StoryTypeChip, type StoryTypeChipId } from "@/lib/story-types";
 import { createGenerationIdentity, type GenerationIdentity, type GenerationMode } from "@/lib/generation-identity";
 import { findLibraryStoryBySavedId, findNextSavedEpisodeInSeries, groupStoriesBySeries, type LibrarySeriesGroup, type SeriesEpisode } from "@/lib/series-library";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
@@ -74,7 +74,7 @@ type LibraryDiagnosticsState = { source: LibrarySource; loadedCount: number; lat
 type CloudSavedStoryRecordResponse = { ownerId?: string; storyId?: string; title: string; story: string; metadata?: Record<string, unknown>; createdAt: string; updatedAt?: string; sequenceNumber?: number; sequenceLabel?: string; storyRole?: string; canonStatus?: string; isFavorite?: boolean; favoriteAt?: string | null; continuationOfStoryId?: string; branchOfStoryId?: string };
 type CloudSavedStoryResponse = { story?: CloudSavedStoryRecordResponse; stories?: CloudSavedStoryRecordResponse[] };
 type StoryStart = { title: string; premise: string; genre: GenrePreset; mood: Mood; heroName: string; heroRole: string; heroBio: string; worldName: string; world: string; seed: string; cast: string; rules: string; sourceStorySparkId: string; sourceStorySparkTitle: string; tags: string[] };
-type LibraryStory = SavedStory | { id: string; storyId?: string; seriesId?: string; sourceStoryId?: string | null; parentSeriesId?: string | null; generationMode?: GenerationMode; title: string; story: string; wordCount: number; createdAt: string; genrePreset: GenrePreset; charactersUsed: string[]; rulesReferenced: string[] };
+type LibraryStory = SavedStory | { id: string; storyId?: string; seriesId?: string; sourceStoryId?: string | null; parentSeriesId?: string | null; generationMode?: GenerationMode; title: string; story: string; wordCount: number; createdAt: string; genrePreset: GenrePreset; selectedStoryTypeChipId?: string; selectedStoryTypeChipLabel?: string; legacyGenrePreset?: GenrePreset; charactersUsed: string[]; rulesReferenced: string[] };
 type StoryBrief = { hook: string; recap: string; changed: string; tension: string; nextHook: string; heroName: string; heroRole: string; struggle: string };
 type MoodIntakeMode = "story-start" | "generate" | null;
 type MoodIntakeFormState = ReaderMoodDraft;
@@ -682,7 +682,7 @@ export default function Home() {
     return true;
   }
 
-  async function handleGenerate(overrides: { generationMode: GenerationMode; worldBible?: string; characterProfiles?: string; storySeed?: string; storyRules?: string; genrePreset?: GenrePreset; narrativeArchitecture?: NarrativeArchitecture; characterArc?: CharacterArc; endingType?: EndingType; lengthTarget?: LengthTarget; readerMood?: ReaderMoodSnapshot | null; presentation?: Exclude<GeneratedStoryPresentation, null>; loadingMessage?: string; signalSource?: ReaderProfileEventSource; generationSource?: Exclude<GenerationSource, null>; continuationStoryId?: string; continuationContextIncluded?: boolean; selectedSeriesId?: string | null; sourceStoryId?: string | null }) {
+  async function handleGenerate(overrides: { generationMode: GenerationMode; worldBible?: string; characterProfiles?: string; storySeed?: string; storyRules?: string; genrePreset?: GenrePreset; selectedStoryTypeChip?: StoryTypeChip; narrativeArchitecture?: NarrativeArchitecture; characterArc?: CharacterArc; endingType?: EndingType; lengthTarget?: LengthTarget; readerMood?: ReaderMoodSnapshot | null; presentation?: Exclude<GeneratedStoryPresentation, null>; loadingMessage?: string; signalSource?: ReaderProfileEventSource; generationSource?: Exclude<GenerationSource, null>; continuationStoryId?: string; continuationContextIncluded?: boolean; selectedSeriesId?: string | null; sourceStoryId?: string | null }) {
     if (requireSignInForAppAction(overrides.generationMode === "continue_series" ? "continuing a series" : "starting generation")) return;
     const nextGenerationSource = overrides.generationSource ?? (overrides.generationMode === "continue_series" ? "continue-story" : "new-story");
     const continuationStoryId = nextGenerationSource === "continue-story" ? overrides.continuationStoryId?.trim() ?? "" : "";
@@ -755,7 +755,7 @@ export default function Home() {
       const payload = await response.json();
       if (activeGenerationRequestId.current !== requestId) return;
       if (!response.ok) throw new Error(payload.error ?? "Story generation failed.");
-      const normalizedResponse = normalizeGenerateStoryResponse(payload);
+      const normalizedResponse = applySelectedStoryTypeMetadata(normalizeGenerateStoryResponse(payload), overrides.selectedStoryTypeChip);
       setLastNewStoryPersonalization((current) => ({
         ...current,
         responseSnapshot: normalizedResponse.metadata.diagnostics.readerProfileSnapshot ?? normalizedResponse.metadata.diagnostics.readerProfileGenerationSnapshot,
@@ -1053,6 +1053,7 @@ export default function Home() {
       storySeed: withStoryTypeGuidance(storyStart.seed, selectedChipDefinition),
       storyRules: storyStart.rules,
       genrePreset: storyStart.genre,
+      selectedStoryTypeChip: selectedChipDefinition,
       narrativeArchitecture,
       characterArc,
       endingType,
@@ -2017,7 +2018,7 @@ function EpisodeReader({ continueLabel = "Continue this story", episodeNumber, e
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">{episodeNumber ? `${eyebrow} · Episode ${episodeNumber}` : eyebrow}</p>
         <h2 className="mt-2 text-3xl font-semibold leading-tight text-paper md:text-5xl">{story.title}</h2>
-        <p className="mt-3 text-sm leading-6 text-paper/60">{story.wordCount.toLocaleString()} words | {story.genrePreset} | {source}</p>
+        <p className="mt-3 text-sm leading-6 text-paper/60">{story.wordCount.toLocaleString()} words | {getLibraryStoryCategoryLabel(story)} | {source}</p>
       </div>
       <div className="min-w-0 whitespace-pre-wrap rounded-md border border-paper/10 bg-night-ink/70 p-4 text-base leading-8 text-paper/85 sm:p-5">{story.story}</div>
       {generationProfileSnapshot ? <GenerationProfileSnapshotPanel snapshot={generationProfileSnapshot} /> : null}
@@ -3200,7 +3201,27 @@ function SelectLibrary({ label, onChange, options, value }: { label: string; onC
 
 function savedStoryToCloudInput(story: SavedStory) { return { storyId: story.id, title: story.title, story: story.story, metadata: story }; }
 function cloudRecordToSavedStory(record: CloudSavedStoryRecordResponse): SavedStory { const metadata = record.metadata && typeof record.metadata === "object" ? record.metadata as Partial<SavedStory> : {}; return { ...metadata, id: record.storyId || metadata.id || createStoryId(record.story, record.createdAt), title: record.title || metadata.title || createStoryTitle(record.story), story: record.story, createdAt: metadata.createdAt || record.createdAt, wordCount: typeof metadata.wordCount === "number" ? metadata.wordCount : countWords(record.story), generatorSource: metadata.generatorSource || "cloud", charactersUsed: Array.isArray(metadata.charactersUsed) ? metadata.charactersUsed : [], rulesReferenced: Array.isArray(metadata.rulesReferenced) ? metadata.rulesReferenced : [], genrePreset: metadata.genrePreset || "Speculative Mystery", narrativeArchitecture: metadata.narrativeArchitecture || "Revelation Story", characterArc: metadata.characterArc || "Positive Change Arc", endingType: metadata.endingType || "Resolution with Residue", lengthTarget: metadata.lengthTarget || "Standard", diagnosticsNotice: metadata.diagnosticsNotice ?? null } as SavedStory; }
-function responseToLibraryStory(response: GenerateStoryResponse, id: string): LibraryStory { return { id, storyId: response.metadata.diagnostics.storyId, seriesId: response.metadata.diagnostics.seriesId, sourceStoryId: response.metadata.diagnostics.sourceStoryId ?? null, parentSeriesId: response.metadata.diagnostics.parentSeriesId ?? null, generationMode: response.metadata.diagnostics.generationMode, title: createStoryTitle(response.story), story: response.story, wordCount: response.metadata.wordCount, createdAt: response.metadata.generationStartedAt ?? new Date().toISOString(), genrePreset: response.metadata.diagnostics.genrePreset, charactersUsed: response.metadata.charactersUsed, rulesReferenced: response.metadata.rulesReferenced }; }
+function applySelectedStoryTypeMetadata(response: GenerateStoryResponse, chip?: StoryTypeChip): GenerateStoryResponse {
+  if (!chip) return response;
+  return {
+    ...response,
+    metadata: {
+      ...response.metadata,
+      diagnostics: {
+        ...response.metadata.diagnostics,
+        selectedStoryTypeChipId: chip.id,
+        selectedStoryTypeChipLabel: chip.label,
+        legacyGenrePreset: response.metadata.diagnostics.genrePreset
+      }
+    }
+  };
+}
+
+function getLibraryStoryCategoryLabel(story: Pick<LibraryStory, "genrePreset"> & { selectedStoryTypeChipLabel?: string | null; storyTypeChipLabel?: string | null }): string {
+  return getStoryTypePrimaryCategory({ selectedStoryTypeChipLabel: story.selectedStoryTypeChipLabel, storyTypeChipLabel: story.storyTypeChipLabel, genrePreset: story.genrePreset });
+}
+
+function responseToLibraryStory(response: GenerateStoryResponse, id: string): LibraryStory { return { id, storyId: response.metadata.diagnostics.storyId, seriesId: response.metadata.diagnostics.seriesId, sourceStoryId: response.metadata.diagnostics.sourceStoryId ?? null, parentSeriesId: response.metadata.diagnostics.parentSeriesId ?? null, generationMode: response.metadata.diagnostics.generationMode, title: createStoryTitle(response.story), story: response.story, wordCount: response.metadata.wordCount, createdAt: response.metadata.generationStartedAt ?? new Date().toISOString(), genrePreset: response.metadata.diagnostics.genrePreset, selectedStoryTypeChipId: response.metadata.diagnostics.selectedStoryTypeChipId, selectedStoryTypeChipLabel: response.metadata.diagnostics.selectedStoryTypeChipLabel, legacyGenrePreset: response.metadata.diagnostics.legacyGenrePreset ?? response.metadata.diagnostics.genrePreset, charactersUsed: response.metadata.charactersUsed, rulesReferenced: response.metadata.rulesReferenced }; }
 function normalizeGenerateStoryResponse(payload: unknown): GenerateStoryResponse { const normalizedPayload = normalizeStoryPayload(payload) as Partial<GenerateStoryResponse>; const story = normalizeStoryText(normalizedPayload.story); if (!story || !normalizedPayload.metadata) throw new Error("Story generation returned an invalid response."); return { ...normalizedPayload, story, metadata: { ...normalizedPayload.metadata, wordCount: countWords(story) } } as GenerateStoryResponse; }
 async function fetchCloudJson<T>(input: string, init?: RequestInit): Promise<T> { const response = await fetch(input, { ...init, cache: "no-store" }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(formatCloudApiError(payload, input)); return payload as T; }
 function formatCloudApiError(payload: unknown, fallbackPath: string): string { const value = payload && typeof payload === "object" ? payload as Record<string, unknown> : {}; const diagnostic = value.diagnostic && typeof value.diagnostic === "object" ? value.diagnostic as Record<string, unknown> : {}; const parts = [typeof value.error === "string" ? value.error : "Cloud request failed."]; const apiPath = typeof diagnostic.apiPath === "string" ? diagnostic.apiPath : fallbackPath; parts.push(`path=${apiPath}`); if ("authTokenPresent" in diagnostic) parts.push(`authTokenPresent=${diagnostic.authTokenPresent ? "true" : "false"}`); if (typeof diagnostic.resolvedOwnerId === "string") parts.push(`owner=${diagnostic.resolvedOwnerId}`); if (typeof diagnostic.persistenceMode === "string") parts.push(`mode=${diagnostic.persistenceMode}`); if (typeof diagnostic.sanitizedErrorName === "string") parts.push(`error=${diagnostic.sanitizedErrorName}`); if (typeof diagnostic.sanitizedErrorCode === "number") parts.push(`code=${diagnostic.sanitizedErrorCode}`); return parts.join(" "); }

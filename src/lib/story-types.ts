@@ -23,6 +23,10 @@ export function getStoryTypeChipById(id: string): StoryTypeChip | null {
   return STORY_TYPE_CHIPS.find((chip) => chip.id === id) ?? null;
 }
 
+export function getStoryTypePrimaryCategory(input: { selectedStoryTypeChipLabel?: string | null; storyTypeChipLabel?: string | null; genrePreset?: string | null }): string {
+  return input.selectedStoryTypeChipLabel?.trim() || input.storyTypeChipLabel?.trim() || input.genrePreset?.trim() || "Story";
+}
+
 
 export function getStoryTypeStartCopy(storyTypeLabel?: string | null): { confirmation: string; detail: string; button: string; loading: string } {
   const label = storyTypeLabel?.trim();
