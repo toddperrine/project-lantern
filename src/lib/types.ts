@@ -159,4 +159,22 @@ export type StoryDiagnostics = {
   continuationContextIncluded: boolean;
   newSeriesCreated: boolean;
   generationTrigger: string;
+  episodeMomentum?: {
+    active: boolean;
+    activation_reason: string;
+    scores: {
+      curiosity: number;
+      escalation: number;
+      unresolved_tension: number;
+      character_investment: number;
+      resolution_pressure: number;
+      ending_strength: number;
+      cheap_cliffhanger_risk: number;
+      continue_probability: number;
+    };
+    repair_ran: boolean;
+    repair_reason: string;
+    json_parse_failed: boolean;
+    fallback_used: boolean;
+  };
 };
