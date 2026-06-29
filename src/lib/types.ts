@@ -66,6 +66,13 @@ export type GenerateStoryRequest = {
   storySeed: string;
   storyRules: string;
   genrePreset: GenrePreset;
+  selectedStoryTypeChipId?: string;
+  selectedStoryTypeChipLabel?: string;
+  legacyGenrePreset?: GenrePreset;
+  storyTypeSelectionMode?: string;
+  storySeedSource?: string;
+  selectedStoryTypeGuidance?: string;
+  selectedStoryTypeKeywords?: string[];
   narrativeArchitecture: NarrativeArchitecture;
   characterArc: CharacterArc;
   endingType: EndingType;
@@ -115,6 +122,13 @@ export type StoryDiagnostics = {
   fallbackReason: string | null;
   notice: string | null;
   genrePreset: GenrePreset;
+  selectedStoryTypeChipId?: string;
+  selectedStoryTypeChipLabel?: string;
+  legacyGenrePreset?: GenrePreset;
+  storyTypeSelectionMode?: string;
+  storySeedSource?: string;
+  selectedStoryTypeGuidance?: string;
+  selectedStoryTypeKeywords?: string[];
   narrativeArchitecture: NarrativeArchitecture;
   characterArc: CharacterArc;
   endingType: EndingType;

@@ -29,6 +29,9 @@ export type SavedStory = {
   charactersUsed: string[];
   rulesReferenced: string[];
   genrePreset: GenrePreset;
+  selectedStoryTypeChipId?: string;
+  selectedStoryTypeChipLabel?: string;
+  legacyGenrePreset?: GenrePreset;
   narrativeArchitecture: NarrativeArchitecture;
   characterArc: CharacterArc;
   endingType: EndingType;
@@ -207,6 +210,9 @@ export function createSavedStory(response: GenerateStoryResponse, storyId = crea
     charactersUsed: response.metadata.charactersUsed,
     rulesReferenced: response.metadata.rulesReferenced,
     genrePreset: diagnostics.genrePreset,
+    selectedStoryTypeChipId: diagnostics.selectedStoryTypeChipId,
+    selectedStoryTypeChipLabel: diagnostics.selectedStoryTypeChipLabel,
+    legacyGenrePreset: diagnostics.legacyGenrePreset ?? diagnostics.genrePreset,
     narrativeArchitecture: diagnostics.narrativeArchitecture,
     characterArc: diagnostics.characterArc,
     endingType: diagnostics.endingType,
@@ -230,6 +236,9 @@ export function savedStoryToResponse(savedStory: SavedStory): GenerateStoryRespo
     fallbackReason: null,
     notice: savedStory.diagnosticsNotice,
     genrePreset: savedStory.genrePreset,
+    selectedStoryTypeChipId: savedStory.selectedStoryTypeChipId,
+    selectedStoryTypeChipLabel: savedStory.selectedStoryTypeChipLabel,
+    legacyGenrePreset: savedStory.legacyGenrePreset ?? savedStory.genrePreset,
     narrativeArchitecture: savedStory.narrativeArchitecture,
     characterArc: savedStory.characterArc,
     endingType: savedStory.endingType,

@@ -33,6 +33,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  try {
+    return await handleGenerateRequest(request);
+  } catch (error) {
+    const message = summarizeOpenAIError(error);
+    console.error("Unhandled /api/generate failure", message);
+    return NextResponse.json({ error: "Story generation failed before a response could be completed.", diagnostic: { message } }, { status: 500 });
+  }
+}
+
+async function handleGenerateRequest(request: Request) {
   const generationStartedAt = new Date();
   let body: Partial<GenerateStoryRequest>;
 
@@ -56,6 +66,13 @@ export async function POST(request: Request) {
     storySeed: body.storySeed!.trim(),
     storyRules: buildStoryRules(body.storyRules, readerMood, body.personalizationContext),
     genrePreset: body.genrePreset!,
+    selectedStoryTypeChipId: normalizeOptionalString(body.selectedStoryTypeChipId),
+    selectedStoryTypeChipLabel: normalizeOptionalString(body.selectedStoryTypeChipLabel),
+    legacyGenrePreset: body.legacyGenrePreset,
+    storyTypeSelectionMode: normalizeOptionalString(body.storyTypeSelectionMode),
+    storySeedSource: normalizeOptionalString(body.storySeedSource),
+    selectedStoryTypeGuidance: normalizeOptionalString(body.selectedStoryTypeGuidance),
+    selectedStoryTypeKeywords: Array.isArray(body.selectedStoryTypeKeywords) ? body.selectedStoryTypeKeywords.filter((keyword): keyword is string => typeof keyword === "string" && Boolean(keyword.trim())).map((keyword) => keyword.trim()) : undefined,
     narrativeArchitecture: body.narrativeArchitecture!,
     characterArc: body.characterArc!,
     endingType: body.endingType!,
@@ -335,7 +352,7 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
   return null;
 }
 
-function buildRequestGenerationDiagnostics(input: GenerateStoryRequest): Pick<GenerateStoryResponse["metadata"]["diagnostics"], "generationMode" | "storyId" | "seriesId" | "sourceStoryId" | "parentSeriesId" | "continuationContextIncluded" | "newSeriesCreated" | "generationTrigger"> {
+function buildRequestGenerationDiagnostics(input: GenerateStoryRequest): Pick<GenerateStoryResponse["metadata"]["diagnostics"], "generationMode" | "storyId" | "seriesId" | "sourceStoryId" | "parentSeriesId" | "continuationContextIncluded" | "newSeriesCreated" | "generationTrigger" | "selectedStoryTypeChipId" | "selectedStoryTypeChipLabel" | "legacyGenrePreset" | "storyTypeSelectionMode" | "storySeedSource"> {
   return {
     generationMode: input.generationIdentity.generationMode,
     storyId: input.generationIdentity.storyId,
@@ -344,7 +361,12 @@ function buildRequestGenerationDiagnostics(input: GenerateStoryRequest): Pick<Ge
     parentSeriesId: input.generationIdentity.parentSeriesId ?? null,
     continuationContextIncluded: input.continuationContextIncluded,
     newSeriesCreated: input.generationMode === "new_story",
-    generationTrigger: input.generationTrigger
+    generationTrigger: input.generationTrigger,
+    selectedStoryTypeChipId: input.selectedStoryTypeChipId,
+    selectedStoryTypeChipLabel: input.selectedStoryTypeChipLabel,
+    legacyGenrePreset: input.legacyGenrePreset,
+    storyTypeSelectionMode: input.storyTypeSelectionMode,
+    storySeedSource: input.storySeedSource
   };
 }
 
@@ -368,6 +390,10 @@ function buildStoryRules(storyRules: string | undefined, readerMood: GenerateSto
 
   return [baseRules, formatStoryCraftGuidance(), readerMoodGuidance, controlledPersonalization].filter(Boolean).join("\n\n");
 }
+function normalizeOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
 function summarizeOpenAIError(error: unknown): string {
   if (error instanceof Error) {
     return redactSecretLikeText(error.message);
