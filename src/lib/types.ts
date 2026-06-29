@@ -69,6 +69,10 @@ export type GenerateStoryRequest = {
   selectedStoryTypeChipId?: string;
   selectedStoryTypeChipLabel?: string;
   legacyGenrePreset?: GenrePreset;
+  storyTypeSelectionMode?: string;
+  storySeedSource?: string;
+  selectedStoryTypeGuidance?: string;
+  selectedStoryTypeKeywords?: string[];
   narrativeArchitecture: NarrativeArchitecture;
   characterArc: CharacterArc;
   endingType: EndingType;
@@ -121,6 +125,10 @@ export type StoryDiagnostics = {
   selectedStoryTypeChipId?: string;
   selectedStoryTypeChipLabel?: string;
   legacyGenrePreset?: GenrePreset;
+  storyTypeSelectionMode?: string;
+  storySeedSource?: string;
+  selectedStoryTypeGuidance?: string;
+  selectedStoryTypeKeywords?: string[];
   narrativeArchitecture: NarrativeArchitecture;
   characterArc: CharacterArc;
   endingType: EndingType;

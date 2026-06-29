@@ -672,7 +672,7 @@ export default function Home() {
     return true;
   }
 
-  async function handleGenerate(overrides: { generationMode: GenerationMode; worldBible?: string; characterProfiles?: string; storySeed?: string; storyRules?: string; genrePreset?: GenrePreset; selectedStoryTypeChip?: StoryTypeChip; narrativeArchitecture?: NarrativeArchitecture; characterArc?: CharacterArc; endingType?: EndingType; lengthTarget?: LengthTarget; readerMood?: ReaderMoodSnapshot | null; presentation?: Exclude<GeneratedStoryPresentation, null>; loadingMessage?: string; signalSource?: ReaderProfileEventSource; generationSource?: Exclude<GenerationSource, null>; continuationStoryId?: string; continuationContextIncluded?: boolean; selectedSeriesId?: string | null; sourceStoryId?: string | null }) {
+  async function handleGenerate(overrides: { generationMode: GenerationMode; worldBible?: string; characterProfiles?: string; storySeed?: string; storyRules?: string; genrePreset?: GenrePreset; selectedStoryTypeChip?: StoryTypeChip; storySeedSource?: string; narrativeArchitecture?: NarrativeArchitecture; characterArc?: CharacterArc; endingType?: EndingType; lengthTarget?: LengthTarget; readerMood?: ReaderMoodSnapshot | null; presentation?: Exclude<GeneratedStoryPresentation, null>; loadingMessage?: string; signalSource?: ReaderProfileEventSource; generationSource?: Exclude<GenerationSource, null>; continuationStoryId?: string; continuationContextIncluded?: boolean; selectedSeriesId?: string | null; sourceStoryId?: string | null }) {
     if (requireSignInForAppAction(overrides.generationMode === "continue_series" ? "continuing a series" : "starting generation")) return;
     const nextGenerationSource = overrides.generationSource ?? (overrides.generationMode === "continue_series" ? "continue-story" : "new-story");
     const continuationStoryId = nextGenerationSource === "continue-story" ? overrides.continuationStoryId?.trim() ?? "" : "";
@@ -739,13 +739,13 @@ export default function Home() {
           ...(personalization.prompt ? { personalizationContext: personalization.prompt } : {}),
           readerProfileGenerationSnapshot: personalization.snapshot,
           readerProfileInput: buildGenerationReaderProfileInput(activeCanonicalProfile),
-          ...(overrides.selectedStoryTypeChip ? { selectedStoryTypeChipId: overrides.selectedStoryTypeChip.id, selectedStoryTypeChipLabel: overrides.selectedStoryTypeChip.label, legacyGenrePreset: overrides?.genrePreset ?? genrePreset } : {}),
+          ...(overrides.selectedStoryTypeChip ? { selectedStoryTypeChipId: overrides.selectedStoryTypeChip.id, selectedStoryTypeChipLabel: overrides.selectedStoryTypeChip.label, legacyGenrePreset: overrides?.genrePreset ?? genrePreset, storyTypeSelectionMode: "selected", storySeedSource: overrides.storySeedSource, selectedStoryTypeGuidance: overrides.selectedStoryTypeChip.guidance, selectedStoryTypeKeywords: overrides.selectedStoryTypeChip.keywords } : {}),
           ...(continuationStoryId ? { continuationStoryId } : {})
         })
       });
-      const payload = await response.json();
+      const payload = await readGenerateResponsePayload(response);
       if (activeGenerationRequestId.current !== requestId) return;
-      if (!response.ok) throw new Error(payload.error ?? "Story generation failed.");
+      if (!response.ok) throw new Error(typeof payload.error === "string" ? payload.error : "Story generation failed.");
       const normalizedResponse = applySelectedStoryTypeMetadata(normalizeGenerateStoryResponse(payload), overrides.selectedStoryTypeChip);
       setLastNewStoryPersonalization((current) => ({
         ...current,
@@ -1050,6 +1050,7 @@ export default function Home() {
       storyRules: storyStart.rules,
       genrePreset: storyStart.genre,
       selectedStoryTypeChip: selectedChipDefinition,
+      storySeedSource: fallbackUsed ? "direct-chip-guidance" : "compatible-storyspark",
       narrativeArchitecture,
       characterArc,
       endingType,
@@ -3200,6 +3201,16 @@ function SelectLibrary({ label, onChange, options, value }: { label: string; onC
 
 function savedStoryToCloudInput(story: SavedStory) { return { storyId: story.id, title: story.title, story: story.story, metadata: story }; }
 function cloudRecordToSavedStory(record: CloudSavedStoryRecordResponse): SavedStory { const metadata = record.metadata && typeof record.metadata === "object" ? record.metadata as Partial<SavedStory> : {}; return { ...metadata, id: record.storyId || metadata.id || createStoryId(record.story, record.createdAt), title: record.title || metadata.title || createStoryTitle(record.story), story: record.story, createdAt: metadata.createdAt || record.createdAt, wordCount: typeof metadata.wordCount === "number" ? metadata.wordCount : countWords(record.story), generatorSource: metadata.generatorSource || "cloud", charactersUsed: Array.isArray(metadata.charactersUsed) ? metadata.charactersUsed : [], rulesReferenced: Array.isArray(metadata.rulesReferenced) ? metadata.rulesReferenced : [], genrePreset: metadata.genrePreset || "Speculative Mystery", narrativeArchitecture: metadata.narrativeArchitecture || "Revelation Story", characterArc: metadata.characterArc || "Positive Change Arc", endingType: metadata.endingType || "Resolution with Residue", lengthTarget: metadata.lengthTarget || "Standard", diagnosticsNotice: metadata.diagnosticsNotice ?? null } as SavedStory; }
+async function readGenerateResponsePayload(response: Response): Promise<Record<string, unknown>> {
+  const responseText = await response.text();
+  if (!responseText.trim()) return { error: "Story generation returned an empty response." };
+  try {
+    return JSON.parse(responseText) as Record<string, unknown>;
+  } catch {
+    return { error: `Story generation returned a non-JSON response (${response.status}).`, diagnostic: responseText.slice(0, 240) };
+  }
+}
+
 function applySelectedStoryTypeMetadata(response: GenerateStoryResponse, chip?: StoryTypeChip): GenerateStoryResponse {
   if (!chip) return response;
   return {
