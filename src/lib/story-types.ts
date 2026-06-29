@@ -22,3 +22,23 @@ export type StoryTypeChipId = (typeof STORY_TYPE_CHIPS)[number]["id"];
 export function getStoryTypeChipById(id: string): StoryTypeChip | null {
   return STORY_TYPE_CHIPS.find((chip) => chip.id === id) ?? null;
 }
+
+
+export function getStoryTypeStartCopy(storyTypeLabel?: string | null): { confirmation: string; detail: string; button: string; loading: string } {
+  const label = storyTypeLabel?.trim();
+  if (!label) {
+    return {
+      confirmation: "No story type selected. Lantyrn will surprise you.",
+      detail: "",
+      button: "Start Something New",
+      loading: "Writing the perfect story for you…"
+    };
+  }
+
+  return {
+    confirmation: `Selected story type: ${label}`,
+    detail: "Lantyrn will use this to shape the next story.",
+    button: `Start ${label} Story`,
+    loading: `Writing a ${label} story for you…`
+  };
+}
