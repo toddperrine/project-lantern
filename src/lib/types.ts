@@ -57,6 +57,7 @@ export type ReaderProfileGenerationSnapshot = {
   genreSignal: string;
   canonicalReaderProfileUsed?: boolean;
   canonicalReaderProfileInput?: object;
+  explicitReaderPreferencesForGeneration?: object;
   generatedAt: string;
 };
 

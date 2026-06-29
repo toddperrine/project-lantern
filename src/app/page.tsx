@@ -36,7 +36,12 @@ import {
   DEFAULT_READER_SAFETY_GUARDRAILS,
   normalizeReaderTasteProfile,
   STORY_FEEDBACK_SCORE_BY_RATING,
-  createFeedbackEventId
+  createFeedbackEventId,
+  saveReaderProfilePreferences,
+  hasReaderProfilePreferences,
+  addUniquePreferenceItem,
+  MAX_READER_HARD_AVOIDANCES,
+  READER_PROFILE_PREFERENCES_VERSION
 } from "@/lib/reader-profile";
 import {
   countPreparedReadyStoryQueueItems,
@@ -106,7 +111,8 @@ type LastNewStoryPersonalization = {
 };
 type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" | "not found" | "blocked";
 type AccountMode = "guest" | "signed-in" | "unknown";
-type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; topMoods: string[]; topGenres: string[]; hardAvoidances: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
+type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; topMoods: string[]; topGenres: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
+type ReaderPreferencesSaveStatus = "saved" | "saving" | "error";
 type CloudReaderProfileSyncState = {
   profileId: string;
   status: CloudReaderProfileStatus;
@@ -541,6 +547,7 @@ export default function Home() {
   const currentSeriesEpisode = useMemo(() => findEpisodeInLibrarySeries(savedStories, currentStoryId), [currentStoryId, savedStories]);
   const canGenerate = Boolean(worldBible.content.trim() && characterProfiles.content.trim() && storySeed.content.trim() && !isGenerating);
   const accountProfileSummary = useMemo(() => toAccountProfileSummary({ authState, canonicalProfile: canonicalReaderProfile, inputArtifacts, profile: readerProfile, savedForLaterStoryQueue, savedStories }), [authState, canonicalReaderProfile, inputArtifacts, readerProfile, savedForLaterStoryQueue, savedStories]);
+  const [readerPreferencesSaveStatus, setReaderPreferencesSaveStatus] = useState<ReaderPreferencesSaveStatus>("saved");
 
   function authHeaders(): HeadersInit {
     const token = authState.getAccessToken();
@@ -1697,6 +1704,29 @@ export default function Home() {
     void syncReaderProfileToCloud(nextProfile);
   }
 
+  function handleReaderPreferencesChange(nextPreferences: ReaderProfile["explicitReaderPreferences"]) {
+    setReaderPreferencesSaveStatus("saving");
+    try {
+      const savedProfile = saveReaderProfilePreferences({ ...nextPreferences, updatedAt: new Date().toISOString() }, readerProfile);
+      setReaderProfile(savedProfile);
+      const baseCanonicalProfile = canonicalReaderProfile ?? loadCanonicalReaderProfile();
+      const nextCanonicalProfile = saveCanonicalReaderProfile({
+        ...baseCanonicalProfile,
+        updatedAt: savedProfile.updatedAt,
+        preferences: {
+          ...baseCanonicalProfile.preferences,
+          hardAvoidances: savedProfile.explicitReaderPreferences.hardAvoidances,
+          explicitReaderPreferences: savedProfile.explicitReaderPreferences,
+        },
+      });
+      setCanonicalReaderProfile(nextCanonicalProfile);
+      setReaderPreferencesSaveStatus("saved");
+      void syncReaderProfileToCloud(savedProfile);
+    } catch {
+      setReaderPreferencesSaveStatus("error");
+    }
+  }
+
   function handleStartSomethingDifferent() {
     if (currentGeneratedStory) {
       recordReaderSignal({ eventType: "startSomethingDifferentClicked", source: "startSomethingNew", storyId: currentGeneratedStory.id, title: currentGeneratedStory.title, genre: currentGeneratedStory.genrePreset, wordCount: currentGeneratedStory.wordCount });
@@ -1828,7 +1858,7 @@ export default function Home() {
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
         {activeView === "characters" ? <CharactersView onOpenStory={handleStartRecommendation} /> : null}
-        {activeView === "account" ? <AccountView onOpenLibrary={() => navigateToView("library")} summary={accountProfileSummary} /> : null}
+        {activeView === "account" ? <AccountView onOpenLibrary={() => navigateToView("library")} onReaderPreferencesChange={handleReaderPreferencesChange} readerPreferences={readerProfile.explicitReaderPreferences} saveStatus={readerPreferencesSaveStatus} summary={accountProfileSummary} /> : null}
         {activeView !== "home" ? <MobileDeveloperDiagnostics>{diagnosticsPanels}</MobileDeveloperDiagnostics> : null}
       </section>
       <MobileBottomNav activeView={activeView} onChange={navigateToView} />
@@ -2424,63 +2454,73 @@ function findEpisodeInLibrarySeries(stories: LibraryStory[], currentStoryId: str
 }
 
 
-function AccountView({ onOpenLibrary, summary }: { onOpenLibrary: () => void; summary: AccountProfileSummary }) {
+const READER_MOOD_OPTIONS = ["Cozy", "Funny", "Adventurous", "Scary", "Mysterious", "Hopeful", "Wondrous", "Thoughtful"];
+const READER_GENRE_OPTIONS = ["Fantasy", "Mystery", "Adventure", "Science fiction", "Fairy tale", "Realistic", "Historical", "Animal companion"];
+const CONTENT_LANE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "All ages", value: "all-ages" }, { label: "Middle grade", value: "middle-grade" }, { label: "Teen", value: "teen" }, { label: "Adult", value: "adult" }];
+const STORY_INTENSITY_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Gentle", value: "gentle" }, { label: "Balanced", value: "balanced" }, { label: "Intense", value: "intense" }];
+const ENDING_PREFERENCE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Mostly resolved", value: "mostly-resolved" }, { label: "Open-ended", value: "open-ended" }, { label: "Serialized / continue the pressure", value: "serialized-pressure" }];
+const HERO_PREFERENCE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Hero like me", value: "hero-like-me" }, { label: "Hero unlike me", value: "hero-unlike-me" }, { label: "Surprise me", value: "surprise-me" }];
+
+function AccountView({ onOpenLibrary, onReaderPreferencesChange, readerPreferences, saveStatus, summary }: { onOpenLibrary: () => void; onReaderPreferencesChange: (preferences: ReaderProfile["explicitReaderPreferences"]) => void; readerPreferences: ReaderProfile["explicitReaderPreferences"]; saveStatus: ReaderPreferencesSaveStatus; summary: AccountProfileSummary }) {
+  const [avoidanceDraft, setAvoidanceDraft] = useState("");
   const savedCountEntries = [
     typeof summary.counts.savedStories === "number" ? { label: "Saved stories", value: summary.counts.savedStories } : null,
     typeof summary.counts.series === "number" ? { label: "Series / storyworlds", value: summary.counts.series } : null,
     typeof summary.counts.characters === "number" ? { label: "Characters / casts", value: summary.counts.characters } : null,
     typeof summary.counts.storySparks === "number" ? { label: "Story sparks", value: summary.counts.storySparks } : null,
   ].filter(Boolean) as Array<{ label: string; value: number }>;
+  const updatePreferences = (patch: Partial<ReaderProfile["explicitReaderPreferences"]>) => onReaderPreferencesChange({ ...readerPreferences, ...patch });
+  const toggleItem = (field: "preferredMoods" | "preferredGenres", value: string) => {
+    const current = readerPreferences[field];
+    updatePreferences({ [field]: current.includes(value) ? current.filter((item) => item !== value) : [...current, value] });
+  };
+  const addAvoidance = () => {
+    const next = addUniquePreferenceItem(readerPreferences.hardAvoidances, avoidanceDraft, MAX_READER_HARD_AVOIDANCES);
+    if (next !== readerPreferences.hardAvoidances) updatePreferences({ hardAvoidances: next });
+    setAvoidanceDraft("");
+  };
 
   return (
     <section className="mx-auto grid w-full max-w-5xl min-w-0 gap-5 pb-8 md:pb-0">
-      <PageHeading eyebrow="Account" title="Account / Profile" body="A read-only snapshot of your current Lantyrn profile, saved content, and future data controls." />
+      <PageHeading eyebrow="Account" title="Account / Profile" body="A snapshot of your current Lantyrn profile, saved content, reader preferences, and future data controls." />
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <article className="grid min-w-0 gap-3 rounded-xl border border-lantern-gold/25 bg-lantern-gold/10 p-4 shadow-soft lg:col-span-2">
-          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Current status</p>
-              <h2 className="mt-1 text-2xl font-semibold leading-tight text-paper">{summary.displayName}</h2>
-            </div>
-            <span className="w-fit rounded-md border border-paper/15 bg-night-ink/70 px-2.5 py-1 text-xs font-semibold capitalize text-paper/70">{summary.accountMode}</span>
-          </div>
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Current status</p><h2 className="mt-1 text-2xl font-semibold leading-tight text-paper">{summary.displayName}</h2></div><span className="w-fit rounded-md border border-paper/15 bg-night-ink/70 px-2.5 py-1 text-xs font-semibold capitalize text-paper/70">{summary.accountMode}</span></div>
           {summary.profileId ? <p className="text-sm font-semibold text-paper/80">Profile ID: {summary.profileId}</p> : null}
           <p className="text-sm leading-6 text-paper/70">{summary.statusText}</p>
         </article>
-
         <AccountCard title="What Lantyrn knows so far">
-          <ProfileSummaryRow label="Top moods" values={summary.topMoods} empty="No strong mood signals yet." />
-          <ProfileSummaryRow label="Top genres" values={summary.topGenres} empty="No strong genre signals yet." />
+          <ProfileSummaryRow label="Preferred moods" values={summary.topMoods} empty="No strong mood signals yet." />
+          <ProfileSummaryRow label="Preferred genres" values={summary.topGenres} empty="No strong genre signals yet." />
           <ProfileSummaryRow label="Hard avoidances" values={summary.hardAvoidances} empty="No hard avoidances saved yet." />
+          <ProfileSummaryRow label="Explicit preferences" values={summary.explicitDetails} empty="No explicit lane, intensity, ending, or hero preference saved yet." />
           <ProfileSummaryRow label="Continuation preference" values={summary.continuationPreference ? [summary.continuationPreference] : []} empty="Not enough signal yet." />
           <ProfileSummaryRow label="Recent feedback" values={summary.recentFeedback} empty="No feedback captured yet." />
           <ProfileSummaryRow label="Confidence / status" values={[summary.confidenceLabel]} empty="Still learning." />
         </AccountCard>
-
-        <AccountCard title="Your saved Lantyrn content">
-          {savedCountEntries.length ? (
-            <dl className="grid gap-3 sm:grid-cols-2">
-              {savedCountEntries.map((entry) => (
-                <div className="rounded-md border border-paper/10 bg-night-ink/45 p-3" key={entry.label}>
-                  <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{entry.label}</dt>
-                  <dd className="mt-1 text-2xl font-semibold text-paper">{entry.value}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved items found yet.</p>}
-          <button className="mt-4 min-h-11 w-full rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-night-ink sm:w-fit" onClick={onOpenLibrary} type="button">Go to Library</button>
+        <AccountCard title="Reader preferences">
+          <PreferenceChipGroup label="Preferred moods" options={READER_MOOD_OPTIONS} selected={readerPreferences.preferredMoods} onToggle={(value) => toggleItem("preferredMoods", value)} />
+          <PreferenceChipGroup label="Preferred genres" options={READER_GENRE_OPTIONS} selected={readerPreferences.preferredGenres} onToggle={(value) => toggleItem("preferredGenres", value)} />
+          <div className="grid gap-2"><p className="text-sm font-semibold text-paper">Hard avoidances</p><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={60} onChange={(event) => setAvoidanceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} placeholder="No dead pets, no gore..." value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={!avoidanceDraft.trim() || readerPreferences.hardAvoidances.length >= MAX_READER_HARD_AVOIDANCES} onClick={addAvoidance} type="button">Add</button></div><div className="flex flex-wrap gap-2">{readerPreferences.hardAvoidances.map((item) => <button className="rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => updatePreferences({ hardAvoidances: readerPreferences.hardAvoidances.filter((current) => current !== item) })} type="button">{item} ×</button>)}</div><p className="text-xs text-paper/45">Up to 10 avoidances, 60 characters each.</p></div>
+          <PreferenceSelect label="Content lane" options={CONTENT_LANE_OPTIONS} value={readerPreferences.contentLane} onChange={(value) => updatePreferences({ contentLane: value as typeof readerPreferences.contentLane })} />
+          <PreferenceSelect label="Story intensity" options={STORY_INTENSITY_OPTIONS} value={readerPreferences.storyIntensity} onChange={(value) => updatePreferences({ storyIntensity: value as typeof readerPreferences.storyIntensity })} />
+          <PreferenceSelect label="Ending preference" options={ENDING_PREFERENCE_OPTIONS} value={readerPreferences.endingPreference} onChange={(value) => updatePreferences({ endingPreference: value as typeof readerPreferences.endingPreference })} />
+          <PreferenceSelect label="Hero preference" options={HERO_PREFERENCE_OPTIONS} value={readerPreferences.heroPreference} onChange={(value) => updatePreferences({ heroPreference: value as typeof readerPreferences.heroPreference })} />
+          <p className={`text-xs font-semibold ${saveStatus === "error" ? "text-red-200" : "text-paper/50"}`}>{saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "Could not save locally" : "Saved"}</p>
         </AccountCard>
-
-        <AccountCard title="Data controls">
-          <div className="grid gap-2">
-            {["Export profile/data", "Clear profile memory", "Delete account/data"].map((label) => (
-              <button className="min-h-11 cursor-not-allowed rounded-md border border-paper/12 bg-paper/5 px-4 py-3 text-left text-sm font-semibold text-paper/45" disabled key={label} type="button">{label} — Coming soon</button>
-            ))}
-          </div>
-        </AccountCard>
+        <AccountCard title="Your saved Lantyrn content">{savedCountEntries.length ? <dl className="grid gap-3 sm:grid-cols-2">{savedCountEntries.map((entry) => <div className="rounded-md border border-paper/10 bg-night-ink/45 p-3" key={entry.label}><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{entry.label}</dt><dd className="mt-1 text-2xl font-semibold text-paper">{entry.value}</dd></div>)}</dl> : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved items found yet.</p>}<button className="mt-4 min-h-11 w-full rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-night-ink sm:w-fit" onClick={onOpenLibrary} type="button">Go to Library</button></AccountCard>
+        <AccountCard title="Data controls"><div className="grid gap-2">{["Export profile/data", "Clear profile memory", "Delete account/data"].map((label) => <button className="min-h-11 cursor-not-allowed rounded-md border border-paper/12 bg-paper/5 px-4 py-3 text-left text-sm font-semibold text-paper/45" disabled key={label} type="button">{label} — Coming soon</button>)}</div></AccountCard>
       </div>
     </section>
   );
+}
+
+function PreferenceChipGroup({ label, onToggle, options, selected }: { label: string; onToggle: (value: string) => void; options: string[]; selected: string[] }) {
+  return <div className="grid gap-2"><p className="text-sm font-semibold text-paper">{label}</p><div className="flex flex-wrap gap-2">{options.map((option) => { const isSelected = selected.includes(option); return <button className={`min-h-10 rounded-full border px-3 py-2 text-xs font-semibold transition ${isSelected ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper/70"}`} key={option} onClick={() => onToggle(option)} type="button">{option}</button>; })}</div></div>;
+}
+
+function PreferenceSelect({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: { label: string; value: string }[]; value: string }) {
+  return <label className="grid gap-2"><span className="text-sm font-semibold text-paper">{label}</span><select className="min-h-11 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" onChange={(event) => onChange(event.target.value)} value={value}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
 }
 
 function AccountCard({ children, title }: { children: ReactNode; title: string }) {
@@ -2760,6 +2800,7 @@ function buildNewStoryPersonalization({ canonicalProfile, continuationStoryId, e
     `- Mood selection counts: ${formatCounts(profile.moodCounts)}.`,
     `- Genre counts: ${formatCounts(profile.genreCounts)}.`,
     `- Recent story feedback, as weak preference guidance: ${feedbackSummary}`,
+    hasReaderProfilePreferences(profile.explicitReaderPreferences) ? `- Explicit reader preferences: ${formatExplicitReaderPreferencesForGeneration(profile.explicitReaderPreferences)}.` : "- Explicit reader preferences: none saved.",
     userHardAvoidances.length ? `- User hard avoidances, as hard constraints: ${userHardAvoidances.join(", ")}.` : "- User hard avoidances: none recorded.",
     defaultEerieSafetyGuardrails.length ? `- Default/eerie safety guardrails, not user-entered avoidances: ${defaultEerieSafetyGuardrails.join(", ")}.` : "- Default/eerie safety guardrails: none recorded.",
     includeEerieSignals
@@ -2826,6 +2867,15 @@ function createReaderProfileGenerationSnapshot({ canonicalProfile, defaultSafety
     userHardAvoidancesSummary: userHardAvoidances.length ? userHardAvoidances.join(", ") : "none",
     defaultSafetyGuardrailCount: defaultSafetyGuardrails.length,
     defaultSafetyGuardrailsSummary: defaultSafetyGuardrails.length ? defaultSafetyGuardrails.join(", ") : "none",
+    explicitReaderPreferencesForGeneration: {
+      preferredMoods: profile.explicitReaderPreferences.preferredMoods,
+      preferredGenres: profile.explicitReaderPreferences.preferredGenres,
+      hardAvoidances: profile.explicitReaderPreferences.hardAvoidances,
+      contentLane: profile.explicitReaderPreferences.contentLane,
+      storyIntensity: profile.explicitReaderPreferences.storyIntensity,
+      endingPreference: profile.explicitReaderPreferences.endingPreference,
+      heroPreference: profile.explicitReaderPreferences.heroPreference,
+    },
     moodSignal,
     genreSignal,
     canonicalReaderProfileUsed: true,
@@ -2855,6 +2905,10 @@ function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeries
       <div className="mt-3 grid gap-1 sm:grid-cols-2">
         <p><span className="font-semibold text-paper/80">Active view:</span> {activeView}</p>
         <p><span className="font-semibold text-paper/80">accountShellVersion:</span> v1</p>
+        <p><span className="font-semibold text-paper/80">readerPreferencesVersion:</span> {READER_PROFILE_PREFERENCES_VERSION}</p>
+        <p><span className="font-semibold text-paper/80">explicitReaderPreferencesAvailable:</span> true</p>
+        <p><span className="font-semibold text-paper/80">explicitReaderPreferencesSaved:</span> {hasReaderProfilePreferences(profile.explicitReaderPreferences) ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">explicitReaderPreferencesGenerationLinked:</span> true</p>
         <p><span className="font-semibold text-paper/80">accountMode:</span> {accountSummary.accountMode}</p>
         <p><span className="font-semibold text-paper/80">profileSummaryAvailable:</span> {(accountSummary.topMoods.length || accountSummary.topGenres.length || accountSummary.hardAvoidances.length || accountSummary.recentFeedback.length) ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">savedContentCountsAvailable:</span> true</p>
@@ -3339,15 +3393,17 @@ function toAccountProfileSummary({ authState, canonicalProfile, inputArtifacts, 
   const profileId = userId ? shortenProfileId(userId) : undefined;
   const displayName = userId ? "Signed-in profile" : "Guest profile";
   const statusText = userId ? `Profile ID: ${profileId}` : "Your stories and preferences are tied to this browser/session until full sign-in is added.";
-  const topMoods = topLabels(canonicalProfile?.learned?.moods, profile.moodCounts);
-  const topGenres = topLabels(canonicalProfile?.learned?.genres, profile.genreCounts);
-  const hardAvoidances = uniqueNonEmpty([...(canonicalProfile?.preferences.hardAvoidances ?? []), ...(profile.tasteProfile?.userHardAvoidances ?? [])]).slice(0, 6);
+  const explicitPreferences = profile.explicitReaderPreferences;
+  const topMoods = uniqueNonEmpty([...explicitPreferences.preferredMoods, ...topLabels(canonicalProfile?.learned?.moods, profile.moodCounts)]).slice(0, 6);
+  const topGenres = uniqueNonEmpty([...explicitPreferences.preferredGenres, ...topLabels(canonicalProfile?.learned?.genres, profile.genreCounts)]).slice(0, 6);
+  const hardAvoidances = uniqueNonEmpty([...explicitPreferences.hardAvoidances, ...(canonicalProfile?.preferences.hardAvoidances ?? []), ...(profile.tasteProfile?.userHardAvoidances ?? [])]).slice(0, 6);
   const continuationPreference = formatContinuationPreference(canonicalProfile?.learned?.continuationPreference);
   const recentFeedback = formatRecentFeedback(profile.storyFeedbackSignals).slice(0, 3);
   const confidenceLabel = formatAccountConfidence(canonicalProfile?.learned?.confidence, profile.tasteProfile?.profileConfidence);
   const series = groupStoriesBySeries(savedStories).length;
   const characters = uniqueNonEmpty(savedStories.flatMap((story) => story.charactersUsed ?? [])).length;
   const storySparks = inputArtifacts.filter((artifact) => artifact.type === "storySeed").length + savedForLaterStoryQueue.length;
+  const explicitDetails = formatExplicitReaderPreferenceDetails(explicitPreferences);
 
   return {
     displayName,
@@ -3357,6 +3413,7 @@ function toAccountProfileSummary({ authState, canonicalProfile, inputArtifacts, 
     topMoods,
     topGenres,
     hardAvoidances,
+    explicitDetails,
     continuationPreference,
     recentFeedback,
     confidenceLabel,
@@ -3376,6 +3433,31 @@ function topLabels(primary?: Record<string, number>, fallback?: Record<string, n
 
 function uniqueNonEmpty(values: string[]): string[] {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function formatExplicitReaderPreferencesForGeneration(preferences: ReaderProfile["explicitReaderPreferences"]): string {
+  return [
+    preferences.preferredMoods.length ? `preferredMoods=${preferences.preferredMoods.join(", ")}` : "preferredMoods=none",
+    preferences.preferredGenres.length ? `preferredGenres=${preferences.preferredGenres.join(", ")}` : "preferredGenres=none",
+    preferences.hardAvoidances.length ? `hardAvoidances=${preferences.hardAvoidances.join(", ")}` : "hardAvoidances=none",
+    `contentLane=${preferences.contentLane}`,
+    `storyIntensity=${preferences.storyIntensity}`,
+    `endingPreference=${preferences.endingPreference}`,
+    `heroPreference=${preferences.heroPreference}`,
+  ].join("; ");
+}
+
+function formatExplicitReaderPreferenceDetails(preferences: ReaderProfile["explicitReaderPreferences"]): string[] {
+  const labels: string[] = [];
+  if (preferences.contentLane !== "not-set") labels.push(`Content lane: ${formatPreferenceOptionLabel(preferences.contentLane)}`);
+  if (preferences.storyIntensity !== "not-set") labels.push(`Intensity: ${formatPreferenceOptionLabel(preferences.storyIntensity)}`);
+  if (preferences.endingPreference !== "not-set") labels.push(`Ending: ${formatPreferenceOptionLabel(preferences.endingPreference)}`);
+  if (preferences.heroPreference !== "not-set") labels.push(`Hero: ${formatPreferenceOptionLabel(preferences.heroPreference)}`);
+  return labels;
+}
+
+function formatPreferenceOptionLabel(value: string): string {
+  return value.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ").replace("Serialized Pressure", "Serialized / continue the pressure");
 }
 
 function formatContinuationPreference(value?: number): string | undefined {
