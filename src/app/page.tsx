@@ -82,6 +82,7 @@ type GeneratedStoryPresentation = "first-episode" | "continuation" | "saved-epis
 type GenerationSource = "new-story" | "continue-story" | null;
 type ReaderScrollDiagnostics = { nextEpisodeClicked: string; continuationLoaded: string; scrollResetAttempted: string; scrollTargetUsed: string };
 type LastGenerationIdentityDiagnostics = { identity: GenerationIdentity | null; continuationContextIncluded: boolean; newSeriesCreated: boolean; trigger: string; activeCommittedStoryId: string; activeCommittedSeriesId: string; pendingGenerationMode: GenerationMode | "none"; lastGenerationCancelledOrAborted: boolean };
+type StoryTypeSelectionDiagnostics = { selectedChipId: string; selectedChip: string; availableChips: string; storySparkUsed: string; selectedStorySparkId: string; selectedStorySparkTitle: string; selectedStorySparkMatchedChip: string; directChipGuidanceUsed: string; compatibilityResult: string; fallbackSelectionUsed: string; selectedChipPreservedDuringGeneration: string };
 type ProfileSourceUsed = "local" | "cloud" | "default" | "none";
 type EpisodeMomentumDiagnostics = NonNullable<GenerateStoryResponse["metadata"]["diagnostics"]["episodeMomentum"]>;
 type LastNewStoryPersonalization = {
@@ -349,15 +350,32 @@ function readMood(value: string): Mood {
   return MOOD_DISPLAY_ORDER.includes(value as Mood) ? value as Mood : STORY_TYPE_CHIPS[0].id;
 }
 
-function storyStartSupportsMood(story: StoryStart, mood: Mood): boolean {
+const GENERIC_STORY_TYPE_MATCH_TERMS = new Set(["dark", "dread", "eerie", "horror", "unsettling", "creepy"]);
+
+function getStoryTypeCompatibility(story: StoryStart, mood: Mood): { compatible: boolean; result: string } {
   const chip = getStoryTypeChip(mood);
   const haystack = [story.mood, story.genre, story.title, story.premise, story.seed, story.world, story.rules, ...story.tags].join(" ").toLowerCase();
-  return chip.keywords.some((keyword) => haystack.includes(keyword.toLowerCase())) || haystack.includes(chip.label.toLowerCase());
+  const labelMatched = haystack.includes(chip.label.toLowerCase()) || haystack.includes(chip.id.replace(/-/g, " "));
+  const matchedKeywords = chip.keywords.filter((keyword) => haystack.includes(keyword.toLowerCase()));
+  const specificMatches = matchedKeywords.filter((keyword) => !GENERIC_STORY_TYPE_MATCH_TERMS.has(keyword.toLowerCase()));
+
+  if (labelMatched) return { compatible: true, result: `compatible: matched selected chip label/id (${chip.id})` };
+  if (specificMatches.length) return { compatible: true, result: `compatible: matched selected chip keyword(s): ${specificMatches.join(", ")}` };
+  if (matchedKeywords.length) return { compatible: false, result: `not compatible: only generic overlap (${matchedKeywords.join(", ")})` };
+  return { compatible: false, result: "not compatible: no selected chip label/id/keyword match" };
 }
 
-function findStoryStartForMood(mood: Mood): { storyStart: StoryStart; fallbackUsed: boolean } {
-  const matchedStoryStart = SUGGESTED_STORY_STARTS.find((story) => storyStartSupportsMood(story, mood));
-  return { storyStart: matchedStoryStart ?? createStoryStartFromChip(mood), fallbackUsed: !matchedStoryStart };
+function storyStartSupportsMood(story: StoryStart, mood: Mood): boolean {
+  return getStoryTypeCompatibility(story, mood).compatible;
+}
+
+function findStoryStartForMood(mood: Mood): { storyStart: StoryStart; fallbackUsed: boolean; compatibilityResult: string } {
+  for (const story of SUGGESTED_STORY_STARTS) {
+    const compatibility = getStoryTypeCompatibility(story, mood);
+    if (compatibility.compatible) return { storyStart: story, fallbackUsed: false, compatibilityResult: compatibility.result };
+  }
+
+  return { storyStart: createStoryStartFromChip(mood), fallbackUsed: true, compatibilityResult: "no compatible StorySpark found; using direct selected chip guidance" };
 }
 
 function formatMoodChipList(moods: Mood[]): string {
@@ -450,7 +468,7 @@ export default function Home() {
   const [readyStoryPreparationStatus, setReadyStoryPreparationStatus] = useState("idle");
   const [lastReadyStoryPreparationOutcome, setLastReadyStoryPreparationOutcome] = useState("none");
   const [isStoryStartSelectionOpen, setIsStoryStartSelectionOpen] = useState(false);
-  const [storyTypeSelectionDiagnostics, setStoryTypeSelectionDiagnostics] = useState({ selectedChip: getStoryTypeChip(AVAILABLE_MOOD_CHIPS[0]).label, availableChips: formatMoodChipList(AVAILABLE_MOOD_CHIPS), selectedStorySparkId: "none", selectedStorySparkTitle: "none", selectedStorySparkMatchedChip: "none", fallbackSelectionUsed: "no", selectedChipPreservedDuringGeneration: "not generating" });
+  const [storyTypeSelectionDiagnostics, setStoryTypeSelectionDiagnostics] = useState<StoryTypeSelectionDiagnostics>({ selectedChipId: AVAILABLE_MOOD_CHIPS[0], selectedChip: getStoryTypeChip(AVAILABLE_MOOD_CHIPS[0]).label, availableChips: formatMoodChipList(AVAILABLE_MOOD_CHIPS), storySparkUsed: "no", selectedStorySparkId: "none", selectedStorySparkTitle: "none", selectedStorySparkMatchedChip: "none", directChipGuidanceUsed: "no", compatibilityResult: "not evaluated", fallbackSelectionUsed: "no", selectedChipPreservedDuringGeneration: "not generating" });
   const activeGenerationRequestId = useRef(0);
   const activeGenerationAbortController = useRef<AbortController | null>(null);
 
@@ -1004,15 +1022,19 @@ export default function Home() {
 
     const selectedChip = activeMood;
     const selectedChipDefinition = getStoryTypeChip(selectedChip);
-    const { storyStart, fallbackUsed } = findStoryStartForMood(selectedChip);
+    const { storyStart, fallbackUsed, compatibilityResult } = findStoryStartForMood(selectedChip);
     applyStoryStart(storyStart);
     setStoryTypeSelectionDiagnostics({
+      selectedChipId: selectedChipDefinition.id,
       selectedChip: selectedChipDefinition.label,
       availableChips: formatMoodChipList(AVAILABLE_MOOD_CHIPS),
+      storySparkUsed: fallbackUsed ? "no" : "yes",
       selectedStorySparkId: fallbackUsed ? "none" : storyStart.sourceStorySparkId,
       selectedStorySparkTitle: fallbackUsed ? "none" : storyStart.sourceStorySparkTitle,
-      selectedStorySparkMatchedChip: fallbackUsed ? "direct-chip-guidance" : selectedChipDefinition.label,
-      fallbackSelectionUsed: fallbackUsed ? "yes - direct chip-guidance seed used" : "no",
+      selectedStorySparkMatchedChip: fallbackUsed ? "none" : selectedChipDefinition.label,
+      directChipGuidanceUsed: fallbackUsed ? "yes" : "no",
+      compatibilityResult,
+      fallbackSelectionUsed: fallbackUsed ? "yes - direct selected chip-guidance seed used" : "no",
       selectedChipPreservedDuringGeneration: activeMood === selectedChip ? "yes" : "no"
     });
     setStoryResponse(null);
@@ -2744,7 +2766,7 @@ function getGenerationTriggerLabel(generationMode: GenerationMode, source: Reade
   return "Create";
 }
 
-function AppStateDiagnostics({ activeView, activeCommittedSeriesId, activeCommittedStoryId, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics }: { activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: { selectedChip: string; availableChips: string; selectedStorySparkId: string; selectedStorySparkTitle: string; selectedStorySparkMatchedChip: string; fallbackSelectionUsed: string; selectedChipPreservedDuringGeneration: string } }) {
+function AppStateDiagnostics({ activeView, activeCommittedSeriesId, activeCommittedStoryId, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics }: { activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: StoryTypeSelectionDiagnostics }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
@@ -2770,11 +2792,15 @@ function AppStateDiagnostics({ activeView, activeCommittedSeriesId, activeCommit
         <p><span className="font-semibold text-paper/80">Total story feedback signals:</span> {profile.storyFeedbackSignals?.length ?? 0}</p>
         <p><span className="font-semibold text-paper/80">Ready story queue count:</span> {readyStoryQueue.length}</p>
         <p><span className="font-semibold text-paper/80">StorySpark catalog count:</span> {STORY_SPARK_CATALOG.length}</p>
+        <p><span className="font-semibold text-paper/80">Selected story type chip id:</span> {storyTypeSelectionDiagnostics.selectedChipId}</p>
         <p><span className="font-semibold text-paper/80">Selected story type chip:</span> {storyTypeSelectionDiagnostics.selectedChip}</p>
         <p><span className="font-semibold text-paper/80">Available story type chips:</span> {storyTypeSelectionDiagnostics.availableChips}</p>
+        <p><span className="font-semibold text-paper/80">StorySpark used:</span> {storyTypeSelectionDiagnostics.storySparkUsed}</p>
         <p><span className="font-semibold text-paper/80">Selected StorySpark id:</span> {storyTypeSelectionDiagnostics.selectedStorySparkId}</p>
         <p><span className="font-semibold text-paper/80">Selected StorySpark title:</span> {storyTypeSelectionDiagnostics.selectedStorySparkTitle}</p>
         <p><span className="font-semibold text-paper/80">Selected StorySpark matched chip/type:</span> {storyTypeSelectionDiagnostics.selectedStorySparkMatchedChip}</p>
+        <p><span className="font-semibold text-paper/80">Direct chip-guidance generation used:</span> {storyTypeSelectionDiagnostics.directChipGuidanceUsed}</p>
+        <p><span className="font-semibold text-paper/80">StorySpark compatibility result:</span> {storyTypeSelectionDiagnostics.compatibilityResult}</p>
         <p><span className="font-semibold text-paper/80">Fallback story selection used:</span> {storyTypeSelectionDiagnostics.fallbackSelectionUsed}</p>
         <p><span className="font-semibold text-paper/80">Selected chip preserved during generation:</span> {storyTypeSelectionDiagnostics.selectedChipPreservedDuringGeneration}</p>
         <p><span className="font-semibold text-paper/80">Ready queue StorySpark source count:</span> {readyStoryQueue.filter((item) => item.sourceStorySparkId).length}</p>
