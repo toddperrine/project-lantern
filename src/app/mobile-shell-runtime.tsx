@@ -65,7 +65,7 @@ const FALLBACK_STARTS = [
   { title: "Orchard of Borrowed Moons", premise: "Small moons ripen with unfinished wishes inside.", tags: ["Wonder", "Magic"], mood: "Wonder" },
   { title: "The Quiet Engine", premise: "A machine turns silence into possible futures.", tags: ["Emotional", "Sci-fi"], mood: "Emotional" }
 ];
-const FALLBACK_MOODS = ["Mystery", "Wonder", "Emotional", "Adventure", "Strange", "Hopeful", "Dark", "Reflective"];
+const FALLBACK_MOODS = ["Small-Town Dread", "Gothic Shadows", "Uncanny", "Cosmic Horror", "Weird Nature", "Haunted Past", "Creature Unease", "Dark Fairy Tale", "Psychological Dread"];
 const CHECK_IN_GATE_KEY = "projectLantern.mobileCheckInGate";
 const CHECK_IN_STEP_KEY = "projectLantern.mobileCheckInStep";
 const CHECK_IN_ANSWERS_KEY = "projectLantern.mobileCheckInAnswers";

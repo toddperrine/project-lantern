@@ -53,6 +53,7 @@ import {
   type ReadyStoryQueueSignal
 } from "@/lib/ready-story-queue";
 import { STORY_SPARK_CATALOG, type StorySparkCatalogItem } from "@/lib/story-spark-catalog";
+import { STORY_TYPE_CHIPS, type StoryTypeChip, type StoryTypeChipId } from "@/lib/story-types";
 import { createGenerationIdentity, type GenerationIdentity, type GenerationMode } from "@/lib/generation-identity";
 import { findLibraryStoryBySavedId, findNextSavedEpisodeInSeries, groupStoriesBySeries, type LibrarySeriesGroup, type SeriesEpisode } from "@/lib/series-library";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
@@ -66,7 +67,7 @@ import { APP_VERSION } from "@/lib/build-info";
 import { useAuth, type AuthStatus } from "@/lib/auth";
 
 type AppView = "home" | "library" | "worlds" | "create" | "characters" | "mood-intake";
-type Mood = "Mystery" | "Wonder" | "Emotional" | "Adventure" | "Strange" | "Hopeful" | "Dark" | "Reflective";
+type Mood = StoryTypeChipId;
 type CloudProjectSummary = Pick<SavedProject, "id" | "name" | "createdAt" | "updatedAt">;
 type LibrarySource = "authenticated cloud" | "legacy local" | "auth-disabled fallback";
 type LibraryDiagnosticsState = { source: LibrarySource; loadedCount: number; latestSaveOwnerId: string; lastBlockedAction: string; };
@@ -147,7 +148,7 @@ type ReaderProfileSaveResponse = {
 const ACCEPTED_EXTENSIONS = [".md", ".txt"];
 const EMPTY_UPLOAD: UploadState = { name: "", content: "" };
 const INPUT_LABELS: Record<InputArtifactType, string> = { worldBible: "Storyworld", characterProfiles: "Cast", storySeed: "Story Spark", storyRules: "Craft Rules" };
-const MOOD_DISPLAY_ORDER: Mood[] = ["Mystery", "Wonder", "Emotional", "Adventure", "Strange", "Hopeful", "Dark", "Reflective"];
+const MOOD_DISPLAY_ORDER: Mood[] = STORY_TYPE_CHIPS.map((chip) => chip.id);
 const DEFAULT_STORY_RULES_NOTICE = "Default craft rules are used automatically when this is empty.";
 const FIRST_PAGE_TEST_STORY_RULES = "First-page-test mode: Write a strong opening section of roughly 600-1000 words. Do not resolve the central story event. End at a compelling point of curiosity, pressure, or choice. The result should feel like the first pages of an episode, not a complete chapter.";
 const DEMO_LATEST_STORY_STORAGE_KEY = "projectLantern.demoLatestStory.v1";
@@ -233,12 +234,18 @@ const EMPTY_CLOUD_READER_PROFILE_SYNC: CloudReaderProfileSyncState = {
   initializedDefaultCloudProfile: false
 };
 
+
+function inferStoryTypeForCatalogItem(item: StorySparkCatalogItem): Mood {
+  const haystack = [item.mood, item.genre, item.title, item.premise, item.seed, item.world, item.rules, ...item.tags].join(" ").toLowerCase();
+  return STORY_TYPE_CHIPS.find((chip) => chip.keywords.some((keyword) => haystack.includes(keyword.toLowerCase())) || haystack.includes(chip.label.toLowerCase()))?.id ?? STORY_TYPE_CHIPS[0].id;
+}
+
 function storySparkCatalogItemToStoryStart(item: StorySparkCatalogItem): StoryStart {
   return {
     title: item.title,
     premise: item.premise,
     genre: item.genre,
-    mood: item.mood as Mood,
+    mood: inferStoryTypeForCatalogItem(item),
     heroName: item.heroName,
     heroRole: item.heroRole,
     heroBio: item.heroBio,
@@ -254,9 +261,7 @@ function storySparkCatalogItemToStoryStart(item: StorySparkCatalogItem): StorySt
 }
 
 const SUGGESTED_STORY_STARTS: StoryStart[] = STORY_SPARK_CATALOG.map(storySparkCatalogItemToStoryStart);
-const AVAILABLE_MOOD_CHIPS: Mood[] = MOOD_DISPLAY_ORDER.filter((mood) =>
-  SUGGESTED_STORY_STARTS.some((story) => storyStartSupportsMood(story, mood))
-);
+const AVAILABLE_MOOD_CHIPS: Mood[] = MOOD_DISPLAY_ORDER;
 
 function createInitialReadyStoryQueue(): ReadyStoryQueueItem[] {
   return STORY_SPARK_CATALOG.slice(0, 3).map(storySparkCatalogItemToReadyStoryQueueItem);
@@ -341,23 +346,39 @@ function fillReadyStoryQueueFromCatalog(
 
 
 function readMood(value: string): Mood {
-  return MOOD_DISPLAY_ORDER.includes(value as Mood) ? value as Mood : "Mystery";
+  return MOOD_DISPLAY_ORDER.includes(value as Mood) ? value as Mood : STORY_TYPE_CHIPS[0].id;
 }
 
 function storyStartSupportsMood(story: StoryStart, mood: Mood): boolean {
-  const normalizedMood = mood.toLowerCase();
-  if (story.mood === mood) return true;
-  if (story.genre.toLowerCase().includes(normalizedMood)) return true;
-  return story.tags.some((tag) => tag.toLowerCase().includes(normalizedMood));
+  const chip = getStoryTypeChip(mood);
+  const haystack = [story.mood, story.genre, story.title, story.premise, story.seed, story.world, story.rules, ...story.tags].join(" ").toLowerCase();
+  return chip.keywords.some((keyword) => haystack.includes(keyword.toLowerCase())) || haystack.includes(chip.label.toLowerCase());
 }
 
 function findStoryStartForMood(mood: Mood): { storyStart: StoryStart; fallbackUsed: boolean } {
   const matchedStoryStart = SUGGESTED_STORY_STARTS.find((story) => storyStartSupportsMood(story, mood));
-  return { storyStart: matchedStoryStart ?? SUGGESTED_STORY_STARTS[0], fallbackUsed: !matchedStoryStart };
+  return { storyStart: matchedStoryStart ?? createStoryStartFromChip(mood), fallbackUsed: !matchedStoryStart };
 }
 
 function formatMoodChipList(moods: Mood[]): string {
-  return moods.length ? moods.join(", ") : "none";
+  return moods.length ? moods.map((mood) => getStoryTypeChip(mood).label).join(", ") : "none";
+}
+
+function getStoryTypeChip(mood: Mood): StoryTypeChip {
+  return STORY_TYPE_CHIPS.find((chip) => chip.id === mood) ?? STORY_TYPE_CHIPS[0];
+}
+
+function buildStoryTypeGuidance(chip: StoryTypeChip): string {
+  return [`Story type id: ${chip.id}`, `Story type label: ${chip.label}`, `Story type guidance: ${chip.guidance}`, `Story type keywords: ${chip.keywords.join(", ")}`].join("\n");
+}
+
+function withStoryTypeGuidance(baseSeed: string, chip: StoryTypeChip): string {
+  return `${buildStoryTypeGuidance(chip)}\n\nStory seed:\n${baseSeed}`;
+}
+
+function createStoryStartFromChip(mood: Mood): StoryStart {
+  const chip = getStoryTypeChip(mood);
+  return { title: chip.label, premise: chip.guidance, genre: "Speculative Mystery", mood, heroName: "The reader", heroRole: chip.label, heroBio: `A grounded protagonist caught inside ${chip.label.toLowerCase()}.`, worldName: chip.label, world: chip.guidance, seed: `Use this selected story type as the seed: ${chip.guidance}`, cast: `Create a small, reader-first cast grounded in ${chip.label.toLowerCase()}.`, rules: `Honor the selected story type: ${chip.guidance} Keep the dread specific, serialized, and character-centered.`, sourceStorySparkId: "direct-chip-guidance", sourceStorySparkTitle: "Direct chip guidance", tags: chip.keywords };
 }
 
 function formatLatestReadyStoryQueueSignal(signals: ReaderProfile["readyStoryQueueSignals"]): string {
@@ -370,7 +391,7 @@ export default function Home() {
   const authState = useAuth();
   const searchParams = useSearchParams();
   const [activeView, setActiveView] = useState<AppView>(readAppView(searchParams.get("view")) ?? "home");
-  const [activeMood, setActiveMood] = useState<Mood>(AVAILABLE_MOOD_CHIPS[0] ?? "Mystery");
+  const [activeMood, setActiveMood] = useState<Mood>(AVAILABLE_MOOD_CHIPS[0]);
   const [worldBible, setWorldBible] = useState<UploadState>(EMPTY_UPLOAD);
   const [characterProfiles, setCharacterProfiles] = useState<UploadState>(EMPTY_UPLOAD);
   const [storySeed, setStorySeed] = useState<UploadState>(EMPTY_UPLOAD);
@@ -429,7 +450,7 @@ export default function Home() {
   const [readyStoryPreparationStatus, setReadyStoryPreparationStatus] = useState("idle");
   const [lastReadyStoryPreparationOutcome, setLastReadyStoryPreparationOutcome] = useState("none");
   const [isStoryStartSelectionOpen, setIsStoryStartSelectionOpen] = useState(false);
-  const [storyTypeSelectionDiagnostics, setStoryTypeSelectionDiagnostics] = useState({ selectedChip: AVAILABLE_MOOD_CHIPS[0] ?? "Mystery", availableChips: formatMoodChipList(AVAILABLE_MOOD_CHIPS), selectedStorySparkId: "none", selectedStorySparkTitle: "none", selectedStorySparkMatchedChip: "none", fallbackSelectionUsed: "no" });
+  const [storyTypeSelectionDiagnostics, setStoryTypeSelectionDiagnostics] = useState({ selectedChip: getStoryTypeChip(AVAILABLE_MOOD_CHIPS[0]).label, availableChips: formatMoodChipList(AVAILABLE_MOOD_CHIPS), selectedStorySparkId: "none", selectedStorySparkTitle: "none", selectedStorySparkMatchedChip: "none", fallbackSelectionUsed: "no", selectedChipPreservedDuringGeneration: "not generating" });
   const activeGenerationRequestId = useRef(0);
   const activeGenerationAbortController = useRef<AbortController | null>(null);
 
@@ -982,15 +1003,17 @@ export default function Home() {
     if (isGenerating) return;
 
     const selectedChip = activeMood;
+    const selectedChipDefinition = getStoryTypeChip(selectedChip);
     const { storyStart, fallbackUsed } = findStoryStartForMood(selectedChip);
     applyStoryStart(storyStart);
     setStoryTypeSelectionDiagnostics({
-      selectedChip,
+      selectedChip: selectedChipDefinition.label,
       availableChips: formatMoodChipList(AVAILABLE_MOOD_CHIPS),
-      selectedStorySparkId: storyStart.sourceStorySparkId,
-      selectedStorySparkTitle: storyStart.sourceStorySparkTitle,
-      selectedStorySparkMatchedChip: storyStartSupportsMood(storyStart, selectedChip) ? selectedChip : storyStart.mood,
-      fallbackSelectionUsed: fallbackUsed ? "yes" : "no"
+      selectedStorySparkId: fallbackUsed ? "none" : storyStart.sourceStorySparkId,
+      selectedStorySparkTitle: fallbackUsed ? "none" : storyStart.sourceStorySparkTitle,
+      selectedStorySparkMatchedChip: fallbackUsed ? "direct-chip-guidance" : selectedChipDefinition.label,
+      fallbackSelectionUsed: fallbackUsed ? "yes - direct chip-guidance seed used" : "no",
+      selectedChipPreservedDuringGeneration: activeMood === selectedChip ? "yes" : "no"
     });
     setStoryResponse(null);
     setCurrentStoryId("");
@@ -1004,7 +1027,7 @@ export default function Home() {
       generationMode: "new_story",
       worldBible: storyStart.world,
       characterProfiles: storyStart.cast,
-      storySeed: storyStart.seed,
+      storySeed: withStoryTypeGuidance(storyStart.seed, selectedChipDefinition),
       storyRules: storyStart.rules,
       genrePreset: storyStart.genre,
       narrativeArchitecture,
@@ -2302,7 +2325,7 @@ function MobileCurrentStoryCard({ brief, isGenerating, isRecapOpen, onCloseRecap
 }
 
 function MobileMoodPicker({ activeMood, onSelect }: { activeMood: Mood; onSelect: (mood: Mood) => void }) {
-  return <section className="min-w-0"><h2 className="text-xl font-semibold leading-tight text-paper">What kind of story are you in the mood for?</h2><div className="-mx-3 mt-3 flex min-w-0 gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none]">{AVAILABLE_MOOD_CHIPS.map((mood) => <button className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition ${activeMood === mood ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper"}`} key={mood} onClick={() => onSelect(mood)} type="button">{mood}</button>)}</div></section>;
+  return <section className="min-w-0"><h2 className="text-xl font-semibold leading-tight text-paper">What kind of fear are you in the mood for?</h2><p className="mt-1 text-sm leading-5 text-paper/60">Choose the flavor of dread for your next story.</p><div className="mt-3 flex min-w-0 flex-wrap gap-2">{AVAILABLE_MOOD_CHIPS.map((mood) => { const chip = getStoryTypeChip(mood); return <button className={`rounded-full border px-3 py-2 text-sm font-semibold transition ${activeMood === mood ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper"}`} key={mood} onClick={() => onSelect(mood)} type="button">{chip.label}</button>; })}</div></section>;
 }
 
 function StartSomethingNewPanel({ canUseDemoStory, hasDemoStory, isGenerating, isNewStoryGenerating, onClearDemoStory, onLoadDemoStory, onStartNewStory }: { canUseDemoStory: boolean; hasDemoStory: boolean; isGenerating: boolean; isNewStoryGenerating: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStartNewStory: () => void }) {
@@ -2310,7 +2333,7 @@ function StartSomethingNewPanel({ canUseDemoStory, hasDemoStory, isGenerating, i
 }
 
 function MobileSuggestedStoryStarts({ activeMood, canUseDemoStory, hasDemoStory, onClearDemoStory, onLoadDemoStory, onStart, stories }: { activeMood: Mood; canUseDemoStory: boolean; hasDemoStory: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStart: (story: StoryStart) => void; stories: StoryStart[] }) {
-  return <section className="min-w-0"><div className="flex items-end justify-between gap-3"><div><h2 className="text-xl font-semibold text-paper">Based on your reader pulse</h2><p className="mt-1 text-xs leading-5 text-paper/55">{activeMood} picks for your next read.</p></div>{canUseDemoStory ? <div className="flex shrink-0 gap-2">{hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo</SmallButton> : <SmallButton onClick={onLoadDemoStory}>Demo</SmallButton>}</div> : null}</div><div className="mt-3 grid min-w-0 gap-3">{stories.map((story) => <MobileStoryStartRow key={story.title} onStart={onStart} story={story} />)}</div></section>;
+  return <section className="min-w-0"><div className="flex items-end justify-between gap-3"><div><h2 className="text-xl font-semibold text-paper">Based on your reader pulse</h2><p className="mt-1 text-xs leading-5 text-paper/55">{getStoryTypeChip(activeMood).label} picks for your next read.</p></div>{canUseDemoStory ? <div className="flex shrink-0 gap-2">{hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo</SmallButton> : <SmallButton onClick={onLoadDemoStory}>Demo</SmallButton>}</div> : null}</div><div className="mt-3 grid min-w-0 gap-3">{stories.map((story) => <MobileStoryStartRow key={story.title} onStart={onStart} story={story} />)}</div></section>;
 }
 
 function MobileStoryStartRow({ onStart, story }: { onStart: (story: StoryStart) => void; story: StoryStart }) {
@@ -2328,11 +2351,11 @@ function RecapPanel({ brief, onClose, title }: { brief: StoryBrief; onClose: () 
 function RecapBlock({ body, title }: { body: string; title: string }) { return <section className="rounded-md border border-aged-brass/20 bg-white/65 p-4"><h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-aged-brass">{title}</h4><p className="mt-2 text-sm leading-6 text-primary-dark/75">{body}</p></section>; }
 
 function MoodPicker({ activeMood, hasCurrentStory, onSelect }: { activeMood: Mood; hasCurrentStory: boolean; onSelect: (mood: Mood) => void }) {
-  return <section className={hasCurrentStory ? "min-w-0" : "min-w-0 pt-1"}><div className="max-w-3xl"><h2 className="text-2xl font-semibold text-paper md:text-3xl">What kind of story are you in the mood for?</h2><p className="mt-2 text-sm leading-6 text-paper/62">Choose from the story types currently available.</p>{!hasCurrentStory ? <p className="mt-3 text-sm leading-6 text-paper/70">Start your first story. Once you have one in progress, your next chapter will appear here.</p> : null}</div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{AVAILABLE_MOOD_CHIPS.map((mood) => <button className={`min-w-0 rounded-md border px-4 py-4 text-left transition ${activeMood === mood ? "border-lantern-gold bg-lantern-gold text-night-ink shadow-soft" : "border-paper/15 bg-paper/10 text-paper hover:border-lantern-gold/50 hover:bg-paper/15"}`} key={mood} onClick={() => onSelect(mood)} type="button"><span className="block text-base font-semibold">{mood}</span><span className="mt-2 block text-xs leading-5 opacity-70">{moodDescription(mood)}</span></button>)}</div></section>;
+  return <section className={hasCurrentStory ? "min-w-0" : "min-w-0 pt-1"}><div className="max-w-3xl"><h2 className="text-2xl font-semibold text-paper md:text-3xl">What kind of fear are you in the mood for?</h2><p className="mt-2 text-sm leading-6 text-paper/62">Choose the flavor of dread for your next story.</p>{!hasCurrentStory ? <p className="mt-3 text-sm leading-6 text-paper/70">Start your first story. Once you have one in progress, your next chapter will appear here.</p> : null}</div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{AVAILABLE_MOOD_CHIPS.map((mood) => <button className={`min-w-0 rounded-md border px-4 py-4 text-left transition ${activeMood === mood ? "border-lantern-gold bg-lantern-gold text-night-ink shadow-soft" : "border-paper/15 bg-paper/10 text-paper hover:border-lantern-gold/50 hover:bg-paper/15"}`} key={mood} onClick={() => onSelect(mood)} type="button"><span className="block text-base font-semibold">{getStoryTypeChip(mood).label}</span><span className="mt-2 block text-xs leading-5 opacity-70">{moodDescription(mood)}</span></button>)}</div></section>;
 }
 
 function SuggestedStoryStarts({ activeMood, canUseDemoStory, hasDemoStory, onClearDemoStory, onLoadDemoStory, onStart, stories }: { activeMood: Mood; canUseDemoStory: boolean; hasDemoStory: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStart: (story: StoryStart) => void; stories: StoryStart[] }) {
-  return <section className="min-w-0"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-2xl font-semibold text-paper md:text-3xl">Based on your reader pulse</h2><p className="mt-2 text-sm leading-6 text-paper/62">A small shelf of premieres, with {activeMood.toLowerCase()} closest to the front.</p></div>{canUseDemoStory ? <div className="flex flex-wrap gap-2"><SmallButton disabled={hasDemoStory} onClick={onLoadDemoStory}>Load demo story</SmallButton>{hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo story</SmallButton> : null}</div> : null}</div><div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">{stories.map((story) => <StoryStartCard isFeatured={storyStartSupportsMood(story, activeMood)} key={story.title} onStart={onStart} story={story} />)}</div></section>;
+  return <section className="min-w-0"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-2xl font-semibold text-paper md:text-3xl">Based on your reader pulse</h2><p className="mt-2 text-sm leading-6 text-paper/62">A small shelf of premieres, with {getStoryTypeChip(activeMood).label.toLowerCase()} closest to the front.</p></div>{canUseDemoStory ? <div className="flex flex-wrap gap-2"><SmallButton disabled={hasDemoStory} onClick={onLoadDemoStory}>Load demo story</SmallButton>{hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo story</SmallButton> : null}</div> : null}</div><div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">{stories.map((story) => <StoryStartCard isFeatured={storyStartSupportsMood(story, activeMood)} key={story.title} onStart={onStart} story={story} />)}</div></section>;
 }
 
 function StoryStartCard({ isFeatured, onStart, story }: { isFeatured: boolean; onStart: (story: StoryStart) => void; story: StoryStart }) { return <article className={`min-w-0 rounded-md border p-4 transition ${isFeatured ? "border-lantern-gold/65 bg-paper/15" : "border-paper/12 bg-paper/10"}`}><div className="grid min-w-0 gap-4 sm:grid-cols-[132px_minmax(0,1fr)]"><CoverArt label={story.mood} title={story.title} tone={isFeatured ? "warm" : "cool"} /><div className="min-w-0"><div className="flex min-w-0 flex-wrap gap-2"><Tag>{story.genre}</Tag><Tag>{story.mood}</Tag></div><h3 className="mt-3 text-xl font-semibold leading-tight text-paper">{story.title}</h3><p className="mt-2 text-sm leading-6 text-paper/70">{story.premise}</p><div className="mt-4 flex min-w-0 items-center gap-3 rounded-md border border-paper/10 bg-night-ink/35 p-3"><HeroPortrait name={story.heroName} /><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">Hero / heroine</p><p className="mt-1 text-sm font-semibold text-paper">{story.heroName}</p><p className="mt-1 text-xs leading-5 text-paper/55">{story.heroRole}</p></div></div><button className="mt-4 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink transition hover:bg-lantern-gold/90" onClick={() => onStart(story)} type="button">Start</button></div></div></article>; }
@@ -2721,7 +2744,7 @@ function getGenerationTriggerLabel(generationMode: GenerationMode, source: Reade
   return "Create";
 }
 
-function AppStateDiagnostics({ activeView, activeCommittedSeriesId, activeCommittedStoryId, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics }: { activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: { selectedChip: string; availableChips: string; selectedStorySparkId: string; selectedStorySparkTitle: string; selectedStorySparkMatchedChip: string; fallbackSelectionUsed: string } }) {
+function AppStateDiagnostics({ activeView, activeCommittedSeriesId, activeCommittedStoryId, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics }: { activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: { selectedChip: string; availableChips: string; selectedStorySparkId: string; selectedStorySparkTitle: string; selectedStorySparkMatchedChip: string; fallbackSelectionUsed: string; selectedChipPreservedDuringGeneration: string } }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
@@ -2753,6 +2776,7 @@ function AppStateDiagnostics({ activeView, activeCommittedSeriesId, activeCommit
         <p><span className="font-semibold text-paper/80">Selected StorySpark title:</span> {storyTypeSelectionDiagnostics.selectedStorySparkTitle}</p>
         <p><span className="font-semibold text-paper/80">Selected StorySpark matched chip/type:</span> {storyTypeSelectionDiagnostics.selectedStorySparkMatchedChip}</p>
         <p><span className="font-semibold text-paper/80">Fallback story selection used:</span> {storyTypeSelectionDiagnostics.fallbackSelectionUsed}</p>
+        <p><span className="font-semibold text-paper/80">Selected chip preserved during generation:</span> {storyTypeSelectionDiagnostics.selectedChipPreservedDuringGeneration}</p>
         <p><span className="font-semibold text-paper/80">Ready queue StorySpark source count:</span> {readyStoryQueue.filter((item) => item.sourceStorySparkId).length}</p>
         <p><span className="font-semibold text-paper/80">Ready story prepared count:</span> {countPreparedReadyStoryQueueItems(readyStoryQueue)}</p>
         <p><span className="font-semibold text-paper/80">Ready story preparation status:</span> {lastReadyStoryPreparationStatus}</p>
@@ -3161,7 +3185,7 @@ function clearDemoLatestStory() { if (typeof window === "undefined") return; win
 function createStoryBrief(story: LibraryStory): StoryBrief { if (story.id === DEMO_LATEST_STORY_ID) return DEMO_STORY_BRIEF; const sentences = extractSentences(story.story); const recapSentences = sentences.slice(0, 4); const heroName = story.charactersUsed[0] || "The lead"; const secondCharacter = story.charactersUsed[1]; const hook = sentences[0] ? truncateText(sentences[0], 190) : `${story.title} is waiting at the edge of its next turning point.`; const recap = recapSentences.length ? recapSentences.join(" ") : truncateText(story.story, 420); return { hook, recap, changed: sentences[4] || `${heroName} has crossed a threshold that makes the old version of the story impossible to return to.`, tension: secondCharacter ? `${heroName} and ${secondCharacter} are still caught in the pressure the last chapter exposed.` : `${heroName} is still carrying the central unanswered pressure of the last chapter.`, nextHook: sentences[5] || `The next chapter should press on the choice ${heroName} can no longer avoid.`, heroName, heroRole: story.genrePreset, struggle: `${heroName} is trying to move forward while the last chapter's consequences narrow the path ahead.` }; }
 function extractSentences(text: string): string[] { return (text.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? []).map((sentence) => sentence.trim()).filter(Boolean); }
 function sortStoryStartsByMood(activeMood: Mood): StoryStart[] { return [...SUGGESTED_STORY_STARTS].sort((a, b) => Number(storyStartSupportsMood(b, activeMood)) - Number(storyStartSupportsMood(a, activeMood))); }
-function moodDescription(mood: Mood): string { const descriptions: Record<Mood, string> = { Mystery: "Speculative mysteries with secrets, clues, and dread.", Wonder: "Luminous worlds with a human ache.", Emotional: "Intimate choices and unfinished goodbyes.", Adventure: "Frontier momentum, thresholds, and daring turns.", Strange: "Uncanny turns and beautiful wrongness.", Hopeful: "Warm light after difficult choices.", Dark: "Danger, dread, and costly secrets.", Reflective: "Quiet consequences and inner change." }; return descriptions[mood]; }
+function moodDescription(mood: Mood): string { return getStoryTypeChip(mood).guidance; }
 function readAppView(value: string | null): AppView | null { return value === "library" || value === "worlds" || value === "create" || value === "characters" || value === "home" || value === "mood-intake" ? value : null; }
 function truncateText(text: string, maxLength: number): string { const compact = text.replace(/\s+/g, " ").trim(); return compact.length <= maxLength ? compact : `${compact.slice(0, maxLength).replace(/[\s,.;:]+$/, "")}...`; }
 function slugify(value: string): string { return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "story-world-engine-story"; }
