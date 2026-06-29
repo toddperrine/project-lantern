@@ -71,29 +71,29 @@ export type ReaderFormatPreference = "read" | "listen" | "both";
 export type CanonicalPreferredFormat = "story" | "chapter" | "both";
 export type CanonicalReaderProfileSource = "local" | "cloud" | "merged" | "default";
 export type ReaderProfileContentLane = "not-set" | "all-ages" | "middle-grade" | "teen" | "adult";
-export type ReaderProfileStoryIntensity = "not-set" | "gentle" | "balanced" | "intense";
-export type ReaderProfileEndingPreference = "not-set" | "mostly-resolved" | "open-ended" | "serialized-pressure";
-export type ReaderProfileHeroPreference = "not-set" | "hero-like-me" | "hero-unlike-me" | "surprise-me";
+export type ReaderProfileNarrativePressure = "not-set" | "gentle-unease" | "balanced-tension" | "dark-intense" | "high-dread";
+export type ReaderProfileEpisodeEndingShape = "not-set" | "resolved-incident" | "open-mystery" | "next-episode-pull" | "quiet-aftermath";
+export type ReaderProfileProtagonistLens = "not-set" | "surprise-me" | "ordinary-person-pulled-in" | "investigator-seeker" | "caretaker-protector" | "reluctant-keeper-heir" | "outsider-newcomer" | "animal-bonded-protagonist";
 
 export type ReaderProfilePreferences = {
-  preferredMoods: string[];
-  preferredGenres: string[];
+  preferredStoryTypes: string[];
+  storyIngredients: string[];
   hardAvoidances: string[];
   contentLane: ReaderProfileContentLane;
-  storyIntensity: ReaderProfileStoryIntensity;
-  endingPreference: ReaderProfileEndingPreference;
-  heroPreference: ReaderProfileHeroPreference;
+  narrativePressure: ReaderProfileNarrativePressure;
+  episodeEndingShape: ReaderProfileEpisodeEndingShape;
+  protagonistLens: ReaderProfileProtagonistLens;
   updatedAt?: string;
 };
 
 export const DEFAULT_READER_PROFILE_PREFERENCES: ReaderProfilePreferences = {
-  preferredMoods: [],
-  preferredGenres: [],
+  preferredStoryTypes: [],
+  storyIngredients: [],
   hardAvoidances: [],
   contentLane: "not-set",
-  storyIntensity: "not-set",
-  endingPreference: "not-set",
-  heroPreference: "not-set",
+  narrativePressure: "not-set",
+  episodeEndingShape: "not-set",
+  protagonistLens: "not-set",
 };
 export type ReaderFeedbackRating = StoryFeedbackRating;
 export type ReaderFeedbackEvent = {
@@ -571,13 +571,13 @@ export function normalizeReaderProfile(value: unknown): ReaderProfile {
 export function normalizeReaderProfilePreferences(value: unknown): ReaderProfilePreferences {
   const candidate = isRecord(value) ? value : {};
   return {
-    preferredMoods: readStringArray(candidate.preferredMoods).slice(0, 8),
-    preferredGenres: readStringArray(candidate.preferredGenres).slice(0, 8),
+    preferredStoryTypes: readStringArray(candidate.preferredStoryTypes ?? candidate.preferredMoods).slice(0, 12),
+    storyIngredients: readStringArray(candidate.storyIngredients ?? candidate.preferredGenres).slice(0, 12),
     hardAvoidances: readStringArray(candidate.hardAvoidances).reduce((items, item) => addUniquePreferenceItem(items, item, MAX_READER_HARD_AVOIDANCES), [] as string[]),
     contentLane: isReaderProfileContentLane(candidate.contentLane) ? candidate.contentLane : "not-set",
-    storyIntensity: isReaderProfileStoryIntensity(candidate.storyIntensity) ? candidate.storyIntensity : "not-set",
-    endingPreference: isReaderProfileEndingPreference(candidate.endingPreference) ? candidate.endingPreference : "not-set",
-    heroPreference: isReaderProfileHeroPreference(candidate.heroPreference) ? candidate.heroPreference : "not-set",
+    narrativePressure: isReaderProfileNarrativePressure(candidate.narrativePressure) ? candidate.narrativePressure : migrateStoryIntensity(candidate.storyIntensity),
+    episodeEndingShape: isReaderProfileEpisodeEndingShape(candidate.episodeEndingShape) ? candidate.episodeEndingShape : migrateEndingPreference(candidate.endingPreference),
+    protagonistLens: isReaderProfileProtagonistLens(candidate.protagonistLens) ? candidate.protagonistLens : migrateHeroPreference(candidate.heroPreference),
     ...(typeof candidate.updatedAt === "string" && candidate.updatedAt.trim() ? { updatedAt: candidate.updatedAt } : {}),
   };
 }
@@ -595,7 +595,7 @@ export function addUniquePreferenceItem(items: string[], next: string, maxItems:
 }
 
 export function hasReaderProfilePreferences(preferences: ReaderProfilePreferences): boolean {
-  return Boolean(preferences.preferredMoods.length || preferences.preferredGenres.length || preferences.hardAvoidances.length || preferences.contentLane !== "not-set" || preferences.storyIntensity !== "not-set" || preferences.endingPreference !== "not-set" || preferences.heroPreference !== "not-set");
+  return Boolean(preferences.preferredStoryTypes.length || preferences.storyIngredients.length || preferences.hardAvoidances.length || preferences.contentLane !== "not-set" || preferences.narrativePressure !== "not-set" || preferences.episodeEndingShape !== "not-set" || preferences.protagonistLens !== "not-set");
 }
 
 export function saveReaderProfilePreferences(nextPreferences: ReaderProfilePreferences, profile?: ReaderProfile, persist = true): ReaderProfile {
@@ -614,9 +614,30 @@ export function saveReaderProfilePreferences(nextPreferences: ReaderProfilePrefe
 }
 
 function isReaderProfileContentLane(value: unknown): value is ReaderProfileContentLane { return value === "not-set" || value === "all-ages" || value === "middle-grade" || value === "teen" || value === "adult"; }
-function isReaderProfileStoryIntensity(value: unknown): value is ReaderProfileStoryIntensity { return value === "not-set" || value === "gentle" || value === "balanced" || value === "intense"; }
-function isReaderProfileEndingPreference(value: unknown): value is ReaderProfileEndingPreference { return value === "not-set" || value === "mostly-resolved" || value === "open-ended" || value === "serialized-pressure"; }
-function isReaderProfileHeroPreference(value: unknown): value is ReaderProfileHeroPreference { return value === "not-set" || value === "hero-like-me" || value === "hero-unlike-me" || value === "surprise-me"; }
+function isReaderProfileNarrativePressure(value: unknown): value is ReaderProfileNarrativePressure { return value === "not-set" || value === "gentle-unease" || value === "balanced-tension" || value === "dark-intense" || value === "high-dread"; }
+function isReaderProfileEpisodeEndingShape(value: unknown): value is ReaderProfileEpisodeEndingShape { return value === "not-set" || value === "resolved-incident" || value === "open-mystery" || value === "next-episode-pull" || value === "quiet-aftermath"; }
+function isReaderProfileProtagonistLens(value: unknown): value is ReaderProfileProtagonistLens { return value === "not-set" || value === "surprise-me" || value === "ordinary-person-pulled-in" || value === "investigator-seeker" || value === "caretaker-protector" || value === "reluctant-keeper-heir" || value === "outsider-newcomer" || value === "animal-bonded-protagonist"; }
+
+function migrateStoryIntensity(value: unknown): ReaderProfileNarrativePressure {
+  if (value === "gentle") return "gentle-unease";
+  if (value === "balanced") return "balanced-tension";
+  if (value === "intense") return "dark-intense";
+  return "not-set";
+}
+
+function migrateEndingPreference(value: unknown): ReaderProfileEpisodeEndingShape {
+  if (value === "mostly-resolved") return "resolved-incident";
+  if (value === "open-ended") return "open-mystery";
+  if (value === "serialized-pressure") return "next-episode-pull";
+  return "not-set";
+}
+
+function migrateHeroPreference(value: unknown): ReaderProfileProtagonistLens {
+  if (value === "surprise-me") return "surprise-me";
+  if (value === "hero-like-me") return "ordinary-person-pulled-in";
+  if (value === "hero-unlike-me") return "outsider-newcomer";
+  return "not-set";
+}
 
 export function normalizeReaderTasteProfile(value: unknown): ReaderTasteProfile {
   const fallback = createDefaultReaderTasteProfile();

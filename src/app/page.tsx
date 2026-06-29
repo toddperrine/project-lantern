@@ -111,7 +111,7 @@ type LastNewStoryPersonalization = {
 };
 type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" | "not found" | "blocked";
 type AccountMode = "guest" | "signed-in" | "unknown";
-type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; topMoods: string[]; topGenres: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
+type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; preferredStoryTypes: string[]; storyIngredients: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
 type ReaderPreferencesSaveStatus = "saved" | "saving" | "error";
 type CloudReaderProfileSyncState = {
   profileId: string;
@@ -386,7 +386,7 @@ function getStoryTypeChip(mood: Mood): StoryTypeChip {
 }
 
 function buildStoryTypeGuidance(chip: StoryTypeChip): string {
-  return [`Story type id: ${chip.id}`, `Story type label: ${chip.label}`, `Story type guidance: ${chip.guidance}`, `Story type keywords: ${chip.keywords.join(", ")}`, getStoryTypePromptRequirements(chip)].filter(Boolean).join("\n");
+  return [`Selected Lantyrn story fit: ${chip.label}.`, `Story fit direction: ${chip.guidance}`, `Useful story fit ingredients: ${chip.keywords.join(", ")}.`, "Use these as private planning guidance only. Do not print story type ids, story type guidance labels, keywords lists, prompt rules, or craft metadata in the prose.", getStoryTypePromptRequirements(chip)].filter(Boolean).join("\n");
 }
 
 function withStoryTypeGuidance(baseSeed: string, chip: StoryTypeChip): string {
@@ -2454,12 +2454,12 @@ function findEpisodeInLibrarySeries(stories: LibraryStory[], currentStoryId: str
 }
 
 
-const READER_MOOD_OPTIONS = ["Cozy", "Funny", "Adventurous", "Scary", "Mysterious", "Hopeful", "Wondrous", "Thoughtful"];
-const READER_GENRE_OPTIONS = ["Fantasy", "Mystery", "Adventure", "Science fiction", "Fairy tale", "Realistic", "Historical", "Animal companion"];
+const READER_STORY_TYPE_OPTIONS = STORY_TYPE_CHIPS.map((chip) => chip.label);
+const READER_STORY_INGREDIENT_OPTIONS = ["Magic with rules", "Strange technology", "Ancient folklore", "Ordinary place made uncanny", "Found map / key / object", "Secret society or order", "Companion animal", "Family legacy", "Lost town / lost road", "Moral bargain", "Unreliable memory", "Hidden room / hidden archive"];
 const CONTENT_LANE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "All ages", value: "all-ages" }, { label: "Middle grade", value: "middle-grade" }, { label: "Teen", value: "teen" }, { label: "Adult", value: "adult" }];
-const STORY_INTENSITY_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Gentle", value: "gentle" }, { label: "Balanced", value: "balanced" }, { label: "Intense", value: "intense" }];
-const ENDING_PREFERENCE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Mostly resolved", value: "mostly-resolved" }, { label: "Open-ended", value: "open-ended" }, { label: "Serialized / continue the pressure", value: "serialized-pressure" }];
-const HERO_PREFERENCE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Hero like me", value: "hero-like-me" }, { label: "Hero unlike me", value: "hero-unlike-me" }, { label: "Surprise me", value: "surprise-me" }];
+const NARRATIVE_PRESSURE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Gentle unease", value: "gentle-unease" }, { label: "Balanced tension", value: "balanced-tension" }, { label: "Dark / intense", value: "dark-intense" }, { label: "High dread", value: "high-dread" }];
+const EPISODE_ENDING_SHAPE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Resolve this episode’s incident", value: "resolved-incident" }, { label: "Leave an open mystery", value: "open-mystery" }, { label: "Strong next-episode pull", value: "next-episode-pull" }, { label: "Quiet aftermath with consequences", value: "quiet-aftermath" }];
+const PROTAGONIST_LENS_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Surprise me", value: "surprise-me" }, { label: "Ordinary person pulled in", value: "ordinary-person-pulled-in" }, { label: "Investigator / seeker", value: "investigator-seeker" }, { label: "Caretaker / protector", value: "caretaker-protector" }, { label: "Reluctant keeper / heir", value: "reluctant-keeper-heir" }, { label: "Outsider / newcomer", value: "outsider-newcomer" }, { label: "Animal-bonded protagonist", value: "animal-bonded-protagonist" }];
 
 function AccountView({ onOpenLibrary, onReaderPreferencesChange, readerPreferences, saveStatus, summary }: { onOpenLibrary: () => void; onReaderPreferencesChange: (preferences: ReaderProfile["explicitReaderPreferences"]) => void; readerPreferences: ReaderProfile["explicitReaderPreferences"]; saveStatus: ReaderPreferencesSaveStatus; summary: AccountProfileSummary }) {
   const [avoidanceDraft, setAvoidanceDraft] = useState("");
@@ -2470,7 +2470,7 @@ function AccountView({ onOpenLibrary, onReaderPreferencesChange, readerPreferenc
     typeof summary.counts.storySparks === "number" ? { label: "Story sparks", value: summary.counts.storySparks } : null,
   ].filter(Boolean) as Array<{ label: string; value: number }>;
   const updatePreferences = (patch: Partial<ReaderProfile["explicitReaderPreferences"]>) => onReaderPreferencesChange({ ...readerPreferences, ...patch });
-  const toggleItem = (field: "preferredMoods" | "preferredGenres", value: string) => {
+  const toggleItem = (field: "preferredStoryTypes" | "storyIngredients", value: string) => {
     const current = readerPreferences[field];
     updatePreferences({ [field]: current.includes(value) ? current.filter((item) => item !== value) : [...current, value] });
   };
@@ -2490,22 +2490,22 @@ function AccountView({ onOpenLibrary, onReaderPreferencesChange, readerPreferenc
           <p className="text-sm leading-6 text-paper/70">{summary.statusText}</p>
         </article>
         <AccountCard title="What Lantyrn knows so far">
-          <ProfileSummaryRow label="Preferred moods" values={summary.topMoods} empty="No strong mood signals yet." />
-          <ProfileSummaryRow label="Preferred genres" values={summary.topGenres} empty="No strong genre signals yet." />
+          <ProfileSummaryRow label="Preferred story types" values={summary.preferredStoryTypes} empty="No explicit story-type signals yet." />
+          <ProfileSummaryRow label="Story ingredients" values={summary.storyIngredients} empty="No story ingredients saved yet." />
           <ProfileSummaryRow label="Hard avoidances" values={summary.hardAvoidances} empty="No hard avoidances saved yet." />
-          <ProfileSummaryRow label="Explicit preferences" values={summary.explicitDetails} empty="No explicit lane, intensity, ending, or hero preference saved yet." />
+          <ProfileSummaryRow label="Story fit settings" values={summary.explicitDetails} empty="No explicit lane, pressure, ending shape, or protagonist lens saved yet." />
           <ProfileSummaryRow label="Continuation preference" values={summary.continuationPreference ? [summary.continuationPreference] : []} empty="Not enough signal yet." />
           <ProfileSummaryRow label="Recent feedback" values={summary.recentFeedback} empty="No feedback captured yet." />
           <ProfileSummaryRow label="Confidence / status" values={[summary.confidenceLabel]} empty="Still learning." />
         </AccountCard>
-        <AccountCard title="Reader preferences">
-          <PreferenceChipGroup label="Preferred moods" options={READER_MOOD_OPTIONS} selected={readerPreferences.preferredMoods} onToggle={(value) => toggleItem("preferredMoods", value)} />
-          <PreferenceChipGroup label="Preferred genres" options={READER_GENRE_OPTIONS} selected={readerPreferences.preferredGenres} onToggle={(value) => toggleItem("preferredGenres", value)} />
+        <AccountCard title="Story fit preferences">
+          <PreferenceChipGroup label="Preferred story types" options={READER_STORY_TYPE_OPTIONS} selected={readerPreferences.preferredStoryTypes} onToggle={(value) => toggleItem("preferredStoryTypes", value)} />
+          <PreferenceChipGroup label="Story ingredients" options={READER_STORY_INGREDIENT_OPTIONS} selected={readerPreferences.storyIngredients} onToggle={(value) => toggleItem("storyIngredients", value)} />
           <div className="grid gap-2"><p className="text-sm font-semibold text-paper">Hard avoidances</p><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={60} onChange={(event) => setAvoidanceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} placeholder="No dead pets, no gore..." value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={!avoidanceDraft.trim() || readerPreferences.hardAvoidances.length >= MAX_READER_HARD_AVOIDANCES} onClick={addAvoidance} type="button">Add</button></div><div className="flex flex-wrap gap-2">{readerPreferences.hardAvoidances.map((item) => <button className="rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => updatePreferences({ hardAvoidances: readerPreferences.hardAvoidances.filter((current) => current !== item) })} type="button">{item} ×</button>)}</div><p className="text-xs text-paper/45">Up to 10 avoidances, 60 characters each.</p></div>
           <PreferenceSelect label="Content lane" options={CONTENT_LANE_OPTIONS} value={readerPreferences.contentLane} onChange={(value) => updatePreferences({ contentLane: value as typeof readerPreferences.contentLane })} />
-          <PreferenceSelect label="Story intensity" options={STORY_INTENSITY_OPTIONS} value={readerPreferences.storyIntensity} onChange={(value) => updatePreferences({ storyIntensity: value as typeof readerPreferences.storyIntensity })} />
-          <PreferenceSelect label="Ending preference" options={ENDING_PREFERENCE_OPTIONS} value={readerPreferences.endingPreference} onChange={(value) => updatePreferences({ endingPreference: value as typeof readerPreferences.endingPreference })} />
-          <PreferenceSelect label="Hero preference" options={HERO_PREFERENCE_OPTIONS} value={readerPreferences.heroPreference} onChange={(value) => updatePreferences({ heroPreference: value as typeof readerPreferences.heroPreference })} />
+          <PreferenceSelect label="Narrative pressure" options={NARRATIVE_PRESSURE_OPTIONS} value={readerPreferences.narrativePressure} onChange={(value) => updatePreferences({ narrativePressure: value as typeof readerPreferences.narrativePressure })} />
+          <PreferenceSelect label="Episode ending shape" options={EPISODE_ENDING_SHAPE_OPTIONS} value={readerPreferences.episodeEndingShape} onChange={(value) => updatePreferences({ episodeEndingShape: value as typeof readerPreferences.episodeEndingShape })} />
+          <PreferenceSelect label="Protagonist lens" options={PROTAGONIST_LENS_OPTIONS} value={readerPreferences.protagonistLens} onChange={(value) => updatePreferences({ protagonistLens: value as typeof readerPreferences.protagonistLens })} />
           <p className={`text-xs font-semibold ${saveStatus === "error" ? "text-red-200" : "text-paper/50"}`}>{saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "Could not save locally" : "Saved"}</p>
         </AccountCard>
         <AccountCard title="Your saved Lantyrn content">{savedCountEntries.length ? <dl className="grid gap-3 sm:grid-cols-2">{savedCountEntries.map((entry) => <div className="rounded-md border border-paper/10 bg-night-ink/45 p-3" key={entry.label}><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{entry.label}</dt><dd className="mt-1 text-2xl font-semibold text-paper">{entry.value}</dd></div>)}</dl> : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved items found yet.</p>}<button className="mt-4 min-h-11 w-full rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-night-ink sm:w-fit" onClick={onOpenLibrary} type="button">Go to Library</button></AccountCard>
@@ -2868,13 +2868,13 @@ function createReaderProfileGenerationSnapshot({ canonicalProfile, defaultSafety
     defaultSafetyGuardrailCount: defaultSafetyGuardrails.length,
     defaultSafetyGuardrailsSummary: defaultSafetyGuardrails.length ? defaultSafetyGuardrails.join(", ") : "none",
     explicitReaderPreferencesForGeneration: {
-      preferredMoods: profile.explicitReaderPreferences.preferredMoods,
-      preferredGenres: profile.explicitReaderPreferences.preferredGenres,
+      preferredStoryTypes: profile.explicitReaderPreferences.preferredStoryTypes,
+      storyIngredients: profile.explicitReaderPreferences.storyIngredients,
       hardAvoidances: profile.explicitReaderPreferences.hardAvoidances,
       contentLane: profile.explicitReaderPreferences.contentLane,
-      storyIntensity: profile.explicitReaderPreferences.storyIntensity,
-      endingPreference: profile.explicitReaderPreferences.endingPreference,
-      heroPreference: profile.explicitReaderPreferences.heroPreference,
+      narrativePressure: profile.explicitReaderPreferences.narrativePressure,
+      episodeEndingShape: profile.explicitReaderPreferences.episodeEndingShape,
+      protagonistLens: profile.explicitReaderPreferences.protagonistLens,
     },
     moodSignal,
     genreSignal,
@@ -2910,7 +2910,7 @@ function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeries
         <p><span className="font-semibold text-paper/80">explicitReaderPreferencesSaved:</span> {hasReaderProfilePreferences(profile.explicitReaderPreferences) ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">explicitReaderPreferencesGenerationLinked:</span> true</p>
         <p><span className="font-semibold text-paper/80">accountMode:</span> {accountSummary.accountMode}</p>
-        <p><span className="font-semibold text-paper/80">profileSummaryAvailable:</span> {(accountSummary.topMoods.length || accountSummary.topGenres.length || accountSummary.hardAvoidances.length || accountSummary.recentFeedback.length) ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">profileSummaryAvailable:</span> {(accountSummary.preferredStoryTypes.length || accountSummary.storyIngredients.length || accountSummary.hardAvoidances.length || accountSummary.recentFeedback.length) ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">savedContentCountsAvailable:</span> true</p>
         <p><span className="font-semibold text-paper/80">Generation in progress:</span> {isGenerating ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Last generation trigger/source:</span> {lastGenerationTrigger}</p>
@@ -3394,8 +3394,8 @@ function toAccountProfileSummary({ authState, canonicalProfile, inputArtifacts, 
   const displayName = userId ? "Signed-in profile" : "Guest profile";
   const statusText = userId ? `Profile ID: ${profileId}` : "Your stories and preferences are tied to this browser/session until full sign-in is added.";
   const explicitPreferences = profile.explicitReaderPreferences;
-  const topMoods = uniqueNonEmpty([...explicitPreferences.preferredMoods, ...topLabels(canonicalProfile?.learned?.moods, profile.moodCounts)]).slice(0, 6);
-  const topGenres = uniqueNonEmpty([...explicitPreferences.preferredGenres, ...topLabels(canonicalProfile?.learned?.genres, profile.genreCounts)]).slice(0, 6);
+  const preferredStoryTypes = uniqueNonEmpty([...explicitPreferences.preferredStoryTypes, ...topLabels(canonicalProfile?.learned?.moods, profile.moodCounts)]).slice(0, 6);
+  const storyIngredients = uniqueNonEmpty([...explicitPreferences.storyIngredients, ...topLabels(canonicalProfile?.learned?.genres, profile.genreCounts)]).slice(0, 6);
   const hardAvoidances = uniqueNonEmpty([...explicitPreferences.hardAvoidances, ...(canonicalProfile?.preferences.hardAvoidances ?? []), ...(profile.tasteProfile?.userHardAvoidances ?? [])]).slice(0, 6);
   const continuationPreference = formatContinuationPreference(canonicalProfile?.learned?.continuationPreference);
   const recentFeedback = formatRecentFeedback(profile.storyFeedbackSignals).slice(0, 3);
@@ -3410,8 +3410,8 @@ function toAccountProfileSummary({ authState, canonicalProfile, inputArtifacts, 
     profileId,
     accountMode,
     statusText,
-    topMoods,
-    topGenres,
+    preferredStoryTypes,
+    storyIngredients,
     hardAvoidances,
     explicitDetails,
     continuationPreference,
@@ -3437,27 +3437,43 @@ function uniqueNonEmpty(values: string[]): string[] {
 
 function formatExplicitReaderPreferencesForGeneration(preferences: ReaderProfile["explicitReaderPreferences"]): string {
   return [
-    preferences.preferredMoods.length ? `preferredMoods=${preferences.preferredMoods.join(", ")}` : "preferredMoods=none",
-    preferences.preferredGenres.length ? `preferredGenres=${preferences.preferredGenres.join(", ")}` : "preferredGenres=none",
+    preferences.preferredStoryTypes.length ? `preferredStoryTypes=${preferences.preferredStoryTypes.join(", ")}` : "preferredStoryTypes=none",
+    preferences.storyIngredients.length ? `storyIngredients=${preferences.storyIngredients.join(", ")}` : "storyIngredients=none",
     preferences.hardAvoidances.length ? `hardAvoidances=${preferences.hardAvoidances.join(", ")}` : "hardAvoidances=none",
     `contentLane=${preferences.contentLane}`,
-    `storyIntensity=${preferences.storyIntensity}`,
-    `endingPreference=${preferences.endingPreference}`,
-    `heroPreference=${preferences.heroPreference}`,
+    `narrativePressure=${preferences.narrativePressure}`,
+    `episodeEndingShape=${preferences.episodeEndingShape}`,
+    `protagonistLens=${preferences.protagonistLens}`,
   ].join("; ");
 }
 
 function formatExplicitReaderPreferenceDetails(preferences: ReaderProfile["explicitReaderPreferences"]): string[] {
   const labels: string[] = [];
   if (preferences.contentLane !== "not-set") labels.push(`Content lane: ${formatPreferenceOptionLabel(preferences.contentLane)}`);
-  if (preferences.storyIntensity !== "not-set") labels.push(`Intensity: ${formatPreferenceOptionLabel(preferences.storyIntensity)}`);
-  if (preferences.endingPreference !== "not-set") labels.push(`Ending: ${formatPreferenceOptionLabel(preferences.endingPreference)}`);
-  if (preferences.heroPreference !== "not-set") labels.push(`Hero: ${formatPreferenceOptionLabel(preferences.heroPreference)}`);
+  if (preferences.narrativePressure !== "not-set") labels.push(`Narrative pressure: ${formatPreferenceOptionLabel(preferences.narrativePressure)}`);
+  if (preferences.episodeEndingShape !== "not-set") labels.push(`Episode ending: ${formatPreferenceOptionLabel(preferences.episodeEndingShape)}`);
+  if (preferences.protagonistLens !== "not-set") labels.push(`Protagonist lens: ${formatPreferenceOptionLabel(preferences.protagonistLens)}`);
   return labels;
 }
 
 function formatPreferenceOptionLabel(value: string): string {
-  return value.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ").replace("Serialized Pressure", "Serialized / continue the pressure");
+  const explicitLabels: Record<string, string> = {
+    "gentle-unease": "Gentle unease",
+    "balanced-tension": "Balanced tension",
+    "dark-intense": "Dark / intense",
+    "high-dread": "High dread",
+    "resolved-incident": "Resolve this episode’s incident",
+    "open-mystery": "Leave an open mystery",
+    "next-episode-pull": "Strong next-episode pull",
+    "quiet-aftermath": "Quiet aftermath with consequences",
+    "ordinary-person-pulled-in": "Ordinary person pulled in",
+    "investigator-seeker": "Investigator / seeker",
+    "caretaker-protector": "Caretaker / protector",
+    "reluctant-keeper-heir": "Reluctant keeper / heir",
+    "outsider-newcomer": "Outsider / newcomer",
+    "animal-bonded-protagonist": "Animal-bonded protagonist",
+  };
+  return explicitLabels[value] ?? value.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 }
 
 function formatContinuationPreference(value?: number): string | undefined {
