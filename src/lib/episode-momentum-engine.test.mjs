@@ -119,6 +119,8 @@ test("repair runs at most once and repaired text becomes final response.story wi
   assert.equal(result.story, repaired);
   assert.equal(result.metadata.wordCount, repaired.split(/\s+/).length);
   assert.equal(result.metadata.diagnostics.finalWordCount, repaired.split(/\s+/).length);
+  assert.equal(result.metadata.diagnostics.episodeMomentum.active, true);
+  assert.equal(result.metadata.diagnostics.episodeMomentum.activation_reason, "continue_series");
   assert.equal(result.metadata.diagnostics.episodeMomentum.repair_ran, true);
   assert.equal(result.metadata.diagnostics.storyId, "story-id");
   assert.equal(result.metadata.diagnostics.seriesId, "series-id");
