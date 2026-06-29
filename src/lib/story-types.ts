@@ -23,6 +23,36 @@ export function getStoryTypeChipById(id: string): StoryTypeChip | null {
   return STORY_TYPE_CHIPS.find((chip) => chip.id === id) ?? null;
 }
 
+const GENERIC_STORY_TYPE_MATCH_TERMS = new Set(["dark", "dread", "eerie", "horror", "unsettling", "creepy"]);
+
+export function getStoryTypeTextCompatibility(chip: StoryTypeChip, text: string): { compatible: boolean; result: string } {
+  const haystack = text.toLowerCase();
+  const labelMatched = haystack.includes(chip.label.toLowerCase()) || haystack.includes(chip.id.replace(/-/g, " "));
+  const matchedKeywords = chip.keywords.filter((keyword) => haystack.includes(keyword.toLowerCase()));
+  const specificMatches = matchedKeywords.filter((keyword) => !GENERIC_STORY_TYPE_MATCH_TERMS.has(keyword.toLowerCase()));
+
+  if (labelMatched) return { compatible: true, result: `compatible: matched selected chip label/id (${chip.id})` };
+  if (specificMatches.length) return { compatible: true, result: `compatible: matched selected chip keyword(s): ${specificMatches.join(", ")}` };
+  if (matchedKeywords.length) return { compatible: false, result: `not compatible: only generic overlap (${matchedKeywords.join(", ")})` };
+  return { compatible: false, result: "not compatible: no selected chip label/id/keyword match" };
+}
+
+export function getStoryTypeSeedSource(chip: StoryTypeChip, candidateTexts: string[]): "compatible-storyspark" | "direct-chip-guidance" {
+  return candidateTexts.some((text) => getStoryTypeTextCompatibility(chip, text).compatible) ? "compatible-storyspark" : "direct-chip-guidance";
+}
+
+export function getStoryTypePromptRequirements(chip: StoryTypeChip): string {
+  if (chip.id !== "dark-fairy-tale") return "";
+  return [
+    "Dark Fairy Tale requirements:",
+    "- Require folklore or fairy-tale logic.",
+    "- Center rules, bargains, thresholds, curses, transformations, or beautiful cruelty.",
+    "- Turn a storybook or mythic pattern dangerous.",
+    "- Make dread come from violating or discovering a hidden rule.",
+    "- Avoid mayor/town archive/town scandal, municipal mystery, old mill/founding-family crime, or generic small-town conspiracy defaults."
+  ].join("\n");
+}
+
 export function getStoryTypePrimaryCategory(input: { selectedStoryTypeChipLabel?: string | null; storyTypeChipLabel?: string | null; genrePreset?: string | null }): string {
   return input.selectedStoryTypeChipLabel?.trim() || input.storyTypeChipLabel?.trim() || input.genrePreset?.trim() || "Story";
 }
