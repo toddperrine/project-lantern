@@ -8,7 +8,8 @@ const NAV_ITEMS = [
   { label: "Story Library", href: "/?view=library", view: "library" },
   { label: "Characters", href: "/?view=characters", view: "characters" },
   { label: "Worlds", href: "/?view=worlds", view: "worlds" },
-  { label: "Create", href: "/?view=create", view: "create" }
+  { label: "Create", href: "/?view=create", view: "create" },
+  { label: "Account", href: "/?view=account", view: "account" }
 ];
 
 const NAV_SELECTED_CLASS = "flex min-w-0 flex-1 basis-[calc(50%-0.25rem)] items-center justify-center rounded-md border border-lantern-gold bg-lantern-gold px-3 py-2 text-center text-sm font-semibold leading-5 text-primary-dark transition sm:basis-auto sm:flex-none";

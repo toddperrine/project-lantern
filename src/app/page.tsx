@@ -59,14 +59,14 @@ import { findLibraryStoryBySavedId, findNextSavedEpisodeInSeries, groupStoriesBy
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
 import type { EerieReaderProfile } from "@/lib/eerie-reader-profile";
-import type { CanonicalReaderProfile, ReaderEnergyLevel, ReaderIntensityLevel, ReaderMoodDraft, ReaderMoodSnapshot, ReaderProfile, ReaderProfileEventInput, ReaderProfileEventSource, StoryFeedbackGenerationMode, StoryFeedbackRating, StoryFeedbackReason, StoryFeedbackSignal } from "@/lib/reader-profile";
+import type { CanonicalReaderProfile, ReaderEnergyLevel, ReaderIntensityLevel, ReaderMoodDraft, ReaderMoodSnapshot, ReaderProfile, ReaderProfileEventInput, ReaderProfileEventSource, ReaderTasteProfileConfidence, StoryFeedbackGenerationMode, StoryFeedbackRating, StoryFeedbackReason, StoryFeedbackSignal } from "@/lib/reader-profile";
 import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture, ReaderProfileGenerationSnapshot } from "@/lib/types";
 import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
 import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
 import { APP_VERSION } from "@/lib/build-info";
 import { useAuth, type AuthStatus } from "@/lib/auth";
 
-type AppView = "home" | "library" | "worlds" | "create" | "characters" | "mood-intake";
+type AppView = "home" | "library" | "worlds" | "create" | "characters" | "account" | "mood-intake";
 type Mood = StoryTypeChipId;
 type CloudProjectSummary = Pick<SavedProject, "id" | "name" | "createdAt" | "updatedAt">;
 type LibrarySource = "authenticated cloud" | "legacy local" | "auth-disabled fallback";
@@ -105,6 +105,8 @@ type LastNewStoryPersonalization = {
   identityDiagnostics: LastGenerationIdentityDiagnostics;
 };
 type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" | "not found" | "blocked";
+type AccountMode = "guest" | "signed-in" | "unknown";
+type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; topMoods: string[]; topGenres: string[]; hardAvoidances: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
 type CloudReaderProfileSyncState = {
   profileId: string;
   status: CloudReaderProfileStatus;
@@ -169,7 +171,8 @@ const NAV_ITEMS: { label: string; view: AppView }[] = [
   { label: "Story Library", view: "library" },
   { label: "Worlds", view: "worlds" },
   { label: "Create", view: "create" },
-  { label: "Characters", view: "characters" }
+  { label: "Characters", view: "characters" },
+  { label: "Account", view: "account" }
 ];
 
 const STORY_FEEDBACK_RATING_OPTIONS: { rating: StoryFeedbackRating; label: string }[] = [
@@ -537,6 +540,7 @@ export default function Home() {
   const currentGeneratedStory = useMemo(() => storyResponse ? responseToLibraryStory(storyResponse, currentStoryId || createStoryId(storyResponse.story)) : null, [currentStoryId, storyResponse]);
   const currentSeriesEpisode = useMemo(() => findEpisodeInLibrarySeries(savedStories, currentStoryId), [currentStoryId, savedStories]);
   const canGenerate = Boolean(worldBible.content.trim() && characterProfiles.content.trim() && storySeed.content.trim() && !isGenerating);
+  const accountProfileSummary = useMemo(() => toAccountProfileSummary({ authState, canonicalProfile: canonicalReaderProfile, inputArtifacts, profile: readerProfile, savedForLaterStoryQueue, savedStories }), [authState, canonicalReaderProfile, inputArtifacts, readerProfile, savedForLaterStoryQueue, savedStories]);
 
   function authHeaders(): HeadersInit {
     const token = authState.getAccessToken();
@@ -1720,7 +1724,7 @@ export default function Home() {
   const isContinuationGenerating = isGenerating && generationSource === "continue-story";
   const diagnosticsPanels = (
     <>
-      <AppStateDiagnostics activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} storyResponseEpisodeMomentum={storyResponse?.metadata.diagnostics.episodeMomentum ?? null} storyTypeSelectionDiagnostics={storyTypeSelectionDiagnostics} />
+      <AppStateDiagnostics accountSummary={accountProfileSummary} activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} storyResponseEpisodeMomentum={storyResponse?.metadata.diagnostics.episodeMomentum ?? null} storyTypeSelectionDiagnostics={storyTypeSelectionDiagnostics} />
       <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
       <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
       <AuthDiagnostics appActionsGated={authState.appActionsGated} authConfigured={authState.authConfigured} authFlow={authState.authFlow} authMode={authState.authMode} authStatus={authState.authStatus} cognitoUserId={authState.currentUser?.id ?? ""} currentUserEmail={authState.currentUser?.email ?? ""} lastAuthStep={authState.lastAuthStep} lastCognitoErrorCode={authState.lastCognitoErrorCode} libraryDiagnostics={libraryDiagnostics} profileLibraryMode={authState.profileLibraryMode} region={authState.region} resetFlowState={authState.resetFlowState} />
@@ -1780,6 +1784,14 @@ export default function Home() {
 
             <button
               className="min-h-12 w-full rounded-xl border border-paper/15 bg-paper/10 px-4 py-3 text-base font-semibold text-paper"
+              onClick={() => navigateToView("account")}
+              type="button"
+            >
+              Account
+            </button>
+
+            <button
+              className="min-h-12 w-full rounded-xl border border-paper/15 bg-paper/10 px-4 py-3 text-base font-semibold text-paper"
               onClick={() => navigateToView("create")}
               type="button"
             >
@@ -1816,6 +1828,7 @@ export default function Home() {
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
         {activeView === "characters" ? <CharactersView onOpenStory={handleStartRecommendation} /> : null}
+        {activeView === "account" ? <AccountView onOpenLibrary={() => navigateToView("library")} summary={accountProfileSummary} /> : null}
         {activeView !== "home" ? <MobileDeveloperDiagnostics>{diagnosticsPanels}</MobileDeveloperDiagnostics> : null}
       </section>
       <MobileBottomNav activeView={activeView} onChange={navigateToView} />
@@ -2410,6 +2423,75 @@ function findEpisodeInLibrarySeries(stories: LibraryStory[], currentStoryId: str
   return null;
 }
 
+
+function AccountView({ onOpenLibrary, summary }: { onOpenLibrary: () => void; summary: AccountProfileSummary }) {
+  const savedCountEntries = [
+    typeof summary.counts.savedStories === "number" ? { label: "Saved stories", value: summary.counts.savedStories } : null,
+    typeof summary.counts.series === "number" ? { label: "Series / storyworlds", value: summary.counts.series } : null,
+    typeof summary.counts.characters === "number" ? { label: "Characters / casts", value: summary.counts.characters } : null,
+    typeof summary.counts.storySparks === "number" ? { label: "Story sparks", value: summary.counts.storySparks } : null,
+  ].filter(Boolean) as Array<{ label: string; value: number }>;
+
+  return (
+    <section className="mx-auto grid w-full max-w-5xl min-w-0 gap-5 pb-8 md:pb-0">
+      <PageHeading eyebrow="Account" title="Account / Profile" body="A read-only snapshot of your current Lantyrn profile, saved content, and future data controls." />
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <article className="grid min-w-0 gap-3 rounded-xl border border-lantern-gold/25 bg-lantern-gold/10 p-4 shadow-soft lg:col-span-2">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Current status</p>
+              <h2 className="mt-1 text-2xl font-semibold leading-tight text-paper">{summary.displayName}</h2>
+            </div>
+            <span className="w-fit rounded-md border border-paper/15 bg-night-ink/70 px-2.5 py-1 text-xs font-semibold capitalize text-paper/70">{summary.accountMode}</span>
+          </div>
+          {summary.profileId ? <p className="text-sm font-semibold text-paper/80">Profile ID: {summary.profileId}</p> : null}
+          <p className="text-sm leading-6 text-paper/70">{summary.statusText}</p>
+        </article>
+
+        <AccountCard title="What Lantyrn knows so far">
+          <ProfileSummaryRow label="Top moods" values={summary.topMoods} empty="No strong mood signals yet." />
+          <ProfileSummaryRow label="Top genres" values={summary.topGenres} empty="No strong genre signals yet." />
+          <ProfileSummaryRow label="Hard avoidances" values={summary.hardAvoidances} empty="No hard avoidances saved yet." />
+          <ProfileSummaryRow label="Continuation preference" values={summary.continuationPreference ? [summary.continuationPreference] : []} empty="Not enough signal yet." />
+          <ProfileSummaryRow label="Recent feedback" values={summary.recentFeedback} empty="No feedback captured yet." />
+          <ProfileSummaryRow label="Confidence / status" values={[summary.confidenceLabel]} empty="Still learning." />
+        </AccountCard>
+
+        <AccountCard title="Your saved Lantyrn content">
+          {savedCountEntries.length ? (
+            <dl className="grid gap-3 sm:grid-cols-2">
+              {savedCountEntries.map((entry) => (
+                <div className="rounded-md border border-paper/10 bg-night-ink/45 p-3" key={entry.label}>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{entry.label}</dt>
+                  <dd className="mt-1 text-2xl font-semibold text-paper">{entry.value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved items found yet.</p>}
+          <button className="mt-4 min-h-11 w-full rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-night-ink sm:w-fit" onClick={onOpenLibrary} type="button">Go to Library</button>
+        </AccountCard>
+
+        <AccountCard title="Data controls">
+          <div className="grid gap-2">
+            {["Export profile/data", "Clear profile memory", "Delete account/data"].map((label) => (
+              <button className="min-h-11 cursor-not-allowed rounded-md border border-paper/12 bg-paper/5 px-4 py-3 text-left text-sm font-semibold text-paper/45" disabled key={label} type="button">{label} — Coming soon</button>
+            ))}
+          </div>
+        </AccountCard>
+      </div>
+    </section>
+  );
+}
+
+function AccountCard({ children, title }: { children: ReactNode; title: string }) {
+  return <article className="min-w-0 rounded-xl border border-paper/12 bg-paper/10 p-4"><h2 className="text-xl font-semibold text-paper">{title}</h2><div className="mt-4 grid gap-4">{children}</div></article>;
+}
+
+function ProfileSummaryRow({ empty, label, values }: { empty: string; label: string; values: string[] }) {
+  const safeValues = values.map((value) => value.trim()).filter(Boolean);
+  return <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{label}</p>{safeValues.length ? <div className="mt-2 flex flex-wrap gap-2">{safeValues.map((value) => <span className="rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={value}>{value}</span>)}</div> : <p className="mt-1 text-sm leading-6 text-paper/60">{empty}</p>}</div>;
+}
+
 function LibraryView(props: { cloudMessage: string; cloudProjects: CloudProjectSummary[]; isCloudLoading: boolean; onDeleteCloudProject: () => void; onDeleteProject: () => void; onDeleteStory: (storyId: string) => void; onLoadCloudProject: (projectId: string) => void; onLoadProject: (projectId: string) => void; onMoveSavedForLaterToWaitingQueue: (item: ReadyStoryQueueItem) => void; onContinueSavedStoryById: (storyId: string) => void; onOpenSavedStoryById: (storyId: string) => void; onProjectNameChange: (name: string) => void; onReadSavedForLater: (item: ReadyStoryQueueItem) => void; onRefreshCloud: () => void; onRemoveSavedForLater: (item: ReadyStoryQueueItem) => void; onSaveCloudProject: () => void; onSaveProject: () => void; onSaveStory: () => void; projectName: string; savedForLaterStoryQueue: ReadyStoryQueueItem[]; savedProjects: SavedProject[]; savedStories: SavedStory[]; selectedCloudProjectId: string; selectedProjectId: string; storyResponse: GenerateStoryResponse | null }) {
   const { cloudMessage, cloudProjects, isCloudLoading, onDeleteCloudProject, onDeleteProject, onDeleteStory, onLoadCloudProject, onLoadProject, onMoveSavedForLaterToWaitingQueue, onContinueSavedStoryById, onOpenSavedStoryById, onProjectNameChange, onReadSavedForLater, onRefreshCloud, onRemoveSavedForLater, onSaveCloudProject, onSaveProject, onSaveStory, projectName, savedForLaterStoryQueue, savedProjects, savedStories, selectedCloudProjectId, selectedProjectId, storyResponse } = props;
   const libraryStoryRows = savedStories.map((story) => ({ story, kind: "saved" as const }));
@@ -2766,12 +2848,16 @@ function getGenerationTriggerLabel(generationMode: GenerationMode, source: Reade
   return "Create";
 }
 
-function AppStateDiagnostics({ activeView, activeCommittedSeriesId, activeCommittedStoryId, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics }: { activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: StoryTypeSelectionDiagnostics }) {
+function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeriesId, activeCommittedStoryId, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics }: { accountSummary: AccountProfileSummary; activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: StoryTypeSelectionDiagnostics }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
       <div className="mt-3 grid gap-1 sm:grid-cols-2">
         <p><span className="font-semibold text-paper/80">Active view:</span> {activeView}</p>
+        <p><span className="font-semibold text-paper/80">accountShellVersion:</span> v1</p>
+        <p><span className="font-semibold text-paper/80">accountMode:</span> {accountSummary.accountMode}</p>
+        <p><span className="font-semibold text-paper/80">profileSummaryAvailable:</span> {(accountSummary.topMoods.length || accountSummary.topGenres.length || accountSummary.hardAvoidances.length || accountSummary.recentFeedback.length) ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">savedContentCountsAvailable:</span> true</p>
         <p><span className="font-semibold text-paper/80">Generation in progress:</span> {isGenerating ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Last generation trigger/source:</span> {lastGenerationTrigger}</p>
         <p><span className="font-semibold text-paper/80">Active generation source:</span> {generationSource ?? "none"}</p>
@@ -3182,7 +3268,7 @@ function MobileTopHeader({ onGoHome }: { onGoHome: () => void }) {
 }
 
 function MobileBottomNav({ activeView, onChange }: { activeView: AppView; onChange: (view: AppView) => void }) {
-  return <nav aria-label="Mobile primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-paper/10 bg-night-ink/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] pt-2 backdrop-blur md:hidden"><div className="mx-auto grid max-w-md grid-cols-5 gap-1">{NAV_ITEMS.map((item) => <button aria-current={activeView === item.view ? "page" : undefined} className={`rounded-xl px-1 py-2 text-[0.66rem] font-semibold leading-tight ${activeView === item.view ? "bg-lantern-gold text-night-ink" : "text-paper/65"}`} key={item.view} onClick={() => onChange(item.view)} type="button">{item.label}</button>)}</div></nav>;
+  return <nav aria-label="Mobile primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-paper/10 bg-night-ink/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] pt-2 backdrop-blur md:hidden"><div className="mx-auto grid max-w-lg grid-cols-6 gap-1">{NAV_ITEMS.map((item) => <button aria-current={activeView === item.view ? "page" : undefined} className={`rounded-xl px-1 py-2 text-[0.66rem] font-semibold leading-tight ${activeView === item.view ? "bg-lantern-gold text-night-ink" : "text-paper/65"}`} key={item.view} onClick={() => onChange(item.view)} type="button">{item.label}</button>)}</div></nav>;
 }
 
 function NavTabs({ activeView, onChange }: { activeView: AppView; onChange: (view: AppView) => void }) {
@@ -3246,7 +3332,81 @@ function createStoryBrief(story: LibraryStory): StoryBrief { if (story.id === DE
 function extractSentences(text: string): string[] { return (text.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? []).map((sentence) => sentence.trim()).filter(Boolean); }
 function sortStoryStartsByMood(activeMood: Mood): StoryStart[] { return [...SUGGESTED_STORY_STARTS].sort((a, b) => Number(storyStartSupportsMood(b, activeMood)) - Number(storyStartSupportsMood(a, activeMood))); }
 function moodDescription(mood: Mood): string { return getStoryTypeChip(mood).guidance; }
-function readAppView(value: string | null): AppView | null { return value === "library" || value === "worlds" || value === "create" || value === "characters" || value === "home" || value === "mood-intake" ? value : null; }
+
+function toAccountProfileSummary({ authState, canonicalProfile, inputArtifacts, profile, savedForLaterStoryQueue, savedStories }: { authState: ReturnType<typeof useAuth>; canonicalProfile: CanonicalReaderProfile | null; inputArtifacts: InputArtifact[]; profile: ReaderProfile; savedForLaterStoryQueue: ReadyStoryQueueItem[]; savedStories: SavedStory[] }): AccountProfileSummary {
+  const userId = authState.currentUser?.id?.trim();
+  const accountMode: AccountMode = userId ? "signed-in" : authState.authStatus === "error" ? "unknown" : "guest";
+  const profileId = userId ? shortenProfileId(userId) : undefined;
+  const displayName = userId ? "Signed-in profile" : "Guest profile";
+  const statusText = userId ? `Profile ID: ${profileId}` : "Your stories and preferences are tied to this browser/session until full sign-in is added.";
+  const topMoods = topLabels(canonicalProfile?.learned?.moods, profile.moodCounts);
+  const topGenres = topLabels(canonicalProfile?.learned?.genres, profile.genreCounts);
+  const hardAvoidances = uniqueNonEmpty([...(canonicalProfile?.preferences.hardAvoidances ?? []), ...(profile.tasteProfile?.userHardAvoidances ?? [])]).slice(0, 6);
+  const continuationPreference = formatContinuationPreference(canonicalProfile?.learned?.continuationPreference);
+  const recentFeedback = formatRecentFeedback(profile.storyFeedbackSignals).slice(0, 3);
+  const confidenceLabel = formatAccountConfidence(canonicalProfile?.learned?.confidence, profile.tasteProfile?.profileConfidence);
+  const series = groupStoriesBySeries(savedStories).length;
+  const characters = uniqueNonEmpty(savedStories.flatMap((story) => story.charactersUsed ?? [])).length;
+  const storySparks = inputArtifacts.filter((artifact) => artifact.type === "storySeed").length + savedForLaterStoryQueue.length;
+
+  return {
+    displayName,
+    profileId,
+    accountMode,
+    statusText,
+    topMoods,
+    topGenres,
+    hardAvoidances,
+    continuationPreference,
+    recentFeedback,
+    confidenceLabel,
+    counts: {
+      savedStories: savedStories.length,
+      series,
+      ...(characters ? { characters } : {}),
+      storySparks,
+    }
+  };
+}
+
+function topLabels(primary?: Record<string, number>, fallback?: Record<string, number>): string[] {
+  const source = primary && Object.keys(primary).length ? primary : fallback ?? {};
+  return Object.entries(source).filter(([, value]) => Number.isFinite(value) && value > 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([label]) => label.trim()).filter(Boolean);
+}
+
+function uniqueNonEmpty(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function formatContinuationPreference(value?: number): string | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
+  if (value >= 0.66) return "Often continues stories";
+  if (value >= 0.33) return "Sometimes continues stories";
+  return "Light continuation signal";
+}
+
+function formatRecentFeedback(signals?: StoryFeedbackSignal[]): string[] {
+  return [...(signals ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map((signal) => {
+    const title = signal.storyTitle?.trim() || "Story";
+    const reasons = signal.reasons.length ? ` (${signal.reasons.join(", ")})` : "";
+    return `${title}: ${signal.rating.replaceAll("_", " ")}${reasons}`;
+  });
+}
+
+function formatAccountConfidence(confidence?: number, fallback?: ReaderTasteProfileConfidence): string {
+  if (typeof confidence === "number" && Number.isFinite(confidence) && confidence > 0) {
+    if (confidence >= 0.66) return "High confidence";
+    if (confidence >= 0.33) return "Medium confidence";
+    return "Low confidence";
+  }
+  return fallback ? `${fallback.charAt(0).toUpperCase()}${fallback.slice(1)} confidence` : "Still learning";
+}
+
+function shortenProfileId(value: string): string {
+  return value.length > 6 ? `${value.slice(0, 6)}…` : value;
+}
+
+function readAppView(value: string | null): AppView | null { return value === "library" || value === "worlds" || value === "create" || value === "characters" || value === "account" || value === "home" || value === "mood-intake" ? value : null; }
 function truncateText(text: string, maxLength: number): string { const compact = text.replace(/\s+/g, " ").trim(); return compact.length <= maxLength ? compact : `${compact.slice(0, maxLength).replace(/[\s,.;:]+$/, "")}...`; }
 function slugify(value: string): string { return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "story-world-engine-story"; }
 function formatDateTime(value: string): string { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
