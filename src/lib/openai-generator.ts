@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { buildEpisodeMomentumObjective } from "./episode-momentum-engine";
 import { LENGTH_TARGETS } from "./types";
 import type { GenerateStoryRequest, GenerateStoryResponse, LengthTarget, StoryDiagnostics } from "./types";
 import { normalizeStoryPayload, normalizeStoryText, normalizeStringList } from "./story-output";
@@ -791,6 +792,7 @@ Final story requirements:
 - For this length target, a valid blueprint has ${beatRange.min}-${beatRange.max} beats; treat all ${blueprint.sceneBeats.length} provided beats as mandatory.
 - Avoid abstract engine-like story terms such as "protocol" unless the story defines them in-world through concrete action, objects, and consequences.
 ${forbiddenRule}
+${buildEpisodeMomentumObjective(input)}
 - If source concepts resemble forbidden language, translate them into story-world phenomena: ${STORY_WORLD_TRANSLATIONS.join(", ")}.
 
 PREMISE REQUIREMENTS JSON
@@ -1158,12 +1160,12 @@ function estimateStoryMaxTokens(maxWords: number): number {
   return Math.min(16_000, Math.ceil(maxWords * 3.2));
 }
 
-function getDisallowedForbiddenTerms(storyRules: string): string[] {
+export function getDisallowedForbiddenTerms(storyRules: string): string[] {
   const lowerRules = storyRules.toLowerCase();
   return TECHNICAL_FORBIDDEN_TERMS.filter((term) => !lowerRules.includes(`allow ${term.toLowerCase()}`));
 }
 
-function findForbiddenTerms(story: string, disallowedTerms: string[]): string[] {
+export function findForbiddenTerms(story: string, disallowedTerms: string[]): string[] {
   return disallowedTerms.filter((term) => buildForbiddenTermRegex(term).test(story));
 }
 

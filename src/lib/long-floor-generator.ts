@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { applyEpisodeMomentumEngine } from "./episode-momentum-engine";
 import { generateOpenAIStory, getExpansionModel } from "./openai-generator";
 import { normalizeStoryPayload, normalizeStoryText, normalizeStringList } from "./story-output";
 import { countWords } from "./story-analysis";
@@ -11,10 +12,10 @@ export async function generateOpenAIStoryWithLongFloor(input: GenerateStoryReque
   const response = await generateOpenAIStory(input);
 
   if (!shouldAttemptLongFloor(input, response)) {
-    return input.lengthTarget === "Long" ? withLongFloorNotAttemptedDiagnostics(response) : response;
+    return applyEpisodeMomentumEngine(input, input.lengthTarget === "Long" ? withLongFloorNotAttemptedDiagnostics(response) : response);
   }
 
-  return applyLongFloorPass(input, response);
+  return applyEpisodeMomentumEngine(input, await applyLongFloorPass(input, response));
 }
 
 function shouldAttemptLongFloor(input: GenerateStoryRequest, response: GenerateStoryResponse): boolean {
