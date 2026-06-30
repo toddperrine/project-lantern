@@ -41,6 +41,7 @@ import {
   hasReaderProfilePreferences,
   addUniquePreferenceItem,
   MAX_READER_HARD_AVOIDANCES,
+  MAX_READER_HARD_AVOIDANCE_LENGTH,
   READER_PROFILE_PREFERENCES_VERSION,
   DEFAULT_READER_PROFILE_PREFERENCES
 } from "@/lib/reader-profile";
@@ -118,6 +119,10 @@ type AccountDataMode = "signed-in" | "browser-profile" | "local-profile" | "unkn
 type AccountDataClearConfirmation = "story-fit-preferences" | "local-reader-memory" | null;
 type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; preferredStoryTypes: string[]; storyIngredients: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
 type ReaderPreferencesSaveStatus = "saved" | "saving" | "error";
+type StoryFitOnboardingStep = 0 | 1 | 2 | 3 | 4 | 5;
+type StoryFitOnboardingState = { selectedStoryType: string; storyIngredients: string[]; narrativePressure: ReaderProfile["explicitReaderPreferences"]["narrativePressure"]; episodeEndingShape: ReaderProfile["explicitReaderPreferences"]["episodeEndingShape"]; hardAvoidances: string[] };
+const STORY_FIT_ONBOARDING_STORAGE_KEY = "projectLantern.storyFitOnboarding.v1";
+
 type AccountDataExportV1 = { exportVersion: "account-data-v1"; exportedAt: string; appVersion?: string; account: { accountMode: AccountDataMode; profileId?: string; email?: string }; storyFitPreferences?: unknown; readerProfile?: unknown; feedbackSignals?: unknown; savedContentSummary: { savedStories?: number; series?: number; characters?: number; worlds?: number; storySparks?: number }; savedContent?: { stories?: unknown[]; series?: unknown[]; characters?: unknown[]; worlds?: unknown[]; storySparks?: unknown[] } };
 type CloudReaderProfileSyncState = {
   profileId: string;
@@ -440,6 +445,9 @@ export default function Home() {
   const [continueDirection, setContinueDirection] = useState("");
   const [isDirectionOpen, setIsDirectionOpen] = useState(false);
   const [readerProfile, setReaderProfile] = useState<ReaderProfile>(createEmptyReaderProfile());
+  const [hasLoadedReaderProfileState, setHasLoadedReaderProfileState] = useState(false);
+  const [storyFitOnboardingDismissed, setStoryFitOnboardingDismissed] = useState(false);
+  const [isStoryFitOnboardingOpen, setIsStoryFitOnboardingOpen] = useState(false);
   const [canonicalReaderProfile, setCanonicalReaderProfile] = useState<CanonicalReaderProfile | null>(null);
   const [cloudReaderProfileSync, setCloudReaderProfileSync] = useState<CloudReaderProfileSyncState>(EMPTY_CLOUD_READER_PROFILE_SYNC);
   const [eerieReaderProfile, setEerieReaderProfile] = useState<EerieReaderProfile>(createDefaultEerieReaderProfile());
@@ -515,6 +523,8 @@ export default function Home() {
     const mirroredCanonicalProfile = mirrorCanonicalReaderProfilePreferences(canonicalProfile, enrichedProfile, localEerieProfile);
     setCanonicalReaderProfile(mirroredCanonicalProfile);
     setReaderProfile(enrichedProfile);
+    setHasLoadedReaderProfileState(true);
+    setStoryFitOnboardingDismissed(readStoryFitOnboardingDismissed());
     const storedReadyQueue = readReadyStoryQueue();
     const shouldUseCatalogSeed = storedReadyQueue.length === 0 || shouldReplaceLegacyGenericReadyQueue(storedReadyQueue);
     const seededReadyQueue = shouldUseCatalogSeed ? createInitialReadyStoryQueue() : storedReadyQueue;
@@ -533,6 +543,7 @@ export default function Home() {
       setSavedStories([]);
       setLibraryDiagnostics((current) => ({ ...current, source: legacyLocalStoryCount ? "legacy local" : "authenticated cloud", loadedCount: 0, latestSaveOwnerId: "none" }));
       setReaderProfile(createEmptyReaderProfile());
+      setHasLoadedReaderProfileState(true);
       setCloudReaderProfileSync((current) => ({ ...current, profileId: "", ownerId: "none", source: legacyLocalStoryCount ? "legacy local" : "authenticated cloud", status: "blocked", lastLoadStatus: "signed out", lastSaveOutcome: "none" }));
       return;
     }
@@ -550,6 +561,7 @@ export default function Home() {
   const currentSeriesEpisode = useMemo(() => findEpisodeInLibrarySeries(savedStories, currentStoryId), [currentStoryId, savedStories]);
   const canGenerate = Boolean(worldBible.content.trim() && characterProfiles.content.trim() && storySeed.content.trim() && !isGenerating);
   const accountProfileSummary = useMemo(() => toAccountProfileSummary({ authState, canonicalProfile: canonicalReaderProfile, inputArtifacts, profile: readerProfile, savedForLaterStoryQueue, savedStories }), [authState, canonicalReaderProfile, inputArtifacts, readerProfile, savedForLaterStoryQueue, savedStories]);
+  const shouldShowFirstRunStoryFitPrompt = hasLoadedReaderProfileState && !hasReaderProfilePreferences(readerProfile.explicitReaderPreferences) && !storyFitOnboardingDismissed;
   const [readerPreferencesSaveStatus, setReaderPreferencesSaveStatus] = useState<ReaderPreferencesSaveStatus>("saved");
 
   function authHeaders(): HeadersInit {
@@ -576,12 +588,14 @@ export default function Home() {
       const cloudProfile = normalizeCloudReaderProfile(payload.profile);
       if (cloudProfile) {
         setReaderProfile(cloudProfile);
+        setHasLoadedReaderProfileState(true);
         setCanonicalReaderProfile(canonicalReaderProfileFromReaderProfile(cloudProfile, authState.currentUser.id, "cloud"));
         updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? authState.currentUser.id, source: "authenticated cloud", status: "synced", cloudUpdatedAt: cloudProfile.updatedAt, localUpdatedAt: cloudProfile.updatedAt, cloudProfileExists: true, lastLoadStatus: "success", lastError: "", initializedDefaultCloudProfile: false, ...cloudDiagnosticUpdate(payload.diagnostic) });
         return;
       }
       const defaultProfile = createEmptyReaderProfile();
       setReaderProfile(defaultProfile);
+      setHasLoadedReaderProfileState(true);
       setCanonicalReaderProfile(canonicalReaderProfileFromReaderProfile(defaultProfile, authState.currentUser.id, "cloud"));
       updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? authState.currentUser.id, source: "authenticated cloud", status: "not found", cloudProfileExists: false, lastLoadStatus: "not_found_then_initializing", localUpdatedAt: defaultProfile.updatedAt, lastError: "", initializedDefaultCloudProfile: true, ...cloudDiagnosticUpdate(payload.diagnostic) });
       await saveReaderProfileToCloud(profileId, defaultProfile);
@@ -1259,6 +1273,7 @@ export default function Home() {
       if (cloudProfile && cloudUpdatedAt > localProfile.updatedAt) {
         persistReaderProfile(cloudProfile);
         setReaderProfile(cloudProfile);
+        setHasLoadedReaderProfileState(true);
         updateCloudReaderProfileSync({ profileId, status: "synced", cloudUpdatedAt, localUpdatedAt: cloudProfile.updatedAt, localProfileExists: true, lastError: "" });
         return;
       }
@@ -1806,6 +1821,21 @@ export default function Home() {
     setStatusMessage("Story Fit Preferences cleared.");
   }
 
+  function handleSkipStoryFitOnboarding() {
+    saveStoryFitOnboardingDismissed();
+    setStoryFitOnboardingDismissed(true);
+    setIsStoryFitOnboardingOpen(false);
+    setStatusMessage("Story fit setup skipped. You can start it later from Account / Profile.");
+  }
+
+  function handleSaveStoryFitOnboarding(nextPreferences: ReaderProfile["explicitReaderPreferences"]) {
+    handleReaderPreferencesChange(nextPreferences);
+    saveStoryFitOnboardingDismissed();
+    setStoryFitOnboardingDismissed(true);
+    setIsStoryFitOnboardingOpen(false);
+    setStatusMessage("Story Fit Preferences saved.");
+  }
+
   function handleClearLocalReaderMemory() {
     const now = new Date().toISOString();
     const preservedPreferences = { ...readerProfile.explicitReaderPreferences, updatedAt: readerProfile.explicitReaderPreferences.updatedAt ?? now };
@@ -1859,7 +1889,7 @@ export default function Home() {
   const isContinuationGenerating = isGenerating && generationSource === "continue-story";
   const diagnosticsPanels = (
     <>
-      <AppStateDiagnostics accountSummary={accountProfileSummary} activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationFailureDiagnostic={lastGenerationFailureDiagnostic} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} storyResponseEpisodeMomentum={storyResponse?.metadata.diagnostics.episodeMomentum ?? null} storyTypeSelectionDiagnostics={storyTypeSelectionDiagnostics} />
+      <AppStateDiagnostics accountSummary={accountProfileSummary} activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationFailureDiagnostic={lastGenerationFailureDiagnostic} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} storyResponseEpisodeMomentum={storyResponse?.metadata.diagnostics.episodeMomentum ?? null} storyTypeSelectionDiagnostics={storyTypeSelectionDiagnostics} storyFitOnboardingAvailable={shouldShowFirstRunStoryFitPrompt || isStoryFitOnboardingOpen} storyFitOnboardingDismissed={storyFitOnboardingDismissed} />
       <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
       <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
       <AuthDiagnostics appActionsGated={authState.appActionsGated} authConfigured={authState.authConfigured} authFlow={authState.authFlow} authMode={authState.authMode} authStatus={authState.authStatus} cognitoUserId={authState.currentUser?.id ?? ""} currentUserEmail={authState.currentUser?.email ?? ""} lastAuthStep={authState.lastAuthStep} lastCognitoErrorCode={authState.lastCognitoErrorCode} libraryDiagnostics={libraryDiagnostics} profileLibraryMode={authState.profileLibraryMode} region={authState.region} resetFlowState={authState.resetFlowState} />
@@ -1888,6 +1918,8 @@ export default function Home() {
             <h1 className="text-2xl font-semibold leading-tight text-paper">
               What do you want to do?
             </h1>
+
+            {shouldShowFirstRunStoryFitPrompt ? <StoryFitFirstRunCard onSkip={handleSkipStoryFitOnboarding} onStart={() => setIsStoryFitOnboardingOpen(true)} /> : null}
 
             <button
               className="min-h-12 w-full rounded-xl bg-lantern-gold px-4 py-3 text-base font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-60"
@@ -1947,6 +1979,7 @@ export default function Home() {
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {isGenerating ? <StopGenerationControl onStop={handleStopGeneration} /> : null}
         {error ? <Status tone="error">{error}</Status> : null}
+        {isStoryFitOnboardingOpen ? <StoryFitOnboardingPanel initialPreferences={readerProfile.explicitReaderPreferences} onCancel={() => setIsStoryFitOnboardingOpen(false)} onSave={handleSaveStoryFitOnboarding} /> : null}
 
         <div className="hidden min-w-0 gap-3 md:grid">{diagnosticsPanels}</div>
 
@@ -1958,12 +1991,12 @@ export default function Home() {
           />
         ) : null}
         {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={generatedStoryPresentation === "saved-episode" ? handleSavedEpisodeNext : handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onScrollResetDiagnostics={setReaderScrollDiagnostics} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : generatedStoryPresentation === "saved-episode" ? "Saved Episode" : "Next Episode"} continueLabel={generatedStoryPresentation === "saved-episode" ? "Next Episode" : "Continue this story"} episodeNumber={currentSeriesEpisode?.episodeNumber ?? null} generationProfileSnapshot={storyResponse?.metadata.diagnostics.readerProfileSnapshot ?? storyResponse?.metadata.diagnostics.readerProfileGenerationSnapshot} story={currentGeneratedStory} /> : null}
-        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <div className="hidden md:block"><HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onOpenCreate={() => navigateToView("create")} onOpenLibrary={() => navigateToView("library")} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} /></div> : null}
+        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <div className="hidden md:block"><HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onOpenCreate={() => navigateToView("create")} onOpenLibrary={() => navigateToView("library")} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} showStoryFitPrompt={shouldShowFirstRunStoryFitPrompt} onStartStoryFitSetup={() => setIsStoryFitOnboardingOpen(true)} onSkipStoryFitSetup={handleSkipStoryFitOnboarding} /></div> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onMoveSavedForLaterToWaitingQueue={handleMoveSavedForLaterStoryToWaitingQueue} onContinueSavedStoryById={handleContinueSavedStoryById} onOpenSavedStoryById={handleRestoreStoryById} onProjectNameChange={setProjectName} onReadSavedForLater={handleReadSavedForLaterStory} onRefreshCloud={handleRefreshCloudProjects} onRemoveSavedForLater={handleRemoveSavedForLaterStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedForLaterStoryQueue={savedForLaterStoryQueue} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
         {activeView === "characters" ? <CharactersView onOpenStory={handleStartRecommendation} /> : null}
-        {activeView === "account" ? <AccountView authState={authState} canonicalProfile={canonicalReaderProfile} inputArtifacts={inputArtifacts} onClearLocalReaderMemory={handleClearLocalReaderMemory} onClearStoryFitPreferences={handleClearStoryFitPreferences} onOpenLibrary={() => navigateToView("library")} onReaderPreferencesChange={handleReaderPreferencesChange} readerPreferences={readerProfile.explicitReaderPreferences} readerProfile={readerProfile} savedForLaterStoryQueue={savedForLaterStoryQueue} savedStories={savedStories} saveStatus={readerPreferencesSaveStatus} summary={accountProfileSummary} /> : null}
+        {activeView === "account" ? <AccountView authState={authState} canonicalProfile={canonicalReaderProfile} inputArtifacts={inputArtifacts} onClearLocalReaderMemory={handleClearLocalReaderMemory} onClearStoryFitPreferences={handleClearStoryFitPreferences} onOpenLibrary={() => navigateToView("library")} onReaderPreferencesChange={handleReaderPreferencesChange} readerPreferences={readerProfile.explicitReaderPreferences} readerProfile={readerProfile} savedForLaterStoryQueue={savedForLaterStoryQueue} savedStories={savedStories} saveStatus={readerPreferencesSaveStatus} summary={accountProfileSummary} onOpenStoryFitOnboarding={() => setIsStoryFitOnboardingOpen(true)} /> : null}
         {activeView !== "home" ? <MobileDeveloperDiagnostics>{diagnosticsPanels}</MobileDeveloperDiagnostics> : null}
       </section>
       <MobileBottomNav activeView={activeView} onChange={navigateToView} />
@@ -2382,8 +2415,8 @@ function MobileDeveloperDiagnostics({ children }: { children: ReactNode }) {
   );
 }
 
-function HomeView(props: { activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; isContinuationGenerating: boolean; isNewStoryGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onPassReadyStory: (item: ReadyStoryQueueItem) => void; onReadReadyStory: (item: ReadyStoryQueueItem) => void; onSaveReadyStoryForLater: (item: ReadyStoryQueueItem) => void; onOpenCreate: () => void; onOpenLibrary: () => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
-  const { activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, isContinuationGenerating, isNewStoryGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onPassReadyStory, onReadReadyStory, onSaveReadyStoryForLater, onOpenCreate, onOpenLibrary, onStartNewStory, onStartRecommendation, onToggleDirection, readyStoryQueue, savedForLaterStoryQueue, showStoryStartOptions, suggestedStarts } = props;
+function HomeView(props: { showStoryFitPrompt?: boolean; onStartStoryFitSetup?: () => void; onSkipStoryFitSetup?: () => void; activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; isContinuationGenerating: boolean; isNewStoryGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onPassReadyStory: (item: ReadyStoryQueueItem) => void; onReadReadyStory: (item: ReadyStoryQueueItem) => void; onSaveReadyStoryForLater: (item: ReadyStoryQueueItem) => void; onOpenCreate: () => void; onOpenLibrary: () => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
+  const { showStoryFitPrompt = false, onStartStoryFitSetup, onSkipStoryFitSetup, activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, isContinuationGenerating, isNewStoryGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onPassReadyStory, onReadReadyStory, onSaveReadyStoryForLater, onOpenCreate, onOpenLibrary, onStartNewStory, onStartRecommendation, onToggleDirection, readyStoryQueue, savedForLaterStoryQueue, showStoryStartOptions, suggestedStarts } = props;
   const [isRecapOpen, setIsRecapOpen] = useState(false);
   const storyBrief = latestStory ? createStoryBrief(latestStory) : null;
 
@@ -2398,6 +2431,7 @@ function HomeView(props: { activeMood: Mood; canUseDemoStory: boolean; continueD
         onOpenLibrary={onOpenLibrary}
         onStartNewStory={onStartNewStory}
       />
+      {showStoryFitPrompt && onStartStoryFitSetup && onSkipStoryFitSetup ? <StoryFitFirstRunCard onSkip={onSkipStoryFitSetup} onStart={onStartStoryFitSetup} /> : null}
       {latestStory && storyBrief ? <div className="md:hidden"><MobileCurrentStoryCard brief={storyBrief} isGenerating={isContinuationGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onOpenRecap={() => setIsRecapOpen(true)} story={latestStory} /></div> : null}
       <div className="hidden md:grid md:min-w-0 md:gap-8">
         {latestStory && storyBrief ? <CurrentStoryCard brief={storyBrief} direction={continueDirection} isDirectionOpen={isDirectionOpen} isGenerating={isContinuationGenerating} isRecapOpen={isRecapOpen} onCloseRecap={() => setIsRecapOpen(false)} onContinue={onContinue} onDirectionChange={onDirectionChange} onExportStory={onExportStory} onOpenRecap={() => setIsRecapOpen(true)} onToggleDirection={onToggleDirection} story={latestStory} /> : null}
@@ -2410,6 +2444,68 @@ function HomeView(props: { activeMood: Mood; canUseDemoStory: boolean; continueD
 }
 
 
+
+
+function StoryFitFirstRunCard({ onSkip, onStart }: { onSkip: () => void; onStart: () => void }) {
+  return (
+    <section className="min-w-0 rounded-xl border border-lantern-gold/35 bg-lantern-gold/10 p-4 shadow-soft">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Story fit</p>
+      <h2 className="mt-1 text-xl font-semibold text-paper">Set up your story fit</h2>
+      <p className="mt-2 text-sm leading-6 text-paper/70">Answer a few questions so Lantyrn can shape better episodes for you.</p>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-night-ink" onClick={onStart} type="button">Start setup</button>
+        <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-3 text-sm font-semibold text-paper/75" onClick={onSkip} type="button">Skip for now</button>
+      </div>
+    </section>
+  );
+}
+
+function StoryFitOnboardingPanel({ initialPreferences, onCancel, onSave }: { initialPreferences: ReaderProfile["explicitReaderPreferences"]; onCancel: () => void; onSave: (preferences: ReaderProfile["explicitReaderPreferences"]) => void }) {
+  const [step, setStep] = useState<StoryFitOnboardingStep>(0);
+  const [avoidanceDraft, setAvoidanceDraft] = useState("");
+  const [state, setState] = useState<StoryFitOnboardingState>({
+    selectedStoryType: initialPreferences.preferredStoryTypes[0] ?? "",
+    storyIngredients: initialPreferences.storyIngredients.slice(0, 5),
+    narrativePressure: initialPreferences.narrativePressure === "not-set" ? "balanced-tension" : initialPreferences.narrativePressure,
+    episodeEndingShape: initialPreferences.episodeEndingShape === "not-set" ? "open-mystery" : initialPreferences.episodeEndingShape,
+    hardAvoidances: initialPreferences.hardAvoidances,
+  });
+  const steps = ["Story type", "Ingredients", "Intensity", "Ending", "Avoidances", "Review"];
+  const selectedPressureLabel = NARRATIVE_PRESSURE_OPTIONS.find((option) => option.value === state.narrativePressure)?.label ?? "Balanced tension";
+  const selectedEndingLabel = EPISODE_ENDING_SHAPE_OPTIONS.find((option) => option.value === state.episodeEndingShape)?.label ?? "Leave an open mystery";
+  const toggleIngredient = (ingredient: string) => setState((current) => ({ ...current, storyIngredients: current.storyIngredients.includes(ingredient) ? current.storyIngredients.filter((item) => item !== ingredient) : current.storyIngredients.length >= 5 ? current.storyIngredients : [...current.storyIngredients, ingredient] }));
+  const addAvoidance = () => {
+    const next = addUniquePreferenceItem(state.hardAvoidances, avoidanceDraft, MAX_READER_HARD_AVOIDANCES);
+    if (next !== state.hardAvoidances) setState((current) => ({ ...current, hardAvoidances: next }));
+    setAvoidanceDraft("");
+  };
+  const save = () => onSave({ ...initialPreferences, preferredStoryTypes: state.selectedStoryType ? [state.selectedStoryType] : [], storyIngredients: state.storyIngredients, hardAvoidances: state.hardAvoidances, narrativePressure: state.narrativePressure, episodeEndingShape: state.episodeEndingShape, updatedAt: new Date().toISOString() });
+
+  return (
+    <section className="mx-auto grid w-full max-w-3xl min-w-0 gap-4 rounded-xl border border-lantern-gold/35 bg-night-ink/95 p-4 shadow-soft">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Story Fit Setup</p><h2 className="mt-1 text-2xl font-semibold text-paper">{steps[step]}</h2></div>
+        <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper/70" onClick={onCancel} type="button">Cancel</button>
+      </div>
+      <p className="text-xs font-semibold text-paper/45">Step {step + 1} of {steps.length}</p>
+      {step === 0 ? <OnboardingChoiceGrid question="What kind of story do you want first?" options={READER_STORY_TYPE_OPTIONS} selected={[state.selectedStoryType]} onSelect={(value) => setState((current) => ({ ...current, selectedStoryType: value }))} /> : null}
+      {step === 1 ? <OnboardingChoiceGrid question="What ingredients should Lantyrn use?" helper={`${state.storyIngredients.length}/5 selected`} options={READER_STORY_INGREDIENT_OPTIONS} selected={state.storyIngredients} onSelect={toggleIngredient} /> : null}
+      {step === 2 ? <OnboardingChoiceGrid question="How intense should it feel?" options={NARRATIVE_PRESSURE_OPTIONS.filter((option) => option.value !== "not-set").map((option) => option.label)} selected={[selectedPressureLabel]} onSelect={(label) => setState((current) => ({ ...current, narrativePressure: NARRATIVE_PRESSURE_OPTIONS.find((option) => option.label === label)?.value as typeof current.narrativePressure }))} /> : null}
+      {step === 3 ? <OnboardingChoiceGrid question="How should episodes end?" options={EPISODE_ENDING_SHAPE_OPTIONS.filter((option) => option.value !== "not-set").map((option) => option.label)} selected={[selectedEndingLabel]} onSelect={(label) => setState((current) => ({ ...current, episodeEndingShape: EPISODE_ENDING_SHAPE_OPTIONS.find((option) => option.label === label)?.value as typeof current.episodeEndingShape }))} /> : null}
+      {step === 4 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Any hard avoidances?</h3><p className="text-sm leading-6 text-paper/60">Examples: no dead pets, no gore, no harm to children.</p><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={MAX_READER_HARD_AVOIDANCE_LENGTH} onChange={(event) => setAvoidanceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:opacity-50" disabled={!avoidanceDraft.trim() || state.hardAvoidances.length >= MAX_READER_HARD_AVOIDANCES} onClick={addAvoidance} type="button">Add</button></div><div className="flex flex-wrap gap-2">{state.hardAvoidances.map((item) => <button className="rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => setState((current) => ({ ...current, hardAvoidances: current.hardAvoidances.filter((value) => value !== item) }))} type="button">{item} ×</button>)}</div></div> : null}
+      {step === 5 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Review</h3><ProfileSummaryRow label="Preferred story type" values={state.selectedStoryType ? [state.selectedStoryType] : []} empty="None selected." /><ProfileSummaryRow label="Selected ingredients" values={state.storyIngredients} empty="None selected." /><ProfileSummaryRow label="Narrative pressure" values={[selectedPressureLabel]} empty="Not set." /><ProfileSummaryRow label="Episode ending shape" values={[selectedEndingLabel]} empty="Not set." /><ProfileSummaryRow label="Hard avoidances" values={state.hardAvoidances} empty="None added." /></div> : null}
+      <div className="flex flex-col gap-2 sm:flex-row">
+        {step > 0 ? <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={() => setStep((current) => (current - 1) as StoryFitOnboardingStep)} type="button">Back</button> : null}
+        {step < 5 ? <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:opacity-50" disabled={step === 0 && !state.selectedStoryType} onClick={() => setStep((current) => (current + 1) as StoryFitOnboardingStep)} type="button">Next</button> : <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink" onClick={save} type="button">Save story fit</button>}
+        {step === 5 ? <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={onCancel} type="button">Cancel</button> : null}
+      </div>
+    </section>
+  );
+}
+
+function OnboardingChoiceGrid({ helper, onSelect, options, question, selected }: { helper?: string; onSelect: (value: string) => void; options: string[]; question: string; selected: string[] }) {
+  return <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">{question}</h3>{helper ? <p className="text-xs font-semibold text-paper/45">{helper}</p> : null}<div className="grid gap-2 sm:grid-cols-2">{options.map((option) => <button className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm font-semibold ${selected.includes(option) ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper/75"}`} key={option} onClick={() => onSelect(option)} type="button">{option}</button>)}</div></div>;
+}
 
 function ReadyStoryQueuePanel({
   isGenerating,
@@ -2566,7 +2662,7 @@ const NARRATIVE_PRESSURE_OPTIONS = [{ label: "Not set", value: "not-set" }, { la
 const EPISODE_ENDING_SHAPE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Resolve this episode’s incident", value: "resolved-incident" }, { label: "Leave an open mystery", value: "open-mystery" }, { label: "Strong next-episode pull", value: "next-episode-pull" }, { label: "Quiet aftermath with consequences", value: "quiet-aftermath" }];
 const PROTAGONIST_LENS_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Surprise me", value: "surprise-me" }, { label: "Ordinary person pulled in", value: "ordinary-person-pulled-in" }, { label: "Investigator / seeker", value: "investigator-seeker" }, { label: "Caretaker / protector", value: "caretaker-protector" }, { label: "Reluctant keeper / heir", value: "reluctant-keeper-heir" }, { label: "Outsider / newcomer", value: "outsider-newcomer" }, { label: "Animal-bonded protagonist", value: "animal-bonded-protagonist" }];
 
-function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocalReaderMemory, onClearStoryFitPreferences, onOpenLibrary, onReaderPreferencesChange, readerPreferences, readerProfile, savedForLaterStoryQueue, savedStories, saveStatus, summary }: { authState: ReturnType<typeof useAuth>; canonicalProfile: CanonicalReaderProfile | null; inputArtifacts: InputArtifact[]; onClearLocalReaderMemory: () => void; onClearStoryFitPreferences: () => void; onOpenLibrary: () => void; onReaderPreferencesChange: (preferences: ReaderProfile["explicitReaderPreferences"]) => void; readerPreferences: ReaderProfile["explicitReaderPreferences"]; readerProfile: ReaderProfile; savedForLaterStoryQueue: ReadyStoryQueueItem[]; savedStories: SavedStory[]; saveStatus: ReaderPreferencesSaveStatus; summary: AccountProfileSummary }) {
+function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocalReaderMemory, onClearStoryFitPreferences, onOpenLibrary, onOpenStoryFitOnboarding, onReaderPreferencesChange, readerPreferences, readerProfile, savedForLaterStoryQueue, savedStories, saveStatus, summary }: { authState: ReturnType<typeof useAuth>; canonicalProfile: CanonicalReaderProfile | null; inputArtifacts: InputArtifact[]; onClearLocalReaderMemory: () => void; onClearStoryFitPreferences: () => void; onOpenLibrary: () => void; onOpenStoryFitOnboarding: () => void; onReaderPreferencesChange: (preferences: ReaderProfile["explicitReaderPreferences"]) => void; readerPreferences: ReaderProfile["explicitReaderPreferences"]; readerProfile: ReaderProfile; savedForLaterStoryQueue: ReadyStoryQueueItem[]; savedStories: SavedStory[]; saveStatus: ReaderPreferencesSaveStatus; summary: AccountProfileSummary }) {
   const [avoidanceDraft, setAvoidanceDraft] = useState("");
   const [dataControlMessage, setDataControlMessage] = useState("");
   const [pendingClearConfirmation, setPendingClearConfirmation] = useState<AccountDataClearConfirmation>(null);
@@ -2628,6 +2724,7 @@ function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocal
           </dl>
         </AccountCard>
         <AccountCard title="Story fit preferences">
+          <button className="min-h-11 w-full rounded-md border border-lantern-gold/45 bg-lantern-gold/10 px-4 py-3 text-left text-sm font-semibold text-lantern-gold sm:w-fit" onClick={onOpenStoryFitOnboarding} type="button">Edit via guided setup</button>
           <PreferenceChipGroup label="Preferred story types" options={READER_STORY_TYPE_OPTIONS} selected={readerPreferences.preferredStoryTypes} onToggle={(value) => toggleItem("preferredStoryTypes", value)} />
           <PreferenceChipGroup label="Story ingredients" options={READER_STORY_INGREDIENT_OPTIONS} selected={readerPreferences.storyIngredients} onToggle={(value) => toggleItem("storyIngredients", value)} />
           <div className="grid gap-2"><p className="text-sm font-semibold text-paper">Hard avoidances</p><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={60} onChange={(event) => setAvoidanceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} placeholder="No dead pets, no gore..." value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={!avoidanceDraft.trim() || readerPreferences.hardAvoidances.length >= MAX_READER_HARD_AVOIDANCES} onClick={addAvoidance} type="button">Add</button></div><div className="flex flex-wrap gap-2">{readerPreferences.hardAvoidances.map((item) => <button className="rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => updatePreferences({ hardAvoidances: readerPreferences.hardAvoidances.filter((current) => current !== item) })} type="button">{item} ×</button>)}</div><p className="text-xs text-paper/45">Up to 10 avoidances, 60 characters each.</p></div>
@@ -3105,7 +3202,7 @@ function getGenerationTriggerLabel(generationMode: GenerationMode, source: Reade
   return "Create";
 }
 
-function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeriesId, activeCommittedStoryId, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationFailureDiagnostic, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics }: { accountSummary: AccountProfileSummary; activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationFailureDiagnostic: GenerationFailureDiagnostic; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: StoryTypeSelectionDiagnostics }) {
+function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeriesId, activeCommittedStoryId, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationFailureDiagnostic, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics, storyFitOnboardingAvailable, storyFitOnboardingDismissed }: { accountSummary: AccountProfileSummary; activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationFailureDiagnostic: GenerationFailureDiagnostic; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: StoryTypeSelectionDiagnostics; storyFitOnboardingAvailable: boolean; storyFitOnboardingDismissed: boolean }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
@@ -3120,6 +3217,9 @@ function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeries
         <p><span className="font-semibold text-paper/80">fallbackUserDisplayBlocked:</span> true</p>
         <p><span className="font-semibold text-paper/80">storyFitLegacyNormalizationEnabled:</span> true</p>
         <p><span className="font-semibold text-paper/80">storyFitGenerationContextVersion:</span> v1</p>
+        <p><span className="font-semibold text-paper/80">storyFitOnboardingVersion:</span> v1</p>
+        <p><span className="font-semibold text-paper/80">storyFitOnboardingAvailable:</span> {storyFitOnboardingAvailable ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">storyFitOnboardingDismissed:</span> {storyFitOnboardingDismissed ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">accountMode:</span> {accountSummary.accountMode}</p>
         <p><span className="font-semibold text-paper/80">profileSummaryAvailable:</span> {(accountSummary.preferredStoryTypes.length || accountSummary.storyIngredients.length || accountSummary.hardAvoidances.length || accountSummary.recentFeedback.length) ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">savedContentCountsAvailable:</span> true</p>
@@ -3643,6 +3743,17 @@ function persistDemoLatestStory(story: SavedStory) { if (typeof window === "unde
 function clearDemoLatestStory() { if (typeof window === "undefined") return; window.localStorage.removeItem(DEMO_LATEST_STORY_STORAGE_KEY); }
 function createStoryBrief(story: LibraryStory): StoryBrief { if (story.id === DEMO_LATEST_STORY_ID) return DEMO_STORY_BRIEF; const sentences = extractSentences(story.story); const recapSentences = sentences.slice(0, 4); const heroName = story.charactersUsed[0] || "The lead"; const secondCharacter = story.charactersUsed[1]; const hook = sentences[0] ? truncateText(sentences[0], 190) : `${story.title} is waiting at the edge of its next turning point.`; const recap = recapSentences.length ? recapSentences.join(" ") : truncateText(story.story, 420); return { hook, recap, changed: sentences[4] || `${heroName} has crossed a threshold that makes the old version of the story impossible to return to.`, tension: secondCharacter ? `${heroName} and ${secondCharacter} are still caught in the pressure the last chapter exposed.` : `${heroName} is still carrying the central unanswered pressure of the last chapter.`, nextHook: sentences[5] || `The next chapter should press on the choice ${heroName} can no longer avoid.`, heroName, heroRole: getLibraryStoryCategoryLabel(story), struggle: `${heroName} is trying to move forward while the last chapter's consequences narrow the path ahead.` }; }
 function extractSentences(text: string): string[] { return (text.replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? []).map((sentence) => sentence.trim()).filter(Boolean); }
+
+function readStoryFitOnboardingDismissed(): boolean {
+  if (typeof window === "undefined") return false;
+  try { return window.localStorage.getItem(STORY_FIT_ONBOARDING_STORAGE_KEY) === "dismissed"; } catch { return false; }
+}
+
+function saveStoryFitOnboardingDismissed() {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(STORY_FIT_ONBOARDING_STORAGE_KEY, "dismissed"); } catch {}
+}
+
 function sortStoryStartsByMood(activeMood: Mood): StoryStart[] { return [...SUGGESTED_STORY_STARTS].sort((a, b) => Number(storyStartSupportsMood(b, activeMood)) - Number(storyStartSupportsMood(a, activeMood))); }
 function moodDescription(mood: Mood): string { return getStoryTypeChip(mood).guidance; }
 
