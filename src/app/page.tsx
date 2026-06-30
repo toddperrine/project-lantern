@@ -119,8 +119,8 @@ type AccountDataMode = "signed-in" | "browser-profile" | "local-profile" | "unkn
 type AccountDataClearConfirmation = "story-fit-preferences" | "local-reader-memory" | null;
 type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; preferredStoryTypes: string[]; storyIngredients: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
 type ReaderPreferencesSaveStatus = "saved" | "saving" | "error";
-type StoryFitOnboardingStep = 0 | 1 | 2 | 3 | 4 | 5;
-type StoryFitOnboardingState = { selectedStoryType: string; storyIngredients: string[]; narrativePressure: ReaderProfile["explicitReaderPreferences"]["narrativePressure"]; episodeEndingShape: ReaderProfile["explicitReaderPreferences"]["episodeEndingShape"]; hardAvoidances: string[] };
+type StoryFitOnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+type StoryFitOnboardingState = { preferredStoryTypes: string[]; storyIngredients: string[]; contentLane: ReaderProfile["explicitReaderPreferences"]["contentLane"]; narrativePressure: ReaderProfile["explicitReaderPreferences"]["narrativePressure"]; episodeEndingShape: ReaderProfile["explicitReaderPreferences"]["episodeEndingShape"]; protagonistLens: ReaderProfile["explicitReaderPreferences"]["protagonistLens"]; hardAvoidances: string[] };
 const STORY_FIT_ONBOARDING_STORAGE_KEY = "projectLantern.storyFitOnboarding.v1";
 
 type AccountDataExportV1 = { exportVersion: "account-data-v1"; exportedAt: string; appVersion?: string; account: { accountMode: AccountDataMode; profileId?: string; email?: string }; storyFitPreferences?: unknown; readerProfile?: unknown; feedbackSignals?: unknown; savedContentSummary: { savedStories?: number; series?: number; characters?: number; worlds?: number; storySparks?: number }; savedContent?: { stories?: unknown[]; series?: unknown[]; characters?: unknown[]; worlds?: unknown[]; storySparks?: unknown[] } };
@@ -2463,23 +2463,60 @@ function StoryFitFirstRunCard({ onSkip, onStart }: { onSkip: () => void; onStart
 function StoryFitOnboardingPanel({ initialPreferences, onCancel, onSave }: { initialPreferences: ReaderProfile["explicitReaderPreferences"]; onCancel: () => void; onSave: (preferences: ReaderProfile["explicitReaderPreferences"]) => void }) {
   const [step, setStep] = useState<StoryFitOnboardingStep>(0);
   const [avoidanceDraft, setAvoidanceDraft] = useState("");
+  const [limitMessage, setLimitMessage] = useState("");
   const [state, setState] = useState<StoryFitOnboardingState>({
-    selectedStoryType: initialPreferences.preferredStoryTypes[0] ?? "",
-    storyIngredients: initialPreferences.storyIngredients.slice(0, 5),
-    narrativePressure: initialPreferences.narrativePressure === "not-set" ? "balanced-tension" : initialPreferences.narrativePressure,
-    episodeEndingShape: initialPreferences.episodeEndingShape === "not-set" ? "open-mystery" : initialPreferences.episodeEndingShape,
+    preferredStoryTypes: initialPreferences.preferredStoryTypes.slice(0, 5),
+    storyIngredients: initialPreferences.storyIngredients.slice(0, 8),
+    contentLane: initialPreferences.contentLane,
+    narrativePressure: initialPreferences.narrativePressure,
+    episodeEndingShape: initialPreferences.episodeEndingShape,
+    protagonistLens: initialPreferences.protagonistLens,
     hardAvoidances: initialPreferences.hardAvoidances,
   });
-  const steps = ["Story type", "Ingredients", "Intensity", "Ending", "Avoidances", "Review"];
-  const selectedPressureLabel = NARRATIVE_PRESSURE_OPTIONS.find((option) => option.value === state.narrativePressure)?.label ?? "Balanced tension";
-  const selectedEndingLabel = EPISODE_ENDING_SHAPE_OPTIONS.find((option) => option.value === state.episodeEndingShape)?.label ?? "Leave an open mystery";
-  const toggleIngredient = (ingredient: string) => setState((current) => ({ ...current, storyIngredients: current.storyIngredients.includes(ingredient) ? current.storyIngredients.filter((item) => item !== ingredient) : current.storyIngredients.length >= 5 ? current.storyIngredients : [...current.storyIngredients, ingredient] }));
+  const steps = ["Story types", "Ingredients", "Content lane", "Intensity", "Ending", "Protagonist", "Avoidances", "Review"];
+  const selectedContentLaneLabel = CONTENT_LANE_OPTIONS.find((option) => option.value === state.contentLane)?.label ?? "Not set";
+  const selectedPressureLabel = NARRATIVE_PRESSURE_OPTIONS.find((option) => option.value === state.narrativePressure)?.label ?? "Not set";
+  const selectedEndingLabel = EPISODE_ENDING_SHAPE_OPTIONS.find((option) => option.value === state.episodeEndingShape)?.label ?? "Not set";
+  const selectedProtagonistLabel = PROTAGONIST_LENS_OPTIONS.find((option) => option.value === state.protagonistLens)?.label ?? "Not set";
+  const toggleLimitedItem = (field: "preferredStoryTypes" | "storyIngredients", value: string, max: number, message: string) => {
+    setState((current) => {
+      const currentValues = current[field];
+      if (currentValues.includes(value)) {
+        setLimitMessage("");
+        return { ...current, [field]: currentValues.filter((item) => item !== value) };
+      }
+      if (currentValues.length >= max) {
+        setLimitMessage(message);
+        return current;
+      }
+      setLimitMessage("");
+      return { ...current, [field]: [...currentValues, value] };
+    });
+  };
   const addAvoidance = () => {
     const next = addUniquePreferenceItem(state.hardAvoidances, avoidanceDraft, MAX_READER_HARD_AVOIDANCES);
     if (next !== state.hardAvoidances) setState((current) => ({ ...current, hardAvoidances: next }));
     setAvoidanceDraft("");
   };
-  const save = () => onSave({ ...initialPreferences, preferredStoryTypes: state.selectedStoryType ? [state.selectedStoryType] : [], storyIngredients: state.storyIngredients, hardAvoidances: state.hardAvoidances, narrativePressure: state.narrativePressure, episodeEndingShape: state.episodeEndingShape, updatedAt: new Date().toISOString() });
+  const goNext = () => {
+    setLimitMessage("");
+    setStep((current) => (current + 1) as StoryFitOnboardingStep);
+  };
+  const goBack = () => {
+    setLimitMessage("");
+    setStep((current) => (current - 1) as StoryFitOnboardingStep);
+  };
+  const save = () => onSave({
+    ...initialPreferences,
+    preferredStoryTypes: state.preferredStoryTypes,
+    storyIngredients: state.storyIngredients,
+    hardAvoidances: state.hardAvoidances,
+    contentLane: state.contentLane,
+    narrativePressure: state.narrativePressure,
+    episodeEndingShape: state.episodeEndingShape,
+    protagonistLens: state.protagonistLens,
+    updatedAt: new Date().toISOString(),
+  });
 
   return (
     <section className="mx-auto grid w-full max-w-3xl min-w-0 gap-4 rounded-xl border border-lantern-gold/35 bg-night-ink/95 p-4 shadow-soft">
@@ -2488,16 +2525,19 @@ function StoryFitOnboardingPanel({ initialPreferences, onCancel, onSave }: { ini
         <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper/70" onClick={onCancel} type="button">Cancel</button>
       </div>
       <p className="text-xs font-semibold text-paper/45">Step {step + 1} of {steps.length}</p>
-      {step === 0 ? <OnboardingChoiceGrid question="What kind of story do you want first?" options={READER_STORY_TYPE_OPTIONS} selected={[state.selectedStoryType]} onSelect={(value) => setState((current) => ({ ...current, selectedStoryType: value }))} /> : null}
-      {step === 1 ? <OnboardingChoiceGrid question="What ingredients should Lantyrn use?" helper={`${state.storyIngredients.length}/5 selected`} options={READER_STORY_INGREDIENT_OPTIONS} selected={state.storyIngredients} onSelect={toggleIngredient} /> : null}
-      {step === 2 ? <OnboardingChoiceGrid question="How intense should it feel?" options={NARRATIVE_PRESSURE_OPTIONS.filter((option) => option.value !== "not-set").map((option) => option.label)} selected={[selectedPressureLabel]} onSelect={(label) => setState((current) => ({ ...current, narrativePressure: NARRATIVE_PRESSURE_OPTIONS.find((option) => option.label === label)?.value as typeof current.narrativePressure }))} /> : null}
-      {step === 3 ? <OnboardingChoiceGrid question="How should episodes end?" options={EPISODE_ENDING_SHAPE_OPTIONS.filter((option) => option.value !== "not-set").map((option) => option.label)} selected={[selectedEndingLabel]} onSelect={(label) => setState((current) => ({ ...current, episodeEndingShape: EPISODE_ENDING_SHAPE_OPTIONS.find((option) => option.label === label)?.value as typeof current.episodeEndingShape }))} /> : null}
-      {step === 4 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Any hard avoidances?</h3><p className="text-sm leading-6 text-paper/60">Examples: no dead pets, no gore, no harm to children.</p><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={MAX_READER_HARD_AVOIDANCE_LENGTH} onChange={(event) => setAvoidanceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:opacity-50" disabled={!avoidanceDraft.trim() || state.hardAvoidances.length >= MAX_READER_HARD_AVOIDANCES} onClick={addAvoidance} type="button">Add</button></div><div className="flex flex-wrap gap-2">{state.hardAvoidances.map((item) => <button className="rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => setState((current) => ({ ...current, hardAvoidances: current.hardAvoidances.filter((value) => value !== item) }))} type="button">{item} ×</button>)}</div></div> : null}
-      {step === 5 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Review</h3><ProfileSummaryRow label="Preferred story type" values={state.selectedStoryType ? [state.selectedStoryType] : []} empty="None selected." /><ProfileSummaryRow label="Selected ingredients" values={state.storyIngredients} empty="None selected." /><ProfileSummaryRow label="Narrative pressure" values={[selectedPressureLabel]} empty="Not set." /><ProfileSummaryRow label="Episode ending shape" values={[selectedEndingLabel]} empty="Not set." /><ProfileSummaryRow label="Hard avoidances" values={state.hardAvoidances} empty="None added." /></div> : null}
+      {step === 0 ? <OnboardingChoiceGrid question="What kinds of stories do you usually want?" helper="Choose up to 5. Lantyrn can use these as your favorite story directions." options={READER_STORY_TYPE_OPTIONS} selected={state.preferredStoryTypes} onSelect={(value) => toggleLimitedItem("preferredStoryTypes", value, 5, "Choose up to 5 favorite story directions.")} /> : null}
+      {step === 1 ? <OnboardingChoiceGrid question="What ingredients do you often like?" helper="Choose up to 8. These are reusable ingredients, not rigid requirements." options={READER_STORY_INGREDIENT_OPTIONS} selected={state.storyIngredients} onSelect={(value) => toggleLimitedItem("storyIngredients", value, 8, "Choose up to 8 reusable ingredients.")} /> : null}
+      {step === 2 ? <OnboardingChoiceGrid question="Who should this feel written for?" options={CONTENT_LANE_OPTIONS.map((option) => option.label)} selected={[selectedContentLaneLabel]} onSelect={(label) => setState((current) => ({ ...current, contentLane: CONTENT_LANE_OPTIONS.find((option) => option.label === label)?.value as typeof current.contentLane }))} /> : null}
+      {step === 3 ? <OnboardingChoiceGrid question="How intense should it feel?" options={NARRATIVE_PRESSURE_OPTIONS.filter((option) => option.value !== "not-set").map((option) => option.label)} selected={state.narrativePressure === "not-set" ? [] : [selectedPressureLabel]} onSelect={(label) => setState((current) => ({ ...current, narrativePressure: NARRATIVE_PRESSURE_OPTIONS.find((option) => option.label === label)?.value as typeof current.narrativePressure }))} /> : null}
+      {step === 4 ? <OnboardingChoiceGrid question="How should episodes end?" options={EPISODE_ENDING_SHAPE_OPTIONS.filter((option) => option.value !== "not-set").map((option) => option.label)} selected={state.episodeEndingShape === "not-set" ? [] : [selectedEndingLabel]} onSelect={(label) => setState((current) => ({ ...current, episodeEndingShape: EPISODE_ENDING_SHAPE_OPTIONS.find((option) => option.label === label)?.value as typeof current.episodeEndingShape }))} /> : null}
+      {step === 5 ? <OnboardingChoiceGrid question="What kind of main character lens do you prefer?" options={PROTAGONIST_LENS_OPTIONS.map((option) => option.label)} selected={[selectedProtagonistLabel]} onSelect={(label) => setState((current) => ({ ...current, protagonistLens: PROTAGONIST_LENS_OPTIONS.find((option) => option.label === label)?.value as typeof current.protagonistLens }))} /> : null}
+      {step === 6 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Anything Lantyrn should avoid?</h3><p className="text-sm leading-6 text-paper/60">Optional. Examples: no dead pets, no gore, no harm to children.</p><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={MAX_READER_HARD_AVOIDANCE_LENGTH} onChange={(event) => setAvoidanceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:opacity-50" disabled={!avoidanceDraft.trim() || state.hardAvoidances.length >= MAX_READER_HARD_AVOIDANCES} onClick={addAvoidance} type="button">Add</button></div><div className="flex flex-wrap gap-2">{state.hardAvoidances.map((item) => <button className="rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => setState((current) => ({ ...current, hardAvoidances: current.hardAvoidances.filter((value) => value !== item) }))} type="button">{item} ×</button>)}</div><p className="text-xs text-paper/45">Up to 10 avoidances, 60 characters each.</p></div> : null}
+      {step === 7 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Review</h3><ProfileSummaryRow label="Preferred story types" values={state.preferredStoryTypes} empty="Choose at least one story type." /><ProfileSummaryRow label="Story ingredients" values={state.storyIngredients} empty="None selected." /><ProfileSummaryRow label="Content lane" values={[selectedContentLaneLabel]} empty="Not set." /><ProfileSummaryRow label="Narrative pressure" values={state.narrativePressure === "not-set" ? [] : [selectedPressureLabel]} empty="Not set." /><ProfileSummaryRow label="Episode ending shape" values={state.episodeEndingShape === "not-set" ? [] : [selectedEndingLabel]} empty="Not set." /><ProfileSummaryRow label="Protagonist lens" values={[selectedProtagonistLabel]} empty="Not set." /><ProfileSummaryRow label="Hard avoidances" values={state.hardAvoidances} empty="None added." /></div> : null}
+      {limitMessage ? <p className="rounded-md border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-2 text-xs font-semibold text-lantern-gold">{limitMessage}</p> : null}
       <div className="flex flex-col gap-2 sm:flex-row">
-        {step > 0 ? <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={() => setStep((current) => (current - 1) as StoryFitOnboardingStep)} type="button">Back</button> : null}
-        {step < 5 ? <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:opacity-50" disabled={step === 0 && !state.selectedStoryType} onClick={() => setStep((current) => (current + 1) as StoryFitOnboardingStep)} type="button">Next</button> : <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink" onClick={save} type="button">Save story fit</button>}
-        {step === 5 ? <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={onCancel} type="button">Cancel</button> : null}
+        {step > 0 ? <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={goBack} type="button">Back</button> : null}
+        {step < 7 ? <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:opacity-50" disabled={step === 0 && state.preferredStoryTypes.length === 0} onClick={goNext} type="button">Next</button> : <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:opacity-50" disabled={state.preferredStoryTypes.length === 0} onClick={save} type="button">Save story fit</button>}
+        {step === 7 ? <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={onCancel} type="button">Cancel</button> : null}
       </div>
     </section>
   );
