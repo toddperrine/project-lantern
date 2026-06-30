@@ -1,3 +1,4 @@
+import { CLEAN_GENERATION_FAILURE_MESSAGE } from "./generation-display-policy";
 import type {
   CharacterArc,
   EndingType,
@@ -199,6 +200,10 @@ export function isStoryFeedbackScore(value: unknown): value is StoryFeedbackScor
 }
 
 export function createSavedStory(response: GenerateStoryResponse, storyId = createStoryId(response.story), feedback: StoryFeedback[] = []): SavedStory {
+  if (response.metadata.source === "fallback") {
+    throw new Error(CLEAN_GENERATION_FAILURE_MESSAGE);
+  }
+
   const diagnostics = response.metadata.diagnostics;
   return {
     id: storyId,
