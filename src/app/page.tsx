@@ -702,11 +702,28 @@ export default function Home() {
     const generationIdentity = createGenerationIdentity({ generationMode: overrides.generationMode, activeStoryId: activeCommittedStoryId || currentStoryId || null, activeSeriesId: activeCommittedSeriesId || (storyResponse?.metadata.diagnostics.seriesId ?? null), selectedSeriesId: overrides.selectedSeriesId ?? null, sourceStoryId: overrides.sourceStoryId ?? null });
     setError("");
     setLastGenerationFailureDiagnostic({
+      deployedAppVersion: APP_VERSION,
+      latestGenerationAttemptId: String(requestId),
       generationRequestStarted: true,
       generationRequestStatus: "requesting",
       generationEndpointStatusCode: "pending",
       authRequiredForGeneration: authState.appActionsGated,
-      authSessionPresent: Boolean(authState.currentUser)
+      authSessionPresent: Boolean(authState.currentUser),
+      storyGenerationFailureStage: "requesting",
+      storyGenerationFailureReason: null,
+      storyGenerationFailureSource: "client",
+      storyGenerationRetryAttempted: false,
+      storyGenerationRetrySucceeded: false,
+      storyMetadataLeakGuardEnabled: true,
+      storyMetadataLeakScanTarget: "final-story-prose",
+      storyMetadataLeakDetected: false,
+      storyMetadataLeakSanitized: false,
+      storyMetadataLeakFinalClean: false,
+      storyMetadataLeakRemovedPatterns: [],
+      storyRawCandidateLength: 0,
+      storySanitizedCandidateLength: 0,
+      storyRepairAttempted: false,
+      fallbackDisplayBlocked: true
     });
     setStatusMessage(overrides.loadingMessage ?? "");
     setLastGenerationTrigger(overrides.signalSource ?? "create");
@@ -764,19 +781,25 @@ export default function Home() {
       if (activeGenerationRequestId.current !== requestId) return;
       if (!response.ok) {
         setLastGenerationFailureDiagnostic({
+          deployedAppVersion: APP_VERSION,
+          latestGenerationAttemptId: String(requestId),
           ...readDiagnosticRecord(payload),
           generationRequestStarted: true,
           generationRequestStatus: "failed",
-          generationEndpointStatusCode: response.status
+          generationEndpointStatusCode: response.status,
+          fallbackDisplayBlocked: true
         });
         throw new Error(typeof payload.error === "string" ? payload.error : "Story generation failed.");
       }
       const normalizedResponse = assertUserDisplayableGenerationResponse(applySelectedStoryTypeMetadata(normalizeGenerateStoryResponse(payload), overrides.selectedStoryTypeChip));
       setLastGenerationFailureDiagnostic({
+        deployedAppVersion: APP_VERSION,
+        latestGenerationAttemptId: String(requestId),
         ...normalizedResponse.metadata.diagnostics,
         generationRequestStarted: true,
         generationRequestStatus: "succeeded",
-        generationEndpointStatusCode: response.status
+        generationEndpointStatusCode: response.status,
+        fallbackDisplayBlocked: true
       });
       setLastNewStoryPersonalization((current) => ({
         ...current,
@@ -825,7 +848,22 @@ export default function Home() {
       setStatusMessage("Story ready.");
     } catch (caughtError) {
       if (activeGenerationRequestId.current !== requestId) return;
-      setError(caughtError instanceof Error ? caughtError.message : "Story generation failed.");
+      const message = caughtError instanceof Error ? caughtError.message : "Story generation failed.";
+      setStatusMessage("");
+      if (message === CLEAN_GENERATION_FAILURE_MESSAGE) {
+        setLastGenerationFailureDiagnostic((current) => ({
+          ...(current ?? {}),
+          deployedAppVersion: APP_VERSION,
+          latestGenerationAttemptId: String(requestId),
+          generationRequestStarted: true,
+          generationRequestStatus: "failed",
+          storyGenerationFailureStage: current?.storyGenerationFailureStage ?? "display-policy",
+          storyGenerationFailureReason: current?.storyGenerationFailureReason ?? "fallback_or_unclean_story_blocked",
+          storyGenerationFailureSource: current?.storyGenerationFailureSource ?? "client",
+          fallbackDisplayBlocked: true
+        }));
+      }
+      setError(message);
     } finally {
       if (activeGenerationRequestId.current === requestId) {
         activeGenerationAbortController.current = null;
@@ -2951,7 +2989,23 @@ function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeries
         <p><span className="font-semibold text-paper/80">Generation in progress:</span> {isGenerating ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Last generation trigger/source:</span> {lastGenerationTrigger}</p>
         <p><span className="font-semibold text-paper/80">Active generation source:</span> {generationSource ?? "none"}</p>
-        <p><span className="font-semibold text-paper/80">generationFailureDiagnosticsVersion:</span> v1</p>
+        <p><span className="font-semibold text-paper/80">generationFailureDiagnosticsVersion:</span> v2</p>
+        <p><span className="font-semibold text-paper/80">deployedAppVersion:</span> {APP_VERSION}</p>
+        <p><span className="font-semibold text-paper/80">latestGenerationAttemptId:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.latestGenerationAttemptId)}</p>
+        <p><span className="font-semibold text-paper/80">storyGenerationFailureStage:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyGenerationFailureStage)}</p>
+        <p><span className="font-semibold text-paper/80">storyGenerationFailureReason:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyGenerationFailureReason)}</p>
+        <p><span className="font-semibold text-paper/80">storyGenerationFailureSource:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyGenerationFailureSource)}</p>
+        <p><span className="font-semibold text-paper/80">storyGenerationRetryAttempted:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyGenerationRetryAttempted)}</p>
+        <p><span className="font-semibold text-paper/80">storyGenerationRetrySucceeded:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyGenerationRetrySucceeded)}</p>
+        <p><span className="font-semibold text-paper/80">storyMetadataLeakScanTarget:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyMetadataLeakScanTarget)}</p>
+        <p><span className="font-semibold text-paper/80">storyMetadataLeakDetected:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyMetadataLeakDetected)}</p>
+        <p><span className="font-semibold text-paper/80">storyMetadataLeakSanitized:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyMetadataLeakSanitized)}</p>
+        <p><span className="font-semibold text-paper/80">storyMetadataLeakFinalClean:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyMetadataLeakFinalClean)}</p>
+        <p><span className="font-semibold text-paper/80">storyMetadataLeakRemovedPatterns:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyMetadataLeakRemovedPatterns)}</p>
+        <p><span className="font-semibold text-paper/80">storyRawCandidateLength:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyRawCandidateLength)}</p>
+        <p><span className="font-semibold text-paper/80">storySanitizedCandidateLength:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storySanitizedCandidateLength)}</p>
+        <p><span className="font-semibold text-paper/80">storyRepairAttempted:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyRepairAttempted)}</p>
+        <p><span className="font-semibold text-paper/80">fallbackDisplayBlocked:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.fallbackDisplayBlocked)}</p>
         <p><span className="font-semibold text-paper/80">Last generationRequestStarted:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationRequestStarted)}</p>
         <p><span className="font-semibold text-paper/80">Last generationRequestStatus:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationRequestStatus)}</p>
         <p><span className="font-semibold text-paper/80">Last generationEndpointStatusCode:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationEndpointStatusCode)}</p>

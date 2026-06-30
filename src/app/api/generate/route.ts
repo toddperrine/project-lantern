@@ -13,7 +13,7 @@ import {
   LENGTH_TARGETS,
   NARRATIVE_ARCHITECTURES
 } from "@/lib/types";
-import type { GenerateStoryRequest, GenerateStoryResponse } from "@/lib/types";
+import type { GenerateStoryRequest, GenerateStoryResponse, StoryDiagnostics } from "@/lib/types";
 
 const MAX_CONTEXT_CHARS = 120_000;
 const DEFAULT_STORY_RULES = `Every story must obey these rules:
@@ -134,7 +134,8 @@ async function handleGenerateRequest(request: Request) {
           blueprintFailedReason: `${errorSummary}; repair retry: ${repairSummary}`,
           modelGenerationErrorMessageSafe: repairSummary,
           authRequiredForGeneration,
-          authSessionPresent
+          authSessionPresent,
+          storyCleanlinessDiagnostics: readStoryCleanlinessDiagnostics(repairError)
         });
       }
     }
@@ -147,7 +148,8 @@ async function handleGenerateRequest(request: Request) {
       blueprintFailedReason: errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null,
       modelGenerationErrorMessageSafe: errorSummary,
       authRequiredForGeneration,
-      authSessionPresent
+      authSessionPresent,
+      storyCleanlinessDiagnostics: readStoryCleanlinessDiagnostics(error)
     });
   }
 }
@@ -266,6 +268,7 @@ function withRequestDiagnostics(
       ...response.metadata,
       diagnostics: {
         ...response.metadata.diagnostics,
+        deployedAppVersion: getBuildInfo().appVersion,
         generationRequestStarted: true,
         generationRequestStatus: "succeeded",
         generationEndpointStatusCode: options.statusCode,
@@ -295,6 +298,7 @@ function buildGenerationFailureResponse(
     blueprintFailedReason?: string | null;
     authRequiredForGeneration: boolean;
     authSessionPresent: boolean;
+    storyCleanlinessDiagnostics?: Partial<StoryDiagnostics>;
   }
 ) {
   console.error("Story generation failed; deterministic fallback blocked from user display.", {
@@ -327,6 +331,22 @@ function buildGenerationFailureResponse(
     requestPayloadValid: true,
     requestPayloadValidationError: null,
     modelGenerationErrorMessageSafe: options.modelGenerationErrorMessageSafe ?? options.fallbackReason,
+    deployedAppVersion: getBuildInfo().appVersion,
+    storyGenerationFailureStage: options.storyCleanlinessDiagnostics?.storyGenerationFailureStage ?? classifyGenerationFailureStage(options.modelGenerationErrorMessageSafe ?? options.fallbackReason, options),
+    storyGenerationFailureReason: options.storyCleanlinessDiagnostics?.storyGenerationFailureReason ?? classifyGenerationFailureReason(options.modelGenerationErrorMessageSafe ?? options.fallbackReason, options),
+    storyGenerationFailureSource: options.storyCleanlinessDiagnostics?.storyGenerationFailureSource ?? (options.modelGenerationAttempted ? "model" : "environment"),
+    storyGenerationRetryAttempted: options.storyCleanlinessDiagnostics?.storyGenerationRetryAttempted ?? Boolean((options.modelGenerationErrorMessageSafe ?? "").includes("retry")),
+    storyGenerationRetrySucceeded: options.storyCleanlinessDiagnostics?.storyGenerationRetrySucceeded ?? false,
+    storyMetadataLeakGuardEnabled: true,
+    storyMetadataLeakScanTarget: options.storyCleanlinessDiagnostics?.storyMetadataLeakScanTarget ?? "final-story-prose",
+    storyMetadataLeakDetected: options.storyCleanlinessDiagnostics?.storyMetadataLeakDetected ?? Boolean((options.modelGenerationErrorMessageSafe ?? "").toLowerCase().includes("metadata")),
+    storyMetadataLeakSanitized: options.storyCleanlinessDiagnostics?.storyMetadataLeakSanitized ?? Boolean((options.modelGenerationErrorMessageSafe ?? "").toLowerCase().includes("sanitization")),
+    storyMetadataLeakFinalClean: options.storyCleanlinessDiagnostics?.storyMetadataLeakFinalClean ?? false,
+    storyMetadataLeakRemovedPatterns: options.storyCleanlinessDiagnostics?.storyMetadataLeakRemovedPatterns ?? [],
+    storyRawCandidateLength: options.storyCleanlinessDiagnostics?.storyRawCandidateLength ?? 0,
+    storySanitizedCandidateLength: options.storyCleanlinessDiagnostics?.storySanitizedCandidateLength ?? 0,
+    storyRepairAttempted: options.storyCleanlinessDiagnostics?.storyRepairAttempted ?? Boolean(options.repairAttempted),
+    fallbackDisplayBlocked: true,
     generationSource: "fallback",
     fallbackUsed: true,
     fallbackReached: true,
@@ -337,7 +357,7 @@ function buildGenerationFailureResponse(
     modelGenerationErrorType: options.modelGenerationErrorType,
     repairAttempted: Boolean(options.repairAttempted),
     repairSucceeded: false,
-    metadataLeakGuardTriggered: false
+    metadataLeakGuardTriggered: Boolean(options.storyCleanlinessDiagnostics?.storyMetadataLeakDetected)
   });
 
   const buildInfo = getBuildInfo();
@@ -396,7 +416,23 @@ function buildPayloadFailureResponse(
         fallbackUsed: false,
         fallbackReached: false,
         fallbackRejectedForUserDisplay: false,
-        fallbackUserDisplayBlocked: true
+        fallbackUserDisplayBlocked: true,
+        deployedAppVersion: getBuildInfo().appVersion,
+        storyGenerationFailureStage: "payload-validation",
+        storyGenerationFailureReason: validationError,
+        storyGenerationFailureSource: "request",
+        storyGenerationRetryAttempted: false,
+        storyGenerationRetrySucceeded: false,
+        storyMetadataLeakGuardEnabled: true,
+        storyMetadataLeakScanTarget: "not-started",
+        storyMetadataLeakDetected: false,
+        storyMetadataLeakSanitized: false,
+        storyMetadataLeakFinalClean: false,
+        storyMetadataLeakRemovedPatterns: [],
+        storyRawCandidateLength: 0,
+        storySanitizedCandidateLength: 0,
+        storyRepairAttempted: false,
+        fallbackDisplayBlocked: true
       }),
       serverGenerationDurationSeconds,
       appVersion: buildInfo.appVersion,
@@ -406,6 +442,33 @@ function buildPayloadFailureResponse(
       buildTimestamp: buildInfo.buildTimestamp
     }
   }, { status: 400 });
+}
+
+function classifyGenerationFailureStage(
+  message: string,
+  options: { modelGenerationAttempted: boolean; modelGenerationErrorType: string; repairAttempted?: boolean }
+): string {
+  const lower = message.toLowerCase();
+  if (!options.modelGenerationAttempted && options.modelGenerationErrorType === "missing_env") return "environment-config";
+  if (lower.includes("clean story prose") || lower.includes("metadata sanitization")) return "story-cleanliness-retry";
+  if (lower.includes("blueprint")) return options.repairAttempted ? "blueprint-repair" : "blueprint";
+  if (lower.includes("fallback")) return "fallback-display-policy";
+  return options.modelGenerationAttempted ? "model-generation" : "pre-model";
+}
+
+function classifyGenerationFailureReason(
+  message: string,
+  options: { modelGenerationAttempted: boolean; modelGenerationErrorType: string }
+): string {
+  if (!options.modelGenerationAttempted && options.modelGenerationErrorType === "missing_env") return "missing_env";
+  if (message.toLowerCase().includes("clean story prose")) return "no_clean_story_after_sanitization_retry";
+  return options.modelGenerationErrorType || "unknown";
+}
+
+function readStoryCleanlinessDiagnostics(error: unknown): Partial<StoryDiagnostics> | undefined {
+  if (!error || typeof error !== "object" || !("storyCleanlinessDiagnostics" in error)) return undefined;
+  const diagnostics = (error as { storyCleanlinessDiagnostics?: unknown }).storyCleanlinessDiagnostics;
+  return diagnostics && typeof diagnostics === "object" ? diagnostics as Partial<StoryDiagnostics> : undefined;
 }
 
 function withBlueprintRepairSuccessDiagnostics(response: GenerateStoryResponse, originalBlueprintFailure: string): GenerateStoryResponse {

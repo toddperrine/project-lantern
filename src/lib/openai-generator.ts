@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { buildEpisodeMomentumObjective } from "./episode-momentum-engine";
 import { LENGTH_TARGETS } from "./types";
 import type { GenerateStoryRequest, GenerateStoryResponse, LengthTarget, StoryDiagnostics } from "./types";
-import { normalizeStoryPayload, normalizeStoryText, normalizeStringList } from "./story-output";
+import { findStoryMetadataLeakPatterns, normalizeStoryPayload, normalizeStoryText, normalizeStringList, sanitizeStoryMetadataLeaks } from "./story-output";
 import {
   countWords,
   inferCharactersUsed,
@@ -233,6 +233,22 @@ export function getOpenAIDiagnostics(overrides: Partial<StoryDiagnostics> = {}):
     fallbackMetadataLeakGuardEnabled: false,
     fallbackRejectedForMetadataLeak: false,
     metadataLeakPatternsFound: [],
+    deployedAppVersion: undefined,
+    latestGenerationAttemptId: undefined,
+    storyGenerationFailureStage: "none",
+    storyGenerationFailureReason: null,
+    storyGenerationFailureSource: "none",
+    storyGenerationRetryAttempted: false,
+    storyGenerationRetrySucceeded: false,
+    storyMetadataLeakScanTarget: "final-story-prose",
+    storyMetadataLeakDetected: false,
+    storyMetadataLeakSanitized: false,
+    storyMetadataLeakFinalClean: true,
+    storyMetadataLeakRemovedPatterns: [],
+    storyRawCandidateLength: 0,
+    storySanitizedCandidateLength: 0,
+    storyRepairAttempted: false,
+    fallbackDisplayBlocked: true,
     generationRequestStarted: false,
     generationRequestStatus: "not-started",
     generationEndpointStatusCode: undefined,
@@ -292,10 +308,51 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
     buildStoryPrompt(input, blueprint, blueprintRange, disallowedTerms),
     estimateStoryMaxTokens(lengthSpec.maxWords)
   );
+  let rawCandidateLength = payload.story.length;
+  let candidateSanitization = sanitizeStoryMetadataLeaks(payload.story);
   let story = normalizeStoryText(payload.story);
+  let cleanStoryRetryAttempted = false;
+  let cleanStoryRetrySucceeded = false;
+
+  if (!story && hasOptionalCallBudget(generationStartedAt)) {
+    cleanStoryRetryAttempted = true;
+    payload = await requestStory(
+      client,
+      getStoryModel(),
+      buildCleanStoryRetryPrompt(input, blueprint, disallowedTerms),
+      estimateStoryMaxTokens(lengthSpec.maxWords)
+    );
+    rawCandidateLength = payload.story.length;
+    candidateSanitization = sanitizeStoryMetadataLeaks(payload.story);
+    story = normalizeStoryText(payload.story);
+    cleanStoryRetrySucceeded = Boolean(story);
+    repairAttemptsCount += 1;
+  }
 
   if (!story) {
-    throw new Error("OpenAI response did not include a story.");
+    throw Object.assign(
+      new Error("OpenAI response did not include clean story prose after metadata sanitization and retry."),
+      {
+        storyCleanlinessDiagnostics: {
+          storyGenerationFailureStage: "story-cleanliness-retry",
+          storyGenerationFailureReason: "no_clean_story_after_sanitization_retry",
+          storyGenerationFailureSource: "model",
+          storyGenerationRetryAttempted: cleanStoryRetryAttempted,
+          storyGenerationRetrySucceeded: cleanStoryRetrySucceeded,
+          storyMetadataLeakGuardEnabled: true,
+          storyMetadataLeakScanTarget: "final-story-prose",
+          storyMetadataLeakDetected: candidateSanitization.detected,
+          storyMetadataLeakSanitized: candidateSanitization.sanitized,
+          storyMetadataLeakFinalClean: false,
+          storyMetadataLeakRemovedPatterns: candidateSanitization.removedPatterns,
+          metadataLeakPatternsFound: candidateSanitization.removedPatterns,
+          storyRawCandidateLength: rawCandidateLength,
+          storySanitizedCandidateLength: candidateSanitization.text.length,
+          storyRepairAttempted: repairAttemptsCount > 0,
+          fallbackDisplayBlocked: true
+        } satisfies Partial<StoryDiagnostics>
+      }
+    );
   }
 
   let forbiddenRepair = await repairForbiddenTermsIfNeeded(
@@ -426,6 +483,22 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
         repairAttempted: repairAttemptsCount > 0,
         repairSucceeded: repairAttemptsCount > 0 && remainingForbiddenTerms.length === 0,
         metadataLeakGuardTriggered: remainingForbiddenTerms.length > 0,
+        storyGenerationFailureStage: "none",
+        storyGenerationFailureReason: null,
+        storyGenerationFailureSource: "model",
+        storyGenerationRetryAttempted: cleanStoryRetryAttempted,
+        storyGenerationRetrySucceeded: cleanStoryRetrySucceeded,
+        storyMetadataLeakGuardEnabled: true,
+        storyMetadataLeakScanTarget: "final-story-prose",
+        storyMetadataLeakDetected: candidateSanitization.detected,
+        storyMetadataLeakSanitized: candidateSanitization.sanitized,
+        storyMetadataLeakFinalClean: findStoryMetadataLeakPatterns(story).length === 0,
+        storyMetadataLeakRemovedPatterns: candidateSanitization.removedPatterns,
+        metadataLeakPatternsFound: findStoryMetadataLeakPatterns(story),
+        storyRawCandidateLength: rawCandidateLength,
+        storySanitizedCandidateLength: story.length,
+        storyRepairAttempted: repairAttemptsCount > 0,
+        fallbackDisplayBlocked: true,
         underTargetNotice,
         blueprintGenerated: true,
         blueprintSceneCount: blueprint.sceneBeats.length,
@@ -853,6 +926,47 @@ ${input.storySeed}
 
 NARRATIVE RULES
 ${narrativeRules}`;
+}
+
+function buildCleanStoryRetryPrompt(
+  input: GenerateStoryRequest,
+  blueprint: StoryBlueprint,
+  disallowedTerms: string[]
+): string {
+  const lengthSpec = getLengthTargetSpec(input.lengthTarget);
+  const forbiddenRule = buildForbiddenLanguageRule(disallowedTerms);
+
+  return `Write a clean final story from this private blueprint.
+
+Return only valid JSON matching this shape: {"story":"...","charactersUsed":["..."],"rulesReferenced":["..."]}.
+
+The "story" value must contain finished story prose only.
+Do not include labels, headings, notes, analysis, prompt instructions, story-fit labels, story seed labels, craft-rule labels, JSON-like context names, private planning text, keyword lists, or blueprint text inside the story.
+The story must begin directly with scene prose, concrete action, setting, or dialogue.
+
+Length requirements:
+- Minimum: ${lengthSpec.minWords} words.
+- Maximum: ${lengthSpec.maxWords} words.
+- Selected target: ${formatLengthTarget(input.lengthTarget)}.
+
+Use these private materials only as planning context:
+
+PRIVATE BLUEPRINT JSON
+${JSON.stringify(blueprint, null, 2)}
+
+WORLD BIBLE
+${input.worldBible}
+
+CHARACTERS
+${input.characterProfiles}
+
+STORY REQUEST
+${input.storySeed}
+
+NARRATIVE RULES
+${input.storyRules}
+
+${forbiddenRule}`;
 }
 
 function buildExpansionPrompt(
