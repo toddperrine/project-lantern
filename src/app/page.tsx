@@ -41,7 +41,8 @@ import {
   hasReaderProfilePreferences,
   addUniquePreferenceItem,
   MAX_READER_HARD_AVOIDANCES,
-  READER_PROFILE_PREFERENCES_VERSION
+  READER_PROFILE_PREFERENCES_VERSION,
+  DEFAULT_READER_PROFILE_PREFERENCES
 } from "@/lib/reader-profile";
 import {
   countPreparedReadyStoryQueueItems,
@@ -113,8 +114,11 @@ type LastNewStoryPersonalization = {
 };
 type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" | "not found" | "blocked";
 type AccountMode = "guest" | "signed-in" | "unknown";
+type AccountDataMode = "signed-in" | "browser-profile" | "local-profile" | "unknown";
+type AccountDataClearConfirmation = "story-fit-preferences" | "local-reader-memory" | null;
 type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; preferredStoryTypes: string[]; storyIngredients: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
 type ReaderPreferencesSaveStatus = "saved" | "saving" | "error";
+type AccountDataExportV1 = { exportVersion: "account-data-v1"; exportedAt: string; appVersion?: string; account: { accountMode: AccountDataMode; profileId?: string; email?: string }; storyFitPreferences?: unknown; readerProfile?: unknown; feedbackSignals?: unknown; savedContentSummary: { savedStories?: number; series?: number; characters?: number; worlds?: number; storySparks?: number }; savedContent?: { stories?: unknown[]; series?: unknown[]; characters?: unknown[]; worlds?: unknown[]; storySparks?: unknown[] } };
 type CloudReaderProfileSyncState = {
   profileId: string;
   status: CloudReaderProfileStatus;
@@ -1797,6 +1801,37 @@ export default function Home() {
     }
   }
 
+  function handleClearStoryFitPreferences() {
+    handleReaderPreferencesChange({ ...DEFAULT_READER_PROFILE_PREFERENCES, updatedAt: new Date().toISOString() });
+    setStatusMessage("Story Fit Preferences cleared.");
+  }
+
+  function handleClearLocalReaderMemory() {
+    const now = new Date().toISOString();
+    const preservedPreferences = { ...readerProfile.explicitReaderPreferences, updatedAt: readerProfile.explicitReaderPreferences.updatedAt ?? now };
+    const emptyProfile = { ...clearReaderProfile(), explicitReaderPreferences: preservedPreferences, updatedAt: now };
+    persistReaderProfile(emptyProfile);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(CANONICAL_READER_PROFILE_STORAGE_KEY);
+      } catch {}
+    }
+    const defaultCanonicalProfile = loadCanonicalReaderProfile();
+    const resetCanonicalProfile = saveCanonicalReaderProfile({
+      ...defaultCanonicalProfile,
+      updatedAt: now,
+      preferences: {
+        ...defaultCanonicalProfile.preferences,
+        hardAvoidances: preservedPreferences.hardAvoidances,
+        explicitReaderPreferences: preservedPreferences,
+      },
+    });
+    setReaderProfile(emptyProfile);
+    setCanonicalReaderProfile(resetCanonicalProfile);
+    setReaderPreferencesSaveStatus("saved");
+    setStatusMessage("Local reader memory and profile signals cleared.");
+  }
+
   function handleStartSomethingDifferent() {
     if (currentGeneratedStory) {
       recordReaderSignal({ eventType: "startSomethingDifferentClicked", source: "startSomethingNew", storyId: currentGeneratedStory.id, title: currentGeneratedStory.title, genre: currentGeneratedStory.genrePreset, wordCount: currentGeneratedStory.wordCount });
@@ -1928,7 +1963,7 @@ export default function Home() {
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
         {activeView === "characters" ? <CharactersView onOpenStory={handleStartRecommendation} /> : null}
-        {activeView === "account" ? <AccountView onOpenLibrary={() => navigateToView("library")} onReaderPreferencesChange={handleReaderPreferencesChange} readerPreferences={readerProfile.explicitReaderPreferences} saveStatus={readerPreferencesSaveStatus} summary={accountProfileSummary} /> : null}
+        {activeView === "account" ? <AccountView authState={authState} canonicalProfile={canonicalReaderProfile} inputArtifacts={inputArtifacts} onClearLocalReaderMemory={handleClearLocalReaderMemory} onClearStoryFitPreferences={handleClearStoryFitPreferences} onOpenLibrary={() => navigateToView("library")} onReaderPreferencesChange={handleReaderPreferencesChange} readerPreferences={readerProfile.explicitReaderPreferences} readerProfile={readerProfile} savedForLaterStoryQueue={savedForLaterStoryQueue} savedStories={savedStories} saveStatus={readerPreferencesSaveStatus} summary={accountProfileSummary} /> : null}
         {activeView !== "home" ? <MobileDeveloperDiagnostics>{diagnosticsPanels}</MobileDeveloperDiagnostics> : null}
       </section>
       <MobileBottomNav activeView={activeView} onChange={navigateToView} />
@@ -2531,8 +2566,12 @@ const NARRATIVE_PRESSURE_OPTIONS = [{ label: "Not set", value: "not-set" }, { la
 const EPISODE_ENDING_SHAPE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Resolve this episode’s incident", value: "resolved-incident" }, { label: "Leave an open mystery", value: "open-mystery" }, { label: "Strong next-episode pull", value: "next-episode-pull" }, { label: "Quiet aftermath with consequences", value: "quiet-aftermath" }];
 const PROTAGONIST_LENS_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Surprise me", value: "surprise-me" }, { label: "Ordinary person pulled in", value: "ordinary-person-pulled-in" }, { label: "Investigator / seeker", value: "investigator-seeker" }, { label: "Caretaker / protector", value: "caretaker-protector" }, { label: "Reluctant keeper / heir", value: "reluctant-keeper-heir" }, { label: "Outsider / newcomer", value: "outsider-newcomer" }, { label: "Animal-bonded protagonist", value: "animal-bonded-protagonist" }];
 
-function AccountView({ onOpenLibrary, onReaderPreferencesChange, readerPreferences, saveStatus, summary }: { onOpenLibrary: () => void; onReaderPreferencesChange: (preferences: ReaderProfile["explicitReaderPreferences"]) => void; readerPreferences: ReaderProfile["explicitReaderPreferences"]; saveStatus: ReaderPreferencesSaveStatus; summary: AccountProfileSummary }) {
+function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocalReaderMemory, onClearStoryFitPreferences, onOpenLibrary, onReaderPreferencesChange, readerPreferences, readerProfile, savedForLaterStoryQueue, savedStories, saveStatus, summary }: { authState: ReturnType<typeof useAuth>; canonicalProfile: CanonicalReaderProfile | null; inputArtifacts: InputArtifact[]; onClearLocalReaderMemory: () => void; onClearStoryFitPreferences: () => void; onOpenLibrary: () => void; onReaderPreferencesChange: (preferences: ReaderProfile["explicitReaderPreferences"]) => void; readerPreferences: ReaderProfile["explicitReaderPreferences"]; readerProfile: ReaderProfile; savedForLaterStoryQueue: ReadyStoryQueueItem[]; savedStories: SavedStory[]; saveStatus: ReaderPreferencesSaveStatus; summary: AccountProfileSummary }) {
   const [avoidanceDraft, setAvoidanceDraft] = useState("");
+  const [dataControlMessage, setDataControlMessage] = useState("");
+  const [pendingClearConfirmation, setPendingClearConfirmation] = useState<AccountDataClearConfirmation>(null);
+  const accountMode = getAccountDataMode(authState, readerProfile, canonicalProfile);
+  const accountRows = getAccountDataStatusRows({ accountMode, authState, canonicalProfile, readerProfile, summary });
   const savedCountEntries = [
     typeof summary.counts.savedStories === "number" ? { label: "Saved stories", value: summary.counts.savedStories } : null,
     typeof summary.counts.series === "number" ? { label: "Series / storyworlds", value: summary.counts.series } : null,
@@ -2548,6 +2587,21 @@ function AccountView({ onOpenLibrary, onReaderPreferencesChange, readerPreferenc
     const next = addUniquePreferenceItem(readerPreferences.hardAvoidances, avoidanceDraft, MAX_READER_HARD_AVOIDANCES);
     if (next !== readerPreferences.hardAvoidances) updatePreferences({ hardAvoidances: next });
     setAvoidanceDraft("");
+  };
+  const exportAccountData = () => {
+    const exportData = buildAccountDataExport({ accountMode, authState, canonicalProfile, inputArtifacts, readerProfile, savedForLaterStoryQueue, savedStories, summary });
+    downloadJsonFile(`lantyrn-account-data-${new Date().toISOString().slice(0, 10)}.json`, exportData);
+    setDataControlMessage("Account/profile data exported as JSON.");
+  };
+  const clearStoryFitPreferences = () => {
+    onClearStoryFitPreferences();
+    setPendingClearConfirmation(null);
+    setDataControlMessage("Story Fit Preferences cleared.");
+  };
+  const clearLocalReaderMemory = () => {
+    onClearLocalReaderMemory();
+    setPendingClearConfirmation(null);
+    setDataControlMessage("Local reader memory/profile signals cleared.");
   };
 
   return (
@@ -2568,6 +2622,11 @@ function AccountView({ onOpenLibrary, onReaderPreferencesChange, readerPreferenc
           <ProfileSummaryRow label="Recent feedback" values={summary.recentFeedback} empty="No feedback captured yet." />
           <ProfileSummaryRow label="Confidence / status" values={[summary.confidenceLabel]} empty="Still learning." />
         </AccountCard>
+        <AccountCard title="Account data status">
+          <dl className="grid gap-2">
+            {accountRows.map((row) => <div className="rounded-md border border-paper/10 bg-night-ink/45 px-3 py-2" key={row.label}><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{row.label}</dt><dd className="mt-1 break-words text-sm font-semibold text-paper/80">{row.value}</dd></div>)}
+          </dl>
+        </AccountCard>
         <AccountCard title="Story fit preferences">
           <PreferenceChipGroup label="Preferred story types" options={READER_STORY_TYPE_OPTIONS} selected={readerPreferences.preferredStoryTypes} onToggle={(value) => toggleItem("preferredStoryTypes", value)} />
           <PreferenceChipGroup label="Story ingredients" options={READER_STORY_INGREDIENT_OPTIONS} selected={readerPreferences.storyIngredients} onToggle={(value) => toggleItem("storyIngredients", value)} />
@@ -2579,10 +2638,88 @@ function AccountView({ onOpenLibrary, onReaderPreferencesChange, readerPreferenc
           <p className={`text-xs font-semibold ${saveStatus === "error" ? "text-red-200" : "text-paper/50"}`}>{saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "Could not save locally" : "Saved"}</p>
         </AccountCard>
         <AccountCard title="Your saved Lantyrn content">{savedCountEntries.length ? <dl className="grid gap-3 sm:grid-cols-2">{savedCountEntries.map((entry) => <div className="rounded-md border border-paper/10 bg-night-ink/45 p-3" key={entry.label}><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{entry.label}</dt><dd className="mt-1 text-2xl font-semibold text-paper">{entry.value}</dd></div>)}</dl> : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved items found yet.</p>}<button className="mt-4 min-h-11 w-full rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-night-ink sm:w-fit" onClick={onOpenLibrary} type="button">Go to Library</button></AccountCard>
-        <AccountCard title="Data controls"><div className="grid gap-2">{["Export profile/data", "Clear profile memory", "Delete account/data"].map((label) => <button className="min-h-11 cursor-not-allowed rounded-md border border-paper/12 bg-paper/5 px-4 py-3 text-left text-sm font-semibold text-paper/45" disabled key={label} type="button">{label} — Coming soon</button>)}</div></AccountCard>
+        <AccountCard title="Data controls">
+          <div className="grid gap-2">
+            <button className="min-h-11 rounded-md border border-lantern-gold/45 bg-lantern-gold/10 px-4 py-3 text-left text-sm font-semibold text-lantern-gold" onClick={exportAccountData} type="button">Export account data</button>
+            <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-3 text-left text-sm font-semibold text-paper/80" onClick={() => { setPendingClearConfirmation("story-fit-preferences"); setDataControlMessage(""); }} type="button">Clear Story Fit Preferences</button>
+            <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-3 text-left text-sm font-semibold text-paper/80" onClick={() => { setPendingClearConfirmation("local-reader-memory"); setDataControlMessage(""); }} type="button">Clear local reader memory/profile signals</button>
+            <button className="min-h-11 cursor-not-allowed rounded-md border border-paper/12 bg-paper/5 px-4 py-3 text-left text-sm font-semibold text-paper/45" disabled type="button">Delete account/data — Coming soon</button>
+          </div>
+          {pendingClearConfirmation ? (
+            <div className="rounded-md border border-lantern-gold/35 bg-night-ink/70 p-3">
+              <p className="text-sm leading-6 text-paper/75">{pendingClearConfirmation === "story-fit-preferences" ? "This clears your selected story types, story ingredients, content lane, narrative pressure, episode ending shape, protagonist lens, and hard avoidances. It does not delete stories." : "This clears local learned reader/profile signals used for personalization. It does not delete stories or sign you out."}</p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={() => setPendingClearConfirmation(null)} type="button">Cancel</button>
+                <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink" onClick={pendingClearConfirmation === "story-fit-preferences" ? clearStoryFitPreferences : clearLocalReaderMemory} type="button">{pendingClearConfirmation === "story-fit-preferences" ? "Clear Story Fit Preferences" : "Clear local reader memory"}</button>
+              </div>
+            </div>
+          ) : null}
+          <p className="text-xs leading-5 text-paper/50">Exports and clearing actions use only data already available in this browser/app state. Account deletion is not enabled here.</p>
+          {dataControlMessage ? <p className="rounded-md border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-2 text-sm font-semibold text-lantern-gold">{dataControlMessage}</p> : null}
+        </AccountCard>
       </div>
     </section>
   );
+}
+
+function getAccountDataMode(authState: ReturnType<typeof useAuth>, readerProfile: ReaderProfile, canonicalProfile: CanonicalReaderProfile | null): AccountDataMode {
+  if (authState.currentUser?.id) return "signed-in";
+  if (readerProfile.profileExists || readerProfileExistsInLocalStorage()) return "browser-profile";
+  if (canonicalProfile?.source === "local") return "local-profile";
+  return authState.authStatus === "error" ? "unknown" : "browser-profile";
+}
+
+function getAccountDataStatusRows({ accountMode, authState, canonicalProfile, readerProfile, summary }: { accountMode: AccountDataMode; authState: ReturnType<typeof useAuth>; canonicalProfile: CanonicalReaderProfile | null; readerProfile: ReaderProfile; summary: AccountProfileSummary }) {
+  const feedbackCount = canonicalProfile?.signals.feedbackSignalCount ?? readerProfile.storyFeedbackSignals?.length;
+  return [
+    { label: "Account mode", value: formatAccountDataMode(accountMode) },
+    summary.profileId ? { label: "Profile ID", value: summary.profileId } : null,
+    authState.currentUser?.email ? { label: "Signed-in email", value: authState.currentUser.email } : null,
+    typeof summary.counts.savedStories === "number" ? { label: "Saved stories", value: String(summary.counts.savedStories) } : null,
+    { label: "Story Fit Preferences", value: hasReaderProfilePreferences(readerProfile.explicitReaderPreferences) ? "Saved" : "Empty" },
+    { label: "Reader memory/profile signals", value: hasReaderMemorySignals(readerProfile, canonicalProfile) ? "Saved" : "Empty" },
+    typeof feedbackCount === "number" ? { label: "Feedback signals", value: String(feedbackCount) } : null,
+    readerProfile.updatedAt || canonicalProfile?.updatedAt ? { label: "Last updated", value: readerProfile.updatedAt || canonicalProfile?.updatedAt || "" } : null,
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
+}
+
+function formatAccountDataMode(accountMode: AccountDataMode) {
+  if (accountMode === "signed-in") return "Signed in";
+  if (accountMode === "browser-profile") return "Browser profile";
+  if (accountMode === "local-profile") return "Local profile";
+  return "Unknown";
+}
+
+function hasReaderMemorySignals(readerProfile: ReaderProfile, canonicalProfile: CanonicalReaderProfile | null) {
+  return Boolean(readerProfile.profileExists || readerProfile.latestMood || readerProfile.moodHistory.length || readerProfile.storyFeedbackSignals?.length || readerProfile.readyStoryQueueSignals?.length || canonicalProfile?.signals.feedbackSignalCount || canonicalProfile?.signals.storyCardSignalCount || canonicalProfile?.signals.savedForLaterCount);
+}
+
+function buildAccountDataExport({ accountMode, authState, canonicalProfile, inputArtifacts, readerProfile, savedForLaterStoryQueue, savedStories, summary }: { accountMode: AccountDataMode; authState: ReturnType<typeof useAuth>; canonicalProfile: CanonicalReaderProfile | null; inputArtifacts: InputArtifact[]; readerProfile: ReaderProfile; savedForLaterStoryQueue: ReadyStoryQueueItem[]; savedStories: SavedStory[]; summary: AccountProfileSummary }): AccountDataExportV1 {
+  const worlds = inputArtifacts.filter((artifact) => artifact.type === "worldBible");
+  const characters = inputArtifacts.filter((artifact) => artifact.type === "characterProfiles");
+  const storySparks = inputArtifacts.filter((artifact) => artifact.type === "storySeed");
+  return {
+    exportVersion: "account-data-v1",
+    exportedAt: new Date().toISOString(),
+    appVersion: APP_VERSION,
+    account: { accountMode, ...(summary.profileId ? { profileId: summary.profileId } : {}), ...(authState.currentUser?.email ? { email: authState.currentUser.email } : {}) },
+    storyFitPreferences: readerProfile.explicitReaderPreferences,
+    readerProfile: { local: readerProfile, canonical: canonicalProfile },
+    feedbackSignals: { local: readerProfile.storyFeedbackSignals ?? [], canonicalRecentFeedback: canonicalProfile?.recentFeedback ?? [] },
+    savedContentSummary: { savedStories: savedStories.length, series: groupStoriesBySeries(savedStories).length, characters: characters.length || summary.counts.characters, worlds: worlds.length, storySparks: storySparks.length + savedForLaterStoryQueue.length },
+    savedContent: { stories: savedStories, series: groupStoriesBySeries(savedStories).map((series) => ({ seriesId: series.seriesId, title: series.title, episodeCount: series.episodes.length })), characters, worlds, storySparks: [...storySparks, ...savedForLaterStoryQueue] },
+  };
+}
+
+function downloadJsonFile(filename: string, data: unknown) {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
 }
 
 function PreferenceChipGroup({ label, onToggle, options, selected }: { label: string; onToggle: (value: string) => void; options: string[]; selected: string[] }) {
