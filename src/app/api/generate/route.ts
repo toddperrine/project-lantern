@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getBuildInfo } from "@/lib/build-info";
-import { generateFallbackStory } from "@/lib/fallback-generator";
+import { CLEAN_GENERATION_FAILURE_MESSAGE } from "@/lib/generation-display-policy";
 import { createGenerationIdentity } from "@/lib/generation-identity";
 import { generateOpenAIStoryWithLongFloor } from "@/lib/long-floor-generator";
 import { getOpenAIDiagnostics, hasOpenAIKey } from "@/lib/openai-generator";
@@ -13,7 +13,7 @@ import {
   LENGTH_TARGETS,
   NARRATIVE_ARCHITECTURES
 } from "@/lib/types";
-import type { GenerateStoryRequest, GenerateStoryResponse } from "@/lib/types";
+import type { GenerateStoryRequest, GenerateStoryResponse, StoryDiagnostics } from "@/lib/types";
 
 const MAX_CONTEXT_CHARS = 120_000;
 const DEFAULT_STORY_RULES = `Every story must obey these rules:
@@ -38,23 +38,26 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = summarizeOpenAIError(error);
     console.error("Unhandled /api/generate failure", message);
-    return NextResponse.json({ error: "Story generation failed before a response could be completed.", diagnostic: { message } }, { status: 500 });
+    const userMessage = message.includes("Fallback rejected for metadata leak") ? CLEAN_GENERATION_FAILURE_MESSAGE : "Story generation failed before a response could be completed.";
+    return NextResponse.json({ error: userMessage, diagnostic: { message } }, { status: 500 });
   }
 }
 
 async function handleGenerateRequest(request: Request) {
   const generationStartedAt = new Date();
+  const authSessionPresent = hasAuthSession(request);
+  const authRequiredForGeneration = false;
   let body: Partial<GenerateStoryRequest>;
 
   try {
     body = (await request.json()) as Partial<GenerateStoryRequest>;
   } catch {
-    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+    return buildPayloadFailureResponse("Request body must be valid JSON.", generationStartedAt, authSessionPresent, authRequiredForGeneration);
   }
 
   const validationError = validateRequest(body);
   if (validationError) {
-    return NextResponse.json({ error: validationError }, { status: 400 });
+    return buildPayloadFailureResponse(validationError, generationStartedAt, authSessionPresent, authRequiredForGeneration);
   }
 
   const readerMood = isReaderMoodSnapshot(body.readerMood) ? body.readerMood : null;
@@ -64,7 +67,11 @@ async function handleGenerateRequest(request: Request) {
     worldBible: body.worldBible!.trim(),
     characterProfiles: body.characterProfiles!.trim(),
     storySeed: body.storySeed!.trim(),
-    storyRules: buildStoryRules(body.storyRules, readerMood, body.personalizationContext),
+    storyRules: buildStoryRules(body.storyRules, readerMood, body.personalizationContext, {
+      label: body.selectedStoryTypeChipLabel,
+      guidance: body.selectedStoryTypeGuidance,
+      keywords: body.selectedStoryTypeKeywords
+    }),
     genrePreset: body.genrePreset!,
     selectedStoryTypeChipId: normalizeOptionalString(body.selectedStoryTypeChipId),
     selectedStoryTypeChipLabel: normalizeOptionalString(body.selectedStoryTypeChipLabel),
@@ -89,31 +96,22 @@ async function handleGenerateRequest(request: Request) {
     generationTrigger: body.generationTrigger!,
     readerMood,
     personalizationContext: body.personalizationContext?.trim() || undefined,
-    readerProfileGenerationSnapshot
+    readerProfileGenerationSnapshot,
+    readerProfileInput: body.readerProfileInput && typeof body.readerProfileInput === "object" ? body.readerProfileInput : undefined
   } satisfies GenerateStoryRequest;
 
   if (!hasOpenAIKey()) {
-    return NextResponse.json(
-      withServerGenerationDuration(
-        withReaderProfileGenerationSnapshot(generateFallbackStory(
-          input,
-          getOpenAIDiagnostics({
-            fallbackReason: "OPENAI_API_KEY is missing or empty in this deployment environment.",
-            genrePreset: input.genrePreset,
-            narrativeArchitecture: input.narrativeArchitecture,
-            characterArc: input.characterArc,
-            endingType: input.endingType,
-            lengthTarget: formatLengthTarget(input.lengthTarget),
-            ...buildRequestGenerationDiagnostics(input)
-          })
-        ), input.readerProfileGenerationSnapshot),
-        generationStartedAt
-      )
-    );
+    return buildGenerationFailureResponse(input, generationStartedAt, {
+      fallbackReason: "Model generation is unavailable in this environment.",
+      modelGenerationAttempted: false,
+      modelGenerationErrorType: "missing_env",
+      authRequiredForGeneration,
+      authSessionPresent
+    });
   }
 
   try {
-    return NextResponse.json(withServerGenerationDuration(withReaderProfileGenerationSnapshot(await generateOpenAIStoryWithLongFloor(input), input.readerProfileGenerationSnapshot), generationStartedAt));
+    return NextResponse.json(withRequestDiagnostics(withServerGenerationDuration(withReaderProfileGenerationSnapshot(await generateOpenAIStoryWithLongFloor(input), input.readerProfileGenerationSnapshot), generationStartedAt), { authRequiredForGeneration, authSessionPresent, statusCode: 200 }));
   } catch (error) {
     const errorSummary = summarizeOpenAIError(error);
 
@@ -121,28 +119,38 @@ async function handleGenerateRequest(request: Request) {
       try {
         const repairedResponse = await generateOpenAIStoryWithLongFloor(buildBlueprintRepairRetryInput(input, errorSummary));
         return NextResponse.json(
-          withServerGenerationDuration(
+          withRequestDiagnostics(withServerGenerationDuration(
             withReaderProfileGenerationSnapshot(withBlueprintRepairSuccessDiagnostics(repairedResponse, errorSummary), input.readerProfileGenerationSnapshot),
             generationStartedAt
-          )
+          ), { authRequiredForGeneration, authSessionPresent, statusCode: 200, repairAttempted: true, repairSucceeded: true })
         );
       } catch (repairError) {
         const repairSummary = summarizeOpenAIError(repairError);
-        return NextResponse.json(
-          withServerGenerationDuration(
-            withReaderProfileGenerationSnapshot(buildOpenAIFallbackResponse(input, `OpenAI request failed: ${errorSummary}. Blueprint repair retry failed: ${repairSummary}`, `${errorSummary}; repair retry: ${repairSummary}`), input.readerProfileGenerationSnapshot),
-            generationStartedAt
-          )
-        );
+        return buildGenerationFailureResponse(input, generationStartedAt, {
+          fallbackReason: `Model generation failed after blueprint repair retry.`,
+          modelGenerationAttempted: true,
+          modelGenerationErrorType: classifyGenerationError(repairSummary),
+          repairAttempted: true,
+          blueprintFailedReason: `${errorSummary}; repair retry: ${repairSummary}`,
+          modelGenerationErrorMessageSafe: repairSummary,
+          authRequiredForGeneration,
+          authSessionPresent,
+          storyCleanlinessDiagnostics: readStoryCleanlinessDiagnostics(repairError)
+        });
       }
     }
 
-    return NextResponse.json(
-      withServerGenerationDuration(
-        withReaderProfileGenerationSnapshot(buildOpenAIFallbackResponse(input, `OpenAI request failed: ${errorSummary}`, errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null), input.readerProfileGenerationSnapshot),
-        generationStartedAt
-      )
-    );
+    return buildGenerationFailureResponse(input, generationStartedAt, {
+      fallbackReason: "Model generation failed before a clean episode could be created.",
+      modelGenerationAttempted: true,
+      modelGenerationErrorType: classifyGenerationError(errorSummary),
+      repairAttempted: isBlueprintGenerationFailure(errorSummary),
+      blueprintFailedReason: errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null,
+      modelGenerationErrorMessageSafe: errorSummary,
+      authRequiredForGeneration,
+      authSessionPresent,
+      storyCleanlinessDiagnostics: readStoryCleanlinessDiagnostics(error)
+    });
   }
 }
 
@@ -198,6 +206,7 @@ function normalizeReaderProfileGenerationSnapshot(
     genreSignal: normalizeDiagnosticString(snapshot.genreSignal),
     canonicalReaderProfileUsed: Boolean(snapshot.canonicalReaderProfileUsed),
     canonicalReaderProfileInput: snapshot.canonicalReaderProfileInput && typeof snapshot.canonicalReaderProfileInput === "object" ? snapshot.canonicalReaderProfileInput : undefined,
+    explicitReaderPreferencesForGeneration: snapshot.explicitReaderPreferencesForGeneration && typeof snapshot.explicitReaderPreferencesForGeneration === "object" ? snapshot.explicitReaderPreferencesForGeneration : undefined,
     generatedAt: normalizeDiagnosticString(snapshot.generatedAt) || new Date().toISOString()
   };
 }
@@ -243,26 +252,228 @@ function withServerGenerationDuration(
   };
 }
 
-function buildOpenAIFallbackResponse(input: GenerateStoryRequest, fallbackReason: string, blueprintFailedReason: string | null): GenerateStoryResponse {
-  console.error("OpenAI story generation failed; using deterministic fallback.", fallbackReason);
-  return generateFallbackStory(
-    input,
-    getOpenAIDiagnostics({
-      openAIRequestAttempted: true,
-      fallbackReason,
-      genrePreset: input.genrePreset,
-      narrativeArchitecture: input.narrativeArchitecture,
-      characterArc: input.characterArc,
-      endingType: input.endingType,
-      lengthTarget: formatLengthTarget(input.lengthTarget),
-      ...buildRequestGenerationDiagnostics(input),
-      timedOutEarly: false,
-      stoppedReason: "openai-error",
-      blueprintGenerated: false,
-      blueprintSceneCount: 0,
-      blueprintFailedReason
-    })
+function withRequestDiagnostics(
+  response: GenerateStoryResponse,
+  options: {
+    authRequiredForGeneration: boolean;
+    authSessionPresent: boolean;
+    statusCode: number;
+    repairAttempted?: boolean;
+    repairSucceeded?: boolean;
+  }
+): GenerateStoryResponse {
+  return {
+    ...response,
+    metadata: {
+      ...response.metadata,
+      diagnostics: {
+        ...response.metadata.diagnostics,
+        deployedAppVersion: getBuildInfo().appVersion,
+        generationRequestStarted: true,
+        generationRequestStatus: "succeeded",
+        generationEndpointStatusCode: options.statusCode,
+        authRequiredForGeneration: options.authRequiredForGeneration,
+        authSessionPresent: options.authSessionPresent,
+        requestPayloadValid: true,
+        requestPayloadValidationError: null,
+        modelGenerationErrorMessageSafe: null,
+        fallbackReached: false,
+        fallbackUserDisplayBlocked: true,
+        repairAttempted: options.repairAttempted ?? response.metadata.diagnostics.repairAttempted,
+        repairSucceeded: options.repairSucceeded ?? response.metadata.diagnostics.repairSucceeded
+      }
+    }
+  };
+}
+
+function buildGenerationFailureResponse(
+  input: GenerateStoryRequest,
+  generationStartedAt: Date,
+  options: {
+    fallbackReason: string;
+    modelGenerationAttempted: boolean;
+    modelGenerationErrorType: string;
+    modelGenerationErrorMessageSafe?: string | null;
+    repairAttempted?: boolean;
+    blueprintFailedReason?: string | null;
+    authRequiredForGeneration: boolean;
+    authSessionPresent: boolean;
+    storyCleanlinessDiagnostics?: Partial<StoryDiagnostics>;
+  }
+) {
+  console.error("Story generation failed; deterministic fallback blocked from user display.", {
+    fallbackReason: options.fallbackReason,
+    modelGenerationAttempted: options.modelGenerationAttempted,
+    modelGenerationErrorType: options.modelGenerationErrorType,
+    repairAttempted: Boolean(options.repairAttempted)
+  });
+
+  const diagnostics = getOpenAIDiagnostics({
+    openAIRequestAttempted: options.modelGenerationAttempted,
+    openAIRequestSucceeded: false,
+    fallbackReason: options.fallbackReason,
+    genrePreset: input.genrePreset,
+    narrativeArchitecture: input.narrativeArchitecture,
+    characterArc: input.characterArc,
+    endingType: input.endingType,
+    lengthTarget: formatLengthTarget(input.lengthTarget),
+    ...buildRequestGenerationDiagnostics(input),
+    timedOutEarly: false,
+    stoppedReason: "openai-error",
+    blueprintGenerated: false,
+    blueprintSceneCount: 0,
+    blueprintFailedReason: options.blueprintFailedReason ?? null,
+    generationRequestStarted: true,
+    generationRequestStatus: "failed",
+    generationEndpointStatusCode: 502,
+    authRequiredForGeneration: options.authRequiredForGeneration,
+    authSessionPresent: options.authSessionPresent,
+    requestPayloadValid: true,
+    requestPayloadValidationError: null,
+    modelGenerationErrorMessageSafe: options.modelGenerationErrorMessageSafe ?? options.fallbackReason,
+    deployedAppVersion: getBuildInfo().appVersion,
+    storyGenerationFailureStage: options.storyCleanlinessDiagnostics?.storyGenerationFailureStage ?? classifyGenerationFailureStage(options.modelGenerationErrorMessageSafe ?? options.fallbackReason, options),
+    storyGenerationFailureReason: options.storyCleanlinessDiagnostics?.storyGenerationFailureReason ?? classifyGenerationFailureReason(options.modelGenerationErrorMessageSafe ?? options.fallbackReason, options),
+    storyGenerationFailureSource: options.storyCleanlinessDiagnostics?.storyGenerationFailureSource ?? (options.modelGenerationAttempted ? "model" : "environment"),
+    storyGenerationRetryAttempted: options.storyCleanlinessDiagnostics?.storyGenerationRetryAttempted ?? Boolean((options.modelGenerationErrorMessageSafe ?? "").includes("retry")),
+    storyGenerationRetrySucceeded: options.storyCleanlinessDiagnostics?.storyGenerationRetrySucceeded ?? false,
+    storyMetadataLeakGuardEnabled: true,
+    storyMetadataLeakScanTarget: options.storyCleanlinessDiagnostics?.storyMetadataLeakScanTarget ?? "final-story-prose",
+    storyMetadataLeakDetected: options.storyCleanlinessDiagnostics?.storyMetadataLeakDetected ?? Boolean((options.modelGenerationErrorMessageSafe ?? "").toLowerCase().includes("metadata")),
+    storyMetadataLeakSanitized: options.storyCleanlinessDiagnostics?.storyMetadataLeakSanitized ?? Boolean((options.modelGenerationErrorMessageSafe ?? "").toLowerCase().includes("sanitization")),
+    storyMetadataLeakFinalClean: options.storyCleanlinessDiagnostics?.storyMetadataLeakFinalClean ?? false,
+    storyMetadataLeakRemovedPatterns: options.storyCleanlinessDiagnostics?.storyMetadataLeakRemovedPatterns ?? [],
+    storyRawCandidateLength: options.storyCleanlinessDiagnostics?.storyRawCandidateLength ?? 0,
+    storySanitizedCandidateLength: options.storyCleanlinessDiagnostics?.storySanitizedCandidateLength ?? 0,
+    storyRepairAttempted: options.storyCleanlinessDiagnostics?.storyRepairAttempted ?? Boolean(options.repairAttempted),
+    fallbackDisplayBlocked: true,
+    generationSource: "model",
+    fallbackUsed: false,
+    fallbackReached: false,
+    fallbackRejectedForUserDisplay: false,
+    fallbackUserDisplayBlocked: true,
+    modelGenerationAttempted: options.modelGenerationAttempted,
+    modelGenerationSucceeded: false,
+    modelGenerationErrorType: options.modelGenerationErrorType,
+    repairAttempted: Boolean(options.repairAttempted),
+    repairSucceeded: false,
+    metadataLeakGuardTriggered: Boolean(options.storyCleanlinessDiagnostics?.storyMetadataLeakDetected)
+  });
+
+  const buildInfo = getBuildInfo();
+  const generationFinishedAt = new Date();
+  const serverGenerationDurationSeconds = Math.max(
+    0,
+    Math.round((generationFinishedAt.getTime() - generationStartedAt.getTime()) / 1000)
   );
+
+  return NextResponse.json({
+    error: CLEAN_GENERATION_FAILURE_MESSAGE,
+    diagnostic: {
+      ...diagnostics,
+      serverGenerationDurationSeconds,
+      appVersion: buildInfo.appVersion,
+      buildEnvironment: buildInfo.buildEnvironment,
+      gitBranch: buildInfo.gitBranch,
+      commitSha: buildInfo.commitSha,
+      buildTimestamp: buildInfo.buildTimestamp,
+      readerProfileSnapshot: input.readerProfileGenerationSnapshot,
+      readerProfileGenerationSnapshot: input.readerProfileGenerationSnapshot,
+      ...buildGenerationIdentityDiagnostics(diagnostics)
+    }
+  }, { status: 502 });
+}
+
+function buildPayloadFailureResponse(
+  validationError: string,
+  generationStartedAt: Date,
+  authSessionPresent: boolean,
+  authRequiredForGeneration: boolean
+) {
+  const buildInfo = getBuildInfo();
+  const serverGenerationDurationSeconds = Math.max(
+    0,
+    Math.round((Date.now() - generationStartedAt.getTime()) / 1000)
+  );
+
+  return NextResponse.json({
+    error: validationError,
+    diagnostic: {
+      ...getOpenAIDiagnostics({
+        fallbackReason: null,
+        generationRequestStarted: true,
+        generationRequestStatus: "failed",
+        generationEndpointStatusCode: 400,
+        authRequiredForGeneration,
+        authSessionPresent,
+        requestPayloadValid: false,
+        requestPayloadValidationError: validationError,
+        modelGenerationAttempted: false,
+        modelGenerationSucceeded: false,
+        modelGenerationErrorType: "payload_validation",
+        modelGenerationErrorMessageSafe: validationError,
+        generationSource: "model",
+        fallbackUsed: false,
+        fallbackReached: false,
+        fallbackRejectedForUserDisplay: false,
+        fallbackUserDisplayBlocked: true,
+        deployedAppVersion: getBuildInfo().appVersion,
+        storyGenerationFailureStage: "payload-validation",
+        storyGenerationFailureReason: validationError,
+        storyGenerationFailureSource: "request",
+        storyGenerationRetryAttempted: false,
+        storyGenerationRetrySucceeded: false,
+        storyMetadataLeakGuardEnabled: true,
+        storyMetadataLeakScanTarget: "not-started",
+        storyMetadataLeakDetected: false,
+        storyMetadataLeakSanitized: false,
+        storyMetadataLeakFinalClean: false,
+        storyMetadataLeakRemovedPatterns: [],
+        storyRawCandidateLength: 0,
+        storySanitizedCandidateLength: 0,
+        storyRepairAttempted: false,
+        fallbackDisplayBlocked: true
+      }),
+      serverGenerationDurationSeconds,
+      appVersion: buildInfo.appVersion,
+      buildEnvironment: buildInfo.buildEnvironment,
+      gitBranch: buildInfo.gitBranch,
+      commitSha: buildInfo.commitSha,
+      buildTimestamp: buildInfo.buildTimestamp
+    }
+  }, { status: 400 });
+}
+
+function classifyGenerationFailureStage(
+  message: string,
+  options: { modelGenerationAttempted: boolean; modelGenerationErrorType: string; repairAttempted?: boolean }
+): string {
+  const lower = message.toLowerCase();
+  if (!options.modelGenerationAttempted && options.modelGenerationErrorType === "missing_env") return "missing-env";
+  if (lower.includes("clean story prose") || lower.includes("metadata sanitization")) return "story-clean-retry";
+  if (lower.includes("story draft request")) return "story-draft-request";
+  if (lower.includes("story draft parse")) return "story-draft-parse";
+  if (lower.includes("forbidden")) return "forbidden-term-repair";
+  if (lower.includes("expansion")) return "expansion";
+  if (lower.includes("long floor")) return "long-floor-pass";
+  if (lower.includes("blueprint")) return options.repairAttempted ? "blueprint-repair" : "blueprint-generation";
+  if (lower.includes("fallback")) return "fallback-display-policy";
+  return options.modelGenerationAttempted ? "unknown-model-error" : "missing-env";
+}
+
+function classifyGenerationFailureReason(
+  message: string,
+  options: { modelGenerationAttempted: boolean; modelGenerationErrorType: string }
+): string {
+  if (!options.modelGenerationAttempted && options.modelGenerationErrorType === "missing_env") return "missing_env";
+  if (message.toLowerCase().includes("clean story prose")) return "no_clean_story_after_sanitization_retry";
+  return options.modelGenerationErrorType || "unknown";
+}
+
+function readStoryCleanlinessDiagnostics(error: unknown): Partial<StoryDiagnostics> | undefined {
+  if (!error || typeof error !== "object" || !("storyCleanlinessDiagnostics" in error)) return undefined;
+  const diagnostics = (error as { storyCleanlinessDiagnostics?: unknown }).storyCleanlinessDiagnostics;
+  return diagnostics && typeof diagnostics === "object" ? diagnostics as Partial<StoryDiagnostics> : undefined;
 }
 
 function withBlueprintRepairSuccessDiagnostics(response: GenerateStoryResponse, originalBlueprintFailure: string): GenerateStoryResponse {
@@ -383,15 +594,43 @@ function buildGenerationIdentityDiagnostics(diagnostics: GenerateStoryResponse["
   };
 }
 
-function buildStoryRules(storyRules: string | undefined, readerMood: GenerateStoryRequest["readerMood"] = null, personalizationContext?: string): string {
+function buildStoryRules(
+  storyRules: string | undefined,
+  readerMood: GenerateStoryRequest["readerMood"] = null,
+  personalizationContext?: string,
+  storyFit?: { label?: unknown; guidance?: unknown; keywords?: unknown }
+): string {
   const baseRules = storyRules?.trim() || DEFAULT_STORY_RULES;
   const readerMoodGuidance = formatReaderMoodForPrompt(readerMood);
   const controlledPersonalization = personalizationContext?.trim() || "";
+  const storyFitGuidance = formatSelectedStoryFitForPrivateRules(storyFit);
 
-  return [baseRules, formatStoryCraftGuidance(), readerMoodGuidance, controlledPersonalization].filter(Boolean).join("\n\n");
+  return [baseRules, formatStoryCraftGuidance(), readerMoodGuidance, storyFitGuidance, controlledPersonalization].filter(Boolean).join("\n\n");
+}
+
+function formatSelectedStoryFitForPrivateRules(storyFit?: { label?: unknown; guidance?: unknown; keywords?: unknown }): string {
+  const label = normalizeOptionalString(storyFit?.label);
+  const guidance = normalizeOptionalString(storyFit?.guidance);
+  const keywords = Array.isArray(storyFit?.keywords)
+    ? storyFit.keywords.filter((keyword): keyword is string => typeof keyword === "string" && Boolean(keyword.trim())).map((keyword) => keyword.trim()).slice(0, 8)
+    : [];
+  if (!label && !guidance && keywords.length === 0) return "";
+
+  return [
+    "Private story-fit planning context:",
+    label ? `- Selected story fit: ${label}. Express this through scene, setting, character pressure, and consequence without printing labels or instructions.` : "",
+    guidance ? `- Direction: ${guidance}` : "",
+    keywords.length ? `- Useful motifs: ${keywords.join(", ")}` : "",
+    "- The final story must begin directly as prose and must not print story-fit labels, ids, keyword lists, craft labels, or prompt instructions."
+  ].filter(Boolean).join("\n");
 }
 function normalizeOptionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function hasAuthSession(request: Request): boolean {
+  const authorization = request.headers.get("authorization") ?? "";
+  return /^Bearer\s+\S+/i.test(authorization);
 }
 
 function summarizeOpenAIError(error: unknown): string {
@@ -400,6 +639,16 @@ function summarizeOpenAIError(error: unknown): string {
   }
 
   return "Unknown error";
+}
+
+function classifyGenerationError(errorSummary: string): string {
+  const normalized = errorSummary.toLowerCase();
+  if (normalized.includes("api key") || normalized.includes("missing") || normalized.includes("environment")) return "missing_env";
+  if (normalized.includes("timeout") || normalized.includes("timed out")) return "timeout";
+  if (normalized.includes("blueprint")) return "blueprint_validation";
+  if (normalized.includes("metadata") || normalized.includes("leak")) return "metadata_leak_guard";
+  if (normalized.includes("parse") || normalized.includes("json")) return "parse_error";
+  return "model_error";
 }
 
 function redactSecretLikeText(value: string): string {

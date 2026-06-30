@@ -44,8 +44,8 @@ export function getStoryTypeSeedSource(chip: StoryTypeChip, candidateTexts: stri
 export function getStoryTypePromptRequirements(chip: StoryTypeChip): string {
   if (chip.id !== "dark-fairy-tale") return "";
   return [
-    "Dark Fairy Tale requirements:",
-    "- Require folklore or fairy-tale logic.",
+    "Private dark fairy-tale planning constraints (do not quote or label in prose):",
+    "- Use folklore or fairy-tale logic.",
     "- Center rules, bargains, thresholds, curses, transformations, or beautiful cruelty.",
     "- Turn a storybook or mythic pattern dangerous.",
     "- Make dread come from violating or discovering a hidden rule.",

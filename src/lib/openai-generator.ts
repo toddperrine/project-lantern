@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { buildEpisodeMomentumObjective } from "./episode-momentum-engine";
 import { LENGTH_TARGETS } from "./types";
 import type { GenerateStoryRequest, GenerateStoryResponse, LengthTarget, StoryDiagnostics } from "./types";
-import { normalizeStoryPayload, normalizeStoryText, normalizeStringList } from "./story-output";
+import { findStoryMetadataLeakPatterns, normalizeStoryPayload, normalizeStoryText, normalizeStringList, sanitizeStoryMetadataLeaks } from "./story-output";
 import {
   countWords,
   inferCharactersUsed,
@@ -229,6 +229,46 @@ export function getOpenAIDiagnostics(overrides: Partial<StoryDiagnostics> = {}):
     partialBeatNormalizationUsed: false,
     missingBeatRepairAttempted: false,
     finalAcceptedBlueprintSceneCount: undefined,
+    storyMetadataLeakGuardEnabled: true,
+    fallbackMetadataLeakGuardEnabled: false,
+    fallbackRejectedForMetadataLeak: false,
+    metadataLeakPatternsFound: [],
+    deployedAppVersion: undefined,
+    latestGenerationAttemptId: undefined,
+    storyGenerationFailureStage: "none",
+    storyGenerationFailureReason: null,
+    storyGenerationFailureSource: "none",
+    storyGenerationRetryAttempted: false,
+    storyGenerationRetrySucceeded: false,
+    storyMetadataLeakScanTarget: "final-story-prose",
+    storyMetadataLeakDetected: false,
+    storyMetadataLeakSanitized: false,
+    storyMetadataLeakFinalClean: true,
+    storyMetadataLeakRemovedPatterns: [],
+    storyRawCandidateLength: 0,
+    storySanitizedCandidateLength: 0,
+    storyRepairAttempted: false,
+    fallbackDisplayBlocked: true,
+    generationRequestStarted: false,
+    generationRequestStatus: "not-started",
+    generationEndpointStatusCode: undefined,
+    authRequiredForGeneration: false,
+    authSessionPresent: false,
+    requestPayloadValid: false,
+    requestPayloadValidationError: null,
+    modelGenerationErrorMessageSafe: null,
+    generationSource: "model",
+    fallbackUsed: false,
+    fallbackReached: false,
+    fallbackRejectedForUserDisplay: false,
+    fallbackUserDisplayBlocked: false,
+    modelGenerationAttempted: false,
+    modelGenerationSucceeded: false,
+    modelGenerationErrorType: "none",
+    repairAttempted: false,
+    repairSucceeded: false,
+    metadataLeakGuardTriggered: false,
+    storyFitGenerationContextVersion: "v1",
     generationMode: "new_story",
     storyId: "unassigned",
     seriesId: "unassigned",
@@ -259,19 +299,89 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
     blueprint = blueprintResult.blueprint;
     repairAttemptsCount += blueprintResult.repairAttemptsCount;
   } catch (error) {
-    throw new Error(`Blueprint generation failed: ${summarizeError(error)}`);
+    throw createGenerationStageError("blueprint-generation", `Blueprint generation failed: ${summarizeError(error)}`, {
+      storyGenerationFailureReason: "blueprint_generation_failed",
+      storyGenerationRetryAttempted: false,
+      storyGenerationRetrySucceeded: false
+    });
   }
 
-  let payload = await requestStory(
-    client,
-    getStoryModel(),
-    buildStoryPrompt(input, blueprint, blueprintRange, disallowedTerms),
-    estimateStoryMaxTokens(lengthSpec.maxWords)
-  );
+  let payload: OpenAIStoryPayload;
+  try {
+    payload = await requestStory(
+      client,
+      getStoryModel(),
+      buildStoryPrompt(input, blueprint, blueprintRange, disallowedTerms),
+      estimateStoryMaxTokens(lengthSpec.maxWords)
+    );
+  } catch (error) {
+    throw createGenerationStageError("story-draft-request", `Story draft request failed: ${summarizeError(error)}`, {
+      storyGenerationFailureReason: "story_draft_request_failed",
+      storyGenerationRetryAttempted: false,
+      storyGenerationRetrySucceeded: false
+    });
+  }
+  let rawCandidateLength = payload.story.length;
+  let candidateSanitization = sanitizeStoryMetadataLeaks(payload.story);
   let story = normalizeStoryText(payload.story);
+  let cleanStoryRetryAttempted = false;
+  let cleanStoryRetrySucceeded = false;
+
+  if (!story && hasOptionalCallBudget(generationStartedAt)) {
+    cleanStoryRetryAttempted = true;
+    try {
+      payload = await requestStory(
+        client,
+        getStoryModel(),
+        buildCleanStoryRetryPrompt(input, blueprint, disallowedTerms),
+        estimateStoryMaxTokens(lengthSpec.maxWords)
+      );
+    } catch (error) {
+      throw createGenerationStageError("story-clean-retry", `Clean story retry failed: ${summarizeError(error)}`, {
+        storyGenerationFailureReason: "clean_story_retry_request_failed",
+        storyGenerationRetryAttempted: true,
+        storyGenerationRetrySucceeded: false,
+        storyMetadataLeakDetected: candidateSanitization.detected,
+        storyMetadataLeakSanitized: candidateSanitization.sanitized,
+        storyMetadataLeakFinalClean: false,
+        storyMetadataLeakRemovedPatterns: candidateSanitization.removedPatterns,
+        metadataLeakPatternsFound: candidateSanitization.removedPatterns,
+        storyRawCandidateLength: rawCandidateLength,
+        storySanitizedCandidateLength: candidateSanitization.text.length,
+        fallbackDisplayBlocked: true
+      });
+    }
+    rawCandidateLength = payload.story.length;
+    candidateSanitization = sanitizeStoryMetadataLeaks(payload.story);
+    story = normalizeStoryText(payload.story);
+    cleanStoryRetrySucceeded = Boolean(story);
+    repairAttemptsCount += 1;
+  }
 
   if (!story) {
-    throw new Error("OpenAI response did not include a story.");
+    throw Object.assign(
+      new Error("OpenAI response did not include clean story prose after metadata sanitization and retry."),
+      {
+        storyCleanlinessDiagnostics: {
+          storyGenerationFailureStage: "story-clean-retry",
+          storyGenerationFailureReason: "no_clean_story_after_sanitization_retry",
+          storyGenerationFailureSource: "model",
+          storyGenerationRetryAttempted: cleanStoryRetryAttempted,
+          storyGenerationRetrySucceeded: cleanStoryRetrySucceeded,
+          storyMetadataLeakGuardEnabled: true,
+          storyMetadataLeakScanTarget: "final-story-prose",
+          storyMetadataLeakDetected: candidateSanitization.detected,
+          storyMetadataLeakSanitized: candidateSanitization.sanitized,
+          storyMetadataLeakFinalClean: false,
+          storyMetadataLeakRemovedPatterns: candidateSanitization.removedPatterns,
+          metadataLeakPatternsFound: candidateSanitization.removedPatterns,
+          storyRawCandidateLength: rawCandidateLength,
+          storySanitizedCandidateLength: candidateSanitization.text.length,
+          storyRepairAttempted: repairAttemptsCount > 0,
+          fallbackDisplayBlocked: true
+        } satisfies Partial<StoryDiagnostics>
+      }
+    );
   }
 
   let forbiddenRepair = await repairForbiddenTermsIfNeeded(
@@ -385,6 +495,39 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
         timedOutEarly: stoppedReason === "time-budget",
         stoppedReason,
         remainingForbiddenTerms,
+        generationRequestStarted: true,
+        generationRequestStatus: "succeeded",
+        generationEndpointStatusCode: 200,
+        requestPayloadValid: true,
+        requestPayloadValidationError: null,
+        modelGenerationErrorMessageSafe: null,
+        generationSource: "model",
+        fallbackUsed: false,
+        fallbackReached: false,
+        fallbackRejectedForUserDisplay: false,
+        fallbackUserDisplayBlocked: false,
+        modelGenerationAttempted: true,
+        modelGenerationSucceeded: true,
+        modelGenerationErrorType: "none",
+        repairAttempted: repairAttemptsCount > 0,
+        repairSucceeded: repairAttemptsCount > 0 && remainingForbiddenTerms.length === 0,
+        metadataLeakGuardTriggered: remainingForbiddenTerms.length > 0,
+        storyGenerationFailureStage: "none",
+        storyGenerationFailureReason: null,
+        storyGenerationFailureSource: "model",
+        storyGenerationRetryAttempted: cleanStoryRetryAttempted,
+        storyGenerationRetrySucceeded: cleanStoryRetrySucceeded,
+        storyMetadataLeakGuardEnabled: true,
+        storyMetadataLeakScanTarget: "final-story-prose",
+        storyMetadataLeakDetected: candidateSanitization.detected,
+        storyMetadataLeakSanitized: candidateSanitization.sanitized,
+        storyMetadataLeakFinalClean: findStoryMetadataLeakPatterns(story).length === 0,
+        storyMetadataLeakRemovedPatterns: candidateSanitization.removedPatterns,
+        metadataLeakPatternsFound: findStoryMetadataLeakPatterns(story),
+        storyRawCandidateLength: rawCandidateLength,
+        storySanitizedCandidateLength: story.length,
+        storyRepairAttempted: repairAttemptsCount > 0,
+        fallbackDisplayBlocked: true,
         underTargetNotice,
         blueprintGenerated: true,
         blueprintSceneCount: blueprint.sceneBeats.length,
@@ -814,6 +957,47 @@ NARRATIVE RULES
 ${narrativeRules}`;
 }
 
+function buildCleanStoryRetryPrompt(
+  input: GenerateStoryRequest,
+  blueprint: StoryBlueprint,
+  disallowedTerms: string[]
+): string {
+  const lengthSpec = getLengthTargetSpec(input.lengthTarget);
+  const forbiddenRule = buildForbiddenLanguageRule(disallowedTerms);
+
+  return `Write a clean final story from this private blueprint.
+
+Return only valid JSON matching this shape: {"story":"...","charactersUsed":["..."],"rulesReferenced":["..."]}.
+
+The "story" value must contain finished story prose only.
+Do not include labels, headings, notes, analysis, prompt instructions, story-fit labels, story seed labels, craft-rule labels, JSON-like context names, private planning text, keyword lists, or blueprint text inside the story.
+The story must begin directly with scene prose, concrete action, setting, or dialogue.
+
+Length requirements:
+- Minimum: ${lengthSpec.minWords} words.
+- Maximum: ${lengthSpec.maxWords} words.
+- Selected target: ${formatLengthTarget(input.lengthTarget)}.
+
+Use these private materials only as planning context:
+
+PRIVATE BLUEPRINT JSON
+${JSON.stringify(blueprint, null, 2)}
+
+WORLD BIBLE
+${input.worldBible}
+
+CHARACTERS
+${input.characterProfiles}
+
+STORY REQUEST
+${input.storySeed}
+
+NARRATIVE RULES
+${input.storyRules}
+
+${forbiddenRule}`;
+}
+
 function buildExpansionPrompt(
   input: GenerateStoryRequest,
   blueprint: StoryBlueprint,
@@ -1068,6 +1252,33 @@ function formatBlueprintFailure(
 
 function formatOptionalNumber(value: number | undefined): string {
   return typeof value === "number" ? value.toString() : "unknown";
+}
+
+function createGenerationStageError(
+  stage: string,
+  message: string,
+  diagnostics: Partial<StoryDiagnostics> = {}
+): Error {
+  return Object.assign(new Error(message), {
+    storyCleanlinessDiagnostics: {
+      storyGenerationFailureStage: stage,
+      storyGenerationFailureReason: diagnostics.storyGenerationFailureReason ?? stage,
+      storyGenerationFailureSource: diagnostics.storyGenerationFailureSource ?? "model",
+      storyGenerationRetryAttempted: diagnostics.storyGenerationRetryAttempted ?? false,
+      storyGenerationRetrySucceeded: diagnostics.storyGenerationRetrySucceeded ?? false,
+      storyMetadataLeakGuardEnabled: true,
+      storyMetadataLeakScanTarget: diagnostics.storyMetadataLeakScanTarget ?? "final-story-prose",
+      storyMetadataLeakDetected: diagnostics.storyMetadataLeakDetected ?? false,
+      storyMetadataLeakSanitized: diagnostics.storyMetadataLeakSanitized ?? false,
+      storyMetadataLeakFinalClean: diagnostics.storyMetadataLeakFinalClean ?? false,
+      storyMetadataLeakRemovedPatterns: diagnostics.storyMetadataLeakRemovedPatterns ?? [],
+      metadataLeakPatternsFound: diagnostics.metadataLeakPatternsFound ?? [],
+      storyRawCandidateLength: diagnostics.storyRawCandidateLength ?? 0,
+      storySanitizedCandidateLength: diagnostics.storySanitizedCandidateLength ?? 0,
+      storyRepairAttempted: diagnostics.storyRepairAttempted ?? false,
+      fallbackDisplayBlocked: true
+    } satisfies Partial<StoryDiagnostics>
+  });
 }
 
 function parseStoryPayload(rawText: string): OpenAIStoryPayload {

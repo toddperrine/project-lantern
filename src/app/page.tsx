@@ -36,7 +36,12 @@ import {
   DEFAULT_READER_SAFETY_GUARDRAILS,
   normalizeReaderTasteProfile,
   STORY_FEEDBACK_SCORE_BY_RATING,
-  createFeedbackEventId
+  createFeedbackEventId,
+  saveReaderProfilePreferences,
+  hasReaderProfilePreferences,
+  addUniquePreferenceItem,
+  MAX_READER_HARD_AVOIDANCES,
+  READER_PROFILE_PREFERENCES_VERSION
 } from "@/lib/reader-profile";
 import {
   countPreparedReadyStoryQueueItems,
@@ -55,6 +60,7 @@ import {
 import { STORY_SPARK_CATALOG, type StorySparkCatalogItem } from "@/lib/story-spark-catalog";
 import { STORY_TYPE_CHIPS, getStoryTypePrimaryCategory, getStoryTypePromptRequirements, getStoryTypeStartCopy, getStoryTypeTextCompatibility, type StoryTypeChip, type StoryTypeChipId } from "@/lib/story-types";
 import { createGenerationIdentity, type GenerationIdentity, type GenerationMode } from "@/lib/generation-identity";
+import { CLEAN_GENERATION_FAILURE_MESSAGE, assertUserDisplayableGenerationResponse, isFallbackGenerationResponse } from "@/lib/generation-display-policy";
 import { findLibraryStoryBySavedId, findNextSavedEpisodeInSeries, groupStoriesBySeries, type LibrarySeriesGroup, type SeriesEpisode } from "@/lib/series-library";
 import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
@@ -81,6 +87,7 @@ type MoodIntakeFormState = ReaderMoodDraft;
 type GeneratedStoryPresentation = "first-episode" | "continuation" | "saved-episode" | null;
 type GenerationSource = "new-story" | "continue-story" | null;
 type ReaderScrollDiagnostics = { nextEpisodeClicked: string; continuationLoaded: string; scrollResetAttempted: string; scrollTargetUsed: string };
+type GenerationFailureDiagnostic = Record<string, unknown> | null;
 type LastGenerationIdentityDiagnostics = { identity: GenerationIdentity | null; continuationContextIncluded: boolean; newSeriesCreated: boolean; trigger: string; activeCommittedStoryId: string; activeCommittedSeriesId: string; pendingGenerationMode: GenerationMode | "none"; lastGenerationCancelledOrAborted: boolean };
 type StoryTypeSelectionDiagnostics = { selectedStoryTypeChipId: string; selectedStoryTypeChipLabel: string; selectedChipId: string; selectedChip: string; availableChips: string; storySparkUsed: string; selectedStorySparkId: string; selectedStorySparkTitle: string; selectedStorySparkMatchedChip: string; directChipGuidanceUsed: string; compatibilityResult: string; chipCompatibilityResult: string; fallbackSelectionUsed: string; selectedChipPreservedDuringGeneration: string; storyTypeSelectionMode: string; storySeedSource: string; visibleCategoryLabel: string };
 type ProfileSourceUsed = "local" | "cloud" | "default" | "none";
@@ -106,7 +113,8 @@ type LastNewStoryPersonalization = {
 };
 type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" | "not found" | "blocked";
 type AccountMode = "guest" | "signed-in" | "unknown";
-type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; topMoods: string[]; topGenres: string[]; hardAvoidances: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
+type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; preferredStoryTypes: string[]; storyIngredients: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
+type ReaderPreferencesSaveStatus = "saved" | "saving" | "error";
 type CloudReaderProfileSyncState = {
   profileId: string;
   status: CloudReaderProfileStatus;
@@ -380,16 +388,12 @@ function getStoryTypeChip(mood: Mood): StoryTypeChip {
 }
 
 function buildStoryTypeGuidance(chip: StoryTypeChip): string {
-  return [`Story type id: ${chip.id}`, `Story type label: ${chip.label}`, `Story type guidance: ${chip.guidance}`, `Story type keywords: ${chip.keywords.join(", ")}`, getStoryTypePromptRequirements(chip)].filter(Boolean).join("\n");
-}
-
-function withStoryTypeGuidance(baseSeed: string, chip: StoryTypeChip): string {
-  return `${buildStoryTypeGuidance(chip)}\n\nStory seed:\n${baseSeed}`;
+  return [`Story fit should lean toward ${chip.label.toLowerCase()} through setting, character pressure, conflict, and consequence rather than labels.`, chip.guidance, `Potential story material: ${chip.keywords.join(", ")}.`, "The final story must begin as prose and must not print story-fit labels, ids, keyword lists, craft labels, or prompt instructions.", getStoryTypePromptRequirements(chip)].filter(Boolean).join("\n");
 }
 
 function createStoryStartFromChip(mood: Mood): StoryStart {
   const chip = getStoryTypeChip(mood);
-  return { title: chip.label, premise: chip.guidance, genre: "Speculative Mystery", mood, heroName: "The reader", heroRole: chip.label, heroBio: `A grounded protagonist caught inside ${chip.label.toLowerCase()}.`, worldName: chip.label, world: chip.guidance, seed: `Use this selected story type as the seed: ${chip.guidance}`, cast: `Create a small, reader-first cast grounded in ${chip.label.toLowerCase()}.`, rules: `Honor the selected story type: ${chip.guidance} ${getStoryTypePromptRequirements(chip)} Keep the dread specific, serialized, and character-centered.`, sourceStorySparkId: "direct-chip-guidance", sourceStorySparkTitle: "Direct chip guidance", tags: chip.keywords };
+  return { title: chip.label, premise: chip.guidance, genre: "Speculative Mystery", mood, heroName: "The reader", heroRole: chip.label, heroBio: `A grounded protagonist caught inside ${chip.label.toLowerCase()}.`, worldName: chip.label, world: chip.guidance, seed: chip.guidance, cast: `Create a small, reader-first cast grounded in ${chip.label.toLowerCase()}.`, rules: `Honor the selected story type: ${chip.guidance} ${getStoryTypePromptRequirements(chip)} Keep the dread specific, serialized, and character-centered.`, sourceStorySparkId: "direct-chip-guidance", sourceStorySparkTitle: "Direct chip guidance", tags: chip.keywords };
 }
 
 function formatLatestReadyStoryQueueSignal(signals: ReaderProfile["readyStoryQueueSignals"]): string {
@@ -447,6 +451,7 @@ export default function Home() {
   const [lastLibraryOpenedEpisodeNumber, setLastLibraryOpenedEpisodeNumber] = useState<number | null>(null);
   const [pendingGenerationMode, setPendingGenerationMode] = useState<GenerationMode | "none">("none");
   const [lastGenerationCancelledOrAborted, setLastGenerationCancelledOrAborted] = useState(false);
+  const [lastGenerationFailureDiagnostic, setLastGenerationFailureDiagnostic] = useState<GenerationFailureDiagnostic>(null);
   const [lastRequestIncludedContinuationStoryId, setLastRequestIncludedContinuationStoryId] = useState(false);
   const [lastContinuationContextIncluded, setLastContinuationContextIncluded] = useState(false);
   const [lastContinuationBlockedBecauseContextMissing, setLastContinuationBlockedBecauseContextMissing] = useState(false);
@@ -541,6 +546,7 @@ export default function Home() {
   const currentSeriesEpisode = useMemo(() => findEpisodeInLibrarySeries(savedStories, currentStoryId), [currentStoryId, savedStories]);
   const canGenerate = Boolean(worldBible.content.trim() && characterProfiles.content.trim() && storySeed.content.trim() && !isGenerating);
   const accountProfileSummary = useMemo(() => toAccountProfileSummary({ authState, canonicalProfile: canonicalReaderProfile, inputArtifacts, profile: readerProfile, savedForLaterStoryQueue, savedStories }), [authState, canonicalReaderProfile, inputArtifacts, readerProfile, savedForLaterStoryQueue, savedStories]);
+  const [readerPreferencesSaveStatus, setReaderPreferencesSaveStatus] = useState<ReaderPreferencesSaveStatus>("saved");
 
   function authHeaders(): HeadersInit {
     const token = authState.getAccessToken();
@@ -695,6 +701,30 @@ export default function Home() {
     activeGenerationAbortController.current = abortController;
     const generationIdentity = createGenerationIdentity({ generationMode: overrides.generationMode, activeStoryId: activeCommittedStoryId || currentStoryId || null, activeSeriesId: activeCommittedSeriesId || (storyResponse?.metadata.diagnostics.seriesId ?? null), selectedSeriesId: overrides.selectedSeriesId ?? null, sourceStoryId: overrides.sourceStoryId ?? null });
     setError("");
+    setLastGenerationFailureDiagnostic({
+      deployedAppVersion: APP_VERSION,
+      latestGenerationAttemptId: String(requestId),
+      generationRequestStarted: true,
+      generationRequestStatus: "requesting",
+      generationEndpointStatusCode: "pending",
+      authRequiredForGeneration: authState.appActionsGated,
+      authSessionPresent: Boolean(authState.currentUser),
+      storyGenerationFailureStage: "requesting",
+      storyGenerationFailureReason: null,
+      storyGenerationFailureSource: "client",
+      storyGenerationRetryAttempted: false,
+      storyGenerationRetrySucceeded: false,
+      storyMetadataLeakGuardEnabled: true,
+      storyMetadataLeakScanTarget: "final-story-prose",
+      storyMetadataLeakDetected: false,
+      storyMetadataLeakSanitized: false,
+      storyMetadataLeakFinalClean: false,
+      storyMetadataLeakRemovedPatterns: [],
+      storyRawCandidateLength: 0,
+      storySanitizedCandidateLength: 0,
+      storyRepairAttempted: false,
+      fallbackDisplayBlocked: true
+    });
     setStatusMessage(overrides.loadingMessage ?? "");
     setLastGenerationTrigger(overrides.signalSource ?? "create");
     setGenerationSource(nextGenerationSource);
@@ -749,8 +779,28 @@ export default function Home() {
       });
       const payload = await readGenerateResponsePayload(response);
       if (activeGenerationRequestId.current !== requestId) return;
-      if (!response.ok) throw new Error(typeof payload.error === "string" ? payload.error : "Story generation failed.");
-      const normalizedResponse = applySelectedStoryTypeMetadata(normalizeGenerateStoryResponse(payload), overrides.selectedStoryTypeChip);
+      if (!response.ok) {
+        setLastGenerationFailureDiagnostic({
+          deployedAppVersion: APP_VERSION,
+          latestGenerationAttemptId: String(requestId),
+          ...readDiagnosticRecord(payload),
+          generationRequestStarted: true,
+          generationRequestStatus: "failed",
+          generationEndpointStatusCode: response.status,
+          fallbackDisplayBlocked: true
+        });
+        throw new Error(typeof payload.error === "string" ? payload.error : "Story generation failed.");
+      }
+      const normalizedResponse = assertUserDisplayableGenerationResponse(applySelectedStoryTypeMetadata(normalizeGenerateStoryResponse(payload), overrides.selectedStoryTypeChip));
+      setLastGenerationFailureDiagnostic({
+        deployedAppVersion: APP_VERSION,
+        latestGenerationAttemptId: String(requestId),
+        ...normalizedResponse.metadata.diagnostics,
+        generationRequestStarted: true,
+        generationRequestStatus: "succeeded",
+        generationEndpointStatusCode: response.status,
+        fallbackDisplayBlocked: true
+      });
       setLastNewStoryPersonalization((current) => ({
         ...current,
         responseSnapshot: normalizedResponse.metadata.diagnostics.readerProfileSnapshot ?? normalizedResponse.metadata.diagnostics.readerProfileGenerationSnapshot,
@@ -798,7 +848,22 @@ export default function Home() {
       setStatusMessage("Story ready.");
     } catch (caughtError) {
       if (activeGenerationRequestId.current !== requestId) return;
-      setError(caughtError instanceof Error ? caughtError.message : "Story generation failed.");
+      const message = caughtError instanceof Error ? caughtError.message : "Story generation failed.";
+      setStatusMessage("");
+      if (message === CLEAN_GENERATION_FAILURE_MESSAGE) {
+        setLastGenerationFailureDiagnostic((current) => ({
+          ...(current ?? {}),
+          deployedAppVersion: APP_VERSION,
+          latestGenerationAttemptId: String(requestId),
+          generationRequestStarted: true,
+          generationRequestStatus: "failed",
+          storyGenerationFailureStage: current?.storyGenerationFailureStage ?? "display-policy",
+          storyGenerationFailureReason: current?.storyGenerationFailureReason ?? "fallback_or_unclean_story_blocked",
+          storyGenerationFailureSource: current?.storyGenerationFailureSource ?? "client",
+          fallbackDisplayBlocked: true
+        }));
+      }
+      setError(message);
     } finally {
       if (activeGenerationRequestId.current === requestId) {
         activeGenerationAbortController.current = null;
@@ -1050,7 +1115,7 @@ export default function Home() {
       generationMode: "new_story",
       worldBible: storyStart.world,
       characterProfiles: storyStart.cast,
-      storySeed: withStoryTypeGuidance(storyStart.seed, selectedChipDefinition),
+      storySeed: storyStart.seed,
       storyRules: storyStart.rules,
       genrePreset: storyStart.genre,
       selectedStoryTypeChip: selectedChipDefinition,
@@ -1365,6 +1430,10 @@ export default function Home() {
       return;
     }
     if (!storyResponse) return;
+    if (isFallbackGenerationResponse(storyResponse)) {
+      setStatusMessage(CLEAN_GENERATION_FAILURE_MESSAGE);
+      return;
+    }
     try {
       await saveStoryToAuthenticatedLibrary(createSavedStory(storyResponse, currentStoryId || createStoryId(storyResponse.story)));
       setStatusMessage(authState.authConfigured ? "Story saved to your account Library." : "Story saved locally in this browser.");
@@ -1429,12 +1498,20 @@ export default function Home() {
 
   function handleExportLatestStory() {
     if (!latestStory) return;
+    if (storyResponse && isFallbackGenerationResponse(storyResponse)) {
+      setStatusMessage(CLEAN_GENERATION_FAILURE_MESSAGE);
+      return;
+    }
     recordReaderSignal({ eventType: "storyExported", storyId: latestStory.id, title: latestStory.title, genre: latestStory.genrePreset, wordCount: latestStory.wordCount });
     downloadTextFile(`${slugify(latestStory.title)}.txt`, latestStory.story);
   }
 
   function handleSaveProject() {
     if (requireSignInForAppAction("saving a project")) return;
+    if (storyResponse && isFallbackGenerationResponse(storyResponse)) {
+      setError(CLEAN_GENERATION_FAILURE_MESSAGE);
+      return;
+    }
     const trimmedName = projectName.trim();
     if (!trimmedName) return setError("Add a project name before saving this workspace.");
     const now = new Date().toISOString();
@@ -1697,6 +1774,29 @@ export default function Home() {
     void syncReaderProfileToCloud(nextProfile);
   }
 
+  function handleReaderPreferencesChange(nextPreferences: ReaderProfile["explicitReaderPreferences"]) {
+    setReaderPreferencesSaveStatus("saving");
+    try {
+      const savedProfile = saveReaderProfilePreferences({ ...nextPreferences, updatedAt: new Date().toISOString() }, readerProfile);
+      setReaderProfile(savedProfile);
+      const baseCanonicalProfile = canonicalReaderProfile ?? loadCanonicalReaderProfile();
+      const nextCanonicalProfile = saveCanonicalReaderProfile({
+        ...baseCanonicalProfile,
+        updatedAt: savedProfile.updatedAt,
+        preferences: {
+          ...baseCanonicalProfile.preferences,
+          hardAvoidances: savedProfile.explicitReaderPreferences.hardAvoidances,
+          explicitReaderPreferences: savedProfile.explicitReaderPreferences,
+        },
+      });
+      setCanonicalReaderProfile(nextCanonicalProfile);
+      setReaderPreferencesSaveStatus("saved");
+      void syncReaderProfileToCloud(savedProfile);
+    } catch {
+      setReaderPreferencesSaveStatus("error");
+    }
+  }
+
   function handleStartSomethingDifferent() {
     if (currentGeneratedStory) {
       recordReaderSignal({ eventType: "startSomethingDifferentClicked", source: "startSomethingNew", storyId: currentGeneratedStory.id, title: currentGeneratedStory.title, genre: currentGeneratedStory.genrePreset, wordCount: currentGeneratedStory.wordCount });
@@ -1724,7 +1824,7 @@ export default function Home() {
   const isContinuationGenerating = isGenerating && generationSource === "continue-story";
   const diagnosticsPanels = (
     <>
-      <AppStateDiagnostics accountSummary={accountProfileSummary} activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} storyResponseEpisodeMomentum={storyResponse?.metadata.diagnostics.episodeMomentum ?? null} storyTypeSelectionDiagnostics={storyTypeSelectionDiagnostics} />
+      <AppStateDiagnostics accountSummary={accountProfileSummary} activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationFailureDiagnostic={lastGenerationFailureDiagnostic} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} storyResponseEpisodeMomentum={storyResponse?.metadata.diagnostics.episodeMomentum ?? null} storyTypeSelectionDiagnostics={storyTypeSelectionDiagnostics} />
       <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
       <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
       <AuthDiagnostics appActionsGated={authState.appActionsGated} authConfigured={authState.authConfigured} authFlow={authState.authFlow} authMode={authState.authMode} authStatus={authState.authStatus} cognitoUserId={authState.currentUser?.id ?? ""} currentUserEmail={authState.currentUser?.email ?? ""} lastAuthStep={authState.lastAuthStep} lastCognitoErrorCode={authState.lastCognitoErrorCode} libraryDiagnostics={libraryDiagnostics} profileLibraryMode={authState.profileLibraryMode} region={authState.region} resetFlowState={authState.resetFlowState} />
@@ -1822,13 +1922,13 @@ export default function Home() {
             pendingStoryTitle={pendingStoryStart?.title ?? null}
           />
         ) : null}
-        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={generatedStoryPresentation === "saved-episode" ? handleSavedEpisodeNext : handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onScrollResetDiagnostics={setReaderScrollDiagnostics} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : generatedStoryPresentation === "saved-episode" ? "Saved Episode" : "Next Episode"} continueLabel={generatedStoryPresentation === "saved-episode" ? "Next Episode" : "Continue this story"} episodeNumber={currentSeriesEpisode?.episodeNumber ?? null} generationProfileSnapshot={storyResponse?.metadata.diagnostics.readerProfileSnapshot ?? storyResponse?.metadata.diagnostics.readerProfileGenerationSnapshot} source={storyResponse?.metadata.source ?? "fallback"} story={currentGeneratedStory} /> : null}
+        {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={generatedStoryPresentation === "saved-episode" ? handleSavedEpisodeNext : handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onScrollResetDiagnostics={setReaderScrollDiagnostics} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : generatedStoryPresentation === "saved-episode" ? "Saved Episode" : "Next Episode"} continueLabel={generatedStoryPresentation === "saved-episode" ? "Next Episode" : "Continue this story"} episodeNumber={currentSeriesEpisode?.episodeNumber ?? null} generationProfileSnapshot={storyResponse?.metadata.diagnostics.readerProfileSnapshot ?? storyResponse?.metadata.diagnostics.readerProfileGenerationSnapshot} story={currentGeneratedStory} /> : null}
         {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <div className="hidden md:block"><HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onOpenCreate={() => navigateToView("create")} onOpenLibrary={() => navigateToView("library")} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} /></div> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onMoveSavedForLaterToWaitingQueue={handleMoveSavedForLaterStoryToWaitingQueue} onContinueSavedStoryById={handleContinueSavedStoryById} onOpenSavedStoryById={handleRestoreStoryById} onProjectNameChange={setProjectName} onReadSavedForLater={handleReadSavedForLaterStory} onRefreshCloud={handleRefreshCloudProjects} onRemoveSavedForLater={handleRemoveSavedForLaterStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedForLaterStoryQueue={savedForLaterStoryQueue} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
         {activeView === "characters" ? <CharactersView onOpenStory={handleStartRecommendation} /> : null}
-        {activeView === "account" ? <AccountView onOpenLibrary={() => navigateToView("library")} summary={accountProfileSummary} /> : null}
+        {activeView === "account" ? <AccountView onOpenLibrary={() => navigateToView("library")} onReaderPreferencesChange={handleReaderPreferencesChange} readerPreferences={readerProfile.explicitReaderPreferences} saveStatus={readerPreferencesSaveStatus} summary={accountProfileSummary} /> : null}
         {activeView !== "home" ? <MobileDeveloperDiagnostics>{diagnosticsPanels}</MobileDeveloperDiagnostics> : null}
       </section>
       <MobileBottomNav activeView={activeView} onChange={navigateToView} />
@@ -1998,7 +2098,7 @@ function StopGenerationControl({ onStop }: { onStop: () => void }) {
   return <div className="rounded-md border border-red-300/30 bg-red-950/30 px-4 py-3"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-semibold text-paper">Story generation is running.</p><button className="w-fit rounded-md border border-red-300/60 bg-red-300 px-4 py-2 text-sm font-semibold text-red-950 transition hover:bg-red-200" onClick={onStop} type="button">Stop generating</button></div></div>;
 }
 
-function EpisodeReader({ continueLabel = "Continue this story", episodeNumber, eyebrow, feedback, generationBlockedBecauseUnsavedFeedback, generationProfileSnapshot, isGenerating, onContinue, onExport, onFeedbackChange, onFeedbackDraftStateChange, onScrollResetDiagnostics, onStartDifferent, source, story }: { continueLabel?: string; episodeNumber?: number | null; eyebrow: string; feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; generationProfileSnapshot?: ReaderProfileGenerationSnapshot; isGenerating: boolean; onContinue: () => void; onExport: () => void; onFeedbackChange: (story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void; onFeedbackDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onScrollResetDiagnostics: (diagnostics: ReaderScrollDiagnostics | ((current: ReaderScrollDiagnostics) => ReaderScrollDiagnostics)) => void; onStartDifferent: () => void; source: GenerateStoryResponse["metadata"]["source"]; story: LibraryStory }) {
+function EpisodeReader({ continueLabel = "Continue this story", episodeNumber, eyebrow, feedback, generationBlockedBecauseUnsavedFeedback, generationProfileSnapshot, isGenerating, onContinue, onExport, onFeedbackChange, onFeedbackDraftStateChange, onScrollResetDiagnostics, onStartDifferent, story }: { continueLabel?: string; episodeNumber?: number | null; eyebrow: string; feedback: StoryFeedbackSignal | null; generationBlockedBecauseUnsavedFeedback: boolean; generationProfileSnapshot?: ReaderProfileGenerationSnapshot; isGenerating: boolean; onContinue: () => void; onExport: () => void; onFeedbackChange: (story: LibraryStory, rating: StoryFeedbackRating, reasons: StoryFeedbackReason[]) => void; onFeedbackDraftStateChange: (state: { hasUnsavedChanges: boolean; saveBlockedBecauseRatingMissing: boolean }) => void; onScrollResetDiagnostics: (diagnostics: ReaderScrollDiagnostics | ((current: ReaderScrollDiagnostics) => ReaderScrollDiagnostics)) => void; onStartDifferent: () => void; story: LibraryStory }) {
   const readerTopRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -2028,7 +2128,7 @@ function EpisodeReader({ continueLabel = "Continue this story", episodeNumber, e
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">{episodeNumber ? `${eyebrow} · Episode ${episodeNumber}` : eyebrow}</p>
         <h2 className="mt-2 text-3xl font-semibold leading-tight text-paper md:text-5xl">{story.title}</h2>
-        <p className="mt-3 text-sm leading-6 text-paper/60">{story.wordCount.toLocaleString()} words | {getLibraryStoryCategoryLabel(story)} | {source}</p>
+        <p className="mt-3 text-sm leading-6 text-paper/60">{story.wordCount.toLocaleString()} words | {getLibraryStoryCategoryLabel(story)}</p>
       </div>
       <div className="min-w-0 whitespace-pre-wrap rounded-md border border-paper/10 bg-night-ink/70 p-4 text-base leading-8 text-paper/85 sm:p-5">{story.story}</div>
       {generationProfileSnapshot ? <GenerationProfileSnapshotPanel snapshot={generationProfileSnapshot} /> : null}
@@ -2424,63 +2524,73 @@ function findEpisodeInLibrarySeries(stories: LibraryStory[], currentStoryId: str
 }
 
 
-function AccountView({ onOpenLibrary, summary }: { onOpenLibrary: () => void; summary: AccountProfileSummary }) {
+const READER_STORY_TYPE_OPTIONS = STORY_TYPE_CHIPS.map((chip) => chip.label);
+const READER_STORY_INGREDIENT_OPTIONS = ["Magic with rules", "Strange technology", "Ancient folklore", "Ordinary place made uncanny", "Found map / key / object", "Secret society or order", "Companion animal", "Family legacy", "Lost town / lost road", "Moral bargain", "Unreliable memory", "Hidden room / hidden archive"];
+const CONTENT_LANE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "All ages", value: "all-ages" }, { label: "Middle grade", value: "middle-grade" }, { label: "Teen", value: "teen" }, { label: "Adult", value: "adult" }];
+const NARRATIVE_PRESSURE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Gentle unease", value: "gentle-unease" }, { label: "Balanced tension", value: "balanced-tension" }, { label: "Dark / intense", value: "dark-intense" }, { label: "High dread", value: "high-dread" }];
+const EPISODE_ENDING_SHAPE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Resolve this episode’s incident", value: "resolved-incident" }, { label: "Leave an open mystery", value: "open-mystery" }, { label: "Strong next-episode pull", value: "next-episode-pull" }, { label: "Quiet aftermath with consequences", value: "quiet-aftermath" }];
+const PROTAGONIST_LENS_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Surprise me", value: "surprise-me" }, { label: "Ordinary person pulled in", value: "ordinary-person-pulled-in" }, { label: "Investigator / seeker", value: "investigator-seeker" }, { label: "Caretaker / protector", value: "caretaker-protector" }, { label: "Reluctant keeper / heir", value: "reluctant-keeper-heir" }, { label: "Outsider / newcomer", value: "outsider-newcomer" }, { label: "Animal-bonded protagonist", value: "animal-bonded-protagonist" }];
+
+function AccountView({ onOpenLibrary, onReaderPreferencesChange, readerPreferences, saveStatus, summary }: { onOpenLibrary: () => void; onReaderPreferencesChange: (preferences: ReaderProfile["explicitReaderPreferences"]) => void; readerPreferences: ReaderProfile["explicitReaderPreferences"]; saveStatus: ReaderPreferencesSaveStatus; summary: AccountProfileSummary }) {
+  const [avoidanceDraft, setAvoidanceDraft] = useState("");
   const savedCountEntries = [
     typeof summary.counts.savedStories === "number" ? { label: "Saved stories", value: summary.counts.savedStories } : null,
     typeof summary.counts.series === "number" ? { label: "Series / storyworlds", value: summary.counts.series } : null,
     typeof summary.counts.characters === "number" ? { label: "Characters / casts", value: summary.counts.characters } : null,
     typeof summary.counts.storySparks === "number" ? { label: "Story sparks", value: summary.counts.storySparks } : null,
   ].filter(Boolean) as Array<{ label: string; value: number }>;
+  const updatePreferences = (patch: Partial<ReaderProfile["explicitReaderPreferences"]>) => onReaderPreferencesChange({ ...readerPreferences, ...patch });
+  const toggleItem = (field: "preferredStoryTypes" | "storyIngredients", value: string) => {
+    const current = readerPreferences[field];
+    updatePreferences({ [field]: current.includes(value) ? current.filter((item) => item !== value) : [...current, value] });
+  };
+  const addAvoidance = () => {
+    const next = addUniquePreferenceItem(readerPreferences.hardAvoidances, avoidanceDraft, MAX_READER_HARD_AVOIDANCES);
+    if (next !== readerPreferences.hardAvoidances) updatePreferences({ hardAvoidances: next });
+    setAvoidanceDraft("");
+  };
 
   return (
     <section className="mx-auto grid w-full max-w-5xl min-w-0 gap-5 pb-8 md:pb-0">
-      <PageHeading eyebrow="Account" title="Account / Profile" body="A read-only snapshot of your current Lantyrn profile, saved content, and future data controls." />
+      <PageHeading eyebrow="Account" title="Account / Profile" body="A snapshot of your current Lantyrn profile, saved content, reader preferences, and future data controls." />
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <article className="grid min-w-0 gap-3 rounded-xl border border-lantern-gold/25 bg-lantern-gold/10 p-4 shadow-soft lg:col-span-2">
-          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Current status</p>
-              <h2 className="mt-1 text-2xl font-semibold leading-tight text-paper">{summary.displayName}</h2>
-            </div>
-            <span className="w-fit rounded-md border border-paper/15 bg-night-ink/70 px-2.5 py-1 text-xs font-semibold capitalize text-paper/70">{summary.accountMode}</span>
-          </div>
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Current status</p><h2 className="mt-1 text-2xl font-semibold leading-tight text-paper">{summary.displayName}</h2></div><span className="w-fit rounded-md border border-paper/15 bg-night-ink/70 px-2.5 py-1 text-xs font-semibold capitalize text-paper/70">{summary.accountMode}</span></div>
           {summary.profileId ? <p className="text-sm font-semibold text-paper/80">Profile ID: {summary.profileId}</p> : null}
           <p className="text-sm leading-6 text-paper/70">{summary.statusText}</p>
         </article>
-
         <AccountCard title="What Lantyrn knows so far">
-          <ProfileSummaryRow label="Top moods" values={summary.topMoods} empty="No strong mood signals yet." />
-          <ProfileSummaryRow label="Top genres" values={summary.topGenres} empty="No strong genre signals yet." />
+          <ProfileSummaryRow label="Preferred story types" values={summary.preferredStoryTypes} empty="No explicit story-type signals yet." />
+          <ProfileSummaryRow label="Story ingredients" values={summary.storyIngredients} empty="No story ingredients saved yet." />
           <ProfileSummaryRow label="Hard avoidances" values={summary.hardAvoidances} empty="No hard avoidances saved yet." />
+          <ProfileSummaryRow label="Story fit settings" values={summary.explicitDetails} empty="No explicit lane, pressure, ending shape, or protagonist lens saved yet." />
           <ProfileSummaryRow label="Continuation preference" values={summary.continuationPreference ? [summary.continuationPreference] : []} empty="Not enough signal yet." />
           <ProfileSummaryRow label="Recent feedback" values={summary.recentFeedback} empty="No feedback captured yet." />
           <ProfileSummaryRow label="Confidence / status" values={[summary.confidenceLabel]} empty="Still learning." />
         </AccountCard>
-
-        <AccountCard title="Your saved Lantyrn content">
-          {savedCountEntries.length ? (
-            <dl className="grid gap-3 sm:grid-cols-2">
-              {savedCountEntries.map((entry) => (
-                <div className="rounded-md border border-paper/10 bg-night-ink/45 p-3" key={entry.label}>
-                  <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{entry.label}</dt>
-                  <dd className="mt-1 text-2xl font-semibold text-paper">{entry.value}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved items found yet.</p>}
-          <button className="mt-4 min-h-11 w-full rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-night-ink sm:w-fit" onClick={onOpenLibrary} type="button">Go to Library</button>
+        <AccountCard title="Story fit preferences">
+          <PreferenceChipGroup label="Preferred story types" options={READER_STORY_TYPE_OPTIONS} selected={readerPreferences.preferredStoryTypes} onToggle={(value) => toggleItem("preferredStoryTypes", value)} />
+          <PreferenceChipGroup label="Story ingredients" options={READER_STORY_INGREDIENT_OPTIONS} selected={readerPreferences.storyIngredients} onToggle={(value) => toggleItem("storyIngredients", value)} />
+          <div className="grid gap-2"><p className="text-sm font-semibold text-paper">Hard avoidances</p><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={60} onChange={(event) => setAvoidanceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} placeholder="No dead pets, no gore..." value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={!avoidanceDraft.trim() || readerPreferences.hardAvoidances.length >= MAX_READER_HARD_AVOIDANCES} onClick={addAvoidance} type="button">Add</button></div><div className="flex flex-wrap gap-2">{readerPreferences.hardAvoidances.map((item) => <button className="rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => updatePreferences({ hardAvoidances: readerPreferences.hardAvoidances.filter((current) => current !== item) })} type="button">{item} ×</button>)}</div><p className="text-xs text-paper/45">Up to 10 avoidances, 60 characters each.</p></div>
+          <PreferenceSelect label="Content lane" options={CONTENT_LANE_OPTIONS} value={readerPreferences.contentLane} onChange={(value) => updatePreferences({ contentLane: value as typeof readerPreferences.contentLane })} />
+          <PreferenceSelect label="Narrative pressure" options={NARRATIVE_PRESSURE_OPTIONS} value={readerPreferences.narrativePressure} onChange={(value) => updatePreferences({ narrativePressure: value as typeof readerPreferences.narrativePressure })} />
+          <PreferenceSelect label="Episode ending shape" options={EPISODE_ENDING_SHAPE_OPTIONS} value={readerPreferences.episodeEndingShape} onChange={(value) => updatePreferences({ episodeEndingShape: value as typeof readerPreferences.episodeEndingShape })} />
+          <PreferenceSelect label="Protagonist lens" options={PROTAGONIST_LENS_OPTIONS} value={readerPreferences.protagonistLens} onChange={(value) => updatePreferences({ protagonistLens: value as typeof readerPreferences.protagonistLens })} />
+          <p className={`text-xs font-semibold ${saveStatus === "error" ? "text-red-200" : "text-paper/50"}`}>{saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "Could not save locally" : "Saved"}</p>
         </AccountCard>
-
-        <AccountCard title="Data controls">
-          <div className="grid gap-2">
-            {["Export profile/data", "Clear profile memory", "Delete account/data"].map((label) => (
-              <button className="min-h-11 cursor-not-allowed rounded-md border border-paper/12 bg-paper/5 px-4 py-3 text-left text-sm font-semibold text-paper/45" disabled key={label} type="button">{label} — Coming soon</button>
-            ))}
-          </div>
-        </AccountCard>
+        <AccountCard title="Your saved Lantyrn content">{savedCountEntries.length ? <dl className="grid gap-3 sm:grid-cols-2">{savedCountEntries.map((entry) => <div className="rounded-md border border-paper/10 bg-night-ink/45 p-3" key={entry.label}><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{entry.label}</dt><dd className="mt-1 text-2xl font-semibold text-paper">{entry.value}</dd></div>)}</dl> : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved items found yet.</p>}<button className="mt-4 min-h-11 w-full rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-night-ink sm:w-fit" onClick={onOpenLibrary} type="button">Go to Library</button></AccountCard>
+        <AccountCard title="Data controls"><div className="grid gap-2">{["Export profile/data", "Clear profile memory", "Delete account/data"].map((label) => <button className="min-h-11 cursor-not-allowed rounded-md border border-paper/12 bg-paper/5 px-4 py-3 text-left text-sm font-semibold text-paper/45" disabled key={label} type="button">{label} — Coming soon</button>)}</div></AccountCard>
       </div>
     </section>
   );
+}
+
+function PreferenceChipGroup({ label, onToggle, options, selected }: { label: string; onToggle: (value: string) => void; options: string[]; selected: string[] }) {
+  return <div className="grid gap-2"><p className="text-sm font-semibold text-paper">{label}</p><div className="flex flex-wrap gap-2">{options.map((option) => { const isSelected = selected.includes(option); return <button className={`min-h-10 rounded-full border px-3 py-2 text-xs font-semibold transition ${isSelected ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper/70"}`} key={option} onClick={() => onToggle(option)} type="button">{option}</button>; })}</div></div>;
+}
+
+function PreferenceSelect({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: { label: string; value: string }[]; value: string }) {
+  return <label className="grid gap-2"><span className="text-sm font-semibold text-paper">{label}</span><select className="min-h-11 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" onChange={(event) => onChange(event.target.value)} value={value}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
 }
 
 function AccountCard({ children, title }: { children: ReactNode; title: string }) {
@@ -2760,6 +2870,7 @@ function buildNewStoryPersonalization({ canonicalProfile, continuationStoryId, e
     `- Mood selection counts: ${formatCounts(profile.moodCounts)}.`,
     `- Genre counts: ${formatCounts(profile.genreCounts)}.`,
     `- Recent story feedback, as weak preference guidance: ${feedbackSummary}`,
+    hasReaderProfilePreferences(profile.explicitReaderPreferences) ? `- Explicit reader preferences: ${formatExplicitReaderPreferencesForGeneration(profile.explicitReaderPreferences)}.` : "- Explicit reader preferences: none saved.",
     userHardAvoidances.length ? `- User hard avoidances, as hard constraints: ${userHardAvoidances.join(", ")}.` : "- User hard avoidances: none recorded.",
     defaultEerieSafetyGuardrails.length ? `- Default/eerie safety guardrails, not user-entered avoidances: ${defaultEerieSafetyGuardrails.join(", ")}.` : "- Default/eerie safety guardrails: none recorded.",
     includeEerieSignals
@@ -2826,6 +2937,15 @@ function createReaderProfileGenerationSnapshot({ canonicalProfile, defaultSafety
     userHardAvoidancesSummary: userHardAvoidances.length ? userHardAvoidances.join(", ") : "none",
     defaultSafetyGuardrailCount: defaultSafetyGuardrails.length,
     defaultSafetyGuardrailsSummary: defaultSafetyGuardrails.length ? defaultSafetyGuardrails.join(", ") : "none",
+    explicitReaderPreferencesForGeneration: {
+      preferredStoryTypes: profile.explicitReaderPreferences.preferredStoryTypes,
+      storyIngredients: profile.explicitReaderPreferences.storyIngredients,
+      hardAvoidances: profile.explicitReaderPreferences.hardAvoidances,
+      contentLane: profile.explicitReaderPreferences.contentLane,
+      narrativePressure: profile.explicitReaderPreferences.narrativePressure,
+      episodeEndingShape: profile.explicitReaderPreferences.episodeEndingShape,
+      protagonistLens: profile.explicitReaderPreferences.protagonistLens,
+    },
     moodSignal,
     genreSignal,
     canonicalReaderProfileUsed: true,
@@ -2848,19 +2968,63 @@ function getGenerationTriggerLabel(generationMode: GenerationMode, source: Reade
   return "Create";
 }
 
-function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeriesId, activeCommittedStoryId, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics }: { accountSummary: AccountProfileSummary; activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: StoryTypeSelectionDiagnostics }) {
+function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeriesId, activeCommittedStoryId, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationFailureDiagnostic, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics }: { accountSummary: AccountProfileSummary; activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationFailureDiagnostic: GenerationFailureDiagnostic; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: StoryTypeSelectionDiagnostics }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
       <div className="mt-3 grid gap-1 sm:grid-cols-2">
         <p><span className="font-semibold text-paper/80">Active view:</span> {activeView}</p>
         <p><span className="font-semibold text-paper/80">accountShellVersion:</span> v1</p>
+        <p><span className="font-semibold text-paper/80">readerPreferencesVersion:</span> {READER_PROFILE_PREFERENCES_VERSION}</p>
+        <p><span className="font-semibold text-paper/80">explicitReaderPreferencesAvailable:</span> true</p>
+        <p><span className="font-semibold text-paper/80">explicitReaderPreferencesSaved:</span> {hasReaderProfilePreferences(profile.explicitReaderPreferences) ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">explicitReaderPreferencesGenerationLinked:</span> true</p>
+        <p><span className="font-semibold text-paper/80">storyMetadataLeakGuardEnabled:</span> true</p>
+        <p><span className="font-semibold text-paper/80">fallbackUserDisplayBlocked:</span> true</p>
+        <p><span className="font-semibold text-paper/80">storyFitLegacyNormalizationEnabled:</span> true</p>
+        <p><span className="font-semibold text-paper/80">storyFitGenerationContextVersion:</span> v1</p>
         <p><span className="font-semibold text-paper/80">accountMode:</span> {accountSummary.accountMode}</p>
-        <p><span className="font-semibold text-paper/80">profileSummaryAvailable:</span> {(accountSummary.topMoods.length || accountSummary.topGenres.length || accountSummary.hardAvoidances.length || accountSummary.recentFeedback.length) ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">profileSummaryAvailable:</span> {(accountSummary.preferredStoryTypes.length || accountSummary.storyIngredients.length || accountSummary.hardAvoidances.length || accountSummary.recentFeedback.length) ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">savedContentCountsAvailable:</span> true</p>
         <p><span className="font-semibold text-paper/80">Generation in progress:</span> {isGenerating ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Last generation trigger/source:</span> {lastGenerationTrigger}</p>
         <p><span className="font-semibold text-paper/80">Active generation source:</span> {generationSource ?? "none"}</p>
+        <p><span className="font-semibold text-paper/80">generationFailureDiagnosticsVersion:</span> v2</p>
+        <p><span className="font-semibold text-paper/80">deployedAppVersion:</span> {APP_VERSION}</p>
+        <p><span className="font-semibold text-paper/80">latestGenerationAttemptId:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.latestGenerationAttemptId)}</p>
+        <p><span className="font-semibold text-paper/80">storyGenerationFailureStage:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyGenerationFailureStage)}</p>
+        <p><span className="font-semibold text-paper/80">storyGenerationFailureReason:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyGenerationFailureReason)}</p>
+        <p><span className="font-semibold text-paper/80">storyGenerationFailureSource:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyGenerationFailureSource)}</p>
+        <p><span className="font-semibold text-paper/80">storyGenerationRetryAttempted:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyGenerationRetryAttempted)}</p>
+        <p><span className="font-semibold text-paper/80">storyGenerationRetrySucceeded:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyGenerationRetrySucceeded)}</p>
+        <p><span className="font-semibold text-paper/80">storyMetadataLeakScanTarget:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyMetadataLeakScanTarget)}</p>
+        <p><span className="font-semibold text-paper/80">storyMetadataLeakDetected:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyMetadataLeakDetected)}</p>
+        <p><span className="font-semibold text-paper/80">storyMetadataLeakSanitized:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyMetadataLeakSanitized)}</p>
+        <p><span className="font-semibold text-paper/80">storyMetadataLeakFinalClean:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyMetadataLeakFinalClean)}</p>
+        <p><span className="font-semibold text-paper/80">storyMetadataLeakRemovedPatterns:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyMetadataLeakRemovedPatterns)}</p>
+        <p><span className="font-semibold text-paper/80">storyRawCandidateLength:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyRawCandidateLength)}</p>
+        <p><span className="font-semibold text-paper/80">storySanitizedCandidateLength:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storySanitizedCandidateLength)}</p>
+        <p><span className="font-semibold text-paper/80">storyRepairAttempted:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.storyRepairAttempted)}</p>
+        <p><span className="font-semibold text-paper/80">fallbackDisplayBlocked:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.fallbackDisplayBlocked)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationRequestStarted:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationRequestStarted)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationRequestStatus:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationRequestStatus)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationEndpointStatusCode:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationEndpointStatusCode)}</p>
+        <p><span className="font-semibold text-paper/80">Last authRequiredForGeneration:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.authRequiredForGeneration)}</p>
+        <p><span className="font-semibold text-paper/80">Last authSessionPresent:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.authSessionPresent)}</p>
+        <p><span className="font-semibold text-paper/80">Last requestPayloadValid:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.requestPayloadValid)}</p>
+        <p><span className="font-semibold text-paper/80">Last requestPayloadValidationError:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.requestPayloadValidationError)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationSource:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationSource)}</p>
+        <p><span className="font-semibold text-paper/80">Last fallbackReached:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.fallbackReached)}</p>
+        <p><span className="font-semibold text-paper/80">Last fallbackReason:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.fallbackReason)}</p>
+        <p><span className="font-semibold text-paper/80">Last fallbackUserDisplayBlocked:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.fallbackUserDisplayBlocked)}</p>
+        <p><span className="font-semibold text-paper/80">Last modelGenerationAttempted:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.modelGenerationAttempted)}</p>
+        <p><span className="font-semibold text-paper/80">Last modelGenerationSucceeded:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.modelGenerationSucceeded)}</p>
+        <p><span className="font-semibold text-paper/80">Last modelGenerationErrorType:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.modelGenerationErrorType)}</p>
+        <p><span className="font-semibold text-paper/80">Last modelGenerationErrorMessageSafe:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.modelGenerationErrorMessageSafe)}</p>
+        <p><span className="font-semibold text-paper/80">Last repairAttempted:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.repairAttempted)}</p>
+        <p><span className="font-semibold text-paper/80">Last repairSucceeded:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.repairSucceeded)}</p>
+        <p><span className="font-semibold text-paper/80">Last metadataLeakGuardTriggered:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.metadataLeakGuardTriggered)}</p>
+        <p><span className="font-semibold text-paper/80">Last metadataLeakPatternsFound:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.metadataLeakPatternsFound)}</p>
         <p><span className="font-semibold text-paper/80">Current story ID:</span> {currentStoryId || "none"}</p>
         <p><span className="font-semibold text-paper/80">Active committed storyId:</span> {activeCommittedStoryId || "none"}</p>
         <p><span className="font-semibold text-paper/80">Active committed seriesId:</span> {activeCommittedSeriesId || "none"}</p>
@@ -3297,6 +3461,18 @@ async function readGenerateResponsePayload(response: Response): Promise<Record<s
   }
 }
 
+function readDiagnosticRecord(payload: Record<string, unknown>): Record<string, unknown> | null {
+  return payload.diagnostic && typeof payload.diagnostic === "object" ? payload.diagnostic as Record<string, unknown> : null;
+}
+
+function formatDiagnosticValue(value: unknown): string {
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string" && value.trim()) return value;
+  if (Array.isArray(value)) return value.length ? value.map((item) => String(item)).join(", ") : "none";
+  return "none";
+}
+
 function applySelectedStoryTypeMetadata(response: GenerateStoryResponse, chip?: StoryTypeChip): GenerateStoryResponse {
   if (!chip) return response;
   return {
@@ -3339,24 +3515,29 @@ function toAccountProfileSummary({ authState, canonicalProfile, inputArtifacts, 
   const profileId = userId ? shortenProfileId(userId) : undefined;
   const displayName = userId ? "Signed-in profile" : "Guest profile";
   const statusText = userId ? `Profile ID: ${profileId}` : "Your stories and preferences are tied to this browser/session until full sign-in is added.";
-  const topMoods = topLabels(canonicalProfile?.learned?.moods, profile.moodCounts);
-  const topGenres = topLabels(canonicalProfile?.learned?.genres, profile.genreCounts);
-  const hardAvoidances = uniqueNonEmpty([...(canonicalProfile?.preferences.hardAvoidances ?? []), ...(profile.tasteProfile?.userHardAvoidances ?? [])]).slice(0, 6);
+  const explicitPreferences = profile.explicitReaderPreferences;
+  const learnedStoryTypes = filterStoryFitSummaryLabels(topLabels(canonicalProfile?.learned?.moods, profile.moodCounts), READER_STORY_TYPE_OPTIONS);
+  const learnedIngredients = filterStoryFitSummaryLabels(topLabels(canonicalProfile?.learned?.genres, profile.genreCounts), READER_STORY_INGREDIENT_OPTIONS);
+  const preferredStoryTypes = uniqueNonEmpty([...explicitPreferences.preferredStoryTypes, ...learnedStoryTypes]).slice(0, 6);
+  const storyIngredients = uniqueNonEmpty([...explicitPreferences.storyIngredients, ...learnedIngredients]).slice(0, 6);
+  const hardAvoidances = uniqueNonEmpty([...explicitPreferences.hardAvoidances, ...(canonicalProfile?.preferences.hardAvoidances ?? []), ...(profile.tasteProfile?.userHardAvoidances ?? [])]).slice(0, 6);
   const continuationPreference = formatContinuationPreference(canonicalProfile?.learned?.continuationPreference);
   const recentFeedback = formatRecentFeedback(profile.storyFeedbackSignals).slice(0, 3);
   const confidenceLabel = formatAccountConfidence(canonicalProfile?.learned?.confidence, profile.tasteProfile?.profileConfidence);
   const series = groupStoriesBySeries(savedStories).length;
   const characters = uniqueNonEmpty(savedStories.flatMap((story) => story.charactersUsed ?? [])).length;
   const storySparks = inputArtifacts.filter((artifact) => artifact.type === "storySeed").length + savedForLaterStoryQueue.length;
+  const explicitDetails = formatExplicitReaderPreferenceDetails(explicitPreferences);
 
   return {
     displayName,
     profileId,
     accountMode,
     statusText,
-    topMoods,
-    topGenres,
+    preferredStoryTypes,
+    storyIngredients,
     hardAvoidances,
+    explicitDetails,
     continuationPreference,
     recentFeedback,
     confidenceLabel,
@@ -3376,6 +3557,54 @@ function topLabels(primary?: Record<string, number>, fallback?: Record<string, n
 
 function uniqueNonEmpty(values: string[]): string[] {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function filterStoryFitSummaryLabels(values: string[], approvedLabels: string[]): string[] {
+  return values.reduce((items, value) => {
+    const approved = approvedLabels.find((label) => label.toLowerCase() === value.trim().toLowerCase());
+    return approved ? uniqueNonEmpty([...items, approved]) : items;
+  }, [] as string[]);
+}
+
+function formatExplicitReaderPreferencesForGeneration(preferences: ReaderProfile["explicitReaderPreferences"]): string {
+  return [
+    preferences.preferredStoryTypes.length ? `preferredStoryTypes=${preferences.preferredStoryTypes.join(", ")}` : "preferredStoryTypes=none",
+    preferences.storyIngredients.length ? `storyIngredients=${preferences.storyIngredients.join(", ")}` : "storyIngredients=none",
+    preferences.hardAvoidances.length ? `hardAvoidances=${preferences.hardAvoidances.join(", ")}` : "hardAvoidances=none",
+    `contentLane=${preferences.contentLane}`,
+    `narrativePressure=${preferences.narrativePressure}`,
+    `episodeEndingShape=${preferences.episodeEndingShape}`,
+    `protagonistLens=${preferences.protagonistLens}`,
+  ].join("; ");
+}
+
+function formatExplicitReaderPreferenceDetails(preferences: ReaderProfile["explicitReaderPreferences"]): string[] {
+  const labels: string[] = [];
+  if (preferences.contentLane !== "not-set") labels.push(`Content lane: ${formatPreferenceOptionLabel(preferences.contentLane)}`);
+  if (preferences.narrativePressure !== "not-set") labels.push(`Narrative pressure: ${formatPreferenceOptionLabel(preferences.narrativePressure)}`);
+  if (preferences.episodeEndingShape !== "not-set") labels.push(`Episode ending: ${formatPreferenceOptionLabel(preferences.episodeEndingShape)}`);
+  if (preferences.protagonistLens !== "not-set") labels.push(`Protagonist lens: ${formatPreferenceOptionLabel(preferences.protagonistLens)}`);
+  return labels;
+}
+
+function formatPreferenceOptionLabel(value: string): string {
+  const explicitLabels: Record<string, string> = {
+    "gentle-unease": "Gentle unease",
+    "balanced-tension": "Balanced tension",
+    "dark-intense": "Dark / intense",
+    "high-dread": "High dread",
+    "resolved-incident": "Resolve this episode’s incident",
+    "open-mystery": "Leave an open mystery",
+    "next-episode-pull": "Strong next-episode pull",
+    "quiet-aftermath": "Quiet aftermath with consequences",
+    "ordinary-person-pulled-in": "Ordinary person pulled in",
+    "investigator-seeker": "Investigator / seeker",
+    "caretaker-protector": "Caretaker / protector",
+    "reluctant-keeper-heir": "Reluctant keeper / heir",
+    "outsider-newcomer": "Outsider / newcomer",
+    "animal-bonded-protagonist": "Animal-bonded protagonist",
+  };
+  return explicitLabels[value] ?? value.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 }
 
 function formatContinuationPreference(value?: number): string | undefined {
