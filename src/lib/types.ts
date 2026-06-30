@@ -170,8 +170,17 @@ export type StoryDiagnostics = {
   fallbackMetadataLeakGuardEnabled?: boolean;
   fallbackRejectedForMetadataLeak?: boolean;
   metadataLeakPatternsFound?: string[];
+  generationRequestStarted?: boolean;
+  generationRequestStatus?: "not-started" | "requesting" | "succeeded" | "failed";
+  generationEndpointStatusCode?: number;
+  authRequiredForGeneration?: boolean;
+  authSessionPresent?: boolean;
+  requestPayloadValid?: boolean;
+  requestPayloadValidationError?: string | null;
+  modelGenerationErrorMessageSafe?: string | null;
   generationSource?: "model" | "fallback";
   fallbackUsed?: boolean;
+  fallbackReached?: boolean;
   fallbackRejectedForUserDisplay?: boolean;
   fallbackUserDisplayBlocked?: boolean;
   modelGenerationAttempted?: boolean;

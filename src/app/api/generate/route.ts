@@ -45,17 +45,19 @@ export async function POST(request: Request) {
 
 async function handleGenerateRequest(request: Request) {
   const generationStartedAt = new Date();
+  const authSessionPresent = hasAuthSession(request);
+  const authRequiredForGeneration = false;
   let body: Partial<GenerateStoryRequest>;
 
   try {
     body = (await request.json()) as Partial<GenerateStoryRequest>;
   } catch {
-    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+    return buildPayloadFailureResponse("Request body must be valid JSON.", generationStartedAt, authSessionPresent, authRequiredForGeneration);
   }
 
   const validationError = validateRequest(body);
   if (validationError) {
-    return NextResponse.json({ error: validationError }, { status: 400 });
+    return buildPayloadFailureResponse(validationError, generationStartedAt, authSessionPresent, authRequiredForGeneration);
   }
 
   const readerMood = isReaderMoodSnapshot(body.readerMood) ? body.readerMood : null;
@@ -90,19 +92,22 @@ async function handleGenerateRequest(request: Request) {
     generationTrigger: body.generationTrigger!,
     readerMood,
     personalizationContext: body.personalizationContext?.trim() || undefined,
-    readerProfileGenerationSnapshot
+    readerProfileGenerationSnapshot,
+    readerProfileInput: body.readerProfileInput && typeof body.readerProfileInput === "object" ? body.readerProfileInput : undefined
   } satisfies GenerateStoryRequest;
 
   if (!hasOpenAIKey()) {
     return buildGenerationFailureResponse(input, generationStartedAt, {
       fallbackReason: "Model generation is unavailable in this environment.",
       modelGenerationAttempted: false,
-      modelGenerationErrorType: "missing_env"
+      modelGenerationErrorType: "missing_env",
+      authRequiredForGeneration,
+      authSessionPresent
     });
   }
 
   try {
-    return NextResponse.json(withServerGenerationDuration(withReaderProfileGenerationSnapshot(await generateOpenAIStoryWithLongFloor(input), input.readerProfileGenerationSnapshot), generationStartedAt));
+    return NextResponse.json(withRequestDiagnostics(withServerGenerationDuration(withReaderProfileGenerationSnapshot(await generateOpenAIStoryWithLongFloor(input), input.readerProfileGenerationSnapshot), generationStartedAt), { authRequiredForGeneration, authSessionPresent, statusCode: 200 }));
   } catch (error) {
     const errorSummary = summarizeOpenAIError(error);
 
@@ -110,10 +115,10 @@ async function handleGenerateRequest(request: Request) {
       try {
         const repairedResponse = await generateOpenAIStoryWithLongFloor(buildBlueprintRepairRetryInput(input, errorSummary));
         return NextResponse.json(
-          withServerGenerationDuration(
+          withRequestDiagnostics(withServerGenerationDuration(
             withReaderProfileGenerationSnapshot(withBlueprintRepairSuccessDiagnostics(repairedResponse, errorSummary), input.readerProfileGenerationSnapshot),
             generationStartedAt
-          )
+          ), { authRequiredForGeneration, authSessionPresent, statusCode: 200, repairAttempted: true, repairSucceeded: true })
         );
       } catch (repairError) {
         const repairSummary = summarizeOpenAIError(repairError);
@@ -122,7 +127,10 @@ async function handleGenerateRequest(request: Request) {
           modelGenerationAttempted: true,
           modelGenerationErrorType: classifyGenerationError(repairSummary),
           repairAttempted: true,
-          blueprintFailedReason: `${errorSummary}; repair retry: ${repairSummary}`
+          blueprintFailedReason: `${errorSummary}; repair retry: ${repairSummary}`,
+          modelGenerationErrorMessageSafe: repairSummary,
+          authRequiredForGeneration,
+          authSessionPresent
         });
       }
     }
@@ -132,7 +140,10 @@ async function handleGenerateRequest(request: Request) {
       modelGenerationAttempted: true,
       modelGenerationErrorType: classifyGenerationError(errorSummary),
       repairAttempted: isBlueprintGenerationFailure(errorSummary),
-      blueprintFailedReason: errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null
+      blueprintFailedReason: errorSummary.startsWith("Blueprint generation failed") ? errorSummary : null,
+      modelGenerationErrorMessageSafe: errorSummary,
+      authRequiredForGeneration,
+      authSessionPresent
     });
   }
 }
@@ -189,6 +200,7 @@ function normalizeReaderProfileGenerationSnapshot(
     genreSignal: normalizeDiagnosticString(snapshot.genreSignal),
     canonicalReaderProfileUsed: Boolean(snapshot.canonicalReaderProfileUsed),
     canonicalReaderProfileInput: snapshot.canonicalReaderProfileInput && typeof snapshot.canonicalReaderProfileInput === "object" ? snapshot.canonicalReaderProfileInput : undefined,
+    explicitReaderPreferencesForGeneration: snapshot.explicitReaderPreferencesForGeneration && typeof snapshot.explicitReaderPreferencesForGeneration === "object" ? snapshot.explicitReaderPreferencesForGeneration : undefined,
     generatedAt: normalizeDiagnosticString(snapshot.generatedAt) || new Date().toISOString()
   };
 }
@@ -234,6 +246,39 @@ function withServerGenerationDuration(
   };
 }
 
+function withRequestDiagnostics(
+  response: GenerateStoryResponse,
+  options: {
+    authRequiredForGeneration: boolean;
+    authSessionPresent: boolean;
+    statusCode: number;
+    repairAttempted?: boolean;
+    repairSucceeded?: boolean;
+  }
+): GenerateStoryResponse {
+  return {
+    ...response,
+    metadata: {
+      ...response.metadata,
+      diagnostics: {
+        ...response.metadata.diagnostics,
+        generationRequestStarted: true,
+        generationRequestStatus: "succeeded",
+        generationEndpointStatusCode: options.statusCode,
+        authRequiredForGeneration: options.authRequiredForGeneration,
+        authSessionPresent: options.authSessionPresent,
+        requestPayloadValid: true,
+        requestPayloadValidationError: null,
+        modelGenerationErrorMessageSafe: null,
+        fallbackReached: false,
+        fallbackUserDisplayBlocked: true,
+        repairAttempted: options.repairAttempted ?? response.metadata.diagnostics.repairAttempted,
+        repairSucceeded: options.repairSucceeded ?? response.metadata.diagnostics.repairSucceeded
+      }
+    }
+  };
+}
+
 function buildGenerationFailureResponse(
   input: GenerateStoryRequest,
   generationStartedAt: Date,
@@ -241,8 +286,11 @@ function buildGenerationFailureResponse(
     fallbackReason: string;
     modelGenerationAttempted: boolean;
     modelGenerationErrorType: string;
+    modelGenerationErrorMessageSafe?: string | null;
     repairAttempted?: boolean;
     blueprintFailedReason?: string | null;
+    authRequiredForGeneration: boolean;
+    authSessionPresent: boolean;
   }
 ) {
   console.error("Story generation failed; deterministic fallback blocked from user display.", {
@@ -267,8 +315,17 @@ function buildGenerationFailureResponse(
     blueprintGenerated: false,
     blueprintSceneCount: 0,
     blueprintFailedReason: options.blueprintFailedReason ?? null,
+    generationRequestStarted: true,
+    generationRequestStatus: "failed",
+    generationEndpointStatusCode: 502,
+    authRequiredForGeneration: options.authRequiredForGeneration,
+    authSessionPresent: options.authSessionPresent,
+    requestPayloadValid: true,
+    requestPayloadValidationError: null,
+    modelGenerationErrorMessageSafe: options.modelGenerationErrorMessageSafe ?? options.fallbackReason,
     generationSource: "fallback",
     fallbackUsed: true,
+    fallbackReached: true,
     fallbackRejectedForUserDisplay: true,
     fallbackUserDisplayBlocked: true,
     modelGenerationAttempted: options.modelGenerationAttempted,
@@ -301,6 +358,50 @@ function buildGenerationFailureResponse(
       ...buildGenerationIdentityDiagnostics(diagnostics)
     }
   }, { status: 502 });
+}
+
+function buildPayloadFailureResponse(
+  validationError: string,
+  generationStartedAt: Date,
+  authSessionPresent: boolean,
+  authRequiredForGeneration: boolean
+) {
+  const buildInfo = getBuildInfo();
+  const serverGenerationDurationSeconds = Math.max(
+    0,
+    Math.round((Date.now() - generationStartedAt.getTime()) / 1000)
+  );
+
+  return NextResponse.json({
+    error: validationError,
+    diagnostic: {
+      ...getOpenAIDiagnostics({
+        fallbackReason: null,
+        generationRequestStarted: true,
+        generationRequestStatus: "failed",
+        generationEndpointStatusCode: 400,
+        authRequiredForGeneration,
+        authSessionPresent,
+        requestPayloadValid: false,
+        requestPayloadValidationError: validationError,
+        modelGenerationAttempted: false,
+        modelGenerationSucceeded: false,
+        modelGenerationErrorType: "payload_validation",
+        modelGenerationErrorMessageSafe: validationError,
+        generationSource: "model",
+        fallbackUsed: false,
+        fallbackReached: false,
+        fallbackRejectedForUserDisplay: false,
+        fallbackUserDisplayBlocked: true
+      }),
+      serverGenerationDurationSeconds,
+      appVersion: buildInfo.appVersion,
+      buildEnvironment: buildInfo.buildEnvironment,
+      gitBranch: buildInfo.gitBranch,
+      commitSha: buildInfo.commitSha,
+      buildTimestamp: buildInfo.buildTimestamp
+    }
+  }, { status: 400 });
 }
 
 function withBlueprintRepairSuccessDiagnostics(response: GenerateStoryResponse, originalBlueprintFailure: string): GenerateStoryResponse {
@@ -430,6 +531,11 @@ function buildStoryRules(storyRules: string | undefined, readerMood: GenerateSto
 }
 function normalizeOptionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function hasAuthSession(request: Request): boolean {
+  const authorization = request.headers.get("authorization") ?? "";
+  return /^Bearer\s+\S+/i.test(authorization);
 }
 
 function summarizeOpenAIError(error: unknown): string {

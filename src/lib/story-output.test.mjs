@@ -22,3 +22,9 @@ test("metadata leak guard removes raw craft rule labels", () => {
   assert.doesNotMatch(cleaned, /Overcoming the monster:/i);
   assert.doesNotMatch(cleaned, /Comedy:/i);
 });
+
+test("metadata leak guard allows natural story prose with genre words", () => {
+  const prose = "Mara thought the quest would end at the bridge, but the monster only watched from the reeds while the town rehearsed its tragedy in whispers.";
+  const cleaned = normalizeStoryText(prose);
+  assert.equal(cleaned, prose);
+});

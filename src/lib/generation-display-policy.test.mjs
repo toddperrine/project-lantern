@@ -9,6 +9,7 @@ const {
   isFallbackGenerationResponse
 } = await jiti.import("./generation-display-policy.ts", { default: false });
 const { createSavedStory } = await jiti.import("./project-persistence.ts", { default: false });
+const { getOpenAIDiagnostics } = await jiti.import("./openai-generator.ts", { default: false });
 
 function response(source) {
   return {
@@ -49,4 +50,25 @@ test("saved-story persistence rejects fallback responses", () => {
     () => createSavedStory(response("fallback")),
     new RegExp(CLEAN_GENERATION_FAILURE_MESSAGE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
   );
+});
+
+test("generation diagnostics expose request, model, and fallback status", () => {
+  const diagnostics = getOpenAIDiagnostics({
+    generationRequestStarted: true,
+    generationRequestStatus: "failed",
+    generationEndpointStatusCode: 502,
+    requestPayloadValid: true,
+    modelGenerationAttempted: false,
+    modelGenerationSucceeded: false,
+    modelGenerationErrorType: "missing_env",
+    fallbackReached: true,
+    fallbackUserDisplayBlocked: true
+  });
+
+  assert.equal(diagnostics.generationRequestStarted, true);
+  assert.equal(diagnostics.generationRequestStatus, "failed");
+  assert.equal(diagnostics.generationEndpointStatusCode, 502);
+  assert.equal(diagnostics.modelGenerationErrorType, "missing_env");
+  assert.equal(diagnostics.fallbackReached, true);
+  assert.equal(diagnostics.fallbackUserDisplayBlocked, true);
 });

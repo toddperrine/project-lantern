@@ -705,7 +705,13 @@ export default function Home() {
     activeGenerationAbortController.current = abortController;
     const generationIdentity = createGenerationIdentity({ generationMode: overrides.generationMode, activeStoryId: activeCommittedStoryId || currentStoryId || null, activeSeriesId: activeCommittedSeriesId || (storyResponse?.metadata.diagnostics.seriesId ?? null), selectedSeriesId: overrides.selectedSeriesId ?? null, sourceStoryId: overrides.sourceStoryId ?? null });
     setError("");
-    setLastGenerationFailureDiagnostic(null);
+    setLastGenerationFailureDiagnostic({
+      generationRequestStarted: true,
+      generationRequestStatus: "requesting",
+      generationEndpointStatusCode: "pending",
+      authRequiredForGeneration: authState.appActionsGated,
+      authSessionPresent: Boolean(authState.currentUser)
+    });
     setStatusMessage(overrides.loadingMessage ?? "");
     setLastGenerationTrigger(overrides.signalSource ?? "create");
     setGenerationSource(nextGenerationSource);
@@ -761,10 +767,21 @@ export default function Home() {
       const payload = await readGenerateResponsePayload(response);
       if (activeGenerationRequestId.current !== requestId) return;
       if (!response.ok) {
-        setLastGenerationFailureDiagnostic(readDiagnosticRecord(payload));
+        setLastGenerationFailureDiagnostic({
+          ...readDiagnosticRecord(payload),
+          generationRequestStarted: true,
+          generationRequestStatus: "failed",
+          generationEndpointStatusCode: response.status
+        });
         throw new Error(typeof payload.error === "string" ? payload.error : "Story generation failed.");
       }
       const normalizedResponse = assertUserDisplayableGenerationResponse(applySelectedStoryTypeMetadata(normalizeGenerateStoryResponse(payload), overrides.selectedStoryTypeChip));
+      setLastGenerationFailureDiagnostic({
+        ...normalizedResponse.metadata.diagnostics,
+        generationRequestStarted: true,
+        generationRequestStatus: "succeeded",
+        generationEndpointStatusCode: response.status
+      });
       setLastNewStoryPersonalization((current) => ({
         ...current,
         responseSnapshot: normalizedResponse.metadata.diagnostics.readerProfileSnapshot ?? normalizedResponse.metadata.diagnostics.readerProfileGenerationSnapshot,
@@ -2938,12 +2955,26 @@ function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeries
         <p><span className="font-semibold text-paper/80">Generation in progress:</span> {isGenerating ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Last generation trigger/source:</span> {lastGenerationTrigger}</p>
         <p><span className="font-semibold text-paper/80">Active generation source:</span> {generationSource ?? "none"}</p>
+        <p><span className="font-semibold text-paper/80">generationFailureDiagnosticsVersion:</span> v1</p>
+        <p><span className="font-semibold text-paper/80">Last generationRequestStarted:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationRequestStarted)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationRequestStatus:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationRequestStatus)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationEndpointStatusCode:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationEndpointStatusCode)}</p>
+        <p><span className="font-semibold text-paper/80">Last authRequiredForGeneration:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.authRequiredForGeneration)}</p>
+        <p><span className="font-semibold text-paper/80">Last authSessionPresent:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.authSessionPresent)}</p>
+        <p><span className="font-semibold text-paper/80">Last requestPayloadValid:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.requestPayloadValid)}</p>
+        <p><span className="font-semibold text-paper/80">Last requestPayloadValidationError:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.requestPayloadValidationError)}</p>
         <p><span className="font-semibold text-paper/80">Last generationSource:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationSource)}</p>
+        <p><span className="font-semibold text-paper/80">Last fallbackReached:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.fallbackReached)}</p>
         <p><span className="font-semibold text-paper/80">Last fallbackReason:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.fallbackReason)}</p>
         <p><span className="font-semibold text-paper/80">Last fallbackUserDisplayBlocked:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.fallbackUserDisplayBlocked)}</p>
         <p><span className="font-semibold text-paper/80">Last modelGenerationAttempted:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.modelGenerationAttempted)}</p>
         <p><span className="font-semibold text-paper/80">Last modelGenerationSucceeded:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.modelGenerationSucceeded)}</p>
         <p><span className="font-semibold text-paper/80">Last modelGenerationErrorType:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.modelGenerationErrorType)}</p>
+        <p><span className="font-semibold text-paper/80">Last modelGenerationErrorMessageSafe:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.modelGenerationErrorMessageSafe)}</p>
+        <p><span className="font-semibold text-paper/80">Last repairAttempted:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.repairAttempted)}</p>
+        <p><span className="font-semibold text-paper/80">Last repairSucceeded:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.repairSucceeded)}</p>
+        <p><span className="font-semibold text-paper/80">Last metadataLeakGuardTriggered:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.metadataLeakGuardTriggered)}</p>
+        <p><span className="font-semibold text-paper/80">Last metadataLeakPatternsFound:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.metadataLeakPatternsFound)}</p>
         <p><span className="font-semibold text-paper/80">Current story ID:</span> {currentStoryId || "none"}</p>
         <p><span className="font-semibold text-paper/80">Active committed storyId:</span> {activeCommittedStoryId || "none"}</p>
         <p><span className="font-semibold text-paper/80">Active committed seriesId:</span> {activeCommittedSeriesId || "none"}</p>
@@ -3388,6 +3419,7 @@ function formatDiagnosticValue(value: unknown): string {
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number") return String(value);
   if (typeof value === "string" && value.trim()) return value;
+  if (Array.isArray(value)) return value.length ? value.map((item) => String(item)).join(", ") : "none";
   return "none";
 }
 
