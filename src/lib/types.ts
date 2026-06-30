@@ -61,6 +61,17 @@ export type ReaderProfileGenerationSnapshot = {
   generatedAt: string;
 };
 
+export type ContinuationGenerationDiagnostics = {
+  generationMode: "continue_series";
+  continuationStoryIdPresent: boolean;
+  selectedSeriesId?: string | null;
+  sourceStoryId?: string | null;
+  priorStoryWordCount: number;
+  priorContextCharsSent: number;
+  totalRequestPayloadApproxChars: number;
+  lengthTarget: LengthTarget;
+};
+
 export type GenerateStoryRequest = {
   worldBible: string;
   characterProfiles: string;
@@ -85,6 +96,7 @@ export type GenerateStoryRequest = {
   readerMood?: ReaderMoodSnapshot | null;
   personalizationContext?: string;
   continuationStoryId?: string;
+  continuationDiagnostics?: ContinuationGenerationDiagnostics;
   readerProfileGenerationSnapshot?: ReaderProfileGenerationSnapshot;
   readerProfileInput?: object;
 };
@@ -189,6 +201,14 @@ export type StoryDiagnostics = {
   generationRequestStarted?: boolean;
   generationRequestStatus?: "not-started" | "requesting" | "succeeded" | "failed";
   generationEndpointStatusCode?: number;
+  serverRequestId?: string;
+  generationAttemptId?: string;
+  timeoutLikeFailure?: boolean;
+  continuationStoryIdPresent?: boolean;
+  selectedSeriesId?: string | null;
+  priorStoryWordCount?: number;
+  priorContextCharsSent?: number;
+  totalRequestPayloadApproxChars?: number;
   authRequiredForGeneration?: boolean;
   authSessionPresent?: boolean;
   requestPayloadValid?: boolean;

@@ -31,34 +31,44 @@ const DEFAULT_STORY_RULES = `Every story must obey these rules:
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
+
 
 export async function POST(request: Request) {
+  const generationStartedAt = new Date();
+  const serverRequestId = getGenerationServerRequestId(request);
+  logGenerationLifecycle(serverRequestId, "request_received", { method: request.method });
+
   try {
-    return await handleGenerateRequest(request);
+    return await handleGenerateRequest(request, generationStartedAt, serverRequestId);
   } catch (error) {
     const message = summarizeOpenAIError(error);
-    console.error("Unhandled /api/generate failure", message);
+    logGenerationLifecycle(serverRequestId, "unhandled_failure", { message, elapsedSeconds: elapsedSecondsSince(generationStartedAt) }, "error");
     const userMessage = message.includes("Fallback rejected for metadata leak") ? CLEAN_GENERATION_FAILURE_MESSAGE : "Story generation failed before a response could be completed.";
-    return NextResponse.json({ error: userMessage, diagnostic: { message } }, { status: 500 });
+    return NextResponse.json({ error: userMessage, diagnostic: { message, serverRequestId, generationAttemptId: serverRequestId, generationEndpointStatusCode: 500, generationRequestStatus: "failed", serverGenerationDurationSeconds: elapsedSecondsSince(generationStartedAt), timeoutLikeFailure: isTimeoutLikeError(message) } }, { status: 500 });
   }
 }
 
-async function handleGenerateRequest(request: Request) {
-  const generationStartedAt = new Date();
+async function handleGenerateRequest(request: Request, generationStartedAt: Date, serverRequestId: string) {
   const authSessionPresent = hasAuthSession(request);
   const authRequiredForGeneration = false;
   let body: Partial<GenerateStoryRequest>;
 
   try {
     body = (await request.json()) as Partial<GenerateStoryRequest>;
+    logGenerationLifecycle(serverRequestId, "payload_parsed", { elapsedSeconds: elapsedSecondsSince(generationStartedAt) });
   } catch {
-    return buildPayloadFailureResponse("Request body must be valid JSON.", generationStartedAt, authSessionPresent, authRequiredForGeneration);
+    logGenerationLifecycle(serverRequestId, "validation_complete", { valid: false, reason: "invalid_json", elapsedSeconds: elapsedSecondsSince(generationStartedAt) }, "warn");
+    return buildPayloadFailureResponse("Request body must be valid JSON.", generationStartedAt, authSessionPresent, authRequiredForGeneration, serverRequestId);
   }
 
   const validationError = validateRequest(body);
   if (validationError) {
-    return buildPayloadFailureResponse(validationError, generationStartedAt, authSessionPresent, authRequiredForGeneration);
+    logGenerationLifecycle(serverRequestId, "validation_complete", { valid: false, reason: validationError, elapsedSeconds: elapsedSecondsSince(generationStartedAt) }, "warn");
+    return buildPayloadFailureResponse(validationError, generationStartedAt, authSessionPresent, authRequiredForGeneration, serverRequestId);
   }
+
+  logGenerationLifecycle(serverRequestId, "validation_complete", { valid: true, authSessionPresent, elapsedSeconds: elapsedSecondsSince(generationStartedAt) });
 
   const readerMood = isReaderMoodSnapshot(body.readerMood) ? body.readerMood : null;
   const readerProfileGenerationSnapshot = normalizeReaderProfileGenerationSnapshot(body.readerProfileGenerationSnapshot);
@@ -94,6 +104,8 @@ async function handleGenerateRequest(request: Request) {
     }),
     continuationContextIncluded: Boolean(body.continuationContextIncluded),
     generationTrigger: body.generationTrigger!,
+    continuationStoryId: normalizeOptionalString(body.continuationStoryId),
+    continuationDiagnostics: normalizeContinuationDiagnostics(body.continuationDiagnostics),
     readerMood,
     personalizationContext: body.personalizationContext?.trim() || undefined,
     readerProfileGenerationSnapshot,
@@ -101,31 +113,43 @@ async function handleGenerateRequest(request: Request) {
   } satisfies GenerateStoryRequest;
 
   if (!hasOpenAIKey()) {
+    logGenerationLifecycle(serverRequestId, "openai_response_failed", { errorType: "missing_env", elapsedSeconds: elapsedSecondsSince(generationStartedAt), timeoutLikeFailure: false }, "error");
     return buildGenerationFailureResponse(input, generationStartedAt, {
       fallbackReason: "Model generation is unavailable in this environment.",
       modelGenerationAttempted: false,
       modelGenerationErrorType: "missing_env",
       authRequiredForGeneration,
-      authSessionPresent
+      authSessionPresent,
+      serverRequestId
     });
   }
 
   try {
-    return NextResponse.json(withRequestDiagnostics(withServerGenerationDuration(withReaderProfileGenerationSnapshot(await generateOpenAIStoryWithLongFloor(input), input.readerProfileGenerationSnapshot), generationStartedAt), { authRequiredForGeneration, authSessionPresent, statusCode: 200 }));
+    logGenerationLifecycle(serverRequestId, "openai_request_start", buildSafeInputDiagnostics(input, generationStartedAt));
+    const generatedResponse = await generateOpenAIStoryWithLongFloor(input);
+    logGenerationLifecycle(serverRequestId, "openai_response_received", { elapsedSeconds: elapsedSecondsSince(generationStartedAt), wordCount: generatedResponse.metadata.wordCount, source: generatedResponse.metadata.source });
+    const response = NextResponse.json(withRequestDiagnostics(withServerGenerationDuration(withReaderProfileGenerationSnapshot(generatedResponse, input.readerProfileGenerationSnapshot), generationStartedAt), { authRequiredForGeneration, authSessionPresent, statusCode: 200, serverRequestId }));
+    logGenerationLifecycle(serverRequestId, "final_response_returned", { statusCode: 200, elapsedSeconds: elapsedSecondsSince(generationStartedAt) });
+    return response;
   } catch (error) {
     const errorSummary = summarizeOpenAIError(error);
 
     if (isBlueprintGenerationFailure(errorSummary)) {
       try {
+        logGenerationLifecycle(serverRequestId, "repair_start", { reason: "blueprint_generation_failure", elapsedSeconds: elapsedSecondsSince(generationStartedAt) }, "warn");
         const repairedResponse = await generateOpenAIStoryWithLongFloor(buildBlueprintRepairRetryInput(input, errorSummary));
-        return NextResponse.json(
+        logGenerationLifecycle(serverRequestId, "repair_end", { succeeded: true, elapsedSeconds: elapsedSecondsSince(generationStartedAt), wordCount: repairedResponse.metadata.wordCount });
+        const response = NextResponse.json(
           withRequestDiagnostics(withServerGenerationDuration(
             withReaderProfileGenerationSnapshot(withBlueprintRepairSuccessDiagnostics(repairedResponse, errorSummary), input.readerProfileGenerationSnapshot),
             generationStartedAt
-          ), { authRequiredForGeneration, authSessionPresent, statusCode: 200, repairAttempted: true, repairSucceeded: true })
+          ), { authRequiredForGeneration, authSessionPresent, statusCode: 200, repairAttempted: true, repairSucceeded: true, serverRequestId })
         );
+        logGenerationLifecycle(serverRequestId, "final_response_returned", { statusCode: 200, repaired: true, elapsedSeconds: elapsedSecondsSince(generationStartedAt) });
+        return response;
       } catch (repairError) {
         const repairSummary = summarizeOpenAIError(repairError);
+        logGenerationLifecycle(serverRequestId, "repair_end", { succeeded: false, errorType: classifyGenerationError(repairSummary), elapsedSeconds: elapsedSecondsSince(generationStartedAt) }, "error");
         return buildGenerationFailureResponse(input, generationStartedAt, {
           fallbackReason: `Model generation failed after blueprint repair retry.`,
           modelGenerationAttempted: true,
@@ -135,11 +159,13 @@ async function handleGenerateRequest(request: Request) {
           modelGenerationErrorMessageSafe: repairSummary,
           authRequiredForGeneration,
           authSessionPresent,
+          serverRequestId,
           storyCleanlinessDiagnostics: readStoryCleanlinessDiagnostics(repairError)
         });
       }
     }
 
+    logGenerationLifecycle(serverRequestId, "openai_response_failed", { errorType: classifyGenerationError(errorSummary), elapsedSeconds: elapsedSecondsSince(generationStartedAt), timeoutLikeFailure: isTimeoutLikeError(errorSummary) }, "error");
     return buildGenerationFailureResponse(input, generationStartedAt, {
       fallbackReason: "Model generation failed before a clean episode could be created.",
       modelGenerationAttempted: true,
@@ -149,6 +175,7 @@ async function handleGenerateRequest(request: Request) {
       modelGenerationErrorMessageSafe: errorSummary,
       authRequiredForGeneration,
       authSessionPresent,
+      serverRequestId,
       storyCleanlinessDiagnostics: readStoryCleanlinessDiagnostics(error)
     });
   }
@@ -170,6 +197,23 @@ function withReaderProfileGenerationSnapshot(
         readerProfileGenerationSnapshot
       }
     }
+  };
+}
+
+
+function normalizeContinuationDiagnostics(value: unknown): GenerateStoryRequest["continuationDiagnostics"] {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  if (record.generationMode !== "continue_series") return undefined;
+  return {
+    generationMode: "continue_series",
+    continuationStoryIdPresent: Boolean(record.continuationStoryIdPresent),
+    selectedSeriesId: typeof record.selectedSeriesId === "string" ? record.selectedSeriesId : null,
+    sourceStoryId: typeof record.sourceStoryId === "string" ? record.sourceStoryId : null,
+    priorStoryWordCount: Math.max(0, Number(record.priorStoryWordCount) || 0),
+    priorContextCharsSent: Math.max(0, Number(record.priorContextCharsSent) || 0),
+    totalRequestPayloadApproxChars: Math.max(0, Number(record.totalRequestPayloadApproxChars) || 0),
+    lengthTarget: LENGTH_TARGETS.some((target) => target.value === record.lengthTarget) ? record.lengthTarget as GenerateStoryRequest["lengthTarget"] : "Standard"
   };
 }
 
@@ -260,6 +304,7 @@ function withRequestDiagnostics(
     statusCode: number;
     repairAttempted?: boolean;
     repairSucceeded?: boolean;
+    serverRequestId: string;
   }
 ): GenerateStoryResponse {
   return {
@@ -272,6 +317,8 @@ function withRequestDiagnostics(
         generationRequestStarted: true,
         generationRequestStatus: "succeeded",
         generationEndpointStatusCode: options.statusCode,
+        serverRequestId: options.serverRequestId,
+        generationAttemptId: options.serverRequestId,
         authRequiredForGeneration: options.authRequiredForGeneration,
         authSessionPresent: options.authSessionPresent,
         requestPayloadValid: true,
@@ -298,6 +345,7 @@ function buildGenerationFailureResponse(
     blueprintFailedReason?: string | null;
     authRequiredForGeneration: boolean;
     authSessionPresent: boolean;
+    serverRequestId: string;
     storyCleanlinessDiagnostics?: Partial<StoryDiagnostics>;
   }
 ) {
@@ -305,9 +353,11 @@ function buildGenerationFailureResponse(
     fallbackReason: options.fallbackReason,
     modelGenerationAttempted: options.modelGenerationAttempted,
     modelGenerationErrorType: options.modelGenerationErrorType,
-    repairAttempted: Boolean(options.repairAttempted)
+    repairAttempted: Boolean(options.repairAttempted),
+    serverRequestId: options.serverRequestId
   });
 
+  const failureStatus = isTimeoutLikeError(options.modelGenerationErrorMessageSafe ?? options.fallbackReason) ? 504 : 502;
   const diagnostics = getOpenAIDiagnostics({
     openAIRequestAttempted: options.modelGenerationAttempted,
     openAIRequestSucceeded: false,
@@ -325,7 +375,10 @@ function buildGenerationFailureResponse(
     blueprintFailedReason: options.blueprintFailedReason ?? null,
     generationRequestStarted: true,
     generationRequestStatus: "failed",
-    generationEndpointStatusCode: 502,
+    generationEndpointStatusCode: failureStatus,
+    serverRequestId: options.serverRequestId,
+    generationAttemptId: options.serverRequestId,
+    timeoutLikeFailure: isTimeoutLikeError(options.modelGenerationErrorMessageSafe ?? options.fallbackReason),
     authRequiredForGeneration: options.authRequiredForGeneration,
     authSessionPresent: options.authSessionPresent,
     requestPayloadValid: true,
@@ -367,10 +420,14 @@ function buildGenerationFailureResponse(
     Math.round((generationFinishedAt.getTime() - generationStartedAt.getTime()) / 1000)
   );
 
+  logGenerationLifecycle(options.serverRequestId, "final_response_returned", { statusCode: failureStatus, elapsedSeconds: serverGenerationDurationSeconds });
+
   return NextResponse.json({
     error: CLEAN_GENERATION_FAILURE_MESSAGE,
     diagnostic: {
       ...diagnostics,
+      serverRequestId: options.serverRequestId,
+      generationAttemptId: options.serverRequestId,
       serverGenerationDurationSeconds,
       appVersion: buildInfo.appVersion,
       buildEnvironment: buildInfo.buildEnvironment,
@@ -381,20 +438,23 @@ function buildGenerationFailureResponse(
       readerProfileGenerationSnapshot: input.readerProfileGenerationSnapshot,
       ...buildGenerationIdentityDiagnostics(diagnostics)
     }
-  }, { status: 502 });
+  }, { status: failureStatus });
 }
 
 function buildPayloadFailureResponse(
   validationError: string,
   generationStartedAt: Date,
   authSessionPresent: boolean,
-  authRequiredForGeneration: boolean
+  authRequiredForGeneration: boolean,
+  serverRequestId: string
 ) {
   const buildInfo = getBuildInfo();
   const serverGenerationDurationSeconds = Math.max(
     0,
     Math.round((Date.now() - generationStartedAt.getTime()) / 1000)
   );
+
+  logGenerationLifecycle(serverRequestId, "final_response_returned", { statusCode: 400, elapsedSeconds: serverGenerationDurationSeconds }, "warn");
 
   return NextResponse.json({
     error: validationError,
@@ -404,6 +464,8 @@ function buildPayloadFailureResponse(
         generationRequestStarted: true,
         generationRequestStatus: "failed",
         generationEndpointStatusCode: 400,
+        serverRequestId,
+        generationAttemptId: serverRequestId,
         authRequiredForGeneration,
         authSessionPresent,
         requestPayloadValid: false,
@@ -442,6 +504,46 @@ function buildPayloadFailureResponse(
       buildTimestamp: buildInfo.buildTimestamp
     }
   }, { status: 400 });
+}
+
+function getGenerationServerRequestId(request: Request): string {
+  const headerAttemptId = request.headers.get("x-generation-attempt-id")?.trim();
+  if (headerAttemptId && /^[a-zA-Z0-9_-]{1,80}$/.test(headerAttemptId)) return headerAttemptId;
+  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function elapsedSecondsSince(startedAt: Date): number {
+  return Math.max(0, Math.round((Date.now() - startedAt.getTime()) / 1000));
+}
+
+function logGenerationLifecycle(serverRequestId: string, event: string, details: Record<string, unknown> = {}, level: "info" | "warn" | "error" = "info") {
+  const payload = { route: "/api/generate", serverRequestId, generationAttemptId: serverRequestId, event, ...details };
+  if (level === "error") console.error("/api/generate lifecycle", payload);
+  else if (level === "warn") console.warn("/api/generate lifecycle", payload);
+  else console.info("/api/generate lifecycle", payload);
+}
+
+function buildSafeInputDiagnostics(input: GenerateStoryRequest, generationStartedAt: Date): Record<string, unknown> {
+  return {
+    elapsedSeconds: elapsedSecondsSince(generationStartedAt),
+    generationMode: input.generationMode,
+    lengthTarget: input.lengthTarget,
+    genrePreset: input.genrePreset,
+    storyId: input.generationIdentity.storyId,
+    seriesId: input.generationIdentity.seriesId,
+    continuationContextIncluded: input.continuationContextIncluded,
+    worldBibleChars: input.worldBible.length,
+    characterProfileChars: input.characterProfiles.length,
+    storySeedChars: input.storySeed.length,
+    storyRulesChars: input.storyRules.length,
+    personalizationContextPresent: Boolean(input.personalizationContext),
+    readerProfileSnapshotPresent: Boolean(input.readerProfileGenerationSnapshot),
+    ...(input.continuationDiagnostics ?? {})
+  };
+}
+
+function isTimeoutLikeError(message: string): boolean {
+  return /timeout|timed out|504|gateway|network|socket|terminated|aborted/i.test(message);
 }
 
 function classifyGenerationFailureStage(
@@ -563,7 +665,7 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
   return null;
 }
 
-function buildRequestGenerationDiagnostics(input: GenerateStoryRequest): Pick<GenerateStoryResponse["metadata"]["diagnostics"], "generationMode" | "storyId" | "seriesId" | "sourceStoryId" | "parentSeriesId" | "continuationContextIncluded" | "newSeriesCreated" | "generationTrigger" | "selectedStoryTypeChipId" | "selectedStoryTypeChipLabel" | "legacyGenrePreset" | "storyTypeSelectionMode" | "storySeedSource"> {
+function buildRequestGenerationDiagnostics(input: GenerateStoryRequest): Pick<GenerateStoryResponse["metadata"]["diagnostics"], "generationMode" | "storyId" | "seriesId" | "sourceStoryId" | "parentSeriesId" | "continuationContextIncluded" | "newSeriesCreated" | "generationTrigger" | "selectedStoryTypeChipId" | "selectedStoryTypeChipLabel" | "legacyGenrePreset" | "storyTypeSelectionMode" | "storySeedSource"> & Partial<StoryDiagnostics> {
   return {
     generationMode: input.generationIdentity.generationMode,
     storyId: input.generationIdentity.storyId,
@@ -577,7 +679,8 @@ function buildRequestGenerationDiagnostics(input: GenerateStoryRequest): Pick<Ge
     selectedStoryTypeChipLabel: input.selectedStoryTypeChipLabel,
     legacyGenrePreset: input.legacyGenrePreset,
     storyTypeSelectionMode: input.storyTypeSelectionMode,
-    storySeedSource: input.storySeedSource
+    storySeedSource: input.storySeedSource,
+    ...(input.continuationDiagnostics ?? {})
   };
 }
 

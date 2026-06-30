@@ -68,7 +68,7 @@ import { normalizeStoryPayload, normalizeStoryText } from "@/lib/story-output";
 import { CHARACTER_ARCS, ENDING_TYPES, GENRE_PRESETS, LENGTH_TARGETS, NARRATIVE_ARCHITECTURES } from "@/lib/types";
 import type { EerieReaderProfile } from "@/lib/eerie-reader-profile";
 import type { CanonicalReaderProfile, ReaderEnergyLevel, ReaderIntensityLevel, ReaderMoodDraft, ReaderMoodSnapshot, ReaderProfile, ReaderProfileEventInput, ReaderProfileEventSource, ReaderTasteProfileConfidence, StoryFeedbackGenerationMode, StoryFeedbackRating, StoryFeedbackReason, StoryFeedbackSignal } from "@/lib/reader-profile";
-import type { CharacterArc, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture, ReaderProfileGenerationSnapshot } from "@/lib/types";
+import type { CharacterArc, ContinuationGenerationDiagnostics, EndingType, GenerateStoryResponse, GenrePreset, LengthTarget, NarrativeArchitecture, ReaderProfileGenerationSnapshot } from "@/lib/types";
 import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
 import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
 import { APP_VERSION } from "@/lib/build-info";
@@ -90,6 +90,7 @@ type GeneratedStoryPresentation = "first-episode" | "continuation" | "saved-epis
 type GenerationSource = "new-story" | "continue-story" | null;
 type ReaderScrollDiagnostics = { nextEpisodeClicked: string; continuationLoaded: string; scrollResetAttempted: string; scrollTargetUsed: string };
 type GenerationFailureDiagnostic = Record<string, unknown> | null;
+type GenerationFetchDiagnosticsInput = { attemptId: string; stage: string; endpoint: string; action: string; response?: Response; error?: unknown; elapsedSeconds?: number; authConfigured: boolean; currentUserPresent: boolean; authTokenPresent: boolean; generationSucceededButLibrarySaveFailed?: boolean };
 type LastGenerationIdentityDiagnostics = { identity: GenerationIdentity | null; continuationContextIncluded: boolean; newSeriesCreated: boolean; trigger: string; activeCommittedStoryId: string; activeCommittedSeriesId: string; pendingGenerationMode: GenerationMode | "none"; lastGenerationCancelledOrAborted: boolean };
 type StoryTypeSelectionDiagnostics = { selectedStoryTypeChipId: string; selectedStoryTypeChipLabel: string; selectedChipId: string; selectedChip: string; availableChips: string; storySparkUsed: string; selectedStorySparkId: string; selectedStorySparkTitle: string; selectedStorySparkMatchedChip: string; directChipGuidanceUsed: string; compatibilityResult: string; chipCompatibilityResult: string; fallbackSelectionUsed: string; selectedChipPreservedDuringGeneration: string; storyTypeSelectionMode: string; storySeedSource: string; visibleCategoryLabel: string };
 type ProfileSourceUsed = "local" | "cloud" | "default" | "none";
@@ -120,6 +121,10 @@ type AccountDataClearConfirmation = "story-fit-preferences" | "local-reader-memo
 type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; preferredStoryTypes: string[]; emotionalPromises: string[]; favoriteStoryWorlds: string[]; storyIngredients: string[]; characterLensPreferences: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
 type ReaderPreferencesSaveStatus = "saved" | "saving" | "error";
 type StoryFitOnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+const CONTINUATION_CONTEXT_MAX_CHARS = 3600;
+const CONTINUATION_TAIL_MIN_CHARS = 1200;
+const CONTINUATION_TAIL_MAX_CHARS = 1800;
+
 type StoryFitOnboardingState = { emotionalPromises: string[]; favoriteStoryWorlds: string[]; storyIngredients: string[]; characterLensPreferences: string[]; contentLane: ReaderProfile["explicitReaderPreferences"]["contentLane"]; narrativePressure: ReaderProfile["explicitReaderPreferences"]["narrativePressure"]; episodeEndingShape: ReaderProfile["explicitReaderPreferences"]["episodeEndingShape"]; protagonistLens: ReaderProfile["explicitReaderPreferences"]["protagonistLens"]; hardAvoidances: string[]; preferredStoryTypes: string[] };
 const STORY_FIT_ONBOARDING_STORAGE_KEY = "projectLantern.storyFitOnboarding.v1";
 const STORY_FIT_ONBOARDING_LAST_OPENED_KEY = "projectLantern.storyFitOnboarding.lastOpenedAt.v1";
@@ -575,6 +580,10 @@ export default function Home() {
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
+  function authTokenPresent(): boolean {
+    return Boolean(authState.getAccessToken());
+  }
+
 
   async function loadAuthenticatedReaderProfile() {
     if (!authState.currentUser) return;
@@ -706,7 +715,7 @@ export default function Home() {
     return true;
   }
 
-  async function handleGenerate(overrides: { generationMode: GenerationMode; worldBible?: string; characterProfiles?: string; storySeed?: string; storyRules?: string; genrePreset?: GenrePreset; selectedStoryTypeChip?: StoryTypeChip; storySeedSource?: string; narrativeArchitecture?: NarrativeArchitecture; characterArc?: CharacterArc; endingType?: EndingType; lengthTarget?: LengthTarget; readerMood?: ReaderMoodSnapshot | null; presentation?: Exclude<GeneratedStoryPresentation, null>; loadingMessage?: string; signalSource?: ReaderProfileEventSource; generationSource?: Exclude<GenerationSource, null>; continuationStoryId?: string; continuationContextIncluded?: boolean; selectedSeriesId?: string | null; sourceStoryId?: string | null }) {
+  async function handleGenerate(overrides: { generationMode: GenerationMode; worldBible?: string; characterProfiles?: string; storySeed?: string; storyRules?: string; genrePreset?: GenrePreset; selectedStoryTypeChip?: StoryTypeChip; storySeedSource?: string; narrativeArchitecture?: NarrativeArchitecture; characterArc?: CharacterArc; endingType?: EndingType; lengthTarget?: LengthTarget; readerMood?: ReaderMoodSnapshot | null; presentation?: Exclude<GeneratedStoryPresentation, null>; loadingMessage?: string; signalSource?: ReaderProfileEventSource; generationSource?: Exclude<GenerationSource, null>; continuationStoryId?: string; continuationContextIncluded?: boolean; selectedSeriesId?: string | null; sourceStoryId?: string | null; continuationDiagnostics?: ContinuationGenerationDiagnostics }) {
     if (requireSignInForAppAction(overrides.generationMode === "continue_series" ? "continuing a series" : "starting generation")) return;
     const nextGenerationSource = overrides.generationSource ?? (overrides.generationMode === "continue_series" ? "continue-story" : "new-story");
     const continuationStoryId = nextGenerationSource === "continue-story" ? overrides.continuationStoryId?.trim() ?? "" : "";
@@ -725,14 +734,23 @@ export default function Home() {
     activeGenerationAbortController.current = abortController;
     const generationIdentity = createGenerationIdentity({ generationMode: overrides.generationMode, activeStoryId: activeCommittedStoryId || currentStoryId || null, activeSeriesId: activeCommittedSeriesId || (storyResponse?.metadata.diagnostics.seriesId ?? null), selectedSeriesId: overrides.selectedSeriesId ?? null, sourceStoryId: overrides.sourceStoryId ?? null });
     setError("");
+    const generationAuthTokenPresent = authTokenPresent();
+    const generationDiagnosticsBase = {
+      authConfigured: authState.authConfigured,
+      authRequiredForGeneration: authState.appActionsGated,
+      authSessionPresent: Boolean(authState.currentUser),
+      authTokenPresent: generationAuthTokenPresent,
+      currentUserPresent: Boolean(authState.currentUser),
+      ...(overrides.continuationDiagnostics ?? {})
+    };
+    const generationFetchStartedAt = Date.now();
     setLastGenerationFailureDiagnostic({
       deployedAppVersion: APP_VERSION,
       latestGenerationAttemptId: String(requestId),
       generationRequestStarted: true,
       generationRequestStatus: "requesting",
       generationEndpointStatusCode: "pending",
-      authRequiredForGeneration: authState.appActionsGated,
-      authSessionPresent: Boolean(authState.currentUser),
+      ...generationDiagnosticsBase,
       storyGenerationFailureStage: "requesting",
       storyGenerationFailureReason: null,
       storyGenerationFailureSource: "client",
@@ -775,9 +793,11 @@ export default function Home() {
     setLastNewStoryPersonalization(personalization.diagnostics);
     setIsGenerating(true);
     try {
-      const response = await fetch("/api/generate", {
+      let response: Response;
+      try {
+        response = await fetch("/api/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: { "Content-Type": "application/json", "X-Generation-Attempt-Id": String(requestId), ...authHeaders() },
         signal: abortController.signal,
         body: JSON.stringify({
           worldBible: overrides?.worldBible ?? worldBible.content,
@@ -798,10 +818,26 @@ export default function Home() {
           readerProfileGenerationSnapshot: personalization.snapshot,
           readerProfileInput: buildGenerationReaderProfileInput(activeCanonicalProfile),
           ...(overrides.selectedStoryTypeChip ? { selectedStoryTypeChipId: overrides.selectedStoryTypeChip.id, selectedStoryTypeChipLabel: overrides.selectedStoryTypeChip.label, legacyGenrePreset: overrides?.genrePreset ?? genrePreset, storyTypeSelectionMode: "selected", storySeedSource: overrides.storySeedSource, selectedStoryTypeGuidance: overrides.selectedStoryTypeChip.guidance, selectedStoryTypeKeywords: overrides.selectedStoryTypeChip.keywords } : {}),
-          ...(continuationStoryId ? { continuationStoryId } : {})
+          ...(continuationStoryId ? { continuationStoryId } : {}),
+          ...(overrides.continuationDiagnostics ? { continuationDiagnostics: overrides.continuationDiagnostics } : {})
         })
       });
-      const payload = await readGenerateResponsePayload(response);
+      } catch (fetchError) {
+        if (abortController.signal.aborted) throw fetchError;
+        const diagnostics = buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_request", endpoint: "/api/generate", action: "POST", error: fetchError, elapsedSeconds: elapsedSecondsSince(generationFetchStartedAt), ...generationDiagnosticsBase });
+        logGenerationFetchDiagnostics(diagnostics);
+        setLastGenerationFailureDiagnostic((current) => ({ ...(current ?? {}), deployedAppVersion: APP_VERSION, latestGenerationAttemptId: String(requestId), generationRequestStarted: true, generationRequestStatus: "failed", generationEndpointStatusCode: "none", ...diagnostics, fallbackDisplayBlocked: true }));
+        throw new Error(nextGenerationSource === "continue-story" ? "Continuation request timed out. Episode 1 is still safe. Try continuing again." : "Generation request lost connection before the server responded. Try again.");
+      }
+      let payload: Record<string, unknown>;
+      try {
+        payload = await readGenerateResponsePayload(response);
+      } catch (parseError) {
+        const diagnostics = buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response_parse", endpoint: "/api/generate", action: "parse_json", response, error: parseError, elapsedSeconds: elapsedSecondsSince(generationFetchStartedAt), ...generationDiagnosticsBase });
+        logGenerationFetchDiagnostics(diagnostics);
+        setLastGenerationFailureDiagnostic((current) => ({ ...(current ?? {}), deployedAppVersion: APP_VERSION, latestGenerationAttemptId: String(requestId), generationRequestStarted: true, generationRequestStatus: "failed", generationEndpointStatusCode: response.status, ...diagnostics, fallbackDisplayBlocked: true }));
+        throw new Error(response.status === 504 ? getGenerationTimeoutMessage() : "Story generation returned a response the app could not read. Try again.");
+      }
       if (activeGenerationRequestId.current !== requestId) return;
       if (!response.ok) {
         setLastGenerationFailureDiagnostic({
@@ -811,9 +847,10 @@ export default function Home() {
           generationRequestStarted: true,
           generationRequestStatus: "failed",
           generationEndpointStatusCode: response.status,
+          ...buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response", endpoint: "/api/generate", action: "POST", response, elapsedSeconds: elapsedSecondsSince(generationFetchStartedAt), ...generationDiagnosticsBase }),
           fallbackDisplayBlocked: true
         });
-        throw new Error(typeof payload.error === "string" ? payload.error : "Story generation failed.");
+        throw new Error(response.status === 504 ? getGenerationTimeoutMessage() : typeof payload.error === "string" ? payload.error : "Story generation failed.");
       }
       const normalizedResponse = assertUserDisplayableGenerationResponse(applySelectedStoryTypeMetadata(normalizeGenerateStoryResponse(payload), overrides.selectedStoryTypeChip));
       setLastGenerationFailureDiagnostic({
@@ -823,6 +860,7 @@ export default function Home() {
         generationRequestStarted: true,
         generationRequestStatus: "succeeded",
         generationEndpointStatusCode: response.status,
+        ...buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response_parse", endpoint: "/api/generate", action: "parse_json", response, elapsedSeconds: elapsedSecondsSince(generationFetchStartedAt), ...generationDiagnosticsBase }),
         fallbackDisplayBlocked: true
       });
       setLastNewStoryPersonalization((current) => ({
@@ -847,11 +885,21 @@ export default function Home() {
         }
       }));
       const generatedStoryId = normalizedResponse.metadata.diagnostics.storyId || generationIdentity.storyId;
-      const savedStory = await saveStoryToAuthenticatedLibrary(createSavedStory(normalizedResponse, generatedStoryId));
+      const unsavedGeneratedStory = createSavedStory(normalizedResponse, generatedStoryId);
       setStoryResponse(normalizedResponse);
       setCurrentStoryId(generatedStoryId);
       setActiveCommittedStoryId(generatedStoryId);
       setActiveCommittedSeriesId(normalizedResponse.metadata.diagnostics.seriesId);
+      let savedStory = unsavedGeneratedStory;
+      let librarySaveFailed = false;
+      try {
+        savedStory = await saveStoryToAuthenticatedLibrary(unsavedGeneratedStory);
+      } catch (librarySaveError) {
+        librarySaveFailed = true;
+        const diagnostics = buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "library_save", endpoint: `/api/projects/${AUTHENTICATED_STORY_LIBRARY_PROJECT_ID}/stories`, action: "POST", error: librarySaveError, elapsedSeconds: elapsedSecondsSince(generationFetchStartedAt), generationSucceededButLibrarySaveFailed: true, ...generationDiagnosticsBase });
+        logGenerationFetchDiagnostics(diagnostics);
+        setLastGenerationFailureDiagnostic((current) => ({ ...(current ?? {}), deployedAppVersion: APP_VERSION, latestGenerationAttemptId: String(requestId), generationRequestStarted: true, generationRequestStatus: "succeeded", generationEndpointStatusCode: response.status, ...diagnostics, fallbackDisplayBlocked: true }));
+      }
       const nextPresentation = overrides?.presentation ?? "first-episode";
       setGeneratedStoryPresentation(nextPresentation);
       if (nextGenerationSource === "continue-story" || nextPresentation === "continuation") {
@@ -869,10 +917,11 @@ export default function Home() {
       setDemoStory(null);
       navigateHome({ preserveGeneration: true });
       setGenerationApprovedMoodSnapshotId(null);
-      setStatusMessage("Story ready.");
+      setStatusMessage(librarySaveFailed ? "Story generated, but cloud save failed. Your story is still visible." : "Story ready.");
     } catch (caughtError) {
       if (activeGenerationRequestId.current !== requestId) return;
-      const message = caughtError instanceof Error ? caughtError.message : "Story generation failed.";
+      const rawMessage = caughtError instanceof Error ? caughtError.message : "Story generation failed.";
+      const message = rawMessage === "Load failed" ? "Generation request lost connection before the server responded. Try again." : rawMessage;
       setStatusMessage("");
       if (message === CLEAN_GENERATION_FAILURE_MESSAGE) {
         setLastGenerationFailureDiagnostic((current) => ({
@@ -1388,6 +1437,45 @@ export default function Home() {
     setStatusMessage("Demo story cleared. Your saved history was not changed.");
   }
 
+  function buildCompactContinuationContext(storyToContinue: LibraryStory, storyId: string, selectedSeriesId: string | null, direction?: string): { seed: string; priorStoryWordCount: number; priorContextCharsSent: number } {
+    const storyText = storyToContinue.story.trim();
+    const priorStoryWordCount = storyToContinue.wordCount || countWords(storyText);
+    const sentences = extractSentences(storyText);
+    const conciseRecap = truncateText(sentences.slice(0, 4).join(" ") || storyText, 700);
+    const unresolvedPressure = truncateText(sentences.slice(-4, -1).join(" ") || "Continue the unresolved emotional and plot pressure from the prior episode.", 520);
+    const endingBeat = truncateText(sentences.at(-1) || storyText, 420);
+    const finalEpisodeExcerpt = tailText(storyText, CONTINUATION_TAIL_MIN_CHARS, CONTINUATION_TAIL_MAX_CHARS);
+    const keyCharacters = storyToContinue.charactersUsed.length ? storyToContinue.charactersUsed.slice(0, 8).join(", ") : "Use the established characters from the prior episode.";
+    const rawContext = [
+      "Continue this series with Episode 2 / the next episode. Do not rewrite, restart, summarize, or retell Episode 1. Begin after the prior ending beat.",
+      `Prior title: ${storyToContinue.title}.`,
+      `Episode to continue: ${storyId}.`,
+      selectedSeriesId ? `Series id: ${selectedSeriesId}.` : "Series id: use the current series identity from the request.",
+      `Source story id: ${storyId}.`,
+      `Key characters: ${keyCharacters}.`,
+      `Concise recap: ${conciseRecap}`,
+      `Unresolved pressure to carry forward: ${unresolvedPressure}`,
+      `Last meaningful scene / ending beat: ${endingBeat}`,
+      `Final excerpt from prior episode for voice and immediate continuity:\n${finalEpisodeExcerpt}`,
+      direction?.trim() ? `Reader direction for the next episode: ${direction.trim()}` : "Continue directly from the strongest unresolved story pressure."
+    ].join("\n\n");
+    const seed = rawContext.length <= CONTINUATION_CONTEXT_MAX_CHARS ? rawContext : `${rawContext.slice(0, CONTINUATION_CONTEXT_MAX_CHARS - 3).replace(/[\s,.;:]+$/, "")}...`;
+    return { seed, priorStoryWordCount, priorContextCharsSent: seed.length };
+  }
+
+  function estimateContinuationRequestChars(parts: { worldBible: string; characterProfiles: string; storySeed: string; storyRules: string }): number {
+    return parts.worldBible.length + parts.characterProfiles.length + parts.storySeed.length + parts.storyRules.length;
+  }
+
+  function tailText(value: string, minChars: number, maxChars: number): string {
+    const normalized = value.trim();
+    if (normalized.length <= maxChars) return normalized;
+    const tail = normalized.slice(-maxChars);
+    const sentenceStart = tail.search(/[.!?]\s+[A-Z0-9"“]/);
+    const cleanTail = sentenceStart > -1 && tail.length - sentenceStart >= minChars ? tail.slice(sentenceStart + 1).trim() : tail.trim();
+    return cleanTail || tail.trim();
+  }
+
   function handleContinueStory(storyToContinue: LibraryStory | null | undefined, direction?: string) {
     const storyId = storyToContinue?.id?.trim() ?? "";
     const storyText = storyToContinue?.story?.trim() ?? "";
@@ -1402,17 +1490,27 @@ export default function Home() {
     }
 
     recordReaderSignal({ eventType: "storyContinued", source: "continueSeries", storyId, title: storyToContinue.title, genre: storyToContinue.genrePreset, wordCount: storyToContinue.wordCount });
-    const priorChapterContext = truncateText(storyText, 9000);
-    const continuationSeed = [
-      "Continue this story with the next chapter. Do not rewrite, restart, summarize, or retell the existing chapter. Begin after the events already shown.",
-      `Active story id to continue: ${storyId}.`,
-      `Existing chapter title: ${storyToContinue.title}.`,
-      `Prior chapter context for continuity:\n${priorChapterContext}`,
-      direction?.trim() ? `Reader direction for the next chapter: ${direction.trim()}` : "Continue directly from the strongest unresolved story pressure."
-    ].join("\n\n");
+    const selectedSeriesId = getContinuationSeriesId(storyToContinue, storyId, storyResponse, activeCommittedStoryId, activeCommittedSeriesId);
+    const compactContinuationContext = buildCompactContinuationContext(storyToContinue, storyId, selectedSeriesId, direction);
+    const continuationSeed = compactContinuationContext.seed;
+    const continuationDiagnostics: ContinuationGenerationDiagnostics = {
+      generationMode: "continue_series",
+      continuationStoryIdPresent: Boolean(storyId),
+      selectedSeriesId,
+      sourceStoryId: storyId,
+      priorStoryWordCount: compactContinuationContext.priorStoryWordCount,
+      priorContextCharsSent: compactContinuationContext.priorContextCharsSent,
+      totalRequestPayloadApproxChars: estimateContinuationRequestChars({
+        worldBible: worldBible.content.trim() || `Existing story world inferred from ${storyToContinue.title}. Genre: ${storyToContinue.genrePreset}.`,
+        characterProfiles: characterProfiles.content.trim() || `Top cast: ${storyToContinue.charactersUsed.length ? storyToContinue.charactersUsed.join(", ") : "use the established characters from the prior chapter"}.`,
+        storySeed: continuationSeed,
+        storyRules: [storyRules.content, "Continuation rule: write only the next chapter after the prior chapter context; do not rewrite, restart, summarize, or retell the prior chapter."].filter(Boolean).join("\n\n")
+      }),
+      lengthTarget
+    };
     void handleGenerate({
       generationMode: "continue_series",
-      selectedSeriesId: getContinuationSeriesId(storyToContinue, storyId, storyResponse, activeCommittedStoryId, activeCommittedSeriesId),
+      selectedSeriesId,
       sourceStoryId: storyId,
       worldBible: worldBible.content.trim() || `Existing story world inferred from ${storyToContinue.title}. Genre: ${storyToContinue.genrePreset}.`,
       characterProfiles: characterProfiles.content.trim() || `Top cast: ${storyToContinue.charactersUsed.length ? storyToContinue.charactersUsed.join(", ") : "use the established characters from the prior chapter"}.`,
@@ -1428,7 +1526,8 @@ export default function Home() {
       signalSource: "continueSeries",
       generationSource: "continue-story",
       continuationStoryId: storyId,
-      continuationContextIncluded: true
+      continuationContextIncluded: true,
+      continuationDiagnostics
     });
   }
 
@@ -3370,6 +3469,24 @@ function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeries
         <p><span className="font-semibold text-paper/80">Last generationRequestStarted:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationRequestStarted)}</p>
         <p><span className="font-semibold text-paper/80">Last generationRequestStatus:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationRequestStatus)}</p>
         <p><span className="font-semibold text-paper/80">Last generationEndpointStatusCode:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationEndpointStatusCode)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchDiagnosticStage:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchDiagnosticStage)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchEndpoint:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchEndpoint)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchAction:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchAction)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchHttpStatus:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchHttpStatus)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchElapsedSeconds:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchElapsedSeconds)}</p>
+        <p><span className="font-semibold text-paper/80">Last continuationStoryIdPresent:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.continuationStoryIdPresent)}</p>
+        <p><span className="font-semibold text-paper/80">Last selectedSeriesId:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.selectedSeriesId)}</p>
+        <p><span className="font-semibold text-paper/80">Last sourceStoryId:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.sourceStoryId)}</p>
+        <p><span className="font-semibold text-paper/80">Last priorStoryWordCount:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.priorStoryWordCount)}</p>
+        <p><span className="font-semibold text-paper/80">Last priorContextCharsSent:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.priorContextCharsSent)}</p>
+        <p><span className="font-semibold text-paper/80">Last totalRequestPayloadApproxChars:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.totalRequestPayloadApproxChars)}</p>
+        <p><span className="font-semibold text-paper/80">Last continuation lengthTarget:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.lengthTarget)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchErrorName:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchErrorName)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchErrorMessageSafe:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchErrorMessageSafe)}</p>
+        <p><span className="font-semibold text-paper/80">Last authConfigured:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.authConfigured)}</p>
+        <p><span className="font-semibold text-paper/80">Last currentUserPresent:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.currentUserPresent)}</p>
+        <p><span className="font-semibold text-paper/80">Last authTokenPresent:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.authTokenPresent)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationSucceededButLibrarySaveFailed:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationSucceededButLibrarySaveFailed)}</p>
         <p><span className="font-semibold text-paper/80">Last authRequiredForGeneration:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.authRequiredForGeneration)}</p>
         <p><span className="font-semibold text-paper/80">Last authSessionPresent:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.authSessionPresent)}</p>
         <p><span className="font-semibold text-paper/80">Last requestPayloadValid:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.requestPayloadValid)}</p>
@@ -3814,12 +3931,47 @@ function savedStoryToCloudInput(story: SavedStory) { return { storyId: story.id,
 function cloudRecordToSavedStory(record: CloudSavedStoryRecordResponse): SavedStory { const metadata = record.metadata && typeof record.metadata === "object" ? record.metadata as Partial<SavedStory> : {}; return { ...metadata, id: record.storyId || metadata.id || createStoryId(record.story, record.createdAt), title: record.title || metadata.title || createStoryTitle(record.story), story: record.story, createdAt: metadata.createdAt || record.createdAt, wordCount: typeof metadata.wordCount === "number" ? metadata.wordCount : countWords(record.story), generatorSource: metadata.generatorSource || "cloud", charactersUsed: Array.isArray(metadata.charactersUsed) ? metadata.charactersUsed : [], rulesReferenced: Array.isArray(metadata.rulesReferenced) ? metadata.rulesReferenced : [], genrePreset: metadata.genrePreset || "Speculative Mystery", narrativeArchitecture: metadata.narrativeArchitecture || "Revelation Story", characterArc: metadata.characterArc || "Positive Change Arc", endingType: metadata.endingType || "Resolution with Residue", lengthTarget: metadata.lengthTarget || "Standard", diagnosticsNotice: metadata.diagnosticsNotice ?? null } as SavedStory; }
 async function readGenerateResponsePayload(response: Response): Promise<Record<string, unknown>> {
   const responseText = await response.text();
-  if (!responseText.trim()) return { error: "Story generation returned an empty response." };
+  if (!responseText.trim()) {
+    if (response.status === 504) throw new Error(getGenerationTimeoutMessage());
+    return { error: "Story generation returned an empty response." };
+  }
   try {
     return JSON.parse(responseText) as Record<string, unknown>;
   } catch {
-    return { error: `Story generation returned a non-JSON response (${response.status}).`, diagnostic: responseText.slice(0, 240) };
+    throw new Error(response.status === 504 ? getGenerationTimeoutMessage() : `Story generation returned a non-JSON response (${response.status}).`);
   }
+}
+
+function getGenerationTimeoutMessage(): string {
+  return "Story generation timed out on the server. Try a shorter generation or try again.";
+}
+
+function buildGenerationFetchDiagnostics(input: GenerationFetchDiagnosticsInput): Record<string, unknown> {
+  const error = input.error instanceof Error ? input.error : null;
+  return {
+    generationFetchDiagnosticsVersion: "v1",
+    generationFetchDiagnosticStage: input.stage,
+    generationFetchEndpoint: input.endpoint,
+    generationFetchAction: input.action,
+    generationFetchAttemptId: input.attemptId,
+    generationFetchHttpStatus: input.response?.status ?? null,
+    generationFetchElapsedSeconds: input.elapsedSeconds ?? null,
+    generationFetchErrorName: error?.name ?? null,
+    generationFetchErrorMessageSafe: error?.message ?? (input.error ? String(input.error) : null),
+    authConfigured: input.authConfigured,
+    currentUserPresent: input.currentUserPresent,
+    authTokenPresent: input.authTokenPresent,
+    generationSucceededButLibrarySaveFailed: Boolean(input.generationSucceededButLibrarySaveFailed)
+  };
+}
+
+function elapsedSecondsSince(startedAt: number): number {
+  return Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+}
+
+function logGenerationFetchDiagnostics(diagnostics: Record<string, unknown>) {
+  if (process.env.NODE_ENV === "production") return;
+  console.warn("Project Lantern generation diagnostics", diagnostics);
 }
 
 function readDiagnosticRecord(payload: Record<string, unknown>): Record<string, unknown> | null {
