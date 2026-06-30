@@ -90,6 +90,7 @@ type GeneratedStoryPresentation = "first-episode" | "continuation" | "saved-epis
 type GenerationSource = "new-story" | "continue-story" | null;
 type ReaderScrollDiagnostics = { nextEpisodeClicked: string; continuationLoaded: string; scrollResetAttempted: string; scrollTargetUsed: string };
 type GenerationFailureDiagnostic = Record<string, unknown> | null;
+type GenerationFetchDiagnosticsInput = { attemptId: string; stage: string; endpoint: string; action: string; response?: Response; error?: unknown; authConfigured: boolean; currentUserPresent: boolean; authTokenPresent: boolean; generationSucceededButLibrarySaveFailed?: boolean };
 type LastGenerationIdentityDiagnostics = { identity: GenerationIdentity | null; continuationContextIncluded: boolean; newSeriesCreated: boolean; trigger: string; activeCommittedStoryId: string; activeCommittedSeriesId: string; pendingGenerationMode: GenerationMode | "none"; lastGenerationCancelledOrAborted: boolean };
 type StoryTypeSelectionDiagnostics = { selectedStoryTypeChipId: string; selectedStoryTypeChipLabel: string; selectedChipId: string; selectedChip: string; availableChips: string; storySparkUsed: string; selectedStorySparkId: string; selectedStorySparkTitle: string; selectedStorySparkMatchedChip: string; directChipGuidanceUsed: string; compatibilityResult: string; chipCompatibilityResult: string; fallbackSelectionUsed: string; selectedChipPreservedDuringGeneration: string; storyTypeSelectionMode: string; storySeedSource: string; visibleCategoryLabel: string };
 type ProfileSourceUsed = "local" | "cloud" | "default" | "none";
@@ -575,6 +576,10 @@ export default function Home() {
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
+  function authTokenPresent(): boolean {
+    return Boolean(authState.getAccessToken());
+  }
+
 
   async function loadAuthenticatedReaderProfile() {
     if (!authState.currentUser) return;
@@ -725,14 +730,21 @@ export default function Home() {
     activeGenerationAbortController.current = abortController;
     const generationIdentity = createGenerationIdentity({ generationMode: overrides.generationMode, activeStoryId: activeCommittedStoryId || currentStoryId || null, activeSeriesId: activeCommittedSeriesId || (storyResponse?.metadata.diagnostics.seriesId ?? null), selectedSeriesId: overrides.selectedSeriesId ?? null, sourceStoryId: overrides.sourceStoryId ?? null });
     setError("");
+    const generationAuthTokenPresent = authTokenPresent();
+    const generationDiagnosticsBase = {
+      authConfigured: authState.authConfigured,
+      authRequiredForGeneration: authState.appActionsGated,
+      authSessionPresent: Boolean(authState.currentUser),
+      authTokenPresent: generationAuthTokenPresent,
+      currentUserPresent: Boolean(authState.currentUser)
+    };
     setLastGenerationFailureDiagnostic({
       deployedAppVersion: APP_VERSION,
       latestGenerationAttemptId: String(requestId),
       generationRequestStarted: true,
       generationRequestStatus: "requesting",
       generationEndpointStatusCode: "pending",
-      authRequiredForGeneration: authState.appActionsGated,
-      authSessionPresent: Boolean(authState.currentUser),
+      ...generationDiagnosticsBase,
       storyGenerationFailureStage: "requesting",
       storyGenerationFailureReason: null,
       storyGenerationFailureSource: "client",
@@ -775,7 +787,9 @@ export default function Home() {
     setLastNewStoryPersonalization(personalization.diagnostics);
     setIsGenerating(true);
     try {
-      const response = await fetch("/api/generate", {
+      let response: Response;
+      try {
+        response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         signal: abortController.signal,
@@ -801,7 +815,22 @@ export default function Home() {
           ...(continuationStoryId ? { continuationStoryId } : {})
         })
       });
-      const payload = await readGenerateResponsePayload(response);
+      } catch (fetchError) {
+        if (abortController.signal.aborted) throw fetchError;
+        const diagnostics = buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_request", endpoint: "/api/generate", action: "POST", error: fetchError, ...generationDiagnosticsBase });
+        logGenerationFetchDiagnostics(diagnostics);
+        setLastGenerationFailureDiagnostic((current) => ({ ...(current ?? {}), deployedAppVersion: APP_VERSION, latestGenerationAttemptId: String(requestId), generationRequestStarted: true, generationRequestStatus: "failed", generationEndpointStatusCode: "none", ...diagnostics, fallbackDisplayBlocked: true }));
+        throw new Error("Generation request lost connection before the server responded. Try again.");
+      }
+      let payload: Record<string, unknown>;
+      try {
+        payload = await readGenerateResponsePayload(response);
+      } catch (parseError) {
+        const diagnostics = buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response_parse", endpoint: "/api/generate", action: "parse_json", response, error: parseError, ...generationDiagnosticsBase });
+        logGenerationFetchDiagnostics(diagnostics);
+        setLastGenerationFailureDiagnostic((current) => ({ ...(current ?? {}), deployedAppVersion: APP_VERSION, latestGenerationAttemptId: String(requestId), generationRequestStarted: true, generationRequestStatus: "failed", generationEndpointStatusCode: response.status, ...diagnostics, fallbackDisplayBlocked: true }));
+        throw new Error("Story generation returned a response the app could not read. Try again.");
+      }
       if (activeGenerationRequestId.current !== requestId) return;
       if (!response.ok) {
         setLastGenerationFailureDiagnostic({
@@ -811,6 +840,7 @@ export default function Home() {
           generationRequestStarted: true,
           generationRequestStatus: "failed",
           generationEndpointStatusCode: response.status,
+          ...buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response", endpoint: "/api/generate", action: "POST", response, ...generationDiagnosticsBase }),
           fallbackDisplayBlocked: true
         });
         throw new Error(typeof payload.error === "string" ? payload.error : "Story generation failed.");
@@ -823,6 +853,7 @@ export default function Home() {
         generationRequestStarted: true,
         generationRequestStatus: "succeeded",
         generationEndpointStatusCode: response.status,
+        ...buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response_parse", endpoint: "/api/generate", action: "parse_json", response, ...generationDiagnosticsBase }),
         fallbackDisplayBlocked: true
       });
       setLastNewStoryPersonalization((current) => ({
@@ -847,11 +878,21 @@ export default function Home() {
         }
       }));
       const generatedStoryId = normalizedResponse.metadata.diagnostics.storyId || generationIdentity.storyId;
-      const savedStory = await saveStoryToAuthenticatedLibrary(createSavedStory(normalizedResponse, generatedStoryId));
+      const unsavedGeneratedStory = createSavedStory(normalizedResponse, generatedStoryId);
       setStoryResponse(normalizedResponse);
       setCurrentStoryId(generatedStoryId);
       setActiveCommittedStoryId(generatedStoryId);
       setActiveCommittedSeriesId(normalizedResponse.metadata.diagnostics.seriesId);
+      let savedStory = unsavedGeneratedStory;
+      let librarySaveFailed = false;
+      try {
+        savedStory = await saveStoryToAuthenticatedLibrary(unsavedGeneratedStory);
+      } catch (librarySaveError) {
+        librarySaveFailed = true;
+        const diagnostics = buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "library_save", endpoint: `/api/projects/${AUTHENTICATED_STORY_LIBRARY_PROJECT_ID}/stories`, action: "POST", error: librarySaveError, generationSucceededButLibrarySaveFailed: true, ...generationDiagnosticsBase });
+        logGenerationFetchDiagnostics(diagnostics);
+        setLastGenerationFailureDiagnostic((current) => ({ ...(current ?? {}), deployedAppVersion: APP_VERSION, latestGenerationAttemptId: String(requestId), generationRequestStarted: true, generationRequestStatus: "succeeded", generationEndpointStatusCode: response.status, ...diagnostics, fallbackDisplayBlocked: true }));
+      }
       const nextPresentation = overrides?.presentation ?? "first-episode";
       setGeneratedStoryPresentation(nextPresentation);
       if (nextGenerationSource === "continue-story" || nextPresentation === "continuation") {
@@ -869,10 +910,11 @@ export default function Home() {
       setDemoStory(null);
       navigateHome({ preserveGeneration: true });
       setGenerationApprovedMoodSnapshotId(null);
-      setStatusMessage("Story ready.");
+      setStatusMessage(librarySaveFailed ? "Story generated, but cloud save failed. Your story is still visible." : "Story ready.");
     } catch (caughtError) {
       if (activeGenerationRequestId.current !== requestId) return;
-      const message = caughtError instanceof Error ? caughtError.message : "Story generation failed.";
+      const rawMessage = caughtError instanceof Error ? caughtError.message : "Story generation failed.";
+      const message = rawMessage === "Load failed" ? "Generation request lost connection before the server responded. Try again." : rawMessage;
       setStatusMessage("");
       if (message === CLEAN_GENERATION_FAILURE_MESSAGE) {
         setLastGenerationFailureDiagnostic((current) => ({
@@ -3370,6 +3412,16 @@ function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeries
         <p><span className="font-semibold text-paper/80">Last generationRequestStarted:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationRequestStarted)}</p>
         <p><span className="font-semibold text-paper/80">Last generationRequestStatus:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationRequestStatus)}</p>
         <p><span className="font-semibold text-paper/80">Last generationEndpointStatusCode:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationEndpointStatusCode)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchDiagnosticStage:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchDiagnosticStage)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchEndpoint:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchEndpoint)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchAction:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchAction)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchHttpStatus:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchHttpStatus)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchErrorName:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchErrorName)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchErrorMessageSafe:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchErrorMessageSafe)}</p>
+        <p><span className="font-semibold text-paper/80">Last authConfigured:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.authConfigured)}</p>
+        <p><span className="font-semibold text-paper/80">Last currentUserPresent:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.currentUserPresent)}</p>
+        <p><span className="font-semibold text-paper/80">Last authTokenPresent:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.authTokenPresent)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationSucceededButLibrarySaveFailed:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationSucceededButLibrarySaveFailed)}</p>
         <p><span className="font-semibold text-paper/80">Last authRequiredForGeneration:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.authRequiredForGeneration)}</p>
         <p><span className="font-semibold text-paper/80">Last authSessionPresent:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.authSessionPresent)}</p>
         <p><span className="font-semibold text-paper/80">Last requestPayloadValid:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.requestPayloadValid)}</p>
@@ -3818,8 +3870,31 @@ async function readGenerateResponsePayload(response: Response): Promise<Record<s
   try {
     return JSON.parse(responseText) as Record<string, unknown>;
   } catch {
-    return { error: `Story generation returned a non-JSON response (${response.status}).`, diagnostic: responseText.slice(0, 240) };
+    throw new Error(`Story generation returned a non-JSON response (${response.status}).`);
   }
+}
+
+function buildGenerationFetchDiagnostics(input: GenerationFetchDiagnosticsInput): Record<string, unknown> {
+  const error = input.error instanceof Error ? input.error : null;
+  return {
+    generationFetchDiagnosticsVersion: "v1",
+    generationFetchDiagnosticStage: input.stage,
+    generationFetchEndpoint: input.endpoint,
+    generationFetchAction: input.action,
+    generationFetchAttemptId: input.attemptId,
+    generationFetchHttpStatus: input.response?.status ?? null,
+    generationFetchErrorName: error?.name ?? null,
+    generationFetchErrorMessageSafe: error?.message ?? (input.error ? String(input.error) : null),
+    authConfigured: input.authConfigured,
+    currentUserPresent: input.currentUserPresent,
+    authTokenPresent: input.authTokenPresent,
+    generationSucceededButLibrarySaveFailed: Boolean(input.generationSucceededButLibrarySaveFailed)
+  };
+}
+
+function logGenerationFetchDiagnostics(diagnostics: Record<string, unknown>) {
+  if (process.env.NODE_ENV === "production") return;
+  console.warn("Project Lantern generation diagnostics", diagnostics);
 }
 
 function readDiagnosticRecord(payload: Record<string, unknown>): Record<string, unknown> | null {
