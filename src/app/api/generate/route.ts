@@ -347,10 +347,10 @@ function buildGenerationFailureResponse(
     storySanitizedCandidateLength: options.storyCleanlinessDiagnostics?.storySanitizedCandidateLength ?? 0,
     storyRepairAttempted: options.storyCleanlinessDiagnostics?.storyRepairAttempted ?? Boolean(options.repairAttempted),
     fallbackDisplayBlocked: true,
-    generationSource: "fallback",
-    fallbackUsed: true,
-    fallbackReached: true,
-    fallbackRejectedForUserDisplay: true,
+    generationSource: "model",
+    fallbackUsed: false,
+    fallbackReached: false,
+    fallbackRejectedForUserDisplay: false,
     fallbackUserDisplayBlocked: true,
     modelGenerationAttempted: options.modelGenerationAttempted,
     modelGenerationSucceeded: false,
@@ -449,11 +449,16 @@ function classifyGenerationFailureStage(
   options: { modelGenerationAttempted: boolean; modelGenerationErrorType: string; repairAttempted?: boolean }
 ): string {
   const lower = message.toLowerCase();
-  if (!options.modelGenerationAttempted && options.modelGenerationErrorType === "missing_env") return "environment-config";
-  if (lower.includes("clean story prose") || lower.includes("metadata sanitization")) return "story-cleanliness-retry";
-  if (lower.includes("blueprint")) return options.repairAttempted ? "blueprint-repair" : "blueprint";
+  if (!options.modelGenerationAttempted && options.modelGenerationErrorType === "missing_env") return "missing-env";
+  if (lower.includes("clean story prose") || lower.includes("metadata sanitization")) return "story-clean-retry";
+  if (lower.includes("story draft request")) return "story-draft-request";
+  if (lower.includes("story draft parse")) return "story-draft-parse";
+  if (lower.includes("forbidden")) return "forbidden-term-repair";
+  if (lower.includes("expansion")) return "expansion";
+  if (lower.includes("long floor")) return "long-floor-pass";
+  if (lower.includes("blueprint")) return options.repairAttempted ? "blueprint-repair" : "blueprint-generation";
   if (lower.includes("fallback")) return "fallback-display-policy";
-  return options.modelGenerationAttempted ? "model-generation" : "pre-model";
+  return options.modelGenerationAttempted ? "unknown-model-error" : "missing-env";
 }
 
 function classifyGenerationFailureReason(

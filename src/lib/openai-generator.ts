@@ -299,15 +299,28 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
     blueprint = blueprintResult.blueprint;
     repairAttemptsCount += blueprintResult.repairAttemptsCount;
   } catch (error) {
-    throw new Error(`Blueprint generation failed: ${summarizeError(error)}`);
+    throw createGenerationStageError("blueprint-generation", `Blueprint generation failed: ${summarizeError(error)}`, {
+      storyGenerationFailureReason: "blueprint_generation_failed",
+      storyGenerationRetryAttempted: false,
+      storyGenerationRetrySucceeded: false
+    });
   }
 
-  let payload = await requestStory(
-    client,
-    getStoryModel(),
-    buildStoryPrompt(input, blueprint, blueprintRange, disallowedTerms),
-    estimateStoryMaxTokens(lengthSpec.maxWords)
-  );
+  let payload: OpenAIStoryPayload;
+  try {
+    payload = await requestStory(
+      client,
+      getStoryModel(),
+      buildStoryPrompt(input, blueprint, blueprintRange, disallowedTerms),
+      estimateStoryMaxTokens(lengthSpec.maxWords)
+    );
+  } catch (error) {
+    throw createGenerationStageError("story-draft-request", `Story draft request failed: ${summarizeError(error)}`, {
+      storyGenerationFailureReason: "story_draft_request_failed",
+      storyGenerationRetryAttempted: false,
+      storyGenerationRetrySucceeded: false
+    });
+  }
   let rawCandidateLength = payload.story.length;
   let candidateSanitization = sanitizeStoryMetadataLeaks(payload.story);
   let story = normalizeStoryText(payload.story);
@@ -316,12 +329,28 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
 
   if (!story && hasOptionalCallBudget(generationStartedAt)) {
     cleanStoryRetryAttempted = true;
-    payload = await requestStory(
-      client,
-      getStoryModel(),
-      buildCleanStoryRetryPrompt(input, blueprint, disallowedTerms),
-      estimateStoryMaxTokens(lengthSpec.maxWords)
-    );
+    try {
+      payload = await requestStory(
+        client,
+        getStoryModel(),
+        buildCleanStoryRetryPrompt(input, blueprint, disallowedTerms),
+        estimateStoryMaxTokens(lengthSpec.maxWords)
+      );
+    } catch (error) {
+      throw createGenerationStageError("story-clean-retry", `Clean story retry failed: ${summarizeError(error)}`, {
+        storyGenerationFailureReason: "clean_story_retry_request_failed",
+        storyGenerationRetryAttempted: true,
+        storyGenerationRetrySucceeded: false,
+        storyMetadataLeakDetected: candidateSanitization.detected,
+        storyMetadataLeakSanitized: candidateSanitization.sanitized,
+        storyMetadataLeakFinalClean: false,
+        storyMetadataLeakRemovedPatterns: candidateSanitization.removedPatterns,
+        metadataLeakPatternsFound: candidateSanitization.removedPatterns,
+        storyRawCandidateLength: rawCandidateLength,
+        storySanitizedCandidateLength: candidateSanitization.text.length,
+        fallbackDisplayBlocked: true
+      });
+    }
     rawCandidateLength = payload.story.length;
     candidateSanitization = sanitizeStoryMetadataLeaks(payload.story);
     story = normalizeStoryText(payload.story);
@@ -334,7 +363,7 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
       new Error("OpenAI response did not include clean story prose after metadata sanitization and retry."),
       {
         storyCleanlinessDiagnostics: {
-          storyGenerationFailureStage: "story-cleanliness-retry",
+          storyGenerationFailureStage: "story-clean-retry",
           storyGenerationFailureReason: "no_clean_story_after_sanitization_retry",
           storyGenerationFailureSource: "model",
           storyGenerationRetryAttempted: cleanStoryRetryAttempted,
@@ -1223,6 +1252,33 @@ function formatBlueprintFailure(
 
 function formatOptionalNumber(value: number | undefined): string {
   return typeof value === "number" ? value.toString() : "unknown";
+}
+
+function createGenerationStageError(
+  stage: string,
+  message: string,
+  diagnostics: Partial<StoryDiagnostics> = {}
+): Error {
+  return Object.assign(new Error(message), {
+    storyCleanlinessDiagnostics: {
+      storyGenerationFailureStage: stage,
+      storyGenerationFailureReason: diagnostics.storyGenerationFailureReason ?? stage,
+      storyGenerationFailureSource: diagnostics.storyGenerationFailureSource ?? "model",
+      storyGenerationRetryAttempted: diagnostics.storyGenerationRetryAttempted ?? false,
+      storyGenerationRetrySucceeded: diagnostics.storyGenerationRetrySucceeded ?? false,
+      storyMetadataLeakGuardEnabled: true,
+      storyMetadataLeakScanTarget: diagnostics.storyMetadataLeakScanTarget ?? "final-story-prose",
+      storyMetadataLeakDetected: diagnostics.storyMetadataLeakDetected ?? false,
+      storyMetadataLeakSanitized: diagnostics.storyMetadataLeakSanitized ?? false,
+      storyMetadataLeakFinalClean: diagnostics.storyMetadataLeakFinalClean ?? false,
+      storyMetadataLeakRemovedPatterns: diagnostics.storyMetadataLeakRemovedPatterns ?? [],
+      metadataLeakPatternsFound: diagnostics.metadataLeakPatternsFound ?? [],
+      storyRawCandidateLength: diagnostics.storyRawCandidateLength ?? 0,
+      storySanitizedCandidateLength: diagnostics.storySanitizedCandidateLength ?? 0,
+      storyRepairAttempted: diagnostics.storyRepairAttempted ?? false,
+      fallbackDisplayBlocked: true
+    } satisfies Partial<StoryDiagnostics>
+  });
 }
 
 function parseStoryPayload(rawText: string): OpenAIStoryPayload {
