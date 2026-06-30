@@ -104,6 +104,8 @@ async function handleGenerateRequest(request: Request, generationStartedAt: Date
     }),
     continuationContextIncluded: Boolean(body.continuationContextIncluded),
     generationTrigger: body.generationTrigger!,
+    continuationStoryId: normalizeOptionalString(body.continuationStoryId),
+    continuationDiagnostics: normalizeContinuationDiagnostics(body.continuationDiagnostics),
     readerMood,
     personalizationContext: body.personalizationContext?.trim() || undefined,
     readerProfileGenerationSnapshot,
@@ -195,6 +197,23 @@ function withReaderProfileGenerationSnapshot(
         readerProfileGenerationSnapshot
       }
     }
+  };
+}
+
+
+function normalizeContinuationDiagnostics(value: unknown): GenerateStoryRequest["continuationDiagnostics"] {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  if (record.generationMode !== "continue_series") return undefined;
+  return {
+    generationMode: "continue_series",
+    continuationStoryIdPresent: Boolean(record.continuationStoryIdPresent),
+    selectedSeriesId: typeof record.selectedSeriesId === "string" ? record.selectedSeriesId : null,
+    sourceStoryId: typeof record.sourceStoryId === "string" ? record.sourceStoryId : null,
+    priorStoryWordCount: Math.max(0, Number(record.priorStoryWordCount) || 0),
+    priorContextCharsSent: Math.max(0, Number(record.priorContextCharsSent) || 0),
+    totalRequestPayloadApproxChars: Math.max(0, Number(record.totalRequestPayloadApproxChars) || 0),
+    lengthTarget: LENGTH_TARGETS.some((target) => target.value === record.lengthTarget) ? record.lengthTarget as GenerateStoryRequest["lengthTarget"] : "Standard"
   };
 }
 
@@ -518,7 +537,8 @@ function buildSafeInputDiagnostics(input: GenerateStoryRequest, generationStarte
     storySeedChars: input.storySeed.length,
     storyRulesChars: input.storyRules.length,
     personalizationContextPresent: Boolean(input.personalizationContext),
-    readerProfileSnapshotPresent: Boolean(input.readerProfileGenerationSnapshot)
+    readerProfileSnapshotPresent: Boolean(input.readerProfileGenerationSnapshot),
+    ...(input.continuationDiagnostics ?? {})
   };
 }
 
@@ -645,7 +665,7 @@ function validateRequest(body: Partial<GenerateStoryRequest>): string | null {
   return null;
 }
 
-function buildRequestGenerationDiagnostics(input: GenerateStoryRequest): Pick<GenerateStoryResponse["metadata"]["diagnostics"], "generationMode" | "storyId" | "seriesId" | "sourceStoryId" | "parentSeriesId" | "continuationContextIncluded" | "newSeriesCreated" | "generationTrigger" | "selectedStoryTypeChipId" | "selectedStoryTypeChipLabel" | "legacyGenrePreset" | "storyTypeSelectionMode" | "storySeedSource"> {
+function buildRequestGenerationDiagnostics(input: GenerateStoryRequest): Pick<GenerateStoryResponse["metadata"]["diagnostics"], "generationMode" | "storyId" | "seriesId" | "sourceStoryId" | "parentSeriesId" | "continuationContextIncluded" | "newSeriesCreated" | "generationTrigger" | "selectedStoryTypeChipId" | "selectedStoryTypeChipLabel" | "legacyGenrePreset" | "storyTypeSelectionMode" | "storySeedSource"> & Partial<StoryDiagnostics> {
   return {
     generationMode: input.generationIdentity.generationMode,
     storyId: input.generationIdentity.storyId,
@@ -659,7 +679,8 @@ function buildRequestGenerationDiagnostics(input: GenerateStoryRequest): Pick<Ge
     selectedStoryTypeChipLabel: input.selectedStoryTypeChipLabel,
     legacyGenrePreset: input.legacyGenrePreset,
     storyTypeSelectionMode: input.storyTypeSelectionMode,
-    storySeedSource: input.storySeedSource
+    storySeedSource: input.storySeedSource,
+    ...(input.continuationDiagnostics ?? {})
   };
 }
 
