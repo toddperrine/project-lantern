@@ -38,7 +38,8 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = summarizeOpenAIError(error);
     console.error("Unhandled /api/generate failure", message);
-    return NextResponse.json({ error: "Story generation failed before a response could be completed.", diagnostic: { message } }, { status: 500 });
+    const userMessage = message.includes("Fallback rejected for metadata leak") ? "Story generation failed before a clean episode could be created. Please try again." : "Story generation failed before a response could be completed.";
+    return NextResponse.json({ error: userMessage, diagnostic: { message } }, { status: 500 });
   }
 }
 

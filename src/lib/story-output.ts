@@ -34,8 +34,21 @@ export function normalizeStoryText(value: unknown): string {
     .trim();
 }
 
-const STORY_METADATA_LEAK_LINE_PATTERN = /^[\s"']*(?:story type id|story type label|story type guidance|story type keywords|selected lantyrn story fit|story fit direction|useful story fit ingredients|use these as private planning guidance only|story seed|use this selected story type as the seed|overcoming the monster|rags to riches|the quest|voyage and return|comedy|tragedy|rebirth|preferredStoryTypes|storyIngredients|preferredMoods|preferredGenres|storyIntensity|endingPreference|heroPreference|contentLane|narrativePressure|episodeEndingShape|protagonistLens|explicitReaderPreferences|canonicalReaderProfileInput|readerProfileGenerationSnapshot|profileSource|moodSignal|genreSignal)\s*[:=]/i;
-const STORY_METADATA_LEAK_PHRASE_PATTERN = /(?:use these as private planning guidance only|story type ids?|story type guidance labels?|keyword lists?|prompt rules|craft metadata)/i;
+const STORY_METADATA_LEAK_LINE_PATTERN = /^[\s"']*(story type id|story type label|story type guidance|story type keywords|selected lantyrn story fit|story fit direction|useful story fit ingredients|use these as private planning guidance only|story seed|use this selected story type as the seed|use the selected|private planning guidance|consider these ingredients|overcoming the monster|rags to riches|the quest|voyage and return|comedy|tragedy|rebirth|preferredStoryTypes|storyIngredients|preferredMoods|preferredGenres|storyIntensity|endingPreference|heroPreference|contentLane|narrativePressure|episodeEndingShape|protagonistLens|explicitReaderPreferences|canonicalReaderProfileInput|readerProfileGenerationSnapshot|profileSource|moodSignal|genreSignal)\s*[:=]/i;
+const STORY_METADATA_LEAK_PHRASE_PATTERN = /(?:use these as private planning guidance only|private planning guidance|consider these ingredients|story type ids?|story type guidance labels?|keyword lists?|prompt rules|craft metadata)/i;
+
+export function findStoryMetadataLeakPatterns(value: string): string[] {
+  const normalized = value.replace(/\r\n/g, "\n").replace(/\\n/g, "\n");
+  const patterns = new Set<string>();
+  for (const line of normalized.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const match = trimmed.match(STORY_METADATA_LEAK_LINE_PATTERN);
+    if (match?.[1]) patterns.add(match[1]);
+    if (STORY_METADATA_LEAK_PHRASE_PATTERN.test(trimmed)) patterns.add("prompt-instruction metadata");
+  }
+  return Array.from(patterns);
+}
 
 export function removeStoryMetadataLeaks(value: string): string {
   const normalized = value.replace(/\r\n/g, "\n").replace(/\\n/g, "\n");

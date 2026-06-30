@@ -166,6 +166,11 @@ export type StoryDiagnostics = {
   readerProfileSnapshot?: ReaderProfileGenerationSnapshot;
   readerProfileGenerationSnapshot?: ReaderProfileGenerationSnapshot;
   readerProfileInput?: object;
+  storyMetadataLeakGuardEnabled?: boolean;
+  fallbackMetadataLeakGuardEnabled?: boolean;
+  fallbackRejectedForMetadataLeak?: boolean;
+  metadataLeakPatternsFound?: string[];
+  storyFitGenerationContextVersion?: "v1";
   generationMode: GenerationMode;
   storyId: string;
   seriesId: string;
