@@ -28,3 +28,10 @@ test("metadata leak guard allows natural story prose with genre words", () => {
   const cleaned = normalizeStoryText(prose);
   assert.equal(cleaned, prose);
 });
+
+test("metadata leak guard removes private story-fit planning context", () => {
+  const cleaned = normalizeStoryText(`Private story-fit planning context:\nSelected story fit: Small-Town Dread.\nUseful motifs: diner, fog, secrets.\nUse the selected story fit only as private planning guidance.\n\nMara found the diner unlocked after midnight.`);
+  assert.equal(cleaned, "Mara found the diner unlocked after midnight.");
+  assert.doesNotMatch(cleaned, /Selected story fit:/i);
+  assert.doesNotMatch(cleaned, /Useful motifs:/i);
+});

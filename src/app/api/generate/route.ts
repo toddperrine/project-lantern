@@ -67,7 +67,11 @@ async function handleGenerateRequest(request: Request) {
     worldBible: body.worldBible!.trim(),
     characterProfiles: body.characterProfiles!.trim(),
     storySeed: body.storySeed!.trim(),
-    storyRules: buildStoryRules(body.storyRules, readerMood, body.personalizationContext),
+    storyRules: buildStoryRules(body.storyRules, readerMood, body.personalizationContext, {
+      label: body.selectedStoryTypeChipLabel,
+      guidance: body.selectedStoryTypeGuidance,
+      keywords: body.selectedStoryTypeKeywords
+    }),
     genrePreset: body.genrePreset!,
     selectedStoryTypeChipId: normalizeOptionalString(body.selectedStoryTypeChipId),
     selectedStoryTypeChipLabel: normalizeOptionalString(body.selectedStoryTypeChipLabel),
@@ -522,12 +526,35 @@ function buildGenerationIdentityDiagnostics(diagnostics: GenerateStoryResponse["
   };
 }
 
-function buildStoryRules(storyRules: string | undefined, readerMood: GenerateStoryRequest["readerMood"] = null, personalizationContext?: string): string {
+function buildStoryRules(
+  storyRules: string | undefined,
+  readerMood: GenerateStoryRequest["readerMood"] = null,
+  personalizationContext?: string,
+  storyFit?: { label?: unknown; guidance?: unknown; keywords?: unknown }
+): string {
   const baseRules = storyRules?.trim() || DEFAULT_STORY_RULES;
   const readerMoodGuidance = formatReaderMoodForPrompt(readerMood);
   const controlledPersonalization = personalizationContext?.trim() || "";
+  const storyFitGuidance = formatSelectedStoryFitForPrivateRules(storyFit);
 
-  return [baseRules, formatStoryCraftGuidance(), readerMoodGuidance, controlledPersonalization].filter(Boolean).join("\n\n");
+  return [baseRules, formatStoryCraftGuidance(), readerMoodGuidance, storyFitGuidance, controlledPersonalization].filter(Boolean).join("\n\n");
+}
+
+function formatSelectedStoryFitForPrivateRules(storyFit?: { label?: unknown; guidance?: unknown; keywords?: unknown }): string {
+  const label = normalizeOptionalString(storyFit?.label);
+  const guidance = normalizeOptionalString(storyFit?.guidance);
+  const keywords = Array.isArray(storyFit?.keywords)
+    ? storyFit.keywords.filter((keyword): keyword is string => typeof keyword === "string" && Boolean(keyword.trim())).map((keyword) => keyword.trim()).slice(0, 8)
+    : [];
+  if (!label && !guidance && keywords.length === 0) return "";
+
+  return [
+    "Private story-fit planning context:",
+    label ? `- Selected story fit: ${label}. Express this through scene, setting, character pressure, and consequence without printing labels or instructions.` : "",
+    guidance ? `- Direction: ${guidance}` : "",
+    keywords.length ? `- Useful motifs: ${keywords.join(", ")}` : "",
+    "- The final story must begin directly as prose and must not print story-fit labels, ids, keyword lists, craft labels, or prompt instructions."
+  ].filter(Boolean).join("\n");
 }
 function normalizeOptionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;

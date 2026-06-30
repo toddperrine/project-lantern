@@ -391,10 +391,6 @@ function buildStoryTypeGuidance(chip: StoryTypeChip): string {
   return [`Story fit should lean toward ${chip.label.toLowerCase()} through setting, character pressure, conflict, and consequence rather than labels.`, chip.guidance, `Potential story material: ${chip.keywords.join(", ")}.`, "The final story must begin as prose and must not print story-fit labels, ids, keyword lists, craft labels, or prompt instructions.", getStoryTypePromptRequirements(chip)].filter(Boolean).join("\n");
 }
 
-function withStoryTypeGuidance(baseSeed: string, chip: StoryTypeChip): string {
-  return `${baseSeed}\n\n${buildStoryTypeGuidance(chip)}`;
-}
-
 function createStoryStartFromChip(mood: Mood): StoryStart {
   const chip = getStoryTypeChip(mood);
   return { title: chip.label, premise: chip.guidance, genre: "Speculative Mystery", mood, heroName: "The reader", heroRole: chip.label, heroBio: `A grounded protagonist caught inside ${chip.label.toLowerCase()}.`, worldName: chip.label, world: chip.guidance, seed: chip.guidance, cast: `Create a small, reader-first cast grounded in ${chip.label.toLowerCase()}.`, rules: `Honor the selected story type: ${chip.guidance} ${getStoryTypePromptRequirements(chip)} Keep the dread specific, serialized, and character-centered.`, sourceStorySparkId: "direct-chip-guidance", sourceStorySparkTitle: "Direct chip guidance", tags: chip.keywords };
@@ -1081,7 +1077,7 @@ export default function Home() {
       generationMode: "new_story",
       worldBible: storyStart.world,
       characterProfiles: storyStart.cast,
-      storySeed: withStoryTypeGuidance(storyStart.seed, selectedChipDefinition),
+      storySeed: storyStart.seed,
       storyRules: storyStart.rules,
       genrePreset: storyStart.genre,
       selectedStoryTypeChip: selectedChipDefinition,
