@@ -77,7 +77,10 @@ export type ReaderProfileProtagonistLens = "not-set" | "surprise-me" | "ordinary
 
 export type ReaderProfilePreferences = {
   preferredStoryTypes: string[];
+  emotionalPromises?: string[];
+  favoriteStoryWorlds?: string[];
   storyIngredients: string[];
+  characterLensPreferences?: string[];
   hardAvoidances: string[];
   contentLane: ReaderProfileContentLane;
   narrativePressure: ReaderProfileNarrativePressure;
@@ -88,7 +91,10 @@ export type ReaderProfilePreferences = {
 
 export const DEFAULT_READER_PROFILE_PREFERENCES: ReaderProfilePreferences = {
   preferredStoryTypes: [],
+  emotionalPromises: [],
+  favoriteStoryWorlds: [],
   storyIngredients: [],
+  characterLensPreferences: [],
   hardAvoidances: [],
   contentLane: "not-set",
   narrativePressure: "not-set",
@@ -117,6 +123,18 @@ const APPROVED_STORY_FIT_TYPE_LABELS = new Set([
   "Family secret",
 ]);
 const APPROVED_STORY_FIT_INGREDIENT_LABELS = new Set([
+  "A hidden past resurfacing",
+  "An impossible object, map, or key",
+  "A moral bargain with a cost",
+  "A secret society or institution",
+  "A creature or presence not fully understood",
+  "Memory or time behaving strangely",
+  "Rules-based magic",
+  "Strange technology or AI",
+  "A disappearance or investigation",
+  "Family legacy with consequences",
+  "A place that changes when entered",
+  "A friendship or team tested by pressure",
   "Magic with rules",
   "Strange technology",
   "Ancient folklore",
@@ -618,7 +636,10 @@ export function normalizeReaderProfilePreferences(value: unknown): ReaderProfile
 
   return {
     preferredStoryTypes: preferredStoryTypes.slice(0, 12),
+    emotionalPromises: readStringArray(candidate.emotionalPromises).reduce((items, item) => addUniquePreferenceItem(items, item, 12), [] as string[]),
+    favoriteStoryWorlds: readStringArray(candidate.favoriteStoryWorlds).reduce((items, item) => addUniquePreferenceItem(items, item, 12), [] as string[]),
     storyIngredients: storyIngredients.slice(0, 12),
+    characterLensPreferences: readStringArray(candidate.characterLensPreferences).reduce((items, item) => addUniquePreferenceItem(items, item, 12), [] as string[]),
     hardAvoidances: readStringArray(candidate.hardAvoidances).reduce((items, item) => addUniquePreferenceItem(items, item, MAX_READER_HARD_AVOIDANCES), [] as string[]),
     contentLane: isReaderProfileContentLane(candidate.contentLane) ? candidate.contentLane : "not-set",
     narrativePressure: isReaderProfileNarrativePressure(candidate.narrativePressure) ? candidate.narrativePressure : migrateStoryIntensity(candidate.storyIntensity ?? legacyMoodValues),
@@ -658,7 +679,7 @@ export function addUniquePreferenceItem(items: string[], next: string, maxItems:
 }
 
 export function hasReaderProfilePreferences(preferences: ReaderProfilePreferences): boolean {
-  return Boolean(preferences.preferredStoryTypes.length || preferences.storyIngredients.length || preferences.hardAvoidances.length || preferences.contentLane !== "not-set" || preferences.narrativePressure !== "not-set" || preferences.episodeEndingShape !== "not-set" || preferences.protagonistLens !== "not-set");
+  return Boolean(preferences.preferredStoryTypes.length || (preferences.emotionalPromises?.length ?? 0) || (preferences.favoriteStoryWorlds?.length ?? 0) || preferences.storyIngredients.length || (preferences.characterLensPreferences?.length ?? 0) || preferences.hardAvoidances.length || preferences.contentLane !== "not-set" || preferences.narrativePressure !== "not-set" || preferences.episodeEndingShape !== "not-set" || preferences.protagonistLens !== "not-set");
 }
 
 export function saveReaderProfilePreferences(nextPreferences: ReaderProfilePreferences, profile?: ReaderProfile, persist = true): ReaderProfile {
