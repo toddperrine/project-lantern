@@ -386,16 +386,16 @@ function getStoryTypeChip(mood: Mood): StoryTypeChip {
 }
 
 function buildStoryTypeGuidance(chip: StoryTypeChip): string {
-  return [`Selected Lantyrn story fit: ${chip.label}.`, `Story fit direction: ${chip.guidance}`, `Useful story fit ingredients: ${chip.keywords.join(", ")}.`, "Use these as private planning guidance only. Do not print story type ids, story type guidance labels, keywords lists, prompt rules, or craft metadata in the prose.", getStoryTypePromptRequirements(chip)].filter(Boolean).join("\n");
+  return [`Use the selected ${chip.label} story fit as private planning guidance.`, chip.guidance, `Consider these ingredients when useful: ${chip.keywords.join(", ")}.`, "The final story must begin as prose and must not print story-fit labels, ids, keyword lists, craft labels, or prompt instructions.", getStoryTypePromptRequirements(chip)].filter(Boolean).join("\n");
 }
 
 function withStoryTypeGuidance(baseSeed: string, chip: StoryTypeChip): string {
-  return `${buildStoryTypeGuidance(chip)}\n\nStory seed:\n${baseSeed}`;
+  return `${baseSeed}\n\n${buildStoryTypeGuidance(chip)}`;
 }
 
 function createStoryStartFromChip(mood: Mood): StoryStart {
   const chip = getStoryTypeChip(mood);
-  return { title: chip.label, premise: chip.guidance, genre: "Speculative Mystery", mood, heroName: "The reader", heroRole: chip.label, heroBio: `A grounded protagonist caught inside ${chip.label.toLowerCase()}.`, worldName: chip.label, world: chip.guidance, seed: `Use this selected story type as the seed: ${chip.guidance}`, cast: `Create a small, reader-first cast grounded in ${chip.label.toLowerCase()}.`, rules: `Honor the selected story type: ${chip.guidance} ${getStoryTypePromptRequirements(chip)} Keep the dread specific, serialized, and character-centered.`, sourceStorySparkId: "direct-chip-guidance", sourceStorySparkTitle: "Direct chip guidance", tags: chip.keywords };
+  return { title: chip.label, premise: chip.guidance, genre: "Speculative Mystery", mood, heroName: "The reader", heroRole: chip.label, heroBio: `A grounded protagonist caught inside ${chip.label.toLowerCase()}.`, worldName: chip.label, world: chip.guidance, seed: chip.guidance, cast: `Create a small, reader-first cast grounded in ${chip.label.toLowerCase()}.`, rules: `Honor the selected story type: ${chip.guidance} ${getStoryTypePromptRequirements(chip)} Keep the dread specific, serialized, and character-centered.`, sourceStorySparkId: "direct-chip-guidance", sourceStorySparkTitle: "Direct chip guidance", tags: chip.keywords };
 }
 
 function formatLatestReadyStoryQueueSignal(signals: ReaderProfile["readyStoryQueueSignals"]): string {
@@ -2909,6 +2909,9 @@ function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeries
         <p><span className="font-semibold text-paper/80">explicitReaderPreferencesAvailable:</span> true</p>
         <p><span className="font-semibold text-paper/80">explicitReaderPreferencesSaved:</span> {hasReaderProfilePreferences(profile.explicitReaderPreferences) ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">explicitReaderPreferencesGenerationLinked:</span> true</p>
+        <p><span className="font-semibold text-paper/80">storyMetadataLeakGuardEnabled:</span> true</p>
+        <p><span className="font-semibold text-paper/80">storyFitLegacyNormalizationEnabled:</span> true</p>
+        <p><span className="font-semibold text-paper/80">storyFitGenerationContextVersion:</span> v1</p>
         <p><span className="font-semibold text-paper/80">accountMode:</span> {accountSummary.accountMode}</p>
         <p><span className="font-semibold text-paper/80">profileSummaryAvailable:</span> {(accountSummary.preferredStoryTypes.length || accountSummary.storyIngredients.length || accountSummary.hardAvoidances.length || accountSummary.recentFeedback.length) ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">savedContentCountsAvailable:</span> true</p>
@@ -3394,8 +3397,10 @@ function toAccountProfileSummary({ authState, canonicalProfile, inputArtifacts, 
   const displayName = userId ? "Signed-in profile" : "Guest profile";
   const statusText = userId ? `Profile ID: ${profileId}` : "Your stories and preferences are tied to this browser/session until full sign-in is added.";
   const explicitPreferences = profile.explicitReaderPreferences;
-  const preferredStoryTypes = uniqueNonEmpty([...explicitPreferences.preferredStoryTypes, ...topLabels(canonicalProfile?.learned?.moods, profile.moodCounts)]).slice(0, 6);
-  const storyIngredients = uniqueNonEmpty([...explicitPreferences.storyIngredients, ...topLabels(canonicalProfile?.learned?.genres, profile.genreCounts)]).slice(0, 6);
+  const learnedStoryTypes = filterStoryFitSummaryLabels(topLabels(canonicalProfile?.learned?.moods, profile.moodCounts), READER_STORY_TYPE_OPTIONS);
+  const learnedIngredients = filterStoryFitSummaryLabels(topLabels(canonicalProfile?.learned?.genres, profile.genreCounts), READER_STORY_INGREDIENT_OPTIONS);
+  const preferredStoryTypes = uniqueNonEmpty([...explicitPreferences.preferredStoryTypes, ...learnedStoryTypes]).slice(0, 6);
+  const storyIngredients = uniqueNonEmpty([...explicitPreferences.storyIngredients, ...learnedIngredients]).slice(0, 6);
   const hardAvoidances = uniqueNonEmpty([...explicitPreferences.hardAvoidances, ...(canonicalProfile?.preferences.hardAvoidances ?? []), ...(profile.tasteProfile?.userHardAvoidances ?? [])]).slice(0, 6);
   const continuationPreference = formatContinuationPreference(canonicalProfile?.learned?.continuationPreference);
   const recentFeedback = formatRecentFeedback(profile.storyFeedbackSignals).slice(0, 3);
@@ -3433,6 +3438,13 @@ function topLabels(primary?: Record<string, number>, fallback?: Record<string, n
 
 function uniqueNonEmpty(values: string[]): string[] {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function filterStoryFitSummaryLabels(values: string[], approvedLabels: string[]): string[] {
+  return values.reduce((items, value) => {
+    const approved = approvedLabels.find((label) => label.toLowerCase() === value.trim().toLowerCase());
+    return approved ? uniqueNonEmpty([...items, approved]) : items;
+  }, [] as string[]);
 }
 
 function formatExplicitReaderPreferencesForGeneration(preferences: ReaderProfile["explicitReaderPreferences"]): string {

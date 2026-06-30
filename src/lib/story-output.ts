@@ -25,13 +25,35 @@ export function normalizeStoryText(value: unknown): string {
     story = extractedStory;
   }
 
-  return story
+  return removeStoryMetadataLeaks(story)
     .replace(/\r\n/g, "\n")
     .replace(/\\n/g, "\n")
     .replace(/\\"/g, "\"")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+const STORY_METADATA_LEAK_LINE_PATTERN = /^[\s"']*(?:story type id|story type label|story type guidance|story type keywords|selected lantyrn story fit|story fit direction|useful story fit ingredients|use these as private planning guidance only|story seed|use this selected story type as the seed|overcoming the monster|rags to riches|the quest|voyage and return|comedy|tragedy|rebirth|preferredStoryTypes|storyIngredients|preferredMoods|preferredGenres|storyIntensity|endingPreference|heroPreference|contentLane|narrativePressure|episodeEndingShape|protagonistLens|explicitReaderPreferences|canonicalReaderProfileInput|readerProfileGenerationSnapshot|profileSource|moodSignal|genreSignal)\s*[:=]/i;
+const STORY_METADATA_LEAK_PHRASE_PATTERN = /(?:use these as private planning guidance only|story type ids?|story type guidance labels?|keyword lists?|prompt rules|craft metadata)/i;
+
+export function removeStoryMetadataLeaks(value: string): string {
+  const normalized = value.replace(/\r\n/g, "\n").replace(/\\n/g, "\n");
+  const lines = normalized.split("\n");
+  const keptLines = lines.filter((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return true;
+    if (STORY_METADATA_LEAK_LINE_PATTERN.test(trimmed)) return false;
+    if (STORY_METADATA_LEAK_PHRASE_PATTERN.test(trimmed)) return false;
+    return true;
+  });
+
+  return keptLines
+    .join("\n")
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export function normalizeStoryPayload(payload: unknown): StoryPayloadLike {

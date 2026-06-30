@@ -95,6 +95,41 @@ export const DEFAULT_READER_PROFILE_PREFERENCES: ReaderProfilePreferences = {
   episodeEndingShape: "not-set",
   protagonistLens: "not-set",
 };
+
+const APPROVED_STORY_FIT_TYPE_LABELS = new Set([
+  "Small-Town Dread",
+  "Gothic Shadows",
+  "Uncanny",
+  "Cosmic Horror",
+  "Weird Nature",
+  "Haunted Past",
+  "Creature Unease",
+  "Dark Fairy Tale",
+  "Psychological Dread",
+  "Small-town dread",
+  "Speculative mystery",
+  "Hidden-world adventure",
+  "Folkloric quest",
+  "Strange road / borderland",
+  "Haunted object or house",
+  "Near-future anomaly",
+  "Animal companion mystery",
+  "Family secret",
+]);
+const APPROVED_STORY_FIT_INGREDIENT_LABELS = new Set([
+  "Magic with rules",
+  "Strange technology",
+  "Ancient folklore",
+  "Ordinary place made uncanny",
+  "Found map / key / object",
+  "Secret society or order",
+  "Companion animal",
+  "Family legacy",
+  "Lost town / lost road",
+  "Moral bargain",
+  "Unreliable memory",
+  "Hidden room / hidden archive",
+]);
 export type ReaderFeedbackRating = StoryFeedbackRating;
 export type ReaderFeedbackEvent = {
   id: string;
@@ -570,16 +605,44 @@ export function normalizeReaderProfile(value: unknown): ReaderProfile {
 
 export function normalizeReaderProfilePreferences(value: unknown): ReaderProfilePreferences {
   const candidate = isRecord(value) ? value : {};
+  const explicitStoryTypes = filterApprovedPreferenceItems(readStringArray(candidate.preferredStoryTypes), APPROVED_STORY_FIT_TYPE_LABELS);
+  const legacyMoodValues = readStringArray(candidate.preferredMoods);
+  const preferredStoryTypes = explicitStoryTypes.length
+    ? explicitStoryTypes
+    : filterApprovedPreferenceItems(legacyMoodValues, APPROVED_STORY_FIT_TYPE_LABELS);
+  const explicitIngredients = filterApprovedPreferenceItems(readStringArray(candidate.storyIngredients), APPROVED_STORY_FIT_INGREDIENT_LABELS);
+  const legacyGenreValues = readStringArray(candidate.preferredGenres);
+  const storyIngredients = explicitIngredients.length
+    ? explicitIngredients
+    : migrateLegacyGenreIngredients(legacyGenreValues);
+
   return {
-    preferredStoryTypes: readStringArray(candidate.preferredStoryTypes ?? candidate.preferredMoods).slice(0, 12),
-    storyIngredients: readStringArray(candidate.storyIngredients ?? candidate.preferredGenres).slice(0, 12),
+    preferredStoryTypes: preferredStoryTypes.slice(0, 12),
+    storyIngredients: storyIngredients.slice(0, 12),
     hardAvoidances: readStringArray(candidate.hardAvoidances).reduce((items, item) => addUniquePreferenceItem(items, item, MAX_READER_HARD_AVOIDANCES), [] as string[]),
     contentLane: isReaderProfileContentLane(candidate.contentLane) ? candidate.contentLane : "not-set",
-    narrativePressure: isReaderProfileNarrativePressure(candidate.narrativePressure) ? candidate.narrativePressure : migrateStoryIntensity(candidate.storyIntensity),
+    narrativePressure: isReaderProfileNarrativePressure(candidate.narrativePressure) ? candidate.narrativePressure : migrateStoryIntensity(candidate.storyIntensity ?? legacyMoodValues),
     episodeEndingShape: isReaderProfileEpisodeEndingShape(candidate.episodeEndingShape) ? candidate.episodeEndingShape : migrateEndingPreference(candidate.endingPreference),
     protagonistLens: isReaderProfileProtagonistLens(candidate.protagonistLens) ? candidate.protagonistLens : migrateHeroPreference(candidate.heroPreference),
     ...(typeof candidate.updatedAt === "string" && candidate.updatedAt.trim() ? { updatedAt: candidate.updatedAt } : {}),
   };
+}
+
+
+function filterApprovedPreferenceItems(values: string[], approvedLabels: Set<string>): string[] {
+  return values.reduce((items, value) => {
+    const approved = Array.from(approvedLabels).find((label) => label.toLowerCase() === value.trim().toLowerCase());
+    return approved ? addUniquePreferenceItem(items, approved, 12) : items;
+  }, [] as string[]);
+}
+
+function migrateLegacyGenreIngredients(values: string[]): string[] {
+  return values.reduce((items, value) => {
+    const normalized = normalizePreferenceText(value).toLowerCase();
+    if (normalized === "fantasy") return addUniquePreferenceItem(items, "Magic with rules", 12);
+    if (normalized === "science fiction" || normalized === "sci-fi" || normalized === "sci fi") return addUniquePreferenceItem(items, "Strange technology", 12);
+    return items;
+  }, [] as string[]);
 }
 
 export function normalizePreferenceText(value: string): string {
@@ -619,9 +682,11 @@ function isReaderProfileEpisodeEndingShape(value: unknown): value is ReaderProfi
 function isReaderProfileProtagonistLens(value: unknown): value is ReaderProfileProtagonistLens { return value === "not-set" || value === "surprise-me" || value === "ordinary-person-pulled-in" || value === "investigator-seeker" || value === "caretaker-protector" || value === "reluctant-keeper-heir" || value === "outsider-newcomer" || value === "animal-bonded-protagonist"; }
 
 function migrateStoryIntensity(value: unknown): ReaderProfileNarrativePressure {
-  if (value === "gentle") return "gentle-unease";
-  if (value === "balanced") return "balanced-tension";
-  if (value === "intense") return "dark-intense";
+  const values = Array.isArray(value) ? value : [value];
+  if (values.some((item) => normalizePreferenceText(String(item)).toLowerCase() === "scary")) return "dark-intense";
+  if (values.includes("gentle")) return "gentle-unease";
+  if (values.includes("balanced")) return "balanced-tension";
+  if (values.includes("intense")) return "dark-intense";
   return "not-set";
 }
 
