@@ -43,7 +43,18 @@ import {
   MAX_READER_HARD_AVOIDANCES,
   MAX_READER_HARD_AVOIDANCE_LENGTH,
   READER_PROFILE_PREFERENCES_VERSION,
-  DEFAULT_READER_PROFILE_PREFERENCES
+  DEFAULT_READER_PROFILE_PREFERENCES,
+  STORY_FIT_CHARACTER_LENS_OPTIONS,
+  STORY_FIT_EMOTIONAL_PROMISE_OPTIONS,
+  STORY_FIT_ENDING_TO_LEGACY,
+  STORY_FIT_EPISODE_ENDING_OPTIONS,
+  STORY_FIT_INGREDIENT_OPTIONS,
+  STORY_FIT_NARRATIVE_PRESSURE_OPTIONS,
+  STORY_FIT_PRESSURE_TO_LEGACY,
+  STORY_FIT_SELECTION_LIMITS,
+  STORY_FIT_STORY_TYPE_OPTIONS,
+  STORY_FIT_WORLD_OPTIONS,
+  STORY_FIT_CHARACTER_LENS_TO_LEGACY
 } from "@/lib/reader-profile";
 import {
   countPreparedReadyStoryQueueItems,
@@ -118,14 +129,14 @@ type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" |
 type AccountMode = "guest" | "signed-in" | "unknown";
 type AccountDataMode = "signed-in" | "browser-profile" | "local-profile" | "unknown";
 type AccountDataClearConfirmation = "story-fit-preferences" | "local-reader-memory" | null;
-type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; preferredStoryTypes: string[]; emotionalPromises: string[]; favoriteStoryWorlds: string[]; storyIngredients: string[]; characterLensPreferences: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
+type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; preferredStoryTypes: string[]; emotionalPromises: string[]; favoriteStoryWorlds: string[]; storyIngredients: string[]; characterLensPreferences: string[]; narrativePressurePreferences: string[]; episodeEndingShapePreferences: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
 type ReaderPreferencesSaveStatus = "saved" | "saving" | "error";
-type StoryFitOnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+type StoryFitOnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 const CONTINUATION_CONTEXT_MAX_CHARS = 3600;
 const CONTINUATION_TAIL_MIN_CHARS = 1200;
 const CONTINUATION_TAIL_MAX_CHARS = 1800;
 
-type StoryFitOnboardingState = { emotionalPromises: string[]; favoriteStoryWorlds: string[]; storyIngredients: string[]; characterLensPreferences: string[]; contentLane: ReaderProfile["explicitReaderPreferences"]["contentLane"]; narrativePressure: ReaderProfile["explicitReaderPreferences"]["narrativePressure"]; episodeEndingShape: ReaderProfile["explicitReaderPreferences"]["episodeEndingShape"]; protagonistLens: ReaderProfile["explicitReaderPreferences"]["protagonistLens"]; hardAvoidances: string[]; preferredStoryTypes: string[] };
+type StoryFitOnboardingState = { emotionalPromises: string[]; favoriteStoryWorlds: string[]; storyIngredients: string[]; characterLensPreferences: string[]; narrativePressurePreferences: string[]; episodeEndingShapePreferences: string[]; protagonistLensPreferences: string[]; contentLane: ReaderProfile["explicitReaderPreferences"]["contentLane"]; hardAvoidances: string[]; preferredStoryTypes: string[] };
 const STORY_FIT_ONBOARDING_STORAGE_KEY = "projectLantern.storyFitOnboarding.v1";
 const STORY_FIT_ONBOARDING_LAST_OPENED_KEY = "projectLantern.storyFitOnboarding.lastOpenedAt.v1";
 const STORY_FIT_ONBOARDING_LAST_SAVED_KEY = "projectLantern.storyFitOnboarding.lastSavedAt.v1";
@@ -2575,34 +2586,28 @@ function StoryFitFirstRunCard({ onSkip, onStart }: { onSkip: () => void; onStart
   );
 }
 
-const EMOTIONAL_PROMISE_OPTIONS = ["Wonder and discovery", "Mystery and secrets", "Quiet dread", "Adventure and momentum", "Emotional warmth", "Moral tension", "Awe and cosmic scale", "Comfort with real stakes", "Strangeness in ordinary life", "Earned hope"];
-const FAVORITE_STORY_WORLD_OPTIONS = ["Small town with hidden history", "Old house, library, or archive", "Wild place that feels alive", "Coastal estate or isolated island", "City with secret layers", "School, campus, or institution", "Road trip or lost route", "Family home or inheritance", "Near-future technology", "Mythic village or fairy-tale borderland", "Workplace, lab, or corporate system", "Otherworld or far future"];
-const STORY_ENGINE_OPTIONS = ["A hidden past resurfacing", "An impossible object, map, or key", "A moral bargain with a cost", "A secret society or institution", "A creature or presence not fully understood", "Memory or time behaving strangely", "Rules-based magic", "Strange technology or AI", "A disappearance or investigation", "Family legacy with consequences", "A place that changes when entered", "A friendship or team tested by pressure"];
-const CHARACTER_LENS_OPTIONS = ["Ordinary person pulled into the impossible", "Outsider returning home", "Investigator, researcher, or archivist", "Reluctant hero", "Parent, guardian, or protector", "Small group of friends", "Found family or unlikely allies", "Morally complicated person seeking repair", "Person with an animal companion", "Young person coming of age"];
-const HARD_AVOIDANCE_QUICK_ADD_OPTIONS = ["No dead pets", "No harm to children", "No gore", "No sexual violence", "No hopeless endings", "Keep it sleep-safe"];
+const CONTENT_LANE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Middle grade / family-safe", value: "middle-grade" }, { label: "Teen / YA", value: "teen" }, { label: "Adult", value: "adult" }];
+const HARD_AVOIDANCE_QUICK_ADD_OPTIONS = ["No dead pets", "No gore", "No harm to children", "No body horror", "No spiders", "No hopeless endings"];
 
 function StoryFitOnboardingPanel({ initialPreferences, onCancel, onSave }: { initialPreferences: ReaderProfile["explicitReaderPreferences"]; onCancel: () => void; onSave: (preferences: ReaderProfile["explicitReaderPreferences"]) => void }) {
   const [step, setStep] = useState<StoryFitOnboardingStep>(0);
   const [avoidanceDraft, setAvoidanceDraft] = useState("");
   const [limitMessage, setLimitMessage] = useState("");
   const [state, setState] = useState<StoryFitOnboardingState>({
-    emotionalPromises: initialPreferences.emotionalPromises?.slice(0, 3) ?? [],
-    favoriteStoryWorlds: initialPreferences.favoriteStoryWorlds?.slice(0, 5) ?? [],
-    storyIngredients: initialPreferences.storyIngredients.slice(0, 6),
-    characterLensPreferences: initialPreferences.characterLensPreferences?.slice(0, 3) ?? [],
+    emotionalPromises: initialPreferences.emotionalPromises?.slice(0, STORY_FIT_SELECTION_LIMITS.emotionalPromises) ?? [],
+    favoriteStoryWorlds: initialPreferences.favoriteStoryWorlds?.slice(0, STORY_FIT_SELECTION_LIMITS.favoriteStoryWorlds) ?? [],
+    storyIngredients: initialPreferences.storyIngredients.slice(0, STORY_FIT_SELECTION_LIMITS.storyIngredients),
+    characterLensPreferences: initialPreferences.characterLensPreferences?.slice(0, STORY_FIT_SELECTION_LIMITS.characterLensPreferences) ?? [],
+    narrativePressurePreferences: initialPreferences.narrativePressurePreferences?.slice(0, STORY_FIT_SELECTION_LIMITS.narrativePressurePreferences) ?? [],
+    episodeEndingShapePreferences: initialPreferences.episodeEndingShapePreferences?.slice(0, STORY_FIT_SELECTION_LIMITS.episodeEndingShapePreferences) ?? [],
+    protagonistLensPreferences: initialPreferences.protagonistLensPreferences?.slice(0, STORY_FIT_SELECTION_LIMITS.characterLensPreferences) ?? [],
     contentLane: initialPreferences.contentLane,
-    narrativePressure: initialPreferences.narrativePressure,
-    episodeEndingShape: initialPreferences.episodeEndingShape,
-    protagonistLens: initialPreferences.protagonistLens,
-    hardAvoidances: initialPreferences.hardAvoidances,
-    preferredStoryTypes: initialPreferences.preferredStoryTypes.slice(0, 5),
+    hardAvoidances: initialPreferences.hardAvoidances.slice(0, STORY_FIT_SELECTION_LIMITS.hardAvoidances),
+    preferredStoryTypes: initialPreferences.preferredStoryTypes.slice(0, STORY_FIT_SELECTION_LIMITS.preferredStoryTypes),
   });
-  const steps = ["Emotional promise", "Story worlds", "Story engines", "Character lens", "Content lane", "Intensity", "Episode shape", "Boundaries", "Story directions", "Review"];
+  const steps = ["Story types / fear flavors", "What should the story give you?", "Storyworlds / places I want to live inside", "Story ingredients", "Character lens", "Narrative pressure / intensity", "Episode ending shape", "Hard avoidances", "Review"];
   const selectedContentLaneLabel = CONTENT_LANE_OPTIONS.find((option) => option.value === state.contentLane)?.label ?? "Not set";
-  const selectedPressureLabel = formatOnboardingNarrativePressureLabel(state.narrativePressure);
-  const selectedEndingLabel = formatOnboardingEpisodeShapeLabel(state.episodeEndingShape);
-  const selectedProtagonistLabel = PROTAGONIST_LENS_OPTIONS.find((option) => option.value === state.protagonistLens)?.label ?? "Surprise me";
-  const toggleLimitedItem = (field: "emotionalPromises" | "favoriteStoryWorlds" | "storyIngredients" | "characterLensPreferences" | "preferredStoryTypes", value: string, max: number, message: string) => {
+  const toggleLimitedItem = (field: keyof Pick<StoryFitOnboardingState, "preferredStoryTypes" | "emotionalPromises" | "favoriteStoryWorlds" | "storyIngredients" | "characterLensPreferences" | "narrativePressurePreferences" | "episodeEndingShapePreferences" | "protagonistLensPreferences">, value: string, max: number, label: string) => {
     setState((current) => {
       const currentValues = current[field];
       if (currentValues.includes(value)) {
@@ -2610,7 +2615,7 @@ function StoryFitOnboardingPanel({ initialPreferences, onCancel, onSave }: { ini
         return { ...current, [field]: currentValues.filter((item) => item !== value) };
       }
       if (currentValues.length >= max) {
-        setLimitMessage(message);
+        setLimitMessage(`${label} is limited to ${max} selections.`);
         return current;
       }
       setLimitMessage("");
@@ -2618,108 +2623,60 @@ function StoryFitOnboardingPanel({ initialPreferences, onCancel, onSave }: { ini
     });
   };
   const addAvoidanceValue = (value: string) => {
-    const next = addUniquePreferenceItem(state.hardAvoidances, value, MAX_READER_HARD_AVOIDANCES);
+    const next = addUniquePreferenceItem(state.hardAvoidances, value, STORY_FIT_SELECTION_LIMITS.hardAvoidances);
     if (next !== state.hardAvoidances) setState((current) => ({ ...current, hardAvoidances: next }));
+    if (state.hardAvoidances.length >= STORY_FIT_SELECTION_LIMITS.hardAvoidances && next === state.hardAvoidances) setLimitMessage(`Hard avoidances are limited to ${STORY_FIT_SELECTION_LIMITS.hardAvoidances} selections.`);
   };
-  const addAvoidance = () => {
-    addAvoidanceValue(avoidanceDraft);
-    setAvoidanceDraft("");
-  };
-  const goNext = () => {
-    setLimitMessage("");
-    setStep((current) => (current + 1) as StoryFitOnboardingStep);
-  };
-  const goBack = () => {
-    setLimitMessage("");
-    setStep((current) => (current - 1) as StoryFitOnboardingStep);
-  };
+  const addAvoidance = () => { addAvoidanceValue(avoidanceDraft); setAvoidanceDraft(""); };
+  const goNext = () => { setLimitMessage(""); setStep((current) => Math.min(current + 1, steps.length - 1) as StoryFitOnboardingStep); };
+  const goBack = () => { setLimitMessage(""); setStep((current) => Math.max(current - 1, 0) as StoryFitOnboardingStep); };
   const save = () => onSave({
     ...initialPreferences,
+    preferredStoryTypes: state.preferredStoryTypes,
     emotionalPromises: state.emotionalPromises,
     favoriteStoryWorlds: state.favoriteStoryWorlds,
     storyIngredients: state.storyIngredients,
     characterLensPreferences: state.characterLensPreferences,
-    preferredStoryTypes: state.preferredStoryTypes,
+    narrativePressurePreferences: state.narrativePressurePreferences,
+    episodeEndingShapePreferences: state.episodeEndingShapePreferences,
+    protagonistLensPreferences: state.protagonistLensPreferences,
     hardAvoidances: state.hardAvoidances,
     contentLane: state.contentLane,
-    narrativePressure: state.narrativePressure,
-    episodeEndingShape: state.episodeEndingShape,
-    protagonistLens: resolveProtagonistLensPreference(state.characterLensPreferences, initialPreferences.protagonistLens),
+    narrativePressure: STORY_FIT_PRESSURE_TO_LEGACY[state.narrativePressurePreferences[0]] ?? "not-set",
+    episodeEndingShape: STORY_FIT_ENDING_TO_LEGACY[state.episodeEndingShapePreferences[0]] ?? "not-set",
+    protagonistLens: STORY_FIT_CHARACTER_LENS_TO_LEGACY[state.protagonistLensPreferences[0]] ?? "not-set",
+    storyFitProfileVersion: READER_PROFILE_PREFERENCES_VERSION,
     updatedAt: new Date().toISOString(),
   });
 
   return (
-    <section className="mx-auto grid w-full max-w-3xl min-w-0 gap-4 rounded-xl border border-lantern-gold/35 bg-night-ink/95 p-4 shadow-soft">
+    <section className="mx-auto grid w-full max-w-3xl min-w-0 gap-4 overflow-x-hidden rounded-xl border border-lantern-gold/35 bg-night-ink/95 p-4 pb-24 shadow-soft sm:pb-4">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Story Fit Setup</p><h2 className="mt-1 text-2xl font-semibold text-paper">{steps[step]}</h2><p className="mt-2 text-sm leading-6 text-paper/65">Tell Lantyrn what kinds of stories you want to live inside. You can change this later.</p></div>
-        <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper/70" onClick={onCancel} type="button">Cancel</button>
+        <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper/70" onClick={onCancel} type="button">Cancel</button>
       </div>
       <p className="text-xs font-semibold text-paper/45">Step {step + 1} of {steps.length}</p>
-      {step === 0 ? <OnboardingChoiceGrid question="What should the story give you?" helper="Choose up to 3. This tells Lantyrn what emotional promise to aim for." options={EMOTIONAL_PROMISE_OPTIONS} selected={state.emotionalPromises} onSelect={(value) => toggleLimitedItem("emotionalPromises", value, 3, "Choose up to 3 emotional promises.")} /> : null}
-      {step === 1 ? <OnboardingChoiceGrid question="Where do you like stories to unfold?" helper="Choose up to 5. These help Lantyrn build worlds you want to revisit." options={FAVORITE_STORY_WORLD_OPTIONS} selected={state.favoriteStoryWorlds} onSelect={(value) => toggleLimitedItem("favoriteStoryWorlds", value, 5, "Choose up to 5 favorite story worlds.")} /> : null}
-      {step === 2 ? <OnboardingChoiceGrid question="What kinds of story engines pull you in?" helper="Choose up to 6. These are reusable engines, not rigid requirements." options={STORY_ENGINE_OPTIONS} selected={state.storyIngredients} onSelect={(value) => toggleLimitedItem("storyIngredients", value, 6, "Choose up to 6 story engines.")} /> : null}
-      {step === 3 ? <OnboardingChoiceGrid question="Who do you like following?" helper="Choose up to 3. Lantyrn can vary this, but these are your favorites." options={CHARACTER_LENS_OPTIONS} selected={state.characterLensPreferences} onSelect={(value) => toggleLimitedItem("characterLensPreferences", value, 3, "Choose up to 3 character lenses.")} /> : null}
-      {step === 4 ? <OnboardingChoiceGrid question="Who should this feel written for?" helper="This helps with maturity level, darkness, and complexity." options={CONTENT_LANE_OPTIONS.map((option) => option.label)} selected={[selectedContentLaneLabel]} onSelect={(label) => setState((current) => ({ ...current, contentLane: CONTENT_LANE_OPTIONS.find((option) => option.label === label)?.value as typeof current.contentLane }))} /> : null}
-      {step === 5 ? <OnboardingChoiceGrid question="How intense should it feel?" helper="You can choose dread, comfort, or something between them." options={NARRATIVE_PRESSURE_OPTIONS.filter((option) => option.value !== "not-set").map((option) => formatOnboardingNarrativePressureLabel(option.value))} selected={state.narrativePressure === "not-set" ? [] : [selectedPressureLabel]} onSelect={(label) => setState((current) => ({ ...current, narrativePressure: readNarrativePressureFromOnboardingLabel(label) }))} /> : null}
-      {step === 6 ? <OnboardingChoiceGrid question="How should episodes work?" helper="This shapes whether each episode feels complete or pulls hard into the next one." options={EPISODE_ENDING_SHAPE_OPTIONS.filter((option) => option.value !== "not-set").map((option) => formatOnboardingEpisodeShapeLabel(option.value))} selected={state.episodeEndingShape === "not-set" ? [] : [selectedEndingLabel]} onSelect={(label) => setState((current) => ({ ...current, episodeEndingShape: readEpisodeShapeFromOnboardingLabel(label) }))} /> : null}
-      {step === 7 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">What should Lantyrn avoid?</h3><p className="text-sm leading-6 text-paper/60">Optional. These are hard boundaries. Examples: no dead pets, no gore, no harm to children.</p><div className="flex flex-wrap gap-2">{HARD_AVOIDANCE_QUICK_ADD_OPTIONS.map((item) => <button className="rounded-full border border-paper/15 bg-paper/10 px-3 py-1.5 text-xs font-semibold text-paper/75" key={item} onClick={() => addAvoidanceValue(item)} type="button">{item}</button>)}</div><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={MAX_READER_HARD_AVOIDANCE_LENGTH} onChange={(event) => setAvoidanceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:opacity-50" disabled={!avoidanceDraft.trim() || state.hardAvoidances.length >= MAX_READER_HARD_AVOIDANCES} onClick={addAvoidance} type="button">Add</button></div><div className="flex flex-wrap gap-2">{state.hardAvoidances.map((item) => <button className="rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => setState((current) => ({ ...current, hardAvoidances: current.hardAvoidances.filter((value) => value !== item) }))} type="button">{item} ×</button>)}</div><p className="text-xs text-paper/45">Up to 10 boundaries, 60 characters each.</p></div> : null}
-      {step === 8 ? <OnboardingChoiceGrid question="Any darker story flavors you already know you like?" helper="Optional. These are current Lantyrn story directions." options={READER_STORY_TYPE_OPTIONS} selected={state.preferredStoryTypes} onSelect={(value) => toggleLimitedItem("preferredStoryTypes", value, 5, "Choose up to 5 current Lantyrn story directions.")} /> : null}
-      {step === 9 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Review</h3><ProfileSummaryRow label="Emotional promise" values={state.emotionalPromises} empty="None selected." /><ProfileSummaryRow label="Favorite story worlds" values={state.favoriteStoryWorlds} empty="None selected." /><ProfileSummaryRow label="Story engines" values={state.storyIngredients} empty="None selected." /><ProfileSummaryRow label="Character / cast lens" values={state.characterLensPreferences} empty="None selected." /><ProfileSummaryRow label="Content lane" values={state.contentLane === "not-set" ? [] : [selectedContentLaneLabel]} empty="Not set." /><ProfileSummaryRow label="Intensity" values={state.narrativePressure === "not-set" ? [] : [selectedPressureLabel]} empty="Not set." /><ProfileSummaryRow label="Episode shape" values={state.episodeEndingShape === "not-set" ? [] : [selectedEndingLabel]} empty="Not set." /><ProfileSummaryRow label="Boundaries" values={state.hardAvoidances} empty="None added." /></div> : null}
+      {step === 0 ? <OnboardingChoiceGrid countLabel={`${state.preferredStoryTypes.length} / ${STORY_FIT_SELECTION_LIMITS.preferredStoryTypes} selected`} question="Story types / fear flavors" helper={`Choose up to ${STORY_FIT_SELECTION_LIMITS.preferredStoryTypes}.`} options={STORY_FIT_STORY_TYPE_OPTIONS} selected={state.preferredStoryTypes} onSelect={(value) => toggleLimitedItem("preferredStoryTypes", value, STORY_FIT_SELECTION_LIMITS.preferredStoryTypes, "Story types")} /> : null}
+      {step === 1 ? <OnboardingChoiceGrid countLabel={`${state.emotionalPromises.length} / ${STORY_FIT_SELECTION_LIMITS.emotionalPromises} selected`} question="What should the story give you?" helper={`Choose up to ${STORY_FIT_SELECTION_LIMITS.emotionalPromises}.`} options={STORY_FIT_EMOTIONAL_PROMISE_OPTIONS} selected={state.emotionalPromises} onSelect={(value) => toggleLimitedItem("emotionalPromises", value, STORY_FIT_SELECTION_LIMITS.emotionalPromises, "What should the story give you")} /> : null}
+      {step === 2 ? <OnboardingChoiceGrid countLabel={`${state.favoriteStoryWorlds.length} / ${STORY_FIT_SELECTION_LIMITS.favoriteStoryWorlds} selected`} question="Storyworlds / places I want to live inside" helper={`Choose up to ${STORY_FIT_SELECTION_LIMITS.favoriteStoryWorlds}.`} options={STORY_FIT_WORLD_OPTIONS} selected={state.favoriteStoryWorlds} onSelect={(value) => toggleLimitedItem("favoriteStoryWorlds", value, STORY_FIT_SELECTION_LIMITS.favoriteStoryWorlds, "Storyworlds")} /> : null}
+      {step === 3 ? <OnboardingChoiceGrid countLabel={`${state.storyIngredients.length} / ${STORY_FIT_SELECTION_LIMITS.storyIngredients} selected`} question="Story ingredients" helper={`Choose up to ${STORY_FIT_SELECTION_LIMITS.storyIngredients}.`} options={STORY_FIT_INGREDIENT_OPTIONS} selected={state.storyIngredients} onSelect={(value) => toggleLimitedItem("storyIngredients", value, STORY_FIT_SELECTION_LIMITS.storyIngredients, "Story ingredients")} /> : null}
+      {step === 4 ? <OnboardingChoiceGrid countLabel={`${state.characterLensPreferences.length} / ${STORY_FIT_SELECTION_LIMITS.characterLensPreferences} selected`} question="Character lens" helper={`Choose up to ${STORY_FIT_SELECTION_LIMITS.characterLensPreferences}.`} options={STORY_FIT_CHARACTER_LENS_OPTIONS} selected={state.characterLensPreferences} onSelect={(value) => { toggleLimitedItem("characterLensPreferences", value, STORY_FIT_SELECTION_LIMITS.characterLensPreferences, "Character lens"); toggleLimitedItem("protagonistLensPreferences", value, STORY_FIT_SELECTION_LIMITS.characterLensPreferences, "Character lens"); }} /> : null}
+      {step === 5 ? <OnboardingChoiceGrid countLabel={`${state.narrativePressurePreferences.length} / ${STORY_FIT_SELECTION_LIMITS.narrativePressurePreferences} selected`} question="Narrative pressure / intensity" helper={`Choose up to ${STORY_FIT_SELECTION_LIMITS.narrativePressurePreferences}.`} options={STORY_FIT_NARRATIVE_PRESSURE_OPTIONS} selected={state.narrativePressurePreferences} onSelect={(value) => toggleLimitedItem("narrativePressurePreferences", value, STORY_FIT_SELECTION_LIMITS.narrativePressurePreferences, "Narrative pressure / intensity")} /> : null}
+      {step === 6 ? <OnboardingChoiceGrid countLabel={`${state.episodeEndingShapePreferences.length} / ${STORY_FIT_SELECTION_LIMITS.episodeEndingShapePreferences} selected`} question="Episode ending shape" helper={`Choose up to ${STORY_FIT_SELECTION_LIMITS.episodeEndingShapePreferences}.`} options={STORY_FIT_EPISODE_ENDING_OPTIONS} selected={state.episodeEndingShapePreferences} onSelect={(value) => toggleLimitedItem("episodeEndingShapePreferences", value, STORY_FIT_SELECTION_LIMITS.episodeEndingShapePreferences, "Episode ending shape")} /> : null}
+      {step === 7 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Hard avoidances</h3><p className="text-sm leading-6 text-paper/60">Optional. These are hard boundaries. Examples: no dead pets, no gore, no harm to children.</p><p className="text-xs font-semibold text-paper/45">{state.hardAvoidances.length} / {STORY_FIT_SELECTION_LIMITS.hardAvoidances} selected</p><div className="flex flex-wrap gap-2">{HARD_AVOIDANCE_QUICK_ADD_OPTIONS.map((item) => <button className="min-h-11 rounded-full border border-paper/15 bg-paper/10 px-3 py-1.5 text-xs font-semibold text-paper/75" key={item} onClick={() => addAvoidanceValue(item)} type="button">{item}</button>)}</div><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={MAX_READER_HARD_AVOIDANCE_LENGTH} onChange={(event) => setAvoidanceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:opacity-50" disabled={!avoidanceDraft.trim() || state.hardAvoidances.length >= STORY_FIT_SELECTION_LIMITS.hardAvoidances} onClick={addAvoidance} type="button">Add</button></div><div className="flex flex-wrap gap-2">{state.hardAvoidances.map((item) => <button className="min-h-11 rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => setState((current) => ({ ...current, hardAvoidances: current.hardAvoidances.filter((value) => value !== item) }))} type="button">{item} ×</button>)}</div><p className="text-xs text-paper/45">Up to {STORY_FIT_SELECTION_LIMITS.hardAvoidances} boundaries, {MAX_READER_HARD_AVOIDANCE_LENGTH} characters each.</p></div> : null}
+      {step === 8 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Review</h3><ProfileSummaryRow label="Story types" values={state.preferredStoryTypes} empty="Not set" /><ProfileSummaryRow label="What the story should give you" values={state.emotionalPromises} empty="Not set" /><ProfileSummaryRow label="Storyworlds / places" values={state.favoriteStoryWorlds} empty="Not set" /><ProfileSummaryRow label="Story ingredients" values={state.storyIngredients} empty="Not set" /><ProfileSummaryRow label="Character lens" values={state.characterLensPreferences} empty="Not set" /><ProfileSummaryRow label="Narrative pressure / intensity" values={state.narrativePressurePreferences} empty="Not set" /><ProfileSummaryRow label="Episode ending shape" values={state.episodeEndingShapePreferences} empty="Not set" /><ProfileSummaryRow label="Hard avoidances" values={state.hardAvoidances} empty="Not set" /><ProfileSummaryRow label="Content lane" values={state.contentLane === "not-set" ? [] : [selectedContentLaneLabel]} empty="Not set" /></div> : null}
       {limitMessage ? <p className="rounded-md border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-2 text-xs font-semibold text-lantern-gold">{limitMessage}</p> : null}
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="sticky bottom-3 z-10 flex flex-col gap-2 rounded-lg border border-paper/10 bg-night-ink/95 p-2 sm:static sm:flex-row sm:border-0 sm:bg-transparent sm:p-0">
         {step > 0 ? <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={goBack} type="button">Back</button> : null}
-        {step < 9 ? <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink" onClick={goNext} type="button">Next</button> : <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink" onClick={save} type="button">Save story fit</button>}
-        {step === 9 ? <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={onCancel} type="button">Cancel</button> : null}
+        {step < steps.length - 1 ? <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink" onClick={goNext} type="button">Next</button> : <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink" onClick={save} type="button">Save Profile</button>}
+        {step === steps.length - 1 ? <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={onCancel} type="button">Cancel</button> : null}
       </div>
     </section>
   );
 }
 
-
-function formatOnboardingNarrativePressureLabel(value: string): string {
-  if (value === "gentle-unease") return "Gentle / bedtime-safe";
-  if (value === "balanced-tension") return "Balanced tension";
-  if (value === "dark-intense") return "Dark / intense";
-  if (value === "high-dread") return "High dread";
-  return "Not set";
-}
-
-function readNarrativePressureFromOnboardingLabel(label: string): ReaderProfile["explicitReaderPreferences"]["narrativePressure"] {
-  if (label === "Gentle / bedtime-safe" || label === "Uneasy but safe") return "gentle-unease";
-  if (label === "Balanced tension") return "balanced-tension";
-  if (label === "Dark / intense") return "dark-intense";
-  if (label === "High dread") return "high-dread";
-  return "not-set";
-}
-
-function formatOnboardingEpisodeShapeLabel(value: string): string {
-  if (value === "resolved-incident") return "Complete episode with residue";
-  if (value === "open-mystery") return "Open mystery";
-  if (value === "next-episode-pull") return "Strong next-episode pull";
-  if (value === "quiet-aftermath") return "Quiet aftermath with consequences";
-  return "Not set";
-}
-
-function readEpisodeShapeFromOnboardingLabel(label: string): ReaderProfile["explicitReaderPreferences"]["episodeEndingShape"] {
-  if (label === "Complete episode with residue") return "resolved-incident";
-  if (label === "Open mystery") return "open-mystery";
-  if (label === "Strong next-episode pull") return "next-episode-pull";
-  if (label === "Quiet aftermath with consequences") return "quiet-aftermath";
-  return "not-set";
-}
-
-function resolveProtagonistLensPreference(characterLensPreferences: string[], current: ReaderProfile["explicitReaderPreferences"]["protagonistLens"]): ReaderProfile["explicitReaderPreferences"]["protagonistLens"] {
-  if (characterLensPreferences.includes("Ordinary person pulled into the impossible")) return "ordinary-person-pulled-in";
-  if (characterLensPreferences.includes("Investigator, researcher, or archivist")) return "investigator-seeker";
-  if (characterLensPreferences.includes("Parent, guardian, or protector")) return "caretaker-protector";
-  if (characterLensPreferences.includes("Reluctant hero")) return "reluctant-keeper-heir";
-  if (characterLensPreferences.includes("Outsider returning home")) return "outsider-newcomer";
-  if (characterLensPreferences.includes("Person with an animal companion")) return "animal-bonded-protagonist";
-  return current === "not-set" ? "surprise-me" : current;
-}
-
-function OnboardingChoiceGrid({ helper, onSelect, options, question, selected }: { helper?: string; onSelect: (value: string) => void; options: string[]; question: string; selected: string[] }) {
-  return <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">{question}</h3>{helper ? <p className="text-xs font-semibold text-paper/45">{helper}</p> : null}<div className="grid gap-2 sm:grid-cols-2">{options.map((option) => <button className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm font-semibold ${selected.includes(option) ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper/75"}`} key={option} onClick={() => onSelect(option)} type="button">{option}</button>)}</div></div>;
+function OnboardingChoiceGrid({ countLabel, helper, onSelect, options, question, selected }: { countLabel: string; helper?: string; onSelect: (value: string) => void; options: { label: string; description: string }[]; question: string; selected: string[] }) {
+  return <div className="grid gap-3"><div><h3 className="text-lg font-semibold text-paper">{question}</h3>{helper ? <p className="text-xs font-semibold text-paper/45">{helper}</p> : null}<p className="mt-1 text-xs font-semibold text-lantern-gold">{countLabel}</p></div><div className="grid min-w-0 gap-2 sm:grid-cols-2">{options.map((option) => <button className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm font-semibold ${selected.includes(option.label) ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper/75"}`} key={option.label} onClick={() => onSelect(option.label)} type="button"><span className="block break-words">{option.label}</span><span className={`mt-1 block text-xs font-normal leading-5 ${selected.includes(option.label) ? "text-night-ink/75" : "text-paper/50"}`}>{option.description}</span></button>)}</div></div>;
 }
 
 function ReadyStoryQueuePanel({
@@ -2870,12 +2827,11 @@ function findEpisodeInLibrarySeries(stories: LibraryStory[], currentStoryId: str
 }
 
 
-const READER_STORY_TYPE_OPTIONS = STORY_TYPE_CHIPS.map((chip) => chip.label);
-const READER_STORY_INGREDIENT_OPTIONS = STORY_ENGINE_OPTIONS;
-const CONTENT_LANE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Middle grade / family-safe", value: "middle-grade" }, { label: "Teen / YA", value: "teen" }, { label: "Adult", value: "adult" }];
-const NARRATIVE_PRESSURE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Gentle unease", value: "gentle-unease" }, { label: "Balanced tension", value: "balanced-tension" }, { label: "Dark / intense", value: "dark-intense" }, { label: "High dread", value: "high-dread" }];
-const EPISODE_ENDING_SHAPE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Resolve this episode’s incident", value: "resolved-incident" }, { label: "Leave an open mystery", value: "open-mystery" }, { label: "Strong next-episode pull", value: "next-episode-pull" }, { label: "Quiet aftermath with consequences", value: "quiet-aftermath" }];
-const PROTAGONIST_LENS_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Surprise me", value: "surprise-me" }, { label: "Ordinary person pulled in", value: "ordinary-person-pulled-in" }, { label: "Investigator / seeker", value: "investigator-seeker" }, { label: "Caretaker / protector", value: "caretaker-protector" }, { label: "Reluctant keeper / heir", value: "reluctant-keeper-heir" }, { label: "Outsider / newcomer", value: "outsider-newcomer" }, { label: "Animal-bonded protagonist", value: "animal-bonded-protagonist" }];
+const READER_STORY_TYPE_OPTIONS = STORY_FIT_STORY_TYPE_OPTIONS.map((option) => option.label);
+const READER_STORY_INGREDIENT_OPTIONS = STORY_FIT_INGREDIENT_OPTIONS.map((option) => option.label);
+const NARRATIVE_PRESSURE_OPTIONS = [{ label: "Not set", value: "not-set" }, ...Object.entries(STORY_FIT_PRESSURE_TO_LEGACY).map(([label, value]) => ({ label, value }))];
+const EPISODE_ENDING_SHAPE_OPTIONS = [{ label: "Not set", value: "not-set" }, ...Object.entries(STORY_FIT_ENDING_TO_LEGACY).map(([label, value]) => ({ label, value }))];
+const PROTAGONIST_LENS_OPTIONS = [{ label: "Not set", value: "not-set" }, ...Object.entries(STORY_FIT_CHARACTER_LENS_TO_LEGACY).map(([label, value]) => ({ label, value }))];
 
 function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocalReaderMemory, onClearStoryFitPreferences, onOpenLibrary, onOpenStoryFitOnboarding, onReaderPreferencesChange, readerPreferences, readerProfile, savedForLaterStoryQueue, savedStories, saveStatus, summary }: { authState: ReturnType<typeof useAuth>; canonicalProfile: CanonicalReaderProfile | null; inputArtifacts: InputArtifact[]; onClearLocalReaderMemory: () => void; onClearStoryFitPreferences: () => void; onOpenLibrary: () => void; onOpenStoryFitOnboarding: () => void; onReaderPreferencesChange: (preferences: ReaderProfile["explicitReaderPreferences"]) => void; readerPreferences: ReaderProfile["explicitReaderPreferences"]; readerProfile: ReaderProfile; savedForLaterStoryQueue: ReadyStoryQueueItem[]; savedStories: SavedStory[]; saveStatus: ReaderPreferencesSaveStatus; summary: AccountProfileSummary }) {
   const [avoidanceDraft, setAvoidanceDraft] = useState("");
@@ -2925,13 +2881,15 @@ function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocal
           <p className="text-sm leading-6 text-paper/70">{summary.statusText}</p>
         </article>
         <AccountCard title="What Lantyrn knows so far">
-          {summary.emotionalPromises.length ? <ProfileSummaryRow label="Emotional promise" values={summary.emotionalPromises} empty="" /> : null}
-          {summary.favoriteStoryWorlds.length ? <ProfileSummaryRow label="Favorite story worlds" values={summary.favoriteStoryWorlds} empty="" /> : null}
-          <ProfileSummaryRow label="Story engines" values={summary.storyIngredients} empty="No story engines saved yet." />
-          {summary.characterLensPreferences.length ? <ProfileSummaryRow label="Character / cast lens" values={summary.characterLensPreferences} empty="" /> : null}
-          {summary.preferredStoryTypes.length ? <ProfileSummaryRow label="Story directions" values={summary.preferredStoryTypes} empty="" /> : null}
-          <ProfileSummaryRow label="Boundaries" values={summary.hardAvoidances} empty="No boundaries saved yet." />
-          <ProfileSummaryRow label="Story fit settings" values={summary.explicitDetails} empty="No content lane, intensity, or episode shape saved yet." />
+          <ProfileSummaryRow label="Story types" values={summary.preferredStoryTypes} empty="Not set" />
+          <ProfileSummaryRow label="What the story should give you" values={summary.emotionalPromises} empty="Not set" />
+          <ProfileSummaryRow label="Storyworlds / places" values={summary.favoriteStoryWorlds} empty="Not set" />
+          <ProfileSummaryRow label="Story ingredients" values={summary.storyIngredients} empty="Not set" />
+          <ProfileSummaryRow label="Character lens" values={summary.characterLensPreferences} empty="Not set" />
+          <ProfileSummaryRow label="Narrative pressure / intensity" values={summary.narrativePressurePreferences} empty="Not set" />
+          <ProfileSummaryRow label="Episode ending shape" values={summary.episodeEndingShapePreferences} empty="Not set" />
+          <ProfileSummaryRow label="Hard avoidances" values={summary.hardAvoidances} empty="Not set" />
+          <ProfileSummaryRow label="Story fit settings" values={summary.explicitDetails} empty="Not set" />
           <ProfileSummaryRow label="Continuation preference" values={summary.continuationPreference ? [summary.continuationPreference] : []} empty="Not enough signal yet." />
           <ProfileSummaryRow label="Recent feedback" values={summary.recentFeedback} empty="No feedback captured yet." />
           <ProfileSummaryRow label="Confidence / status" values={[summary.confidenceLabel]} empty="Still learning." />
@@ -2947,9 +2905,9 @@ function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocal
           <PreferenceChipGroup label="Story engines" options={READER_STORY_INGREDIENT_OPTIONS} selected={readerPreferences.storyIngredients} onToggle={(value) => toggleItem("storyIngredients", value)} />
           <div className="grid gap-2"><p className="text-sm font-semibold text-paper">Hard avoidances</p><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={60} onChange={(event) => setAvoidanceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} placeholder="No dead pets, no gore..." value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={!avoidanceDraft.trim() || readerPreferences.hardAvoidances.length >= MAX_READER_HARD_AVOIDANCES} onClick={addAvoidance} type="button">Add</button></div><div className="flex flex-wrap gap-2">{readerPreferences.hardAvoidances.map((item) => <button className="rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => updatePreferences({ hardAvoidances: readerPreferences.hardAvoidances.filter((current) => current !== item) })} type="button">{item} ×</button>)}</div><p className="text-xs text-paper/45">Up to 10 avoidances, 60 characters each.</p></div>
           <PreferenceSelect label="Content lane" options={CONTENT_LANE_OPTIONS} value={readerPreferences.contentLane} onChange={(value) => updatePreferences({ contentLane: value as typeof readerPreferences.contentLane })} />
-          <PreferenceSelect label="Narrative pressure" options={NARRATIVE_PRESSURE_OPTIONS} value={readerPreferences.narrativePressure} onChange={(value) => updatePreferences({ narrativePressure: value as typeof readerPreferences.narrativePressure })} />
-          <PreferenceSelect label="Episode ending shape" options={EPISODE_ENDING_SHAPE_OPTIONS} value={readerPreferences.episodeEndingShape} onChange={(value) => updatePreferences({ episodeEndingShape: value as typeof readerPreferences.episodeEndingShape })} />
-          <PreferenceSelect label="Protagonist lens" options={PROTAGONIST_LENS_OPTIONS} value={readerPreferences.protagonistLens} onChange={(value) => updatePreferences({ protagonistLens: value as typeof readerPreferences.protagonistLens })} />
+          <PreferenceSelect label="Narrative pressure" options={NARRATIVE_PRESSURE_OPTIONS} value={readerPreferences.narrativePressure} onChange={(value) => updatePreferences({ narrativePressure: value as typeof readerPreferences.narrativePressure, narrativePressurePreferences: value === "not-set" ? [] : [NARRATIVE_PRESSURE_OPTIONS.find((option) => option.value === value)?.label ?? ""] })} />
+          <PreferenceSelect label="Episode ending shape" options={EPISODE_ENDING_SHAPE_OPTIONS} value={readerPreferences.episodeEndingShape} onChange={(value) => updatePreferences({ episodeEndingShape: value as typeof readerPreferences.episodeEndingShape, episodeEndingShapePreferences: value === "not-set" ? [] : [EPISODE_ENDING_SHAPE_OPTIONS.find((option) => option.value === value)?.label ?? ""] })} />
+          <PreferenceSelect label="Protagonist lens" options={PROTAGONIST_LENS_OPTIONS} value={readerPreferences.protagonistLens} onChange={(value) => updatePreferences({ protagonistLens: value as typeof readerPreferences.protagonistLens, protagonistLensPreferences: value === "not-set" ? [] : [PROTAGONIST_LENS_OPTIONS.find((option) => option.value === value)?.label ?? ""] })} />
           <p className={`text-xs font-semibold ${saveStatus === "error" ? "text-red-200" : "text-paper/50"}`}>{saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "Could not save locally" : "Saved"}</p>
         </AccountCard>
         <AccountCard title="Your saved Lantyrn content">{savedCountEntries.length ? <dl className="grid gap-3 sm:grid-cols-2">{savedCountEntries.map((entry) => <div className="rounded-md border border-paper/10 bg-night-ink/45 p-3" key={entry.label}><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{entry.label}</dt><dd className="mt-1 text-2xl font-semibold text-paper">{entry.value}</dd></div>)}</dl> : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved items found yet.</p>}<button className="mt-4 min-h-11 w-full rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-night-ink sm:w-fit" onClick={onOpenLibrary} type="button">Go to Library</button></AccountCard>
@@ -3390,8 +3348,15 @@ function createReaderProfileGenerationSnapshot({ canonicalProfile, defaultSafety
     defaultSafetyGuardrailCount: defaultSafetyGuardrails.length,
     defaultSafetyGuardrailsSummary: defaultSafetyGuardrails.length ? defaultSafetyGuardrails.join(", ") : "none",
     explicitReaderPreferencesForGeneration: {
+      storyFitProfileVersion: profile.explicitReaderPreferences.storyFitProfileVersion,
       preferredStoryTypes: profile.explicitReaderPreferences.preferredStoryTypes,
+      emotionalPromises: profile.explicitReaderPreferences.emotionalPromises ?? [],
+      favoriteStoryWorlds: profile.explicitReaderPreferences.favoriteStoryWorlds ?? [],
       storyIngredients: profile.explicitReaderPreferences.storyIngredients,
+      characterLensPreferences: profile.explicitReaderPreferences.characterLensPreferences ?? [],
+      protagonistLensPreferences: profile.explicitReaderPreferences.protagonistLensPreferences ?? [],
+      narrativePressurePreferences: profile.explicitReaderPreferences.narrativePressurePreferences ?? [],
+      episodeEndingShapePreferences: profile.explicitReaderPreferences.episodeEndingShapePreferences ?? [],
       hardAvoidances: profile.explicitReaderPreferences.hardAvoidances,
       contentLane: profile.explicitReaderPreferences.contentLane,
       narrativePressure: profile.explicitReaderPreferences.narrativePressure,
@@ -3434,8 +3399,8 @@ function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeries
         <p><span className="font-semibold text-paper/80">storyMetadataLeakGuardEnabled:</span> true</p>
         <p><span className="font-semibold text-paper/80">fallbackUserDisplayBlocked:</span> true</p>
         <p><span className="font-semibold text-paper/80">storyFitLegacyNormalizationEnabled:</span> true</p>
-        <p><span className="font-semibold text-paper/80">storyFitGenerationContextVersion:</span> v1</p>
-        <p><span className="font-semibold text-paper/80">storyFitOnboardingVersion:</span> v1</p>
+        <p><span className="font-semibold text-paper/80">storyFitGenerationContextVersion:</span> v2</p>
+        <p><span className="font-semibold text-paper/80">storyFitOnboardingVersion:</span> v2</p>
         <p><span className="font-semibold text-paper/80">storyFitOnboardingAvailable:</span> {storyFitOnboardingAvailable ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">storyFitOnboardingDismissed:</span> {storyFitOnboardingDismissed ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">storyFitOnboardingCompleted:</span> {storyFitOnboardingCompleted ? "true" : "false"}</p>
@@ -3443,6 +3408,12 @@ function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeries
         <p><span className="font-semibold text-paper/80">storyFitOnboardingLastSavedAt:</span> {storyFitOnboardingLastSavedAt || "none"}</p>
         <p><span className="font-semibold text-paper/80">storyFitOnboardingWritesPreferences:</span> true</p>
         <p><span className="font-semibold text-paper/80">storyFitOnboardingNorthStarTaxonomy:</span> true</p>
+        <p><span className="font-semibold text-paper/80">storyFitProfileVersion:</span> {profile.explicitReaderPreferences.storyFitProfileVersion ?? "v1"}</p>
+        <p><span className="font-semibold text-paper/80">storyFitV2HasSavedSelections:</span> {hasReaderProfilePreferences(profile.explicitReaderPreferences) ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">storyFitV2SelectedCounts:</span> {`types=${profile.explicitReaderPreferences.preferredStoryTypes.length}; promises=${profile.explicitReaderPreferences.emotionalPromises?.length ?? 0}; worlds=${profile.explicitReaderPreferences.favoriteStoryWorlds?.length ?? 0}; ingredients=${profile.explicitReaderPreferences.storyIngredients.length}; characterLens=${profile.explicitReaderPreferences.characterLensPreferences?.length ?? 0}; pressure=${profile.explicitReaderPreferences.narrativePressurePreferences?.length ?? 0}; endings=${profile.explicitReaderPreferences.episodeEndingShapePreferences?.length ?? 0}; avoidances=${profile.explicitReaderPreferences.hardAvoidances.length}`}</p>
+        <p><span className="font-semibold text-paper/80">storyFitV2PluralPressurePresent:</span> {Array.isArray(profile.explicitReaderPreferences.narrativePressurePreferences) ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">storyFitV2PluralEndingPresent:</span> {Array.isArray(profile.explicitReaderPreferences.episodeEndingShapePreferences) ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">storyFitV2PluralLensPresent:</span> {Array.isArray(profile.explicitReaderPreferences.protagonistLensPreferences) ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">accountMode:</span> {accountSummary.accountMode}</p>
         <p><span className="font-semibold text-paper/80">profileSummaryAvailable:</span> {(accountSummary.preferredStoryTypes.length || accountSummary.emotionalPromises.length || accountSummary.favoriteStoryWorlds.length || accountSummary.storyIngredients.length || accountSummary.characterLensPreferences.length || accountSummary.hardAvoidances.length || accountSummary.recentFeedback.length) ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">savedContentCountsAvailable:</span> true</p>
@@ -4054,7 +4025,9 @@ function toAccountProfileSummary({ authState, canonicalProfile, inputArtifacts, 
   const learnedIngredients = filterStoryFitSummaryLabels(topLabels(canonicalProfile?.learned?.genres, profile.genreCounts), READER_STORY_INGREDIENT_OPTIONS);
   const emotionalPromises = uniqueNonEmpty(explicitPreferences.emotionalPromises ?? []).slice(0, 6);
   const favoriteStoryWorlds = uniqueNonEmpty(explicitPreferences.favoriteStoryWorlds ?? []).slice(0, 6);
-  const characterLensPreferences = uniqueNonEmpty(explicitPreferences.characterLensPreferences ?? []).slice(0, 6);
+  const characterLensPreferences = uniqueNonEmpty(explicitPreferences.characterLensPreferences ?? []).slice(0, STORY_FIT_SELECTION_LIMITS.characterLensPreferences);
+  const narrativePressurePreferences = uniqueNonEmpty(explicitPreferences.narrativePressurePreferences ?? []).slice(0, STORY_FIT_SELECTION_LIMITS.narrativePressurePreferences);
+  const episodeEndingShapePreferences = uniqueNonEmpty(explicitPreferences.episodeEndingShapePreferences ?? []).slice(0, STORY_FIT_SELECTION_LIMITS.episodeEndingShapePreferences);
   const preferredStoryTypes = uniqueNonEmpty([...explicitPreferences.preferredStoryTypes, ...learnedStoryTypes]).slice(0, 6);
   const storyIngredients = uniqueNonEmpty([...explicitPreferences.storyIngredients, ...learnedIngredients]).slice(0, 6);
   const hardAvoidances = uniqueNonEmpty([...explicitPreferences.hardAvoidances, ...(canonicalProfile?.preferences.hardAvoidances ?? []), ...(profile.tasteProfile?.userHardAvoidances ?? [])]).slice(0, 6);
@@ -4076,6 +4049,8 @@ function toAccountProfileSummary({ authState, canonicalProfile, inputArtifacts, 
     favoriteStoryWorlds,
     storyIngredients,
     characterLensPreferences,
+    narrativePressurePreferences,
+    episodeEndingShapePreferences,
     hardAvoidances,
     explicitDetails,
     continuationPreference,
@@ -4109,7 +4084,12 @@ function filterStoryFitSummaryLabels(values: string[], approvedLabels: string[])
 function formatExplicitReaderPreferencesForGeneration(preferences: ReaderProfile["explicitReaderPreferences"]): string {
   return [
     preferences.preferredStoryTypes.length ? `preferredStoryTypes=${preferences.preferredStoryTypes.join(", ")}` : "preferredStoryTypes=none",
+    preferences.emotionalPromises?.length ? `emotionalPromises=${preferences.emotionalPromises.join(", ")}` : "emotionalPromises=none",
+    preferences.favoriteStoryWorlds?.length ? `favoriteStoryWorlds=${preferences.favoriteStoryWorlds.join(", ")}` : "favoriteStoryWorlds=none",
     preferences.storyIngredients.length ? `storyIngredients=${preferences.storyIngredients.join(", ")}` : "storyIngredients=none",
+    preferences.characterLensPreferences?.length ? `characterLensPreferences=${preferences.characterLensPreferences.join(", ")}` : "characterLensPreferences=none",
+    preferences.narrativePressurePreferences?.length ? `narrativePressurePreferences=${preferences.narrativePressurePreferences.join(", ")}` : "narrativePressurePreferences=none",
+    preferences.episodeEndingShapePreferences?.length ? `episodeEndingShapePreferences=${preferences.episodeEndingShapePreferences.join(", ")}` : "episodeEndingShapePreferences=none",
     preferences.hardAvoidances.length ? `hardAvoidances=${preferences.hardAvoidances.join(", ")}` : "hardAvoidances=none",
     `contentLane=${preferences.contentLane}`,
     `narrativePressure=${preferences.narrativePressure}`,
@@ -4121,8 +4101,10 @@ function formatExplicitReaderPreferencesForGeneration(preferences: ReaderProfile
 function formatExplicitReaderPreferenceDetails(preferences: ReaderProfile["explicitReaderPreferences"]): string[] {
   const labels: string[] = [];
   if (preferences.contentLane !== "not-set") labels.push(`Content lane: ${formatPreferenceOptionLabel(preferences.contentLane)}`);
-  if (preferences.narrativePressure !== "not-set") labels.push(`Intensity: ${formatPreferenceOptionLabel(preferences.narrativePressure)}`);
-  if (preferences.episodeEndingShape !== "not-set") labels.push(`Episode shape: ${formatPreferenceOptionLabel(preferences.episodeEndingShape)}`);
+  if (preferences.narrativePressurePreferences?.length) labels.push(`Narrative pressure / intensity: ${preferences.narrativePressurePreferences.join(", ")}`);
+  else if (preferences.narrativePressure !== "not-set") labels.push(`Narrative pressure / intensity: ${formatPreferenceOptionLabel(preferences.narrativePressure)}`);
+  if (preferences.episodeEndingShapePreferences?.length) labels.push(`Episode ending shape: ${preferences.episodeEndingShapePreferences.join(", ")}`);
+  else if (preferences.episodeEndingShape !== "not-set") labels.push(`Episode ending shape: ${formatPreferenceOptionLabel(preferences.episodeEndingShape)}`);
   if (preferences.protagonistLens !== "not-set") labels.push(`Character lens: ${formatPreferenceOptionLabel(preferences.protagonistLens)}`);
   return labels;
 }
