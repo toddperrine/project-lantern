@@ -115,6 +115,7 @@ type LastNewStoryPersonalization = {
 type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" | "not found" | "blocked";
 type AccountMode = "guest" | "signed-in" | "unknown";
 type AccountDataMode = "signed-in" | "browser-profile" | "local-profile" | "unknown";
+type AccountDataClearConfirmation = "story-fit-preferences" | "local-reader-memory" | null;
 type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; preferredStoryTypes: string[]; storyIngredients: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
 type ReaderPreferencesSaveStatus = "saved" | "saving" | "error";
 type AccountDataExportV1 = { exportVersion: "account-data-v1"; exportedAt: string; appVersion?: string; account: { accountMode: AccountDataMode; profileId?: string; email?: string }; storyFitPreferences?: unknown; readerProfile?: unknown; feedbackSignals?: unknown; savedContentSummary: { savedStories?: number; series?: number; characters?: number; worlds?: number; storySparks?: number }; savedContent?: { stories?: unknown[]; series?: unknown[]; characters?: unknown[]; worlds?: unknown[]; storySparks?: unknown[] } };
@@ -1806,14 +1807,27 @@ export default function Home() {
   }
 
   function handleClearLocalReaderMemory() {
-    const emptyProfile = clearReaderProfile();
-    setReaderProfile(emptyProfile);
+    const now = new Date().toISOString();
+    const preservedPreferences = { ...readerProfile.explicitReaderPreferences, updatedAt: readerProfile.explicitReaderPreferences.updatedAt ?? now };
+    const emptyProfile = { ...clearReaderProfile(), explicitReaderPreferences: preservedPreferences, updatedAt: now };
+    persistReaderProfile(emptyProfile);
     if (typeof window !== "undefined") {
       try {
         window.localStorage.removeItem(CANONICAL_READER_PROFILE_STORAGE_KEY);
       } catch {}
     }
-    setCanonicalReaderProfile(loadCanonicalReaderProfile());
+    const defaultCanonicalProfile = loadCanonicalReaderProfile();
+    const resetCanonicalProfile = saveCanonicalReaderProfile({
+      ...defaultCanonicalProfile,
+      updatedAt: now,
+      preferences: {
+        ...defaultCanonicalProfile.preferences,
+        hardAvoidances: preservedPreferences.hardAvoidances,
+        explicitReaderPreferences: preservedPreferences,
+      },
+    });
+    setReaderProfile(emptyProfile);
+    setCanonicalReaderProfile(resetCanonicalProfile);
     setReaderPreferencesSaveStatus("saved");
     setStatusMessage("Local reader memory and profile signals cleared.");
   }
@@ -2555,6 +2569,7 @@ const PROTAGONIST_LENS_OPTIONS = [{ label: "Not set", value: "not-set" }, { labe
 function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocalReaderMemory, onClearStoryFitPreferences, onOpenLibrary, onReaderPreferencesChange, readerPreferences, readerProfile, savedForLaterStoryQueue, savedStories, saveStatus, summary }: { authState: ReturnType<typeof useAuth>; canonicalProfile: CanonicalReaderProfile | null; inputArtifacts: InputArtifact[]; onClearLocalReaderMemory: () => void; onClearStoryFitPreferences: () => void; onOpenLibrary: () => void; onReaderPreferencesChange: (preferences: ReaderProfile["explicitReaderPreferences"]) => void; readerPreferences: ReaderProfile["explicitReaderPreferences"]; readerProfile: ReaderProfile; savedForLaterStoryQueue: ReadyStoryQueueItem[]; savedStories: SavedStory[]; saveStatus: ReaderPreferencesSaveStatus; summary: AccountProfileSummary }) {
   const [avoidanceDraft, setAvoidanceDraft] = useState("");
   const [dataControlMessage, setDataControlMessage] = useState("");
+  const [pendingClearConfirmation, setPendingClearConfirmation] = useState<AccountDataClearConfirmation>(null);
   const accountMode = getAccountDataMode(authState, readerProfile, canonicalProfile);
   const accountRows = getAccountDataStatusRows({ accountMode, authState, canonicalProfile, readerProfile, summary });
   const savedCountEntries = [
@@ -2580,10 +2595,12 @@ function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocal
   };
   const clearStoryFitPreferences = () => {
     onClearStoryFitPreferences();
+    setPendingClearConfirmation(null);
     setDataControlMessage("Story Fit Preferences cleared.");
   };
   const clearLocalReaderMemory = () => {
     onClearLocalReaderMemory();
+    setPendingClearConfirmation(null);
     setDataControlMessage("Local reader memory/profile signals cleared.");
   };
 
@@ -2624,10 +2641,19 @@ function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocal
         <AccountCard title="Data controls">
           <div className="grid gap-2">
             <button className="min-h-11 rounded-md border border-lantern-gold/45 bg-lantern-gold/10 px-4 py-3 text-left text-sm font-semibold text-lantern-gold" onClick={exportAccountData} type="button">Export account data</button>
-            <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-3 text-left text-sm font-semibold text-paper/80" onClick={clearStoryFitPreferences} type="button">Clear Story Fit Preferences</button>
-            <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-3 text-left text-sm font-semibold text-paper/80" onClick={clearLocalReaderMemory} type="button">Clear local reader memory/profile signals</button>
+            <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-3 text-left text-sm font-semibold text-paper/80" onClick={() => { setPendingClearConfirmation("story-fit-preferences"); setDataControlMessage(""); }} type="button">Clear Story Fit Preferences</button>
+            <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-3 text-left text-sm font-semibold text-paper/80" onClick={() => { setPendingClearConfirmation("local-reader-memory"); setDataControlMessage(""); }} type="button">Clear local reader memory/profile signals</button>
             <button className="min-h-11 cursor-not-allowed rounded-md border border-paper/12 bg-paper/5 px-4 py-3 text-left text-sm font-semibold text-paper/45" disabled type="button">Delete account/data — Coming soon</button>
           </div>
+          {pendingClearConfirmation ? (
+            <div className="rounded-md border border-lantern-gold/35 bg-night-ink/70 p-3">
+              <p className="text-sm leading-6 text-paper/75">{pendingClearConfirmation === "story-fit-preferences" ? "This clears your selected story types, story ingredients, content lane, narrative pressure, episode ending shape, protagonist lens, and hard avoidances. It does not delete stories." : "This clears local learned reader/profile signals used for personalization. It does not delete stories or sign you out."}</p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={() => setPendingClearConfirmation(null)} type="button">Cancel</button>
+                <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink" onClick={pendingClearConfirmation === "story-fit-preferences" ? clearStoryFitPreferences : clearLocalReaderMemory} type="button">{pendingClearConfirmation === "story-fit-preferences" ? "Clear Story Fit Preferences" : "Clear local reader memory"}</button>
+              </div>
+            </div>
+          ) : null}
           <p className="text-xs leading-5 text-paper/50">Exports and clearing actions use only data already available in this browser/app state. Account deletion is not enabled here.</p>
           {dataControlMessage ? <p className="rounded-md border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-2 text-sm font-semibold text-lantern-gold">{dataControlMessage}</p> : null}
         </AccountCard>
