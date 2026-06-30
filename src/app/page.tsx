@@ -90,7 +90,7 @@ type GeneratedStoryPresentation = "first-episode" | "continuation" | "saved-epis
 type GenerationSource = "new-story" | "continue-story" | null;
 type ReaderScrollDiagnostics = { nextEpisodeClicked: string; continuationLoaded: string; scrollResetAttempted: string; scrollTargetUsed: string };
 type GenerationFailureDiagnostic = Record<string, unknown> | null;
-type GenerationFetchDiagnosticsInput = { attemptId: string; stage: string; endpoint: string; action: string; response?: Response; error?: unknown; authConfigured: boolean; currentUserPresent: boolean; authTokenPresent: boolean; generationSucceededButLibrarySaveFailed?: boolean };
+type GenerationFetchDiagnosticsInput = { attemptId: string; stage: string; endpoint: string; action: string; response?: Response; error?: unknown; elapsedSeconds?: number; authConfigured: boolean; currentUserPresent: boolean; authTokenPresent: boolean; generationSucceededButLibrarySaveFailed?: boolean };
 type LastGenerationIdentityDiagnostics = { identity: GenerationIdentity | null; continuationContextIncluded: boolean; newSeriesCreated: boolean; trigger: string; activeCommittedStoryId: string; activeCommittedSeriesId: string; pendingGenerationMode: GenerationMode | "none"; lastGenerationCancelledOrAborted: boolean };
 type StoryTypeSelectionDiagnostics = { selectedStoryTypeChipId: string; selectedStoryTypeChipLabel: string; selectedChipId: string; selectedChip: string; availableChips: string; storySparkUsed: string; selectedStorySparkId: string; selectedStorySparkTitle: string; selectedStorySparkMatchedChip: string; directChipGuidanceUsed: string; compatibilityResult: string; chipCompatibilityResult: string; fallbackSelectionUsed: string; selectedChipPreservedDuringGeneration: string; storyTypeSelectionMode: string; storySeedSource: string; visibleCategoryLabel: string };
 type ProfileSourceUsed = "local" | "cloud" | "default" | "none";
@@ -738,6 +738,7 @@ export default function Home() {
       authTokenPresent: generationAuthTokenPresent,
       currentUserPresent: Boolean(authState.currentUser)
     };
+    const generationFetchStartedAt = Date.now();
     setLastGenerationFailureDiagnostic({
       deployedAppVersion: APP_VERSION,
       latestGenerationAttemptId: String(requestId),
@@ -791,7 +792,7 @@ export default function Home() {
       try {
         response = await fetch("/api/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: { "Content-Type": "application/json", "X-Generation-Attempt-Id": String(requestId), ...authHeaders() },
         signal: abortController.signal,
         body: JSON.stringify({
           worldBible: overrides?.worldBible ?? worldBible.content,
@@ -817,7 +818,7 @@ export default function Home() {
       });
       } catch (fetchError) {
         if (abortController.signal.aborted) throw fetchError;
-        const diagnostics = buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_request", endpoint: "/api/generate", action: "POST", error: fetchError, ...generationDiagnosticsBase });
+        const diagnostics = buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_request", endpoint: "/api/generate", action: "POST", error: fetchError, elapsedSeconds: elapsedSecondsSince(generationFetchStartedAt), ...generationDiagnosticsBase });
         logGenerationFetchDiagnostics(diagnostics);
         setLastGenerationFailureDiagnostic((current) => ({ ...(current ?? {}), deployedAppVersion: APP_VERSION, latestGenerationAttemptId: String(requestId), generationRequestStarted: true, generationRequestStatus: "failed", generationEndpointStatusCode: "none", ...diagnostics, fallbackDisplayBlocked: true }));
         throw new Error("Generation request lost connection before the server responded. Try again.");
@@ -826,7 +827,7 @@ export default function Home() {
       try {
         payload = await readGenerateResponsePayload(response);
       } catch (parseError) {
-        const diagnostics = buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response_parse", endpoint: "/api/generate", action: "parse_json", response, error: parseError, ...generationDiagnosticsBase });
+        const diagnostics = buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response_parse", endpoint: "/api/generate", action: "parse_json", response, error: parseError, elapsedSeconds: elapsedSecondsSince(generationFetchStartedAt), ...generationDiagnosticsBase });
         logGenerationFetchDiagnostics(diagnostics);
         setLastGenerationFailureDiagnostic((current) => ({ ...(current ?? {}), deployedAppVersion: APP_VERSION, latestGenerationAttemptId: String(requestId), generationRequestStarted: true, generationRequestStatus: "failed", generationEndpointStatusCode: response.status, ...diagnostics, fallbackDisplayBlocked: true }));
         throw new Error("Story generation returned a response the app could not read. Try again.");
@@ -840,7 +841,7 @@ export default function Home() {
           generationRequestStarted: true,
           generationRequestStatus: "failed",
           generationEndpointStatusCode: response.status,
-          ...buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response", endpoint: "/api/generate", action: "POST", response, ...generationDiagnosticsBase }),
+          ...buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response", endpoint: "/api/generate", action: "POST", response, elapsedSeconds: elapsedSecondsSince(generationFetchStartedAt), ...generationDiagnosticsBase }),
           fallbackDisplayBlocked: true
         });
         throw new Error(typeof payload.error === "string" ? payload.error : "Story generation failed.");
@@ -853,7 +854,7 @@ export default function Home() {
         generationRequestStarted: true,
         generationRequestStatus: "succeeded",
         generationEndpointStatusCode: response.status,
-        ...buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response_parse", endpoint: "/api/generate", action: "parse_json", response, ...generationDiagnosticsBase }),
+        ...buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response_parse", endpoint: "/api/generate", action: "parse_json", response, elapsedSeconds: elapsedSecondsSince(generationFetchStartedAt), ...generationDiagnosticsBase }),
         fallbackDisplayBlocked: true
       });
       setLastNewStoryPersonalization((current) => ({
@@ -889,7 +890,7 @@ export default function Home() {
         savedStory = await saveStoryToAuthenticatedLibrary(unsavedGeneratedStory);
       } catch (librarySaveError) {
         librarySaveFailed = true;
-        const diagnostics = buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "library_save", endpoint: `/api/projects/${AUTHENTICATED_STORY_LIBRARY_PROJECT_ID}/stories`, action: "POST", error: librarySaveError, generationSucceededButLibrarySaveFailed: true, ...generationDiagnosticsBase });
+        const diagnostics = buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "library_save", endpoint: `/api/projects/${AUTHENTICATED_STORY_LIBRARY_PROJECT_ID}/stories`, action: "POST", error: librarySaveError, elapsedSeconds: elapsedSecondsSince(generationFetchStartedAt), generationSucceededButLibrarySaveFailed: true, ...generationDiagnosticsBase });
         logGenerationFetchDiagnostics(diagnostics);
         setLastGenerationFailureDiagnostic((current) => ({ ...(current ?? {}), deployedAppVersion: APP_VERSION, latestGenerationAttemptId: String(requestId), generationRequestStarted: true, generationRequestStatus: "succeeded", generationEndpointStatusCode: response.status, ...diagnostics, fallbackDisplayBlocked: true }));
       }
@@ -3416,6 +3417,7 @@ function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeries
         <p><span className="font-semibold text-paper/80">Last generationFetchEndpoint:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchEndpoint)}</p>
         <p><span className="font-semibold text-paper/80">Last generationFetchAction:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchAction)}</p>
         <p><span className="font-semibold text-paper/80">Last generationFetchHttpStatus:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchHttpStatus)}</p>
+        <p><span className="font-semibold text-paper/80">Last generationFetchElapsedSeconds:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchElapsedSeconds)}</p>
         <p><span className="font-semibold text-paper/80">Last generationFetchErrorName:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchErrorName)}</p>
         <p><span className="font-semibold text-paper/80">Last generationFetchErrorMessageSafe:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.generationFetchErrorMessageSafe)}</p>
         <p><span className="font-semibold text-paper/80">Last authConfigured:</span> {formatDiagnosticValue(lastGenerationFailureDiagnostic?.authConfigured)}</p>
@@ -3883,6 +3885,7 @@ function buildGenerationFetchDiagnostics(input: GenerationFetchDiagnosticsInput)
     generationFetchAction: input.action,
     generationFetchAttemptId: input.attemptId,
     generationFetchHttpStatus: input.response?.status ?? null,
+    generationFetchElapsedSeconds: input.elapsedSeconds ?? null,
     generationFetchErrorName: error?.name ?? null,
     generationFetchErrorMessageSafe: error?.message ?? (input.error ? String(input.error) : null),
     authConfigured: input.authConfigured,
@@ -3890,6 +3893,10 @@ function buildGenerationFetchDiagnostics(input: GenerationFetchDiagnosticsInput)
     authTokenPresent: input.authTokenPresent,
     generationSucceededButLibrarySaveFailed: Boolean(input.generationSucceededButLibrarySaveFailed)
   };
+}
+
+function elapsedSecondsSince(startedAt: number): number {
+  return Math.max(0, Math.round((Date.now() - startedAt) / 1000));
 }
 
 function logGenerationFetchDiagnostics(diagnostics: Record<string, unknown>) {

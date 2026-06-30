@@ -189,6 +189,9 @@ export type StoryDiagnostics = {
   generationRequestStarted?: boolean;
   generationRequestStatus?: "not-started" | "requesting" | "succeeded" | "failed";
   generationEndpointStatusCode?: number;
+  serverRequestId?: string;
+  generationAttemptId?: string;
+  timeoutLikeFailure?: boolean;
   authRequiredForGeneration?: boolean;
   authSessionPresent?: boolean;
   requestPayloadValid?: boolean;
