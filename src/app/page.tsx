@@ -830,7 +830,7 @@ export default function Home() {
         const diagnostics = buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response_parse", endpoint: "/api/generate", action: "parse_json", response, error: parseError, elapsedSeconds: elapsedSecondsSince(generationFetchStartedAt), ...generationDiagnosticsBase });
         logGenerationFetchDiagnostics(diagnostics);
         setLastGenerationFailureDiagnostic((current) => ({ ...(current ?? {}), deployedAppVersion: APP_VERSION, latestGenerationAttemptId: String(requestId), generationRequestStarted: true, generationRequestStatus: "failed", generationEndpointStatusCode: response.status, ...diagnostics, fallbackDisplayBlocked: true }));
-        throw new Error("Story generation returned a response the app could not read. Try again.");
+        throw new Error(response.status === 504 ? getGenerationTimeoutMessage() : "Story generation returned a response the app could not read. Try again.");
       }
       if (activeGenerationRequestId.current !== requestId) return;
       if (!response.ok) {
@@ -844,7 +844,7 @@ export default function Home() {
           ...buildGenerationFetchDiagnostics({ attemptId: String(requestId), stage: "generation_response", endpoint: "/api/generate", action: "POST", response, elapsedSeconds: elapsedSecondsSince(generationFetchStartedAt), ...generationDiagnosticsBase }),
           fallbackDisplayBlocked: true
         });
-        throw new Error(typeof payload.error === "string" ? payload.error : "Story generation failed.");
+        throw new Error(response.status === 504 ? getGenerationTimeoutMessage() : typeof payload.error === "string" ? payload.error : "Story generation failed.");
       }
       const normalizedResponse = assertUserDisplayableGenerationResponse(applySelectedStoryTypeMetadata(normalizeGenerateStoryResponse(payload), overrides.selectedStoryTypeChip));
       setLastGenerationFailureDiagnostic({
@@ -3868,12 +3868,19 @@ function savedStoryToCloudInput(story: SavedStory) { return { storyId: story.id,
 function cloudRecordToSavedStory(record: CloudSavedStoryRecordResponse): SavedStory { const metadata = record.metadata && typeof record.metadata === "object" ? record.metadata as Partial<SavedStory> : {}; return { ...metadata, id: record.storyId || metadata.id || createStoryId(record.story, record.createdAt), title: record.title || metadata.title || createStoryTitle(record.story), story: record.story, createdAt: metadata.createdAt || record.createdAt, wordCount: typeof metadata.wordCount === "number" ? metadata.wordCount : countWords(record.story), generatorSource: metadata.generatorSource || "cloud", charactersUsed: Array.isArray(metadata.charactersUsed) ? metadata.charactersUsed : [], rulesReferenced: Array.isArray(metadata.rulesReferenced) ? metadata.rulesReferenced : [], genrePreset: metadata.genrePreset || "Speculative Mystery", narrativeArchitecture: metadata.narrativeArchitecture || "Revelation Story", characterArc: metadata.characterArc || "Positive Change Arc", endingType: metadata.endingType || "Resolution with Residue", lengthTarget: metadata.lengthTarget || "Standard", diagnosticsNotice: metadata.diagnosticsNotice ?? null } as SavedStory; }
 async function readGenerateResponsePayload(response: Response): Promise<Record<string, unknown>> {
   const responseText = await response.text();
-  if (!responseText.trim()) return { error: "Story generation returned an empty response." };
+  if (!responseText.trim()) {
+    if (response.status === 504) throw new Error(getGenerationTimeoutMessage());
+    return { error: "Story generation returned an empty response." };
+  }
   try {
     return JSON.parse(responseText) as Record<string, unknown>;
   } catch {
-    throw new Error(`Story generation returned a non-JSON response (${response.status}).`);
+    throw new Error(response.status === 504 ? getGenerationTimeoutMessage() : `Story generation returned a non-JSON response (${response.status}).`);
   }
+}
+
+function getGenerationTimeoutMessage(): string {
+  return "Story generation timed out on the server. Try a shorter generation or try again.";
 }
 
 function buildGenerationFetchDiagnostics(input: GenerationFetchDiagnosticsInput): Record<string, unknown> {

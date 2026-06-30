@@ -31,13 +31,13 @@ const DEFAULT_STORY_RULES = `Every story must obey these rules:
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 
 export async function POST(request: Request) {
   const generationStartedAt = new Date();
   const serverRequestId = getGenerationServerRequestId(request);
-  logGenerationLifecycle(serverRequestId, "generation_start", { method: request.method });
+  logGenerationLifecycle(serverRequestId, "request_received", { method: request.method });
 
   try {
     return await handleGenerateRequest(request, generationStartedAt, serverRequestId);
@@ -56,6 +56,7 @@ async function handleGenerateRequest(request: Request, generationStartedAt: Date
 
   try {
     body = (await request.json()) as Partial<GenerateStoryRequest>;
+    logGenerationLifecycle(serverRequestId, "payload_parsed", { elapsedSeconds: elapsedSecondsSince(generationStartedAt) });
   } catch {
     logGenerationLifecycle(serverRequestId, "validation_complete", { valid: false, reason: "invalid_json", elapsedSeconds: elapsedSecondsSince(generationStartedAt) }, "warn");
     return buildPayloadFailureResponse("Request body must be valid JSON.", generationStartedAt, authSessionPresent, authRequiredForGeneration, serverRequestId);
@@ -337,6 +338,7 @@ function buildGenerationFailureResponse(
     serverRequestId: options.serverRequestId
   });
 
+  const failureStatus = isTimeoutLikeError(options.modelGenerationErrorMessageSafe ?? options.fallbackReason) ? 504 : 502;
   const diagnostics = getOpenAIDiagnostics({
     openAIRequestAttempted: options.modelGenerationAttempted,
     openAIRequestSucceeded: false,
@@ -354,7 +356,7 @@ function buildGenerationFailureResponse(
     blueprintFailedReason: options.blueprintFailedReason ?? null,
     generationRequestStarted: true,
     generationRequestStatus: "failed",
-    generationEndpointStatusCode: 502,
+    generationEndpointStatusCode: failureStatus,
     serverRequestId: options.serverRequestId,
     generationAttemptId: options.serverRequestId,
     timeoutLikeFailure: isTimeoutLikeError(options.modelGenerationErrorMessageSafe ?? options.fallbackReason),
@@ -399,7 +401,7 @@ function buildGenerationFailureResponse(
     Math.round((generationFinishedAt.getTime() - generationStartedAt.getTime()) / 1000)
   );
 
-  logGenerationLifecycle(options.serverRequestId, "final_response_returned", { statusCode: isTimeoutLikeError(options.modelGenerationErrorMessageSafe ?? options.fallbackReason) ? 504 : 502, elapsedSeconds: serverGenerationDurationSeconds });
+  logGenerationLifecycle(options.serverRequestId, "final_response_returned", { statusCode: failureStatus, elapsedSeconds: serverGenerationDurationSeconds });
 
   return NextResponse.json({
     error: CLEAN_GENERATION_FAILURE_MESSAGE,
@@ -417,7 +419,7 @@ function buildGenerationFailureResponse(
       readerProfileGenerationSnapshot: input.readerProfileGenerationSnapshot,
       ...buildGenerationIdentityDiagnostics(diagnostics)
     }
-  }, { status: isTimeoutLikeError(options.modelGenerationErrorMessageSafe ?? options.fallbackReason) ? 504 : 502 });
+  }, { status: failureStatus });
 }
 
 function buildPayloadFailureResponse(
