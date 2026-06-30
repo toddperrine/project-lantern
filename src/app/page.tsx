@@ -117,11 +117,13 @@ type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" |
 type AccountMode = "guest" | "signed-in" | "unknown";
 type AccountDataMode = "signed-in" | "browser-profile" | "local-profile" | "unknown";
 type AccountDataClearConfirmation = "story-fit-preferences" | "local-reader-memory" | null;
-type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; preferredStoryTypes: string[]; storyIngredients: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
+type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; preferredStoryTypes: string[]; emotionalPromises: string[]; favoriteStoryWorlds: string[]; storyIngredients: string[]; characterLensPreferences: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
 type ReaderPreferencesSaveStatus = "saved" | "saving" | "error";
-type StoryFitOnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
-type StoryFitOnboardingState = { preferredStoryTypes: string[]; storyIngredients: string[]; contentLane: ReaderProfile["explicitReaderPreferences"]["contentLane"]; narrativePressure: ReaderProfile["explicitReaderPreferences"]["narrativePressure"]; episodeEndingShape: ReaderProfile["explicitReaderPreferences"]["episodeEndingShape"]; protagonistLens: ReaderProfile["explicitReaderPreferences"]["protagonistLens"]; hardAvoidances: string[] };
+type StoryFitOnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+type StoryFitOnboardingState = { emotionalPromises: string[]; favoriteStoryWorlds: string[]; storyIngredients: string[]; characterLensPreferences: string[]; contentLane: ReaderProfile["explicitReaderPreferences"]["contentLane"]; narrativePressure: ReaderProfile["explicitReaderPreferences"]["narrativePressure"]; episodeEndingShape: ReaderProfile["explicitReaderPreferences"]["episodeEndingShape"]; protagonistLens: ReaderProfile["explicitReaderPreferences"]["protagonistLens"]; hardAvoidances: string[]; preferredStoryTypes: string[] };
 const STORY_FIT_ONBOARDING_STORAGE_KEY = "projectLantern.storyFitOnboarding.v1";
+const STORY_FIT_ONBOARDING_LAST_OPENED_KEY = "projectLantern.storyFitOnboarding.lastOpenedAt.v1";
+const STORY_FIT_ONBOARDING_LAST_SAVED_KEY = "projectLantern.storyFitOnboarding.lastSavedAt.v1";
 
 type AccountDataExportV1 = { exportVersion: "account-data-v1"; exportedAt: string; appVersion?: string; account: { accountMode: AccountDataMode; profileId?: string; email?: string }; storyFitPreferences?: unknown; readerProfile?: unknown; feedbackSignals?: unknown; savedContentSummary: { savedStories?: number; series?: number; characters?: number; worlds?: number; storySparks?: number }; savedContent?: { stories?: unknown[]; series?: unknown[]; characters?: unknown[]; worlds?: unknown[]; storySparks?: unknown[] } };
 type CloudReaderProfileSyncState = {
@@ -447,6 +449,8 @@ export default function Home() {
   const [readerProfile, setReaderProfile] = useState<ReaderProfile>(createEmptyReaderProfile());
   const [hasLoadedReaderProfileState, setHasLoadedReaderProfileState] = useState(false);
   const [storyFitOnboardingDismissed, setStoryFitOnboardingDismissed] = useState(false);
+  const [storyFitOnboardingLastOpenedAt, setStoryFitOnboardingLastOpenedAt] = useState("");
+  const [storyFitOnboardingLastSavedAt, setStoryFitOnboardingLastSavedAt] = useState("");
   const [isStoryFitOnboardingOpen, setIsStoryFitOnboardingOpen] = useState(false);
   const [canonicalReaderProfile, setCanonicalReaderProfile] = useState<CanonicalReaderProfile | null>(null);
   const [cloudReaderProfileSync, setCloudReaderProfileSync] = useState<CloudReaderProfileSyncState>(EMPTY_CLOUD_READER_PROFILE_SYNC);
@@ -525,6 +529,8 @@ export default function Home() {
     setReaderProfile(enrichedProfile);
     setHasLoadedReaderProfileState(true);
     setStoryFitOnboardingDismissed(readStoryFitOnboardingDismissed());
+    setStoryFitOnboardingLastOpenedAt(readStoryFitOnboardingTimestamp(STORY_FIT_ONBOARDING_LAST_OPENED_KEY));
+    setStoryFitOnboardingLastSavedAt(readStoryFitOnboardingTimestamp(STORY_FIT_ONBOARDING_LAST_SAVED_KEY));
     const storedReadyQueue = readReadyStoryQueue();
     const shouldUseCatalogSeed = storedReadyQueue.length === 0 || shouldReplaceLegacyGenericReadyQueue(storedReadyQueue);
     const seededReadyQueue = shouldUseCatalogSeed ? createInitialReadyStoryQueue() : storedReadyQueue;
@@ -1821,6 +1827,13 @@ export default function Home() {
     setStatusMessage("Story Fit Preferences cleared.");
   }
 
+  function handleOpenStoryFitOnboarding() {
+    const openedAt = new Date().toISOString();
+    saveStoryFitOnboardingTimestamp(STORY_FIT_ONBOARDING_LAST_OPENED_KEY, openedAt);
+    setStoryFitOnboardingLastOpenedAt(openedAt);
+    setIsStoryFitOnboardingOpen(true);
+  }
+
   function handleSkipStoryFitOnboarding() {
     saveStoryFitOnboardingDismissed();
     setStoryFitOnboardingDismissed(true);
@@ -1830,8 +1843,11 @@ export default function Home() {
 
   function handleSaveStoryFitOnboarding(nextPreferences: ReaderProfile["explicitReaderPreferences"]) {
     handleReaderPreferencesChange(nextPreferences);
+    const savedAt = new Date().toISOString();
     saveStoryFitOnboardingDismissed();
+    saveStoryFitOnboardingTimestamp(STORY_FIT_ONBOARDING_LAST_SAVED_KEY, savedAt);
     setStoryFitOnboardingDismissed(true);
+    setStoryFitOnboardingLastSavedAt(savedAt);
     setIsStoryFitOnboardingOpen(false);
     setStatusMessage("Story Fit Preferences saved.");
   }
@@ -1889,7 +1905,7 @@ export default function Home() {
   const isContinuationGenerating = isGenerating && generationSource === "continue-story";
   const diagnosticsPanels = (
     <>
-      <AppStateDiagnostics accountSummary={accountProfileSummary} activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationFailureDiagnostic={lastGenerationFailureDiagnostic} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} storyResponseEpisodeMomentum={storyResponse?.metadata.diagnostics.episodeMomentum ?? null} storyTypeSelectionDiagnostics={storyTypeSelectionDiagnostics} storyFitOnboardingAvailable={shouldShowFirstRunStoryFitPrompt || isStoryFitOnboardingOpen} storyFitOnboardingDismissed={storyFitOnboardingDismissed} />
+      <AppStateDiagnostics accountSummary={accountProfileSummary} activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationFailureDiagnostic={lastGenerationFailureDiagnostic} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} storyResponseEpisodeMomentum={storyResponse?.metadata.diagnostics.episodeMomentum ?? null} storyTypeSelectionDiagnostics={storyTypeSelectionDiagnostics} storyFitOnboardingAvailable={shouldShowFirstRunStoryFitPrompt || isStoryFitOnboardingOpen} storyFitOnboardingDismissed={storyFitOnboardingDismissed} storyFitOnboardingCompleted={hasReaderProfilePreferences(readerProfile.explicitReaderPreferences)} storyFitOnboardingLastOpenedAt={storyFitOnboardingLastOpenedAt} storyFitOnboardingLastSavedAt={storyFitOnboardingLastSavedAt} />
       <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
       <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
       <AuthDiagnostics appActionsGated={authState.appActionsGated} authConfigured={authState.authConfigured} authFlow={authState.authFlow} authMode={authState.authMode} authStatus={authState.authStatus} cognitoUserId={authState.currentUser?.id ?? ""} currentUserEmail={authState.currentUser?.email ?? ""} lastAuthStep={authState.lastAuthStep} lastCognitoErrorCode={authState.lastCognitoErrorCode} libraryDiagnostics={libraryDiagnostics} profileLibraryMode={authState.profileLibraryMode} region={authState.region} resetFlowState={authState.resetFlowState} />
@@ -1919,7 +1935,7 @@ export default function Home() {
               What do you want to do?
             </h1>
 
-            {shouldShowFirstRunStoryFitPrompt ? <StoryFitFirstRunCard onSkip={handleSkipStoryFitOnboarding} onStart={() => setIsStoryFitOnboardingOpen(true)} /> : null}
+            {shouldShowFirstRunStoryFitPrompt ? <StoryFitFirstRunCard onSkip={handleSkipStoryFitOnboarding} onStart={handleOpenStoryFitOnboarding} /> : null}
 
             <button
               className="min-h-12 w-full rounded-xl bg-lantern-gold px-4 py-3 text-base font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-60"
@@ -1991,12 +2007,12 @@ export default function Home() {
           />
         ) : null}
         {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={generatedStoryPresentation === "saved-episode" ? handleSavedEpisodeNext : handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onScrollResetDiagnostics={setReaderScrollDiagnostics} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : generatedStoryPresentation === "saved-episode" ? "Saved Episode" : "Next Episode"} continueLabel={generatedStoryPresentation === "saved-episode" ? "Next Episode" : "Continue this story"} episodeNumber={currentSeriesEpisode?.episodeNumber ?? null} generationProfileSnapshot={storyResponse?.metadata.diagnostics.readerProfileSnapshot ?? storyResponse?.metadata.diagnostics.readerProfileGenerationSnapshot} story={currentGeneratedStory} /> : null}
-        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <div className="hidden md:block"><HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onOpenCreate={() => navigateToView("create")} onOpenLibrary={() => navigateToView("library")} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} showStoryFitPrompt={shouldShowFirstRunStoryFitPrompt} onStartStoryFitSetup={() => setIsStoryFitOnboardingOpen(true)} onSkipStoryFitSetup={handleSkipStoryFitOnboarding} /></div> : null}
+        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <div className="hidden md:block"><HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onOpenCreate={() => navigateToView("create")} onOpenLibrary={() => navigateToView("library")} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} showStoryFitPrompt={shouldShowFirstRunStoryFitPrompt} onStartStoryFitSetup={handleOpenStoryFitOnboarding} onSkipStoryFitSetup={handleSkipStoryFitOnboarding} /></div> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onMoveSavedForLaterToWaitingQueue={handleMoveSavedForLaterStoryToWaitingQueue} onContinueSavedStoryById={handleContinueSavedStoryById} onOpenSavedStoryById={handleRestoreStoryById} onProjectNameChange={setProjectName} onReadSavedForLater={handleReadSavedForLaterStory} onRefreshCloud={handleRefreshCloudProjects} onRemoveSavedForLater={handleRemoveSavedForLaterStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedForLaterStoryQueue={savedForLaterStoryQueue} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
         {activeView === "characters" ? <CharactersView onOpenStory={handleStartRecommendation} /> : null}
-        {activeView === "account" ? <AccountView authState={authState} canonicalProfile={canonicalReaderProfile} inputArtifacts={inputArtifacts} onClearLocalReaderMemory={handleClearLocalReaderMemory} onClearStoryFitPreferences={handleClearStoryFitPreferences} onOpenLibrary={() => navigateToView("library")} onReaderPreferencesChange={handleReaderPreferencesChange} readerPreferences={readerProfile.explicitReaderPreferences} readerProfile={readerProfile} savedForLaterStoryQueue={savedForLaterStoryQueue} savedStories={savedStories} saveStatus={readerPreferencesSaveStatus} summary={accountProfileSummary} onOpenStoryFitOnboarding={() => setIsStoryFitOnboardingOpen(true)} /> : null}
+        {activeView === "account" ? <AccountView authState={authState} canonicalProfile={canonicalReaderProfile} inputArtifacts={inputArtifacts} onClearLocalReaderMemory={handleClearLocalReaderMemory} onClearStoryFitPreferences={handleClearStoryFitPreferences} onOpenLibrary={() => navigateToView("library")} onReaderPreferencesChange={handleReaderPreferencesChange} readerPreferences={readerProfile.explicitReaderPreferences} readerProfile={readerProfile} savedForLaterStoryQueue={savedForLaterStoryQueue} savedStories={savedStories} saveStatus={readerPreferencesSaveStatus} summary={accountProfileSummary} onOpenStoryFitOnboarding={handleOpenStoryFitOnboarding} /> : null}
         {activeView !== "home" ? <MobileDeveloperDiagnostics>{diagnosticsPanels}</MobileDeveloperDiagnostics> : null}
       </section>
       <MobileBottomNav activeView={activeView} onChange={navigateToView} />
@@ -2460,25 +2476,34 @@ function StoryFitFirstRunCard({ onSkip, onStart }: { onSkip: () => void; onStart
   );
 }
 
+const EMOTIONAL_PROMISE_OPTIONS = ["Wonder and discovery", "Mystery and secrets", "Quiet dread", "Adventure and momentum", "Emotional warmth", "Moral tension", "Awe and cosmic scale", "Comfort with real stakes", "Strangeness in ordinary life", "Earned hope"];
+const FAVORITE_STORY_WORLD_OPTIONS = ["Small town with hidden history", "Old house, library, or archive", "Wild place that feels alive", "Coastal estate or isolated island", "City with secret layers", "School, campus, or institution", "Road trip or lost route", "Family home or inheritance", "Near-future technology", "Mythic village or fairy-tale borderland", "Workplace, lab, or corporate system", "Otherworld or far future"];
+const STORY_ENGINE_OPTIONS = ["A hidden past resurfacing", "An impossible object, map, or key", "A moral bargain with a cost", "A secret society or institution", "A creature or presence not fully understood", "Memory or time behaving strangely", "Rules-based magic", "Strange technology or AI", "A disappearance or investigation", "Family legacy with consequences", "A place that changes when entered", "A friendship or team tested by pressure"];
+const CHARACTER_LENS_OPTIONS = ["Ordinary person pulled into the impossible", "Outsider returning home", "Investigator, researcher, or archivist", "Reluctant hero", "Parent, guardian, or protector", "Small group of friends", "Found family or unlikely allies", "Morally complicated person seeking repair", "Person with an animal companion", "Young person coming of age"];
+const HARD_AVOIDANCE_QUICK_ADD_OPTIONS = ["No dead pets", "No harm to children", "No gore", "No sexual violence", "No hopeless endings", "Keep it sleep-safe"];
+
 function StoryFitOnboardingPanel({ initialPreferences, onCancel, onSave }: { initialPreferences: ReaderProfile["explicitReaderPreferences"]; onCancel: () => void; onSave: (preferences: ReaderProfile["explicitReaderPreferences"]) => void }) {
   const [step, setStep] = useState<StoryFitOnboardingStep>(0);
   const [avoidanceDraft, setAvoidanceDraft] = useState("");
   const [limitMessage, setLimitMessage] = useState("");
   const [state, setState] = useState<StoryFitOnboardingState>({
-    preferredStoryTypes: initialPreferences.preferredStoryTypes.slice(0, 5),
-    storyIngredients: initialPreferences.storyIngredients.slice(0, 8),
+    emotionalPromises: initialPreferences.emotionalPromises?.slice(0, 3) ?? [],
+    favoriteStoryWorlds: initialPreferences.favoriteStoryWorlds?.slice(0, 5) ?? [],
+    storyIngredients: initialPreferences.storyIngredients.slice(0, 6),
+    characterLensPreferences: initialPreferences.characterLensPreferences?.slice(0, 3) ?? [],
     contentLane: initialPreferences.contentLane,
     narrativePressure: initialPreferences.narrativePressure,
     episodeEndingShape: initialPreferences.episodeEndingShape,
     protagonistLens: initialPreferences.protagonistLens,
     hardAvoidances: initialPreferences.hardAvoidances,
+    preferredStoryTypes: initialPreferences.preferredStoryTypes.slice(0, 5),
   });
-  const steps = ["Story types", "Ingredients", "Content lane", "Intensity", "Ending", "Protagonist", "Avoidances", "Review"];
+  const steps = ["Emotional promise", "Story worlds", "Story engines", "Character lens", "Content lane", "Intensity", "Episode shape", "Boundaries", "Story directions", "Review"];
   const selectedContentLaneLabel = CONTENT_LANE_OPTIONS.find((option) => option.value === state.contentLane)?.label ?? "Not set";
-  const selectedPressureLabel = NARRATIVE_PRESSURE_OPTIONS.find((option) => option.value === state.narrativePressure)?.label ?? "Not set";
-  const selectedEndingLabel = EPISODE_ENDING_SHAPE_OPTIONS.find((option) => option.value === state.episodeEndingShape)?.label ?? "Not set";
-  const selectedProtagonistLabel = PROTAGONIST_LENS_OPTIONS.find((option) => option.value === state.protagonistLens)?.label ?? "Not set";
-  const toggleLimitedItem = (field: "preferredStoryTypes" | "storyIngredients", value: string, max: number, message: string) => {
+  const selectedPressureLabel = formatOnboardingNarrativePressureLabel(state.narrativePressure);
+  const selectedEndingLabel = formatOnboardingEpisodeShapeLabel(state.episodeEndingShape);
+  const selectedProtagonistLabel = PROTAGONIST_LENS_OPTIONS.find((option) => option.value === state.protagonistLens)?.label ?? "Surprise me";
+  const toggleLimitedItem = (field: "emotionalPromises" | "favoriteStoryWorlds" | "storyIngredients" | "characterLensPreferences" | "preferredStoryTypes", value: string, max: number, message: string) => {
     setState((current) => {
       const currentValues = current[field];
       if (currentValues.includes(value)) {
@@ -2493,9 +2518,12 @@ function StoryFitOnboardingPanel({ initialPreferences, onCancel, onSave }: { ini
       return { ...current, [field]: [...currentValues, value] };
     });
   };
-  const addAvoidance = () => {
-    const next = addUniquePreferenceItem(state.hardAvoidances, avoidanceDraft, MAX_READER_HARD_AVOIDANCES);
+  const addAvoidanceValue = (value: string) => {
+    const next = addUniquePreferenceItem(state.hardAvoidances, value, MAX_READER_HARD_AVOIDANCES);
     if (next !== state.hardAvoidances) setState((current) => ({ ...current, hardAvoidances: next }));
+  };
+  const addAvoidance = () => {
+    addAvoidanceValue(avoidanceDraft);
     setAvoidanceDraft("");
   };
   const goNext = () => {
@@ -2508,39 +2536,87 @@ function StoryFitOnboardingPanel({ initialPreferences, onCancel, onSave }: { ini
   };
   const save = () => onSave({
     ...initialPreferences,
-    preferredStoryTypes: state.preferredStoryTypes,
+    emotionalPromises: state.emotionalPromises,
+    favoriteStoryWorlds: state.favoriteStoryWorlds,
     storyIngredients: state.storyIngredients,
+    characterLensPreferences: state.characterLensPreferences,
+    preferredStoryTypes: state.preferredStoryTypes,
     hardAvoidances: state.hardAvoidances,
     contentLane: state.contentLane,
     narrativePressure: state.narrativePressure,
     episodeEndingShape: state.episodeEndingShape,
-    protagonistLens: state.protagonistLens,
+    protagonistLens: resolveProtagonistLensPreference(state.characterLensPreferences, initialPreferences.protagonistLens),
     updatedAt: new Date().toISOString(),
   });
 
   return (
     <section className="mx-auto grid w-full max-w-3xl min-w-0 gap-4 rounded-xl border border-lantern-gold/35 bg-night-ink/95 p-4 shadow-soft">
       <div className="flex min-w-0 items-start justify-between gap-3">
-        <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Story Fit Setup</p><h2 className="mt-1 text-2xl font-semibold text-paper">{steps[step]}</h2></div>
+        <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Story Fit Setup</p><h2 className="mt-1 text-2xl font-semibold text-paper">{steps[step]}</h2><p className="mt-2 text-sm leading-6 text-paper/65">Tell Lantyrn what kinds of stories you want to live inside. You can change this later.</p></div>
         <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper/70" onClick={onCancel} type="button">Cancel</button>
       </div>
       <p className="text-xs font-semibold text-paper/45">Step {step + 1} of {steps.length}</p>
-      {step === 0 ? <OnboardingChoiceGrid question="What kinds of stories do you usually want?" helper="Choose up to 5. Lantyrn can use these as your favorite story directions." options={READER_STORY_TYPE_OPTIONS} selected={state.preferredStoryTypes} onSelect={(value) => toggleLimitedItem("preferredStoryTypes", value, 5, "Choose up to 5 favorite story directions.")} /> : null}
-      {step === 1 ? <OnboardingChoiceGrid question="What ingredients do you often like?" helper="Choose up to 8. These are reusable ingredients, not rigid requirements." options={READER_STORY_INGREDIENT_OPTIONS} selected={state.storyIngredients} onSelect={(value) => toggleLimitedItem("storyIngredients", value, 8, "Choose up to 8 reusable ingredients.")} /> : null}
-      {step === 2 ? <OnboardingChoiceGrid question="Who should this feel written for?" options={CONTENT_LANE_OPTIONS.map((option) => option.label)} selected={[selectedContentLaneLabel]} onSelect={(label) => setState((current) => ({ ...current, contentLane: CONTENT_LANE_OPTIONS.find((option) => option.label === label)?.value as typeof current.contentLane }))} /> : null}
-      {step === 3 ? <OnboardingChoiceGrid question="How intense should it feel?" options={NARRATIVE_PRESSURE_OPTIONS.filter((option) => option.value !== "not-set").map((option) => option.label)} selected={state.narrativePressure === "not-set" ? [] : [selectedPressureLabel]} onSelect={(label) => setState((current) => ({ ...current, narrativePressure: NARRATIVE_PRESSURE_OPTIONS.find((option) => option.label === label)?.value as typeof current.narrativePressure }))} /> : null}
-      {step === 4 ? <OnboardingChoiceGrid question="How should episodes end?" options={EPISODE_ENDING_SHAPE_OPTIONS.filter((option) => option.value !== "not-set").map((option) => option.label)} selected={state.episodeEndingShape === "not-set" ? [] : [selectedEndingLabel]} onSelect={(label) => setState((current) => ({ ...current, episodeEndingShape: EPISODE_ENDING_SHAPE_OPTIONS.find((option) => option.label === label)?.value as typeof current.episodeEndingShape }))} /> : null}
-      {step === 5 ? <OnboardingChoiceGrid question="What kind of main character lens do you prefer?" options={PROTAGONIST_LENS_OPTIONS.map((option) => option.label)} selected={[selectedProtagonistLabel]} onSelect={(label) => setState((current) => ({ ...current, protagonistLens: PROTAGONIST_LENS_OPTIONS.find((option) => option.label === label)?.value as typeof current.protagonistLens }))} /> : null}
-      {step === 6 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Anything Lantyrn should avoid?</h3><p className="text-sm leading-6 text-paper/60">Optional. Examples: no dead pets, no gore, no harm to children.</p><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={MAX_READER_HARD_AVOIDANCE_LENGTH} onChange={(event) => setAvoidanceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:opacity-50" disabled={!avoidanceDraft.trim() || state.hardAvoidances.length >= MAX_READER_HARD_AVOIDANCES} onClick={addAvoidance} type="button">Add</button></div><div className="flex flex-wrap gap-2">{state.hardAvoidances.map((item) => <button className="rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => setState((current) => ({ ...current, hardAvoidances: current.hardAvoidances.filter((value) => value !== item) }))} type="button">{item} ×</button>)}</div><p className="text-xs text-paper/45">Up to 10 avoidances, 60 characters each.</p></div> : null}
-      {step === 7 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Review</h3><ProfileSummaryRow label="Preferred story types" values={state.preferredStoryTypes} empty="Choose at least one story type." /><ProfileSummaryRow label="Story ingredients" values={state.storyIngredients} empty="None selected." /><ProfileSummaryRow label="Content lane" values={[selectedContentLaneLabel]} empty="Not set." /><ProfileSummaryRow label="Narrative pressure" values={state.narrativePressure === "not-set" ? [] : [selectedPressureLabel]} empty="Not set." /><ProfileSummaryRow label="Episode ending shape" values={state.episodeEndingShape === "not-set" ? [] : [selectedEndingLabel]} empty="Not set." /><ProfileSummaryRow label="Protagonist lens" values={[selectedProtagonistLabel]} empty="Not set." /><ProfileSummaryRow label="Hard avoidances" values={state.hardAvoidances} empty="None added." /></div> : null}
+      {step === 0 ? <OnboardingChoiceGrid question="What should the story give you?" helper="Choose up to 3. This tells Lantyrn what emotional promise to aim for." options={EMOTIONAL_PROMISE_OPTIONS} selected={state.emotionalPromises} onSelect={(value) => toggleLimitedItem("emotionalPromises", value, 3, "Choose up to 3 emotional promises.")} /> : null}
+      {step === 1 ? <OnboardingChoiceGrid question="Where do you like stories to unfold?" helper="Choose up to 5. These help Lantyrn build worlds you want to revisit." options={FAVORITE_STORY_WORLD_OPTIONS} selected={state.favoriteStoryWorlds} onSelect={(value) => toggleLimitedItem("favoriteStoryWorlds", value, 5, "Choose up to 5 favorite story worlds.")} /> : null}
+      {step === 2 ? <OnboardingChoiceGrid question="What kinds of story engines pull you in?" helper="Choose up to 6. These are reusable engines, not rigid requirements." options={STORY_ENGINE_OPTIONS} selected={state.storyIngredients} onSelect={(value) => toggleLimitedItem("storyIngredients", value, 6, "Choose up to 6 story engines.")} /> : null}
+      {step === 3 ? <OnboardingChoiceGrid question="Who do you like following?" helper="Choose up to 3. Lantyrn can vary this, but these are your favorites." options={CHARACTER_LENS_OPTIONS} selected={state.characterLensPreferences} onSelect={(value) => toggleLimitedItem("characterLensPreferences", value, 3, "Choose up to 3 character lenses.")} /> : null}
+      {step === 4 ? <OnboardingChoiceGrid question="Who should this feel written for?" helper="This helps with maturity level, darkness, and complexity." options={CONTENT_LANE_OPTIONS.map((option) => option.label)} selected={[selectedContentLaneLabel]} onSelect={(label) => setState((current) => ({ ...current, contentLane: CONTENT_LANE_OPTIONS.find((option) => option.label === label)?.value as typeof current.contentLane }))} /> : null}
+      {step === 5 ? <OnboardingChoiceGrid question="How intense should it feel?" helper="You can choose dread, comfort, or something between them." options={NARRATIVE_PRESSURE_OPTIONS.filter((option) => option.value !== "not-set").map((option) => formatOnboardingNarrativePressureLabel(option.value))} selected={state.narrativePressure === "not-set" ? [] : [selectedPressureLabel]} onSelect={(label) => setState((current) => ({ ...current, narrativePressure: readNarrativePressureFromOnboardingLabel(label) }))} /> : null}
+      {step === 6 ? <OnboardingChoiceGrid question="How should episodes work?" helper="This shapes whether each episode feels complete or pulls hard into the next one." options={EPISODE_ENDING_SHAPE_OPTIONS.filter((option) => option.value !== "not-set").map((option) => formatOnboardingEpisodeShapeLabel(option.value))} selected={state.episodeEndingShape === "not-set" ? [] : [selectedEndingLabel]} onSelect={(label) => setState((current) => ({ ...current, episodeEndingShape: readEpisodeShapeFromOnboardingLabel(label) }))} /> : null}
+      {step === 7 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">What should Lantyrn avoid?</h3><p className="text-sm leading-6 text-paper/60">Optional. These are hard boundaries. Examples: no dead pets, no gore, no harm to children.</p><div className="flex flex-wrap gap-2">{HARD_AVOIDANCE_QUICK_ADD_OPTIONS.map((item) => <button className="rounded-full border border-paper/15 bg-paper/10 px-3 py-1.5 text-xs font-semibold text-paper/75" key={item} onClick={() => addAvoidanceValue(item)} type="button">{item}</button>)}</div><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={MAX_READER_HARD_AVOIDANCE_LENGTH} onChange={(event) => setAvoidanceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:opacity-50" disabled={!avoidanceDraft.trim() || state.hardAvoidances.length >= MAX_READER_HARD_AVOIDANCES} onClick={addAvoidance} type="button">Add</button></div><div className="flex flex-wrap gap-2">{state.hardAvoidances.map((item) => <button className="rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => setState((current) => ({ ...current, hardAvoidances: current.hardAvoidances.filter((value) => value !== item) }))} type="button">{item} ×</button>)}</div><p className="text-xs text-paper/45">Up to 10 boundaries, 60 characters each.</p></div> : null}
+      {step === 8 ? <OnboardingChoiceGrid question="Any darker story flavors you already know you like?" helper="Optional. These are current Lantyrn story directions." options={READER_STORY_TYPE_OPTIONS} selected={state.preferredStoryTypes} onSelect={(value) => toggleLimitedItem("preferredStoryTypes", value, 5, "Choose up to 5 current Lantyrn story directions.")} /> : null}
+      {step === 9 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Review</h3><ProfileSummaryRow label="Emotional promise" values={state.emotionalPromises} empty="None selected." /><ProfileSummaryRow label="Favorite story worlds" values={state.favoriteStoryWorlds} empty="None selected." /><ProfileSummaryRow label="Story engines" values={state.storyIngredients} empty="None selected." /><ProfileSummaryRow label="Character / cast lens" values={state.characterLensPreferences} empty="None selected." /><ProfileSummaryRow label="Content lane" values={state.contentLane === "not-set" ? [] : [selectedContentLaneLabel]} empty="Not set." /><ProfileSummaryRow label="Intensity" values={state.narrativePressure === "not-set" ? [] : [selectedPressureLabel]} empty="Not set." /><ProfileSummaryRow label="Episode shape" values={state.episodeEndingShape === "not-set" ? [] : [selectedEndingLabel]} empty="Not set." /><ProfileSummaryRow label="Boundaries" values={state.hardAvoidances} empty="None added." /></div> : null}
       {limitMessage ? <p className="rounded-md border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-2 text-xs font-semibold text-lantern-gold">{limitMessage}</p> : null}
       <div className="flex flex-col gap-2 sm:flex-row">
         {step > 0 ? <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={goBack} type="button">Back</button> : null}
-        {step < 7 ? <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:opacity-50" disabled={step === 0 && state.preferredStoryTypes.length === 0} onClick={goNext} type="button">Next</button> : <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:opacity-50" disabled={state.preferredStoryTypes.length === 0} onClick={save} type="button">Save story fit</button>}
-        {step === 7 ? <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={onCancel} type="button">Cancel</button> : null}
+        {step < 9 ? <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink" onClick={goNext} type="button">Next</button> : <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink" onClick={save} type="button">Save story fit</button>}
+        {step === 9 ? <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-2 text-sm font-semibold text-paper/75" onClick={onCancel} type="button">Cancel</button> : null}
       </div>
     </section>
   );
+}
+
+
+function formatOnboardingNarrativePressureLabel(value: string): string {
+  if (value === "gentle-unease") return "Gentle / bedtime-safe";
+  if (value === "balanced-tension") return "Balanced tension";
+  if (value === "dark-intense") return "Dark / intense";
+  if (value === "high-dread") return "High dread";
+  return "Not set";
+}
+
+function readNarrativePressureFromOnboardingLabel(label: string): ReaderProfile["explicitReaderPreferences"]["narrativePressure"] {
+  if (label === "Gentle / bedtime-safe" || label === "Uneasy but safe") return "gentle-unease";
+  if (label === "Balanced tension") return "balanced-tension";
+  if (label === "Dark / intense") return "dark-intense";
+  if (label === "High dread") return "high-dread";
+  return "not-set";
+}
+
+function formatOnboardingEpisodeShapeLabel(value: string): string {
+  if (value === "resolved-incident") return "Complete episode with residue";
+  if (value === "open-mystery") return "Open mystery";
+  if (value === "next-episode-pull") return "Strong next-episode pull";
+  if (value === "quiet-aftermath") return "Quiet aftermath with consequences";
+  return "Not set";
+}
+
+function readEpisodeShapeFromOnboardingLabel(label: string): ReaderProfile["explicitReaderPreferences"]["episodeEndingShape"] {
+  if (label === "Complete episode with residue") return "resolved-incident";
+  if (label === "Open mystery") return "open-mystery";
+  if (label === "Strong next-episode pull") return "next-episode-pull";
+  if (label === "Quiet aftermath with consequences") return "quiet-aftermath";
+  return "not-set";
+}
+
+function resolveProtagonistLensPreference(characterLensPreferences: string[], current: ReaderProfile["explicitReaderPreferences"]["protagonistLens"]): ReaderProfile["explicitReaderPreferences"]["protagonistLens"] {
+  if (characterLensPreferences.includes("Ordinary person pulled into the impossible")) return "ordinary-person-pulled-in";
+  if (characterLensPreferences.includes("Investigator, researcher, or archivist")) return "investigator-seeker";
+  if (characterLensPreferences.includes("Parent, guardian, or protector")) return "caretaker-protector";
+  if (characterLensPreferences.includes("Reluctant hero")) return "reluctant-keeper-heir";
+  if (characterLensPreferences.includes("Outsider returning home")) return "outsider-newcomer";
+  if (characterLensPreferences.includes("Person with an animal companion")) return "animal-bonded-protagonist";
+  return current === "not-set" ? "surprise-me" : current;
 }
 
 function OnboardingChoiceGrid({ helper, onSelect, options, question, selected }: { helper?: string; onSelect: (value: string) => void; options: string[]; question: string; selected: string[] }) {
@@ -2696,8 +2772,8 @@ function findEpisodeInLibrarySeries(stories: LibraryStory[], currentStoryId: str
 
 
 const READER_STORY_TYPE_OPTIONS = STORY_TYPE_CHIPS.map((chip) => chip.label);
-const READER_STORY_INGREDIENT_OPTIONS = ["Magic with rules", "Strange technology", "Ancient folklore", "Ordinary place made uncanny", "Found map / key / object", "Secret society or order", "Companion animal", "Family legacy", "Lost town / lost road", "Moral bargain", "Unreliable memory", "Hidden room / hidden archive"];
-const CONTENT_LANE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "All ages", value: "all-ages" }, { label: "Middle grade", value: "middle-grade" }, { label: "Teen", value: "teen" }, { label: "Adult", value: "adult" }];
+const READER_STORY_INGREDIENT_OPTIONS = STORY_ENGINE_OPTIONS;
+const CONTENT_LANE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Middle grade / family-safe", value: "middle-grade" }, { label: "Teen / YA", value: "teen" }, { label: "Adult", value: "adult" }];
 const NARRATIVE_PRESSURE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Gentle unease", value: "gentle-unease" }, { label: "Balanced tension", value: "balanced-tension" }, { label: "Dark / intense", value: "dark-intense" }, { label: "High dread", value: "high-dread" }];
 const EPISODE_ENDING_SHAPE_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Resolve this episode’s incident", value: "resolved-incident" }, { label: "Leave an open mystery", value: "open-mystery" }, { label: "Strong next-episode pull", value: "next-episode-pull" }, { label: "Quiet aftermath with consequences", value: "quiet-aftermath" }];
 const PROTAGONIST_LENS_OPTIONS = [{ label: "Not set", value: "not-set" }, { label: "Surprise me", value: "surprise-me" }, { label: "Ordinary person pulled in", value: "ordinary-person-pulled-in" }, { label: "Investigator / seeker", value: "investigator-seeker" }, { label: "Caretaker / protector", value: "caretaker-protector" }, { label: "Reluctant keeper / heir", value: "reluctant-keeper-heir" }, { label: "Outsider / newcomer", value: "outsider-newcomer" }, { label: "Animal-bonded protagonist", value: "animal-bonded-protagonist" }];
@@ -2750,10 +2826,13 @@ function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocal
           <p className="text-sm leading-6 text-paper/70">{summary.statusText}</p>
         </article>
         <AccountCard title="What Lantyrn knows so far">
-          <ProfileSummaryRow label="Preferred story types" values={summary.preferredStoryTypes} empty="No explicit story-type signals yet." />
-          <ProfileSummaryRow label="Story ingredients" values={summary.storyIngredients} empty="No story ingredients saved yet." />
-          <ProfileSummaryRow label="Hard avoidances" values={summary.hardAvoidances} empty="No hard avoidances saved yet." />
-          <ProfileSummaryRow label="Story fit settings" values={summary.explicitDetails} empty="No explicit lane, pressure, ending shape, or protagonist lens saved yet." />
+          {summary.emotionalPromises.length ? <ProfileSummaryRow label="Emotional promise" values={summary.emotionalPromises} empty="" /> : null}
+          {summary.favoriteStoryWorlds.length ? <ProfileSummaryRow label="Favorite story worlds" values={summary.favoriteStoryWorlds} empty="" /> : null}
+          <ProfileSummaryRow label="Story engines" values={summary.storyIngredients} empty="No story engines saved yet." />
+          {summary.characterLensPreferences.length ? <ProfileSummaryRow label="Character / cast lens" values={summary.characterLensPreferences} empty="" /> : null}
+          {summary.preferredStoryTypes.length ? <ProfileSummaryRow label="Story directions" values={summary.preferredStoryTypes} empty="" /> : null}
+          <ProfileSummaryRow label="Boundaries" values={summary.hardAvoidances} empty="No boundaries saved yet." />
+          <ProfileSummaryRow label="Story fit settings" values={summary.explicitDetails} empty="No content lane, intensity, or episode shape saved yet." />
           <ProfileSummaryRow label="Continuation preference" values={summary.continuationPreference ? [summary.continuationPreference] : []} empty="Not enough signal yet." />
           <ProfileSummaryRow label="Recent feedback" values={summary.recentFeedback} empty="No feedback captured yet." />
           <ProfileSummaryRow label="Confidence / status" values={[summary.confidenceLabel]} empty="Still learning." />
@@ -2766,7 +2845,7 @@ function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocal
         <AccountCard title="Story fit preferences">
           <button className="min-h-11 w-full rounded-md border border-lantern-gold/45 bg-lantern-gold/10 px-4 py-3 text-left text-sm font-semibold text-lantern-gold sm:w-fit" onClick={onOpenStoryFitOnboarding} type="button">Edit via guided setup</button>
           <PreferenceChipGroup label="Preferred story types" options={READER_STORY_TYPE_OPTIONS} selected={readerPreferences.preferredStoryTypes} onToggle={(value) => toggleItem("preferredStoryTypes", value)} />
-          <PreferenceChipGroup label="Story ingredients" options={READER_STORY_INGREDIENT_OPTIONS} selected={readerPreferences.storyIngredients} onToggle={(value) => toggleItem("storyIngredients", value)} />
+          <PreferenceChipGroup label="Story engines" options={READER_STORY_INGREDIENT_OPTIONS} selected={readerPreferences.storyIngredients} onToggle={(value) => toggleItem("storyIngredients", value)} />
           <div className="grid gap-2"><p className="text-sm font-semibold text-paper">Hard avoidances</p><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={60} onChange={(event) => setAvoidanceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} placeholder="No dead pets, no gore..." value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={!avoidanceDraft.trim() || readerPreferences.hardAvoidances.length >= MAX_READER_HARD_AVOIDANCES} onClick={addAvoidance} type="button">Add</button></div><div className="flex flex-wrap gap-2">{readerPreferences.hardAvoidances.map((item) => <button className="rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => updatePreferences({ hardAvoidances: readerPreferences.hardAvoidances.filter((current) => current !== item) })} type="button">{item} ×</button>)}</div><p className="text-xs text-paper/45">Up to 10 avoidances, 60 characters each.</p></div>
           <PreferenceSelect label="Content lane" options={CONTENT_LANE_OPTIONS} value={readerPreferences.contentLane} onChange={(value) => updatePreferences({ contentLane: value as typeof readerPreferences.contentLane })} />
           <PreferenceSelect label="Narrative pressure" options={NARRATIVE_PRESSURE_OPTIONS} value={readerPreferences.narrativePressure} onChange={(value) => updatePreferences({ narrativePressure: value as typeof readerPreferences.narrativePressure })} />
@@ -3242,7 +3321,7 @@ function getGenerationTriggerLabel(generationMode: GenerationMode, source: Reade
   return "Create";
 }
 
-function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeriesId, activeCommittedStoryId, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationFailureDiagnostic, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics, storyFitOnboardingAvailable, storyFitOnboardingDismissed }: { accountSummary: AccountProfileSummary; activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationFailureDiagnostic: GenerationFailureDiagnostic; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: StoryTypeSelectionDiagnostics; storyFitOnboardingAvailable: boolean; storyFitOnboardingDismissed: boolean }) {
+function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeriesId, activeCommittedStoryId, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationFailureDiagnostic, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics, storyFitOnboardingAvailable, storyFitOnboardingDismissed, storyFitOnboardingCompleted, storyFitOnboardingLastOpenedAt, storyFitOnboardingLastSavedAt }: { accountSummary: AccountProfileSummary; activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationFailureDiagnostic: GenerationFailureDiagnostic; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: StoryTypeSelectionDiagnostics; storyFitOnboardingAvailable: boolean; storyFitOnboardingDismissed: boolean; storyFitOnboardingCompleted: boolean; storyFitOnboardingLastOpenedAt: string; storyFitOnboardingLastSavedAt: string }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
@@ -3260,8 +3339,13 @@ function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeries
         <p><span className="font-semibold text-paper/80">storyFitOnboardingVersion:</span> v1</p>
         <p><span className="font-semibold text-paper/80">storyFitOnboardingAvailable:</span> {storyFitOnboardingAvailable ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">storyFitOnboardingDismissed:</span> {storyFitOnboardingDismissed ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">storyFitOnboardingCompleted:</span> {storyFitOnboardingCompleted ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">storyFitOnboardingLastOpenedAt:</span> {storyFitOnboardingLastOpenedAt || "none"}</p>
+        <p><span className="font-semibold text-paper/80">storyFitOnboardingLastSavedAt:</span> {storyFitOnboardingLastSavedAt || "none"}</p>
+        <p><span className="font-semibold text-paper/80">storyFitOnboardingWritesPreferences:</span> true</p>
+        <p><span className="font-semibold text-paper/80">storyFitOnboardingNorthStarTaxonomy:</span> true</p>
         <p><span className="font-semibold text-paper/80">accountMode:</span> {accountSummary.accountMode}</p>
-        <p><span className="font-semibold text-paper/80">profileSummaryAvailable:</span> {(accountSummary.preferredStoryTypes.length || accountSummary.storyIngredients.length || accountSummary.hardAvoidances.length || accountSummary.recentFeedback.length) ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">profileSummaryAvailable:</span> {(accountSummary.preferredStoryTypes.length || accountSummary.emotionalPromises.length || accountSummary.favoriteStoryWorlds.length || accountSummary.storyIngredients.length || accountSummary.characterLensPreferences.length || accountSummary.hardAvoidances.length || accountSummary.recentFeedback.length) ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">savedContentCountsAvailable:</span> true</p>
         <p><span className="font-semibold text-paper/80">Generation in progress:</span> {isGenerating ? "yes" : "no"}</p>
         <p><span className="font-semibold text-paper/80">Last generation trigger/source:</span> {lastGenerationTrigger}</p>
@@ -3794,6 +3878,16 @@ function saveStoryFitOnboardingDismissed() {
   try { window.localStorage.setItem(STORY_FIT_ONBOARDING_STORAGE_KEY, "dismissed"); } catch {}
 }
 
+function readStoryFitOnboardingTimestamp(key: string): string {
+  if (typeof window === "undefined") return "";
+  try { return window.localStorage.getItem(key) ?? ""; } catch { return ""; }
+}
+
+function saveStoryFitOnboardingTimestamp(key: string, value: string) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(key, value); } catch {}
+}
+
 function sortStoryStartsByMood(activeMood: Mood): StoryStart[] { return [...SUGGESTED_STORY_STARTS].sort((a, b) => Number(storyStartSupportsMood(b, activeMood)) - Number(storyStartSupportsMood(a, activeMood))); }
 function moodDescription(mood: Mood): string { return getStoryTypeChip(mood).guidance; }
 
@@ -3806,6 +3900,9 @@ function toAccountProfileSummary({ authState, canonicalProfile, inputArtifacts, 
   const explicitPreferences = profile.explicitReaderPreferences;
   const learnedStoryTypes = filterStoryFitSummaryLabels(topLabels(canonicalProfile?.learned?.moods, profile.moodCounts), READER_STORY_TYPE_OPTIONS);
   const learnedIngredients = filterStoryFitSummaryLabels(topLabels(canonicalProfile?.learned?.genres, profile.genreCounts), READER_STORY_INGREDIENT_OPTIONS);
+  const emotionalPromises = uniqueNonEmpty(explicitPreferences.emotionalPromises ?? []).slice(0, 6);
+  const favoriteStoryWorlds = uniqueNonEmpty(explicitPreferences.favoriteStoryWorlds ?? []).slice(0, 6);
+  const characterLensPreferences = uniqueNonEmpty(explicitPreferences.characterLensPreferences ?? []).slice(0, 6);
   const preferredStoryTypes = uniqueNonEmpty([...explicitPreferences.preferredStoryTypes, ...learnedStoryTypes]).slice(0, 6);
   const storyIngredients = uniqueNonEmpty([...explicitPreferences.storyIngredients, ...learnedIngredients]).slice(0, 6);
   const hardAvoidances = uniqueNonEmpty([...explicitPreferences.hardAvoidances, ...(canonicalProfile?.preferences.hardAvoidances ?? []), ...(profile.tasteProfile?.userHardAvoidances ?? [])]).slice(0, 6);
@@ -3823,7 +3920,10 @@ function toAccountProfileSummary({ authState, canonicalProfile, inputArtifacts, 
     accountMode,
     statusText,
     preferredStoryTypes,
+    emotionalPromises,
+    favoriteStoryWorlds,
     storyIngredients,
+    characterLensPreferences,
     hardAvoidances,
     explicitDetails,
     continuationPreference,
@@ -3869,9 +3969,9 @@ function formatExplicitReaderPreferencesForGeneration(preferences: ReaderProfile
 function formatExplicitReaderPreferenceDetails(preferences: ReaderProfile["explicitReaderPreferences"]): string[] {
   const labels: string[] = [];
   if (preferences.contentLane !== "not-set") labels.push(`Content lane: ${formatPreferenceOptionLabel(preferences.contentLane)}`);
-  if (preferences.narrativePressure !== "not-set") labels.push(`Narrative pressure: ${formatPreferenceOptionLabel(preferences.narrativePressure)}`);
-  if (preferences.episodeEndingShape !== "not-set") labels.push(`Episode ending: ${formatPreferenceOptionLabel(preferences.episodeEndingShape)}`);
-  if (preferences.protagonistLens !== "not-set") labels.push(`Protagonist lens: ${formatPreferenceOptionLabel(preferences.protagonistLens)}`);
+  if (preferences.narrativePressure !== "not-set") labels.push(`Intensity: ${formatPreferenceOptionLabel(preferences.narrativePressure)}`);
+  if (preferences.episodeEndingShape !== "not-set") labels.push(`Episode shape: ${formatPreferenceOptionLabel(preferences.episodeEndingShape)}`);
+  if (preferences.protagonistLens !== "not-set") labels.push(`Character lens: ${formatPreferenceOptionLabel(preferences.protagonistLens)}`);
   return labels;
 }
 
