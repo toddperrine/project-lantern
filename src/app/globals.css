@@ -950,18 +950,28 @@ textarea {
   height: 3rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgb(229 9 20 / 0.72);
+  border: 1px solid rgb(229 9 20 / 0.78);
   border-radius: 999px;
   background: rgb(11 11 13 / 0.96);
   color: var(--bloodwick-white);
   box-shadow:
-    0 0 0 1px rgb(242 241 237 / 0.12),
-    0 0 24px rgb(229 9 20 / 0.28);
+    0 0 0 1px rgb(242 241 237 / 0.16),
+    0 0 24px rgb(229 9 20 / 0.32);
 }
 
-.bloodwick-back-to-top svg {
-  width: 1.35rem;
-  height: 1.35rem;
+.bloodwick-back-to-top__icon {
+  display: block;
+  color: var(--bloodwick-white);
+  font-size: 1.65rem;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 0 8px rgb(242 241 237 / 0.28);
+  transform: translateY(-1px);
+}
+
+.bloodwick-back-to-top svg,
+.bloodwick-back-to-top path {
+  color: var(--bloodwick-white);
   fill: currentColor;
   stroke: currentColor;
 }

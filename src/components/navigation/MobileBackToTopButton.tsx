@@ -36,9 +36,9 @@ export function MobileBackToTopButton() {
       onClick={handleClick}
       type="button"
     >
-      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-        <path d="M12 5l7 7-1.4 1.4L13 8.8V20h-2V8.8l-4.6 4.6L5 12l7-7z" />
-      </svg>
+      <span aria-hidden="true" className="bloodwick-back-to-top__icon">
+        ↑
+      </span>
     </button>
   );
 }
