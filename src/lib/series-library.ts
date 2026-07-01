@@ -7,6 +7,8 @@ export type LibraryStoryForSeries = {
   parentSeriesId?: string | null;
   title?: string;
   genre?: string;
+  genrePreset?: string | null;
+  selectedStoryTypeChipLabel?: string | null;
   wordCount?: number;
   createdAt?: string;
   savedAt?: string;
@@ -73,7 +75,7 @@ export function getSeriesDisplayTitle(episodes: Array<SeriesEpisode>): string {
     firstEpisodeTitle: firstTitle,
     episodeTitle: latestTitle,
     protagonistName: heroName,
-    fearCategory: first?.genre,
+    fearCategory: first?.selectedStoryTypeChipLabel ?? first?.genrePreset ?? first?.genre,
   });
 }
 

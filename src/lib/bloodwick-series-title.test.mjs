@@ -5,6 +5,7 @@ const {
   BLOODWICK_SERIES_TITLE_PROMPT,
   getBloodwickSeriesDisplayTitle,
   isProtagonistNameFallbackTitle,
+  isSentenceLikeTitle,
   isWeakBloodwickSeriesTitle,
   normalizeBloodwickSeriesTitle,
 } = await import("./bloodwick-series-title.ts");
@@ -43,10 +44,31 @@ test("prefers generated series titles over protagonist-name saved fallbacks", ()
     "Miles Arlen Series",
   );
 
-  assert.equal(getBloodwickSeriesDisplayTitle({}), "Untitled Series");
+  assert.equal(getBloodwickSeriesDisplayTitle({}), "The Hidden Town");
 });
 
 test("exports the codified Bloodwick series title prompt", () => {
   assert.match(BLOODWICK_SERIES_TITLE_PROMPT, /Bloodwick Series Title Rules:/);
   assert.match(BLOODWICK_SERIES_TITLE_PROMPT, /Create a series_title before drafting the first episode\./);
+});
+
+
+test("rejects long sentence-like episode text as a direct display title", () => {
+  assert.equal(isSentenceLikeTitle("Miles Arlen ran at dawn because the world was simplest then"), true);
+  assert.equal(isSentenceLikeTitle("The Hollow Bell"), false);
+  assert.equal(isSentenceLikeTitle("The Hollow Bell."), true);
+  assert.equal(
+    getBloodwickSeriesDisplayTitle({
+      savedSeriesTitle: "Miles Arlen Series",
+      protagonistName: "Miles Arlen",
+      firstEpisodeTitle: "Miles Arlen ran at dawn because the world was simplest then, the roads never ended, and nobody had started screaming yet",
+      fearCategory: "Gothic Shadows",
+    }),
+    "The Hollow House",
+  );
+});
+
+test("derives deterministic provisional titles by fear category", () => {
+  assert.equal(getBloodwickSeriesDisplayTitle({ fearCategory: "Uncanny" }), "The Wrong Mirror");
+  assert.equal(getBloodwickSeriesDisplayTitle({ fearCategory: "Cosmic Horror" }), "The Midnight Signal");
 });

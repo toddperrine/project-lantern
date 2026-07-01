@@ -55,7 +55,32 @@ export type BloodwickSeriesTitleInput = {
 };
 
 const PLAIN_WEAK_TITLES = new Set(["series", "untitled", "untitled series", "bloodwick series"]);
-const TITLE_MAX_LENGTH = 64;
+const FEAR_CATEGORY_TO_ANCHOR: Record<string, string> = {
+  "Small-Town Dread": "town",
+  "Uncanny": "mirror",
+  "Weird Nature": "orchard",
+  "Creature Unease": "dog",
+  "Psychological Dread": "room",
+  "Gothic Shadows": "house",
+  "Cosmic Horror": "signal",
+  "Haunted Past": "photograph",
+  "Dark Fairy Tale": "road",
+};
+
+const FEAR_CATEGORY_TO_PRESSURE: Record<string, string> = {
+  "Small-Town Dread": "hidden",
+  "Uncanny": "wrong",
+  "Weird Nature": "hungry",
+  "Creature Unease": "watching",
+  "Psychological Dread": "broken",
+  "Gothic Shadows": "hollow",
+  "Cosmic Horror": "midnight",
+  "Haunted Past": "borrowed",
+  "Dark Fairy Tale": "returning",
+};
+
+const DEFAULT_PROVISIONAL_ANCHOR = "town";
+const DEFAULT_PROVISIONAL_PRESSURE = "hidden";
 
 export function normalizeBloodwickSeriesTitle(value?: string | null): string | null {
   const cleaned = removeWrappingQuotes(String(value ?? "").replace(/\s+/g, " ").trim());
@@ -78,23 +103,34 @@ export function isWeakBloodwickSeriesTitle(title?: string | null): boolean {
   return PLAIN_WEAK_TITLES.has(comparable) || isBlockedGenericTitle(comparable);
 }
 
+export function isSentenceLikeTitle(value: string | null | undefined): boolean {
+  const normalized = normalizeBloodwickSeriesTitle(value);
+  if (!normalized) return true;
+  if (normalized.split(/\s+/).filter(Boolean).length > 7) return true;
+  if (normalized.includes(",")) return true;
+  if (normalized.includes("…")) return true;
+  if (normalized.includes("...")) return true;
+  return /[.!?]$/.test(normalized);
+}
+
+export function deriveProvisionalBloodwickSeriesTitle(input: BloodwickSeriesTitleInput): string {
+  const fearCategory = normalizeFearCategory(input.fearCategory);
+  const anchor = FEAR_CATEGORY_TO_ANCHOR[fearCategory] ?? DEFAULT_PROVISIONAL_ANCHOR;
+  const pressure = FEAR_CATEGORY_TO_PRESSURE[fearCategory] ?? DEFAULT_PROVISIONAL_PRESSURE;
+  return `The ${toTitleWord(pressure)} ${toTitleWord(anchor)}`;
+}
+
 export function getBloodwickSeriesDisplayTitle(input: BloodwickSeriesTitleInput): string {
-  const explicitTitle = normalizeStrongTitle(input.explicitTitle);
+  const explicitTitle = normalizeUsableSeriesTitle(input.explicitTitle, input.protagonistName);
   if (explicitTitle) return explicitTitle;
 
-  const generatedSeriesTitle = normalizeStrongTitle(input.generatedSeriesTitle);
+  const generatedSeriesTitle = normalizeUsableSeriesTitle(input.generatedSeriesTitle, input.protagonistName);
   if (generatedSeriesTitle) return generatedSeriesTitle;
 
-  const savedSeriesTitle = normalizeStrongTitle(input.savedSeriesTitle);
-  if (savedSeriesTitle && !isProtagonistNameFallbackTitle(savedSeriesTitle, input.protagonistName)) return savedSeriesTitle;
+  const savedSeriesTitle = normalizeUsableSeriesTitle(input.savedSeriesTitle, input.protagonistName);
+  if (savedSeriesTitle) return savedSeriesTitle;
 
-  const firstEpisodeTitle = normalizeStrongTitle(input.firstEpisodeTitle);
-  if (firstEpisodeTitle) return truncateTitleLike(firstEpisodeTitle, TITLE_MAX_LENGTH);
-
-  const episodeTitle = normalizeStrongTitle(input.episodeTitle);
-  if (episodeTitle) return truncateTitleLike(episodeTitle, TITLE_MAX_LENGTH);
-
-  return "Untitled Series";
+  return deriveProvisionalBloodwickSeriesTitle(input) || "Untitled Series";
 }
 
 export const BLOODWICK_SERIES_TITLE_PROMPT = `
@@ -145,9 +181,33 @@ Good Bloodwick-native style examples:
 - What Came Home Wearing His Face
 `.trim();
 
-function normalizeStrongTitle(value?: string | null): string | null {
+function normalizeUsableSeriesTitle(value: string | null | undefined, protagonistName?: string | null): string | null {
   const normalized = normalizeBloodwickSeriesTitle(value);
-  return normalized && !isWeakBloodwickSeriesTitle(normalized) ? normalized : null;
+  if (!normalized) return null;
+  if (isWeakBloodwickSeriesTitle(normalized)) return null;
+  if (isProtagonistNameFallbackTitle(normalized, protagonistName)) return null;
+  if (isSentenceLikeTitle(normalized)) return null;
+  return normalized;
+}
+
+function normalizeFearCategory(value?: string | null): string {
+  const normalized = String(value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+  const match = Object.keys(FEAR_CATEGORY_TO_ANCHOR).find((category) => category.toLowerCase() === normalized);
+  if (match) return match;
+  if (normalized.includes("small-town") || normalized.includes("small town")) return "Small-Town Dread";
+  if (normalized.includes("uncanny")) return "Uncanny";
+  if (normalized.includes("weird nature") || normalized.includes("nature")) return "Weird Nature";
+  if (normalized.includes("creature")) return "Creature Unease";
+  if (normalized.includes("psychological")) return "Psychological Dread";
+  if (normalized.includes("gothic")) return "Gothic Shadows";
+  if (normalized.includes("cosmic")) return "Cosmic Horror";
+  if (normalized.includes("haunted") || normalized.includes("past")) return "Haunted Past";
+  if (normalized.includes("fairy") || normalized.includes("folklore")) return "Dark Fairy Tale";
+  return "Small-Town Dread";
+}
+
+function toTitleWord(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function isBlockedGenericTitle(value: string): boolean {
@@ -163,8 +223,3 @@ function removeWrappingQuotes(value: string): string {
   return value.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
 }
 
-function truncateTitleLike(value: string, maxLength: number): string {
-  const compact = value.replace(/\s+/g, " ").trim();
-  if (compact.length <= maxLength) return compact;
-  return `${compact.slice(0, maxLength).replace(/[\s,.;:!?-]+$/g, "")}...`;
-}

@@ -20,7 +20,7 @@ test("groups same-series stories into ordered episode numbers and separates othe
   assert.equal(calder.episodeCount, 3);
   assert.deepEqual(calder.episodes.map((episode) => episode.title), ["First", "Second", "Third"]);
   assert.deepEqual(calder.episodes.map((episode) => episode.episodeNumber), [1, 2, 3]);
-  assert.equal(calder.title, "First");
+  assert.equal(calder.title, "The Hidden Town");
   assert.equal(amoma.episodeCount, 1);
 });
 
@@ -43,7 +43,7 @@ test("treats a story without seriesId as a standalone one-episode group", () => 
 
 test("falls back to first episode title when no hero or protagonist exists", () => {
   const groups = groupStoriesBySeries([{ id: "story-id", seriesId: "series-id", title: "A Lonely Door" }]);
-  assert.equal(groups[0].title, "A Lonely Door");
+  assert.equal(groups[0].title, "The Hidden Town");
 });
 
 test("finds the next saved episode in the current series", () => {
