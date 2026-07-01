@@ -172,7 +172,10 @@ import type {
   UploadState,
 } from "@/lib/project-persistence";
 import { APP_VERSION } from "@/lib/build-info";
-import { getBloodwickFearArt } from "@/lib/bloodwick-fear-art";
+import {
+  getBloodwickFearArt,
+  normalizeBloodwickFearCategory,
+} from "@/lib/bloodwick-fear-art";
 import { BloodwickWordmark } from "@/components/bloodwick-brand";
 import { useAuth, type AuthStatus } from "@/lib/auth";
 import { getBloodwickSeriesDisplayTitle } from "@/lib/bloodwick-series-title";
@@ -8053,13 +8056,30 @@ function SeriesLibraryGroup({
     ? `Last updated ${formatDateTime(group.lastUpdatedAt)}`
     : "Not updated yet";
   const title = group.title?.trim() || "Untitled Series";
-  const fearTag = group.episodes
+  const episodeFearTags = group.episodes
     .map((episode) => getLibraryStoryCategoryLabel(episode.story).trim())
-    .find(Boolean);
-  const fearArt = getBloodwickFearArt(fearTag);
-  const selectedFearTag = selectedEpisode
-    ? getLibraryStoryCategoryLabel(selectedEpisode.story)
+    .filter(Boolean);
+  const selectedEpisodeFearTag = selectedEpisode
+    ? getLibraryStoryCategoryLabel(selectedEpisode.story).trim()
     : "";
+  const selectedApprovedFearCategory = normalizeBloodwickFearCategory(
+    selectedEpisodeFearTag,
+  );
+  const firstApprovedFearCategory = normalizeBloodwickFearCategory(
+    episodeFearTags[0],
+  );
+  const firstAvailableApprovedFearCategory = episodeFearTags
+    .map((category) => normalizeBloodwickFearCategory(category))
+    .find(Boolean);
+  const seriesFearCategory =
+    selectedApprovedFearCategory ??
+    firstApprovedFearCategory ??
+    firstAvailableApprovedFearCategory ??
+    episodeFearTags[0] ??
+    selectedEpisodeFearTag;
+  const fearTag = seriesFearCategory;
+  const fearArt = getBloodwickFearArt(seriesFearCategory);
+  const selectedFearTag = selectedEpisodeFearTag;
   const selectedRecap = selectedEpisode
     ? getShelfEpisodeRecap(selectedEpisode.story)
     : "";
