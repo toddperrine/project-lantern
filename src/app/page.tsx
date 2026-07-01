@@ -526,7 +526,7 @@ const AUTHENTICATED_STORY_LIBRARY_PROJECT_ID = "story-library";
 
 const NAV_ITEMS: { label: string; view: AppView }[] = [
   { label: "Home", view: "home" },
-  { label: "Stories", view: "library" },
+  { label: "Shelf", view: "library" },
   { label: "Account", view: "account" },
 ];
 
@@ -7416,7 +7416,7 @@ function AccountView({
             onClick={onOpenLibrary}
             type="button"
           >
-            Go to Stories
+            Go to Shelf
           </button>
         </AccountCard>
         <AccountCard title="Data controls">
@@ -7935,31 +7935,14 @@ function LibraryView(props: {
   storyResponse: GenerateStoryResponse | null;
 }) {
   const {
-    cloudMessage,
-    cloudProjects,
-    isCloudLoading,
-    onDeleteCloudProject,
-    onDeleteProject,
     onDeleteStory,
-    onLoadCloudProject,
-    onLoadProject,
     onMoveSavedForLaterToWaitingQueue,
     onContinueSavedStoryById,
     onOpenSavedStoryById,
-    onProjectNameChange,
     onReadSavedForLater,
-    onRefreshCloud,
     onRemoveSavedForLater,
-    onSaveCloudProject,
-    onSaveProject,
-    onSaveStory,
-    projectName,
     savedForLaterStoryQueue,
-    savedProjects,
     savedStories,
-    selectedCloudProjectId,
-    selectedProjectId,
-    storyResponse,
   } = props;
   const libraryStoryRows = savedStories.map((story) => ({
     story,
@@ -7979,126 +7962,54 @@ function LibraryView(props: {
   return (
     <section className="grid min-w-0 gap-5 pb-8 md:pb-0">
       <PageHeading
-        eyebrow="Library"
-        title="Stories"
-        body="Saved and recent stories live here as a separate destination."
+        eyebrow="SHELF"
+        title="Shelf"
+        body="Saved and recent Bloodwick stories live here."
       />
-      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,420px)_1fr]">
-        <section className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4">
-          <h2 className="text-xl font-semibold text-paper">Library Tools</h2>
-          <p className="mt-1 text-sm leading-6 text-paper/65">
-            Save stories and move project workspaces between local and cloud
-            storage.
-          </p>
-          <button
-            className="mt-4 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!storyResponse}
-            onClick={onSaveStory}
-            type="button"
-          >
-            Save Current Story
-          </button>
-          <label className="mt-4 flex flex-col gap-2">
-            <span className="text-sm font-semibold text-paper">
-              Project Name
-            </span>
-            <input
-              className="rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper"
-              onChange={(event) => onProjectNameChange(event.target.value)}
-              placeholder="My story project"
-              value={projectName}
-            />
-          </label>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <SmallButton onClick={onSaveProject}>Save Project</SmallButton>
-            <SmallButton
-              disabled={!selectedProjectId}
-              onClick={onDeleteProject}
-            >
-              Delete Project
-            </SmallButton>
-            <SmallButton disabled={isCloudLoading} onClick={onRefreshCloud}>
-              {isCloudLoading ? "Syncing..." : "Refresh Cloud"}
-            </SmallButton>
-            <SmallButton disabled={isCloudLoading} onClick={onSaveCloudProject}>
-              Save to Cloud
-            </SmallButton>
-            <SmallButton
-              disabled={isCloudLoading || !selectedCloudProjectId}
-              onClick={onDeleteCloudProject}
-            >
-              Delete Cloud
-            </SmallButton>
-          </div>
-          <SelectLibrary
-            label="Load Project"
-            onChange={onLoadProject}
-            options={savedProjects.map((project) => ({
-              label: `${project.name} - ${formatDateTime(project.updatedAt)}`,
-              value: project.id,
-            }))}
-            value={selectedProjectId}
-          />
-          <SelectLibrary
-            label="Load Cloud Project"
-            onChange={onLoadCloudProject}
-            options={cloudProjects.map((project) => ({
-              label: `${project.name} - ${formatDateTime(project.updatedAt)}`,
-              value: project.id,
-            }))}
-            value={selectedCloudProjectId}
-          />
-          {cloudMessage ? (
-            <p className="mt-3 rounded-md border border-lantern-gold/25 bg-paper/10 px-3 py-2 text-xs leading-5 text-paper/65">
-              {cloudMessage}
+      <section className="grid min-w-0 gap-3">
+        <section className="grid min-w-0 gap-3 rounded-md border border-lantern-gold/20 bg-lantern-gold/5 p-4">
+          <div>
+            <h2 className="text-lg font-semibold text-paper">
+              Saved for later
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-paper/60">
+              Story choices you saved for later.
             </p>
-          ) : null}
+          </div>
+          {savedForLaterStoryQueue.length ? (
+            savedForLaterStoryQueue.map((item) => (
+              <SavedForLaterStoryCard
+                item={item}
+                key={item.id}
+                onMoveToWaitingQueue={() =>
+                  onMoveSavedForLaterToWaitingQueue(item)
+                }
+                onRead={() => onReadSavedForLater(item)}
+                onRemove={() => onRemoveSavedForLater(item)}
+              />
+            ))
+          ) : (
+            <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">
+              No saved-for-later stories yet.
+            </p>
+          )}
         </section>
-        <section className="grid min-w-0 gap-3">
-          <section className="grid min-w-0 gap-3 rounded-md border border-lantern-gold/20 bg-lantern-gold/5 p-4">
-            <div>
-              <h2 className="text-lg font-semibold text-paper">
-                Saved for later
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-paper/60">
-                Ready story choices you saved from the desktop queue.
-              </p>
-            </div>
-            {savedForLaterStoryQueue.length ? (
-              savedForLaterStoryQueue.map((item) => (
-                <SavedForLaterStoryCard
-                  item={item}
-                  key={item.id}
-                  onMoveToWaitingQueue={() =>
-                    onMoveSavedForLaterToWaitingQueue(item)
-                  }
-                  onRead={() => onReadSavedForLater(item)}
-                  onRemove={() => onRemoveSavedForLater(item)}
-                />
-              ))
-            ) : (
-              <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">
-                No saved-for-later stories yet.
-              </p>
-            )}
-          </section>
-          {!hasGeneratedStoryRows ? (
-            <EmptyPanel
-              title="No saved or recent stories yet"
-              body="Generate a story or save one locally and it will appear here."
-            />
-          ) : null}
-          {seriesGroups.map((group) => (
-            <SeriesLibraryGroup
-              key={group.seriesId}
-              group={group}
-              onContinueSavedStoryById={onContinueSavedStoryById}
-              onDeleteStory={onDeleteStory}
-              onOpenSavedStoryById={onOpenSavedStoryById}
-            />
-          ))}
-        </section>
-      </div>
+        {!hasGeneratedStoryRows ? (
+          <EmptyPanel
+            title="No saved or recent stories yet"
+            body="Generate a story or save one for later and it will appear here."
+          />
+        ) : null}
+        {seriesGroups.map((group) => (
+          <SeriesLibraryGroup
+            key={group.seriesId}
+            group={group}
+            onContinueSavedStoryById={onContinueSavedStoryById}
+            onDeleteStory={onDeleteStory}
+            onOpenSavedStoryById={onOpenSavedStoryById}
+          />
+        ))}
+      </section>
     </section>
   );
 }
