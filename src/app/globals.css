@@ -59,7 +59,6 @@ textarea {
     background: rgb(11 11 13 / 0.92);
     color: var(--bloodwick-white);
     border-color: rgb(107 112 120 / 0.28);
-    opacity: 1;
   }
 
   .bloodwick-home .bloodwick-home-card h1,
@@ -70,27 +69,23 @@ textarea {
   .bloodwick-home .bloodwick-home-section h3,
   .bloodwick-home .bloodwick-story-queue-card h3 {
     color: var(--bloodwick-white);
-    opacity: 1;
   }
 
   .bloodwick-home .bloodwick-home-card p,
   .bloodwick-home .bloodwick-home-section p,
   .bloodwick-home .bloodwick-story-queue-card p {
     color: rgb(242 241 237 / 0.78);
-    opacity: 1;
   }
 
   .bloodwick-home .bloodwick-home-card > p:first-child,
   .bloodwick-home .bloodwick-home-section > p:first-child {
     color: var(--bloodwick-copper);
-    opacity: 1;
   }
 
   .bloodwick-home .bloodwick-fear-chip {
     background: rgb(11 11 13 / 0.86);
     color: var(--bloodwick-white);
     border-color: rgb(107 112 120 / 0.55);
-    opacity: 1;
   }
 
   .bloodwick-home .bloodwick-fear-chip[aria-pressed="true"] {
@@ -101,24 +96,20 @@ textarea {
 
   .bloodwick-home .bloodwick-fear-chip span {
     color: inherit;
-    opacity: 1;
   }
 
   .bloodwick-home .bloodwick-start-button {
     background: var(--bloodwick-red);
     color: var(--bloodwick-white);
     border-color: var(--bloodwick-red);
-    opacity: 1;
   }
 
   .bloodwick-home .bloodwick-start-button span {
     color: inherit;
-    opacity: 1;
   }
 
   .bloodwick-home .bloodwick-story-queue-card span {
     color: rgb(242 241 237 / 0.78);
-    opacity: 1;
   }
 
   .bloodwick-home .bloodwick-story-queue-card button {
