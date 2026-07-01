@@ -37,9 +37,9 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
 
   return (
     <article className="bloodwick-action-card">
-      <div className="grid min-w-0 gap-4">
+      <div className="flex h-full min-w-0 flex-col gap-3">
         <div className="min-w-0">
-          <p className="bloodwick-action-card__eyebrow">Continue Your Series</p>
+          <p className="bloodwick-action-card__eyebrow">Return to the Dread</p>
           <p className="bloodwick-action-card__description">
             Pick up where the last episode left its mark.
           </p>
@@ -49,12 +49,12 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
           <span className="mt-3 inline-flex rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold text-bloodwick-white/78">
             {storyTypeLabel}
           </span>
-          <p className="mt-4 text-base leading-7 text-bloodwick-white/72">
+          <p className="mt-3 max-h-24 overflow-hidden text-sm leading-6 text-bloodwick-white/72">
             {hook}
           </p>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="mt-auto grid gap-2 sm:grid-cols-2">
           <button
             className="rounded-xl bg-bloodwick-red px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:bg-bloodwick-red/90 disabled:cursor-not-allowed disabled:opacity-55"
             disabled={isGenerating}

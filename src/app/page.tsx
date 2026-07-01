@@ -5124,7 +5124,7 @@ function HomeView(props: {
         ) : (
           <article className="bloodwick-action-card">
             <p className="bloodwick-action-card__eyebrow">
-              Continue Your Series
+              Return to the Dread
             </p>
             <p className="bloodwick-action-card__description">
               Pick up where the last episode left its mark.

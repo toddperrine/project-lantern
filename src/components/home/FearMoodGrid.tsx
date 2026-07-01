@@ -33,11 +33,11 @@ export function FearMoodGrid({
         <p className="bloodwick-action-card__description">
           Choose a fear and start a new series.
         </p>
-        <h2 className="mt-4 text-lg font-semibold leading-tight text-bloodwick-white">
+        <h2 className="mt-3 text-sm font-semibold leading-5 text-bloodwick-white">
           {heading}
         </h2>
       </div>
-      <div className="mt-4 grid gap-2 grid-cols-2">
+      <div className="mt-3 grid grid-cols-3 gap-1.5">
         {STORY_TYPE_CHIPS.map((chip) => {
           const isSelected = chip.id === activeMood;
           const tooltipId = `fear-help-${chip.id}`;
@@ -46,7 +46,7 @@ export function FearMoodGrid({
               <button
                 aria-describedby={tooltipId}
                 aria-pressed={isSelected}
-                className={`min-h-12 w-full min-w-0 rounded-xl border px-3 py-2 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white ${isSelected ? "border-bloodwick-red bg-bloodwick-red text-bloodwick-white shadow-bloodwick-red" : "border-bloodwick-white/12 bg-bloodwick-white/[0.06] text-bloodwick-white hover:border-bloodwick-copper hover:bg-bloodwick-white/10"}`}
+                className={`min-h-9 w-full min-w-0 rounded-lg border px-2 py-1.5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white ${isSelected ? "border-bloodwick-red bg-bloodwick-red text-bloodwick-white shadow-bloodwick-red" : "border-bloodwick-white/12 bg-bloodwick-white/[0.06] text-bloodwick-white hover:border-bloodwick-copper hover:bg-bloodwick-white/10"}`}
                 onBlur={() => setFocusedMood(null)}
                 onClick={() => onSelect(chip.id)}
                 onFocus={() => setFocusedMood(chip.id)}
@@ -54,7 +54,7 @@ export function FearMoodGrid({
                 onMouseLeave={() => setFocusedMood(null)}
                 type="button"
               >
-                <span className="block text-sm font-semibold leading-5">
+                <span className="block text-xs font-semibold leading-4">
                   {chip.label}
                 </span>
               </button>
@@ -69,11 +69,11 @@ export function FearMoodGrid({
           );
         })}
       </div>
-      <p className="mt-4 rounded-xl border border-bloodwick-white/10 bg-bloodwick-white/[0.06] p-3 text-sm leading-6 text-bloodwick-white/68 md:hidden">
+      <p className="mt-3 max-h-16 overflow-hidden rounded-xl border border-bloodwick-white/10 bg-bloodwick-white/[0.06] p-2 text-xs leading-5 text-bloodwick-white/68 md:hidden">
         {selectedChip.guidance}
       </p>
       <button
-        className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-bloodwick-red px-4 py-3 text-sm font-semibold text-bloodwick-white disabled:cursor-not-allowed disabled:opacity-55"
+        className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-bloodwick-red px-4 py-3 text-sm font-semibold text-bloodwick-white disabled:cursor-not-allowed disabled:opacity-55"
         disabled={isGenerating}
         onClick={onStartNewStory}
         type="button"

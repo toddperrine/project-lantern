@@ -23,26 +23,26 @@ export function StoryQueueCard(props: StoryQueueCardProps) {
       .filter(Boolean)
       .join(" "),
   );
-  const blurb = truncateWords(item.premise, 20);
+  const blurb = truncateWords(item.premise, 12);
 
   return (
-    <article className="grid min-w-0 gap-4 overflow-hidden rounded-bloodwick border border-bloodwick-white/10 bg-bloodwick-obsidian/70 p-4 shadow-bloodwick-soft sm:p-5">
+    <article className="grid min-w-0 gap-2 overflow-hidden rounded-bloodwick-sm border border-bloodwick-white/10 bg-bloodwick-obsidian/70 p-2.5">
       <div className="min-w-0">
         <span className="inline-flex rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold text-bloodwick-white/78">
           {storyTypeLabel}
         </span>
-        <h3 className="mt-3 text-2xl font-semibold leading-tight text-bloodwick-white">
+        <h3 className="mt-2 text-sm font-semibold leading-5 text-bloodwick-white">
           {item.title}
         </h3>
         {blurb ? (
-          <p className="mt-2 text-sm leading-6 text-bloodwick-white/66">
+          <p className="mt-1 text-xs leading-5 text-bloodwick-white/66">
             {blurb}
           </p>
         ) : null}
       </div>
-      <div className="flex flex-col justify-center gap-2">
+      <div className="grid grid-cols-3 gap-1.5">
         <button
-          className="rounded-xl bg-bloodwick-red px-3 py-2 text-sm font-semibold text-bloodwick-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-bloodwick-red px-2 py-1.5 text-xs font-semibold text-bloodwick-white disabled:cursor-not-allowed disabled:opacity-50"
           disabled={isPreparing}
           onClick={() => onRead(item)}
           type="button"
@@ -50,14 +50,14 @@ export function StoryQueueCard(props: StoryQueueCardProps) {
           {isPreparing ? "Preparing…" : "Read"}
         </button>
         <button
-          className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-3 py-2 text-sm font-semibold text-bloodwick-white hover:border-bloodwick-copper"
+          className="rounded-lg border border-bloodwick-white/15 bg-bloodwick-white/10 px-2 py-1.5 text-xs font-semibold text-bloodwick-white hover:border-bloodwick-copper"
           onClick={() => onPass(item)}
           type="button"
         >
           Pass
         </button>
         <button
-          className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-3 py-2 text-sm font-semibold text-bloodwick-white hover:border-bloodwick-copper"
+          className="rounded-lg border border-bloodwick-white/15 bg-bloodwick-white/10 px-2 py-1.5 text-xs font-semibold text-bloodwick-white hover:border-bloodwick-copper"
           onClick={() => onSaveForLater(item)}
           type="button"
         >
