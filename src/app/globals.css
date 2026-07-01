@@ -1251,3 +1251,99 @@ textarea {
     min-height: 44px;
   }
 }
+
+@media (max-width: 767px) {
+  .bloodwick-shelf,
+  .bloodwick-shelf * {
+    opacity: 1 !important;
+  }
+
+  .bloodwick-shelf {
+    color: var(--bloodwick-white) !important;
+  }
+
+  .bloodwick-shelf .bloodwick-shelf-header,
+  .bloodwick-shelf .bloodwick-shelf-saved-later,
+  .bloodwick-shelf .bloodwick-shelf-series-card,
+  .bloodwick-shelf .bloodwick-shelf-selected-episode,
+  .bloodwick-shelf .bloodwick-shelf-episode-rail,
+  .bloodwick-shelf .bloodwick-shelf-empty-state {
+    background: rgb(11 11 13 / 0.94) !important;
+    color: var(--bloodwick-white) !important;
+    border-color: rgb(107 112 120 / 0.32) !important;
+  }
+
+  .bloodwick-shelf h1,
+  .bloodwick-shelf h2,
+  .bloodwick-shelf h3,
+  .bloodwick-shelf .bloodwick-shelf-series-title,
+  .bloodwick-shelf .bloodwick-shelf-selected-episode,
+  .bloodwick-shelf .bloodwick-shelf-selected-episode *,
+  .bloodwick-shelf .bloodwick-shelf-episode-chip,
+  .bloodwick-shelf .bloodwick-shelf-action-primary,
+  .bloodwick-shelf .bloodwick-shelf-action-secondary,
+  .bloodwick-shelf .bloodwick-shelf-action-icon,
+  .bloodwick-shelf .bloodwick-shelf-actions button {
+    color: var(--bloodwick-white) !important;
+  }
+
+  .bloodwick-shelf p,
+  .bloodwick-shelf small,
+  .bloodwick-shelf .bloodwick-shelf-meta {
+    color: rgb(242 241 237 / 0.76) !important;
+  }
+
+  .bloodwick-shelf .bloodwick-shelf-episode-pill,
+  .bloodwick-shelf .bloodwick-shelf-episode-chip,
+  .bloodwick-shelf .bloodwick-shelf-selected-episode span {
+    background: rgb(11 11 13 / 0.82) !important;
+    color: rgb(242 241 237 / 0.88) !important;
+    border-color: rgb(107 112 120 / 0.36) !important;
+  }
+
+  .bloodwick-shelf .bloodwick-shelf-episode-select,
+  .bloodwick-shelf input,
+  .bloodwick-shelf textarea,
+  .bloodwick-shelf select,
+  .bloodwick-shelf .bloodwick-shelf-empty,
+  .bloodwick-shelf .bloodwick-shelf-empty-state {
+    background: rgb(11 11 13 / 0.82) !important;
+    color: rgb(242 241 237 / 0.78) !important;
+    border-color: rgb(107 112 120 / 0.36) !important;
+  }
+
+  .bloodwick-shelf .bloodwick-shelf-episode-chip {
+    border-color: rgb(229 9 20 / 0.58) !important;
+    background: rgb(229 9 20 / 0.16) !important;
+    color: var(--bloodwick-white) !important;
+  }
+
+  .bloodwick-shelf .bloodwick-shelf-tag {
+    background: rgb(229 9 20 / 0.14) !important;
+    color: var(--bloodwick-white) !important;
+    border-color: rgb(229 9 20 / 0.5) !important;
+  }
+
+  .bloodwick-shelf .bloodwick-shelf-action-primary,
+  .bloodwick-shelf .bloodwick-shelf-actions button:first-child {
+    background: var(--bloodwick-red) !important;
+    color: var(--bloodwick-white) !important;
+    border-color: var(--bloodwick-red) !important;
+  }
+
+  .bloodwick-shelf .bloodwick-shelf-action-secondary,
+  .bloodwick-shelf .bloodwick-shelf-action-icon,
+  .bloodwick-shelf .bloodwick-shelf-actions button {
+    background: rgb(11 11 13 / 0.84) !important;
+    color: var(--bloodwick-white) !important;
+    border-color: rgb(107 112 120 / 0.4) !important;
+  }
+
+  .bloodwick-shelf .bloodwick-shelf-action-secondary:disabled,
+  .bloodwick-shelf .bloodwick-shelf-action-icon:disabled,
+  .bloodwick-shelf .bloodwick-shelf-actions button:disabled {
+    color: rgb(242 241 237 / 0.56) !important;
+    border-color: rgb(107 112 120 / 0.28) !important;
+    background: rgb(11 11 13 / 0.62) !important;
+  }
+}

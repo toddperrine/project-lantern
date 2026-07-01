@@ -8003,7 +8003,7 @@ function LibraryView(props: {
               />
             ))
           ) : (
-            <p className="bloodwick-shelf-meta rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm">
+            <p className="bloodwick-shelf-empty-state bloodwick-shelf-meta rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm">
               No saved-for-later stories yet.
             </p>
           )}
