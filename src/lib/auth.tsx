@@ -9,6 +9,7 @@ type TokenSet = { accessToken: string; idToken: string; refreshToken?: string; e
 type StoredSession = { currentUser: CurrentUser; tokens: TokenSet };
 type AuthContextValue = {
   authConfigured: boolean;
+  authSessionChecked: boolean;
   authStatus: AuthStatus;
   currentUser: CurrentUser | null;
   emailPendingVerification: string;
@@ -121,6 +122,7 @@ function readStoredSession(): StoredSession | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const authConfigured = Boolean(COGNITO_USER_POOL_ID && COGNITO_APP_CLIENT_ID && COGNITO_REGION);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("signed_out");
+  const [authSessionChecked, setAuthSessionChecked] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [emailPendingVerification, setEmailPendingVerification] = useState("");
   const [resetEmail, setResetEmail] = useState("");
@@ -138,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthStatus("signed_in");
       setLastAuthStep("stored_session_restored");
     }
+    setAuthSessionChecked(true);
   }, []);
 
   const clearMessages = useCallback(() => {
@@ -266,7 +269,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const getAccessToken = useCallback(() => readStoredSession()?.tokens.accessToken ?? "", []);
 
-  const value = useMemo<AuthContextValue>(() => ({ authConfigured, authStatus, currentUser, emailPendingVerification, resetEmail, errorMessage, successMessage, lastCognitoErrorCode, resetFlowState, region: COGNITO_REGION || "not configured", profileLibraryMode: currentUser ? "authenticated" : "anonymous", authMode: AUTH_MODE, authFlow: AUTH_FLOW, lastAuthStep, appActionsGated: authConfigured && !currentUser, getAccessToken, signIn, beginPasswordReset, confirmPasswordReset, completeNewPassword, signOut }), [authConfigured, authStatus, currentUser, emailPendingVerification, resetEmail, errorMessage, successMessage, lastCognitoErrorCode, resetFlowState, lastAuthStep, getAccessToken, signIn, beginPasswordReset, confirmPasswordReset, completeNewPassword, signOut]);
+  const value = useMemo<AuthContextValue>(() => ({ authConfigured, authSessionChecked, authStatus, currentUser, emailPendingVerification, resetEmail, errorMessage, successMessage, lastCognitoErrorCode, resetFlowState, region: COGNITO_REGION || "not configured", profileLibraryMode: currentUser ? "authenticated" : "anonymous", authMode: AUTH_MODE, authFlow: AUTH_FLOW, lastAuthStep, appActionsGated: authConfigured && !currentUser, getAccessToken, signIn, beginPasswordReset, confirmPasswordReset, completeNewPassword, signOut }), [authConfigured, authSessionChecked, authStatus, currentUser, emailPendingVerification, resetEmail, errorMessage, successMessage, lastCognitoErrorCode, resetFlowState, lastAuthStep, getAccessToken, signIn, beginPasswordReset, confirmPasswordReset, completeNewPassword, signOut]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

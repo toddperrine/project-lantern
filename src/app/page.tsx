@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { useSearchParams } from "next/navigation";
+import { BloodwickSignInModal } from "@/components/auth/BloodwickSignInModal";
 import { BloodwickHomeHero } from "@/components/home/BloodwickHomeHero";
 import { ContinueEpisodeCard } from "@/components/home/ContinueEpisodeCard";
 import { FearMoodGrid } from "@/components/home/FearMoodGrid";
@@ -172,6 +173,9 @@ import type {
 import { APP_VERSION } from "@/lib/build-info";
 import { BloodwickWordmark } from "@/components/bloodwick-brand";
 import { useAuth, type AuthStatus } from "@/lib/auth";
+
+const BLOODWICK_FIRST_OPEN_SIGN_IN_DISMISSED_KEY =
+  "bloodwick:first-open-sign-in-dismissed";
 
 type AppView =
   | "home"
@@ -890,6 +894,14 @@ export default function Home() {
   const [cloudProjectMessage, setCloudProjectMessage] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState("");
+  const [modalSignInEmail, setModalSignInEmail] = useState(
+    authState.currentUser?.email ?? authState.resetEmail,
+  );
+  const [modalSignInPassword, setModalSignInPassword] = useState("");
+  const [isModalSignInSubmitting, setIsModalSignInSubmitting] =
+    useState(false);
+  const [isBloodwickSignInModalDismissed, setIsBloodwickSignInModalDismissed] =
+    useState(false);
   const [isCloudProjectsLoading, setIsCloudProjectsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [continueDirection, setContinueDirection] = useState("");
@@ -3839,6 +3851,60 @@ export default function Home() {
   const isNewStoryGenerating = isGenerating && generationSource === "new-story";
   const isContinuationGenerating =
     isGenerating && generationSource === "continue-story";
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsBloodwickSignInModalDismissed(
+      window.sessionStorage.getItem(
+        BLOODWICK_FIRST_OPEN_SIGN_IN_DISMISSED_KEY,
+      ) === "true",
+    );
+  }, []);
+
+  useEffect(() => {
+    if (authState.currentUser?.email) {
+      setModalSignInEmail(authState.currentUser.email);
+    } else if (authState.resetEmail) {
+      setModalSignInEmail(authState.resetEmail);
+    }
+  }, [authState.currentUser?.email, authState.resetEmail]);
+
+  useEffect(() => {
+    if (authState.currentUser) {
+      setModalSignInPassword("");
+      setIsModalSignInSubmitting(false);
+    }
+  }, [authState.currentUser]);
+
+  const handleContinueAsGuestFromModal = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem(
+        BLOODWICK_FIRST_OPEN_SIGN_IN_DISMISSED_KEY,
+        "true",
+      );
+    }
+    setIsBloodwickSignInModalDismissed(true);
+  }, []);
+
+  const handleModalSignIn = useCallback(async () => {
+    setIsModalSignInSubmitting(true);
+    await authState.signIn(modalSignInEmail, modalSignInPassword);
+    setIsModalSignInSubmitting(false);
+  }, [authState, modalSignInEmail, modalSignInPassword]);
+
+  const handleModalPasswordReset = useCallback(async () => {
+    setIsModalSignInSubmitting(true);
+    await authState.beginPasswordReset(modalSignInEmail || authState.resetEmail);
+    setIsModalSignInSubmitting(false);
+  }, [authState, modalSignInEmail]);
+
+  const shouldShowBloodwickSignInModal =
+    activeView === "home" &&
+    authState.authConfigured &&
+    authState.authSessionChecked &&
+    !authState.currentUser &&
+    !isBloodwickSignInModalDismissed;
+
   const diagnosticsPanels = (
     <>
       <AppStateDiagnostics
@@ -3954,6 +4020,18 @@ export default function Home() {
           <NavTabs activeView={activeView} onChange={navigateToView} />
         </header>
 
+        <BloodwickSignInModal
+          email={modalSignInEmail}
+          errorMessage={authState.errorMessage || null}
+          isOpen={shouldShowBloodwickSignInModal}
+          isSubmitting={isModalSignInSubmitting}
+          onContinueAsGuest={handleContinueAsGuestFromModal}
+          onEmailChange={setModalSignInEmail}
+          onPasswordChange={setModalSignInPassword}
+          onResetPassword={handleModalPasswordReset}
+          onSubmit={handleModalSignIn}
+          password={modalSignInPassword}
+        />
         {activeView === "account" ? <AuthShell /> : null}
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {isGenerating ? (
