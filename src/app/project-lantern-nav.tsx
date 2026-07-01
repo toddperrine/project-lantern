@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 
 const NAV_ITEMS = [
   { label: "Home", href: "/", view: "home" },
-  { label: "Stories", href: "/?view=library", view: "library" },
+  { label: "Shelf", href: "/?view=library", view: "library" },
   { label: "Account", href: "/?view=account", view: "account" }
 ];
 
