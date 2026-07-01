@@ -1,5 +1,4 @@
 export type ContinueEpisodeCardProps = {
-  title: string;
   seriesTitle: string;
   hook: string;
   recap: string;
@@ -32,7 +31,6 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
     onToggleDirection,
     recap,
     storyTypeLabel,
-    title,
   } = props;
   const directionId = "continue-episode-direction-dialog";
   const recapId = "last-time-recap-dialog";
@@ -41,7 +39,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
     <article className="bloodwick-action-card">
       <div className="grid min-w-0 gap-4">
         <div className="min-w-0">
-          <p className="bloodwick-action-card__eyebrow">Return to the Dread</p>
+          <p className="bloodwick-action-card__eyebrow">Continue Your Series</p>
           <p className="bloodwick-action-card__description">
             Pick up where the last episode left its mark.
           </p>
@@ -51,10 +49,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
           <span className="mt-3 inline-flex rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold text-bloodwick-white/78">
             {storyTypeLabel}
           </span>
-          <h2 className="mt-3 text-2xl font-semibold leading-tight text-bloodwick-white">
-            {title}
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-bloodwick-white/68">
+          <p className="mt-4 text-base leading-7 text-bloodwick-white/72">
             {hook}
           </p>
         </div>

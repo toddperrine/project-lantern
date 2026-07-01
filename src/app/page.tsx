@@ -5120,12 +5120,11 @@ function HomeView(props: {
             recap={storyBrief.recap}
             seriesTitle={latestSeriesTitle}
             storyTypeLabel={latestStoryTypeLabel}
-            title={latestStory.title}
           />
         ) : (
           <article className="bloodwick-action-card">
             <p className="bloodwick-action-card__eyebrow">
-              Return to the Dread
+              Continue Your Series
             </p>
             <p className="bloodwick-action-card__description">
               Pick up where the last episode left its mark.
