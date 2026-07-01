@@ -82,6 +82,131 @@ const FEAR_CATEGORY_TO_PRESSURE: Record<string, string> = {
 const DEFAULT_PROVISIONAL_ANCHOR = "town";
 const DEFAULT_PROVISIONAL_PRESSURE = "hidden";
 
+const PROVISIONAL_ANCHOR_WORDS = [
+  "house",
+  "road",
+  "lake",
+  "choir",
+  "dog",
+  "mirror",
+  "station",
+  "orchard",
+  "town",
+  "bell",
+  "photograph",
+  "photo",
+  "room",
+  "signal",
+  "basement",
+  "library",
+  "archive",
+  "key",
+  "woods",
+  "trail",
+  "school",
+  "church",
+  "attic",
+  "platform",
+  "field",
+  "door",
+  "window",
+  "well",
+  "tower",
+] as const;
+
+const PROVISIONAL_PRESSURE_WORDS = [
+  "hungry",
+  "wrong",
+  "hollow",
+  "last",
+  "borrowed",
+  "dead",
+  "midnight",
+  "red",
+  "hidden",
+  "missing",
+  "broken",
+  "returning",
+  "watching",
+  "forgotten",
+  "vanished",
+  "buried",
+  "cold",
+  "silent",
+  "empty",
+  "shattered",
+  "locked",
+  "lost",
+] as const;
+
+const PROVISIONAL_ANCHOR_SYNONYMS: Record<string, string> = {
+  photos: "photograph",
+  photo: "photograph",
+  pictures: "photograph",
+  dogs: "dog",
+  roads: "road",
+  rooms: "room",
+  woods: "woods",
+  keys: "key",
+};
+
+const PROVISIONAL_PRESSURE_SYNONYMS: Record<string, string> = {
+  vanished: "missing",
+  lost: "missing",
+  buried: "hidden",
+  silent: "hollow",
+  empty: "hollow",
+  locked: "hidden",
+  shattered: "broken",
+};
+
+const PROVISIONAL_STOP_WORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "with",
+  "without",
+  "into",
+  "onto",
+  "over",
+  "under",
+  "because",
+  "when",
+  "while",
+  "where",
+  "what",
+  "who",
+  "his",
+  "her",
+  "their",
+  "its",
+  "was",
+  "were",
+  "is",
+  "are",
+  "had",
+  "has",
+  "have",
+  "not",
+  "yet",
+  "then",
+  "than",
+  "from",
+  "this",
+  "that",
+  "there",
+  "here",
+  "after",
+  "before",
+  "through",
+  "beneath",
+  "above",
+  "along",
+]);
+
 export function normalizeBloodwickSeriesTitle(value?: string | null): string | null {
   const cleaned = removeWrappingQuotes(String(value ?? "").replace(/\s+/g, " ").trim());
   if (!cleaned) return null;
@@ -115,8 +240,12 @@ export function isSentenceLikeTitle(value: string | null | undefined): boolean {
 
 export function deriveProvisionalBloodwickSeriesTitle(input: BloodwickSeriesTitleInput): string {
   const fearCategory = normalizeFearCategory(input.fearCategory);
-  const anchor = FEAR_CATEGORY_TO_ANCHOR[fearCategory] ?? DEFAULT_PROVISIONAL_ANCHOR;
-  const pressure = FEAR_CATEGORY_TO_PRESSURE[fearCategory] ?? DEFAULT_PROVISIONAL_PRESSURE;
+  const fallbackAnchor = FEAR_CATEGORY_TO_ANCHOR[fearCategory] ?? DEFAULT_PROVISIONAL_ANCHOR;
+  const fallbackPressure = FEAR_CATEGORY_TO_PRESSURE[fearCategory] ?? DEFAULT_PROVISIONAL_PRESSURE;
+  const sourceTexts = getProvisionalSourceTexts(input);
+  const anchor = extractProvisionalWord(sourceTexts, PROVISIONAL_ANCHOR_WORDS, PROVISIONAL_ANCHOR_SYNONYMS) ?? fallbackAnchor;
+  const pressure = extractProvisionalWord(sourceTexts, PROVISIONAL_PRESSURE_WORDS, PROVISIONAL_PRESSURE_SYNONYMS) ?? fallbackPressure;
+
   return `The ${toTitleWord(pressure)} ${toTitleWord(anchor)}`;
 }
 
@@ -188,6 +317,39 @@ function normalizeUsableSeriesTitle(value: string | null | undefined, protagonis
   if (isProtagonistNameFallbackTitle(normalized, protagonistName)) return null;
   if (isSentenceLikeTitle(normalized)) return null;
   return normalized;
+}
+
+function getProvisionalSourceTexts(input: BloodwickSeriesTitleInput): string[] {
+  return [input.worldLabel, input.firstEpisodeTitle, input.episodeTitle, input.fearCategory]
+    .map((value) => normalizeBloodwickSeriesTitle(value))
+    .filter((value): value is string => Boolean(value));
+}
+
+function extractProvisionalWord(
+  sourceTexts: string[],
+  preferredWords: readonly string[],
+  synonyms: Record<string, string>
+): string | null {
+  const preferred = new Set(preferredWords);
+
+  for (const text of sourceTexts) {
+    const words = tokenizeProvisionalTitleText(text);
+    for (const word of words) {
+      const candidate = synonyms[word] ?? word;
+      if (preferred.has(candidate)) return candidate;
+    }
+  }
+
+  return null;
+}
+
+function tokenizeProvisionalTitleText(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9'\s]/g, " ")
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter((word) => word && !PROVISIONAL_STOP_WORDS.has(word));
 }
 
 function normalizeFearCategory(value?: string | null): string {

@@ -43,7 +43,7 @@ test("treats a story without seriesId as a standalone one-episode group", () => 
 
 test("falls back to first episode title when no hero or protagonist exists", () => {
   const groups = groupStoriesBySeries([{ id: "story-id", seriesId: "series-id", title: "A Lonely Door" }]);
-  assert.equal(groups[0].title, "The Hidden Town");
+  assert.equal(groups[0].title, "The Hidden Door");
 });
 
 test("finds the next saved episode in the current series", () => {
