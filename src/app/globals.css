@@ -1033,15 +1033,51 @@ textarea {
 }
 
 .bloodwick-shelf-series-card {
+  display: grid;
+  gap: 0.875rem;
   padding: 1rem;
 }
 
-.bloodwick-shelf-series-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+.bloodwick-shelf-card-top {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
   gap: 1rem;
-  margin-bottom: 0.875rem;
+  align-items: start;
+}
+
+.bloodwick-shelf-series-media {
+  position: relative;
+  width: 260px;
+  height: 150px;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgb(242 241 237 / 0.14);
+  background: rgb(11 11 13 / 0.9);
+}
+
+.bloodwick-shelf-series-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bloodwick-shelf-series-image-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent, rgb(11 11 13 / 0.32));
+}
+
+.bloodwick-shelf-series-image-fallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgb(229 9 20 / 0.28), rgb(184 115 51 / 0.22), rgb(11 11 13));
+}
+
+.bloodwick-shelf-series-main {
+  display: grid;
+  min-width: 0;
+  gap: 0.75rem;
 }
 
 .bloodwick-shelf-series-title,
@@ -1066,36 +1102,184 @@ textarea {
   font-weight: 700;
 }
 
-.bloodwick-shelf-episode-list {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.bloodwick-shelf-episode-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.75rem;
-  align-items: center;
-  border-radius: 1rem;
+.bloodwick-shelf-selected-episode {
+  border-radius: 0.95rem;
   border: 1px solid rgb(107 112 120 / 0.28);
-  background: rgb(11 11 13 / 0.72);
-  padding: 0.875rem;
+  background: rgb(242 241 237 / 0.06);
+  padding: 0.75rem;
+  color: rgb(242 241 237 / 0.78);
 }
 
-.bloodwick-shelf-episode-title {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+.bloodwick-shelf-episode-rail {
+  border-top: 1px solid rgb(107 112 120 / 0.24);
+  padding-top: 0.875rem;
+}
+
+.bloodwick-shelf-episode-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.bloodwick-shelf-episode-chip {
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgb(242 241 237 / 0.16);
+  background: rgb(242 241 237 / 0.08);
+  color: var(--bloodwick-white);
+  padding: 0.55rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.bloodwick-shelf-episode-chip[aria-pressed="true"] {
+  border-color: var(--bloodwick-red);
+  background: rgb(229 9 20 / 0.92);
+  color: var(--bloodwick-white);
 }
 
 .bloodwick-shelf-actions {
   display: flex;
+  flex-wrap: nowrap;
   gap: 0.5rem;
   align-items: center;
 }
 
-.bloodwick-shelf-actions button:focus-visible {
+.bloodwick-shelf-actions button {
+  min-height: 44px;
+  border-radius: 0.75rem;
+  padding: 0.6rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.bloodwick-shelf-action-primary {
+  border: 1px solid var(--bloodwick-red);
+  background: var(--bloodwick-red);
+  color: var(--bloodwick-white);
+}
+
+.bloodwick-shelf-action-secondary,
+.bloodwick-shelf-action-icon {
+  border: 1px solid rgb(242 241 237 / 0.16);
+  background: transparent;
+  color: var(--bloodwick-white);
+}
+
+.bloodwick-shelf-action-icon {
+  display: inline-flex;
+  width: 44px;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.bloodwick-shelf-action-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: currentColor;
+}
+
+.bloodwick-shelf-action-secondary:disabled {
+  border-color: rgb(107 112 120 / 0.32);
+  color: rgb(107 112 120 / 0.9);
+}
+
+.bloodwick-shelf-empty-state {
+  border: 1px solid rgb(107 112 120 / 0.28);
+  background: rgb(11 11 13 / 0.82);
+  color: var(--bloodwick-white);
+}
+
+
+.bloodwick-shelf-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: rgb(11 11 13 / 0.82);
+  padding: 1rem;
+}
+
+.bloodwick-shelf-modal-panel {
+  width: min(100%, 36rem);
+  max-height: min(82vh, 42rem);
+  overflow-y: auto;
+  border-radius: 1.25rem;
+  border: 1px solid rgb(242 241 237 / 0.18);
+  background: rgb(11 11 13 / 0.98);
+  color: var(--bloodwick-white);
+  padding: 1rem;
+  box-shadow: 0 1.5rem 4rem rgb(11 11 13 / 0.72);
+}
+
+.bloodwick-shelf-confirm-panel {
+  width: min(100%, 30rem);
+}
+
+.bloodwick-shelf-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.bloodwick-shelf-modal-title {
+  margin: 0;
+  color: var(--bloodwick-white);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.bloodwick-shelf-modal-close,
+.bloodwick-shelf-confirm-cancel,
+.bloodwick-shelf-confirm-delete {
+  min-height: 44px;
+  border-radius: 0.75rem;
+  padding: 0.6rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.bloodwick-shelf-modal-close,
+.bloodwick-shelf-confirm-cancel {
+  border: 1px solid rgb(242 241 237 / 0.2);
+  background: rgb(242 241 237 / 0.08);
+  color: var(--bloodwick-white);
+}
+
+.bloodwick-shelf-confirm-delete {
+  border: 1px solid var(--bloodwick-red);
+  background: var(--bloodwick-red);
+  color: var(--bloodwick-white);
+}
+
+.bloodwick-shelf-modal-body {
+  margin: 1rem 0 0;
+  color: rgb(242 241 237 / 0.82);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.bloodwick-shelf-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.bloodwick-shelf-modal-close:focus-visible,
+.bloodwick-shelf-confirm-cancel:focus-visible,
+.bloodwick-shelf-confirm-delete:focus-visible {
+  outline: 3px solid var(--bloodwick-copper);
+  outline-offset: 2px;
+}
+
+.bloodwick-shelf-actions button:focus-visible,
+.bloodwick-shelf-episode-chip:focus-visible {
   outline: 3px solid var(--bloodwick-copper);
   outline-offset: 2px;
 }
@@ -1115,26 +1299,54 @@ textarea {
     opacity: 1;
   }
 
-  .bloodwick-shelf-series-header {
-    flex-direction: column;
-    gap: 0.5rem;
+  .bloodwick-shelf-card-top {
+    grid-template-columns: 128px minmax(0, 1fr);
+    gap: 0.75rem;
   }
 
-  .bloodwick-shelf-episode-row {
-    grid-template-columns: 1fr;
-    background: rgb(11 11 13 / 0.82);
-    color: var(--bloodwick-white);
+  .bloodwick-shelf-series-media {
+    width: 128px;
+    height: 96px;
+    border-radius: 0.85rem;
+  }
+
+  .bloodwick-shelf-selected-episode {
+    padding: 0.65rem;
   }
 
   .bloodwick-shelf-actions {
     justify-content: flex-start;
-    flex-wrap: wrap;
   }
 
-  .bloodwick-shelf-actions button {
-    min-height: 40px;
+  .bloodwick-shelf-action-primary,
+  .bloodwick-shelf-action-secondary {
+    flex: 0 1 auto;
+  }
+
+  .bloodwick-shelf-action-icon {
+    flex: 0 0 44px;
+  }
+
+  .bloodwick-shelf-actions button,
+  .bloodwick-shelf-episode-chip {
+    min-height: 44px;
+  }
+
+  .bloodwick-shelf-modal {
+    align-items: center;
+    padding: 0.75rem;
+  }
+
+  .bloodwick-shelf-modal-panel {
+    max-height: 86vh;
+    padding: 0.875rem;
+  }
+
+  .bloodwick-shelf-modal-title {
+    font-size: 1.35rem;
   }
 }
+
 
 .bloodwick-shelf-header .text-lantern-gold,
 .bloodwick-shelf-saved-later h2,
