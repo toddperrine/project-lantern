@@ -1,3 +1,4 @@
+import { getBloodwickSeriesDisplayTitle } from "./bloodwick-series-title";
 import { LENGTH_TARGETS } from "./types";
 import type { GenerateStoryRequest, GenerateStoryResponse, LengthTarget, StoryDiagnostics } from "./types";
 import { findStoryMetadataLeakPatterns, normalizeStoryText, removeStoryMetadataLeaks } from "./story-output";
@@ -60,6 +61,13 @@ export function generateFallbackStory(
   }
   const wordCount = countWords(story);
   expansionSucceeded = expansionAttempted && wordCount >= lengthSpec.minWords;
+  const seriesTitle = getBloodwickSeriesDisplayTitle({
+    firstEpisodeTitle: createStoryTitleFromText(story),
+    episodeTitle: createStoryTitleFromText(story),
+    protagonistName: cast[0] ?? null,
+    fearCategory: selectedStoryFit,
+    worldLabel: setting,
+  });
   const underTargetNotice =
     wordCount < lengthSpec.minWords ? `Final story is below the selected ${formatLengthTarget(input.lengthTarget)} target.` : null;
 
@@ -67,6 +75,7 @@ export function generateFallbackStory(
     story,
     metadata: {
       wordCount,
+      seriesTitle,
       charactersUsed: cast.slice(0, 4),
       rulesReferenced: rules.slice(0, 6).filter(Boolean),
       source: "fallback",
@@ -89,7 +98,8 @@ export function generateFallbackStory(
         fallbackMetadataLeakGuardEnabled: true,
         fallbackRejectedForMetadataLeak: false,
         metadataLeakPatternsFound: [],
-        storyFitGenerationContextVersion: "v1"
+        storyFitGenerationContextVersion: "v1",
+        seriesTitle
       }
     }
   };
@@ -167,4 +177,11 @@ function fallbackSettingForStoryFit(selectedStoryFit: string): string {
   if (fit.includes("nature")) return "the rain-dark trail behind the houses, where the trees leaned too close";
   if (fit.includes("haunted")) return "a family house that kept one room colder than the rest";
   return "a town where the familiar streets had started keeping secrets";
+}
+
+function createStoryTitleFromText(story: string): string {
+  const firstLine = story.split(/\n+/).find((line) => line.trim())?.trim() ?? "Generated Story";
+  const firstSentence = firstLine.split(/[.!?]/)[0]?.trim() || firstLine;
+  const compact = firstSentence.replace(/^#+\s*/, "").replace(/\s+/g, " ").trim();
+  return compact.length <= 72 ? compact : `${compact.slice(0, 72).replace(/[\s,.;:]+$/g, "")}...`;
 }

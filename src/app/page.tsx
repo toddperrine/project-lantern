@@ -174,6 +174,7 @@ import type {
 import { APP_VERSION } from "@/lib/build-info";
 import { BloodwickWordmark } from "@/components/bloodwick-brand";
 import { useAuth, type AuthStatus } from "@/lib/auth";
+import { getBloodwickSeriesDisplayTitle } from "@/lib/bloodwick-series-title";
 
 const BLOODWICK_FIRST_OPEN_SIGN_IN_DISMISSED_KEY =
   "bloodwick:first-open-sign-in-dismissed";
@@ -258,6 +259,7 @@ type LibraryStory =
       legacyGenrePreset?: GenrePreset;
       charactersUsed: string[];
       rulesReferenced: string[];
+      seriesTitle?: string | null;
     };
 type StoryBrief = {
   hook: string;
@@ -5242,13 +5244,20 @@ function HomeView(props: {
 
 function getLibraryStorySeriesTitle(story: LibraryStory): string {
   const candidate = story as LibraryStory & {
+    heroName?: string | null;
+    protagonistName?: string | null;
     seriesTitle?: string | null;
-    metadata?: { seriesTitle?: string | null };
+    metadata?: { seriesTitle?: string | null; heroName?: string | null; protagonistName?: string | null };
   };
-  const explicitTitle =
-    candidate.seriesTitle?.trim() || candidate.metadata?.seriesTitle?.trim();
 
-  return explicitTitle || "Series Title";
+  return getBloodwickSeriesDisplayTitle({
+    explicitTitle: candidate.seriesTitle ?? candidate.metadata?.seriesTitle ?? null,
+    savedSeriesTitle: candidate.seriesTitle ?? candidate.metadata?.seriesTitle ?? null,
+    firstEpisodeTitle: story.title,
+    episodeTitle: story.title,
+    protagonistName: candidate.protagonistName ?? candidate.heroName ?? candidate.metadata?.protagonistName ?? candidate.metadata?.heroName ?? story.charactersUsed?.[0] ?? null,
+    fearCategory: getLibraryStoryCategoryLabel(story),
+  });
 }
 
 function DesktopDeveloperDiagnostics({ children }: { children: ReactNode }) {
@@ -11324,6 +11333,7 @@ function cloudRecordToSavedStory(
     endingType: metadata.endingType || "Resolution with Residue",
     lengthTarget: metadata.lengthTarget || "Standard",
     diagnosticsNotice: metadata.diagnosticsNotice ?? null,
+    seriesTitle: metadata.seriesTitle ?? null,
   } as SavedStory;
 }
 async function readGenerateResponsePayload(
@@ -11457,6 +11467,7 @@ function responseToLibraryStory(
       response.metadata.diagnostics.genrePreset,
     charactersUsed: response.metadata.charactersUsed,
     rulesReferenced: response.metadata.rulesReferenced,
+    seriesTitle: response.metadata.seriesTitle ?? response.metadata.diagnostics.seriesTitle ?? null,
   };
 }
 function normalizeGenerateStoryResponse(
