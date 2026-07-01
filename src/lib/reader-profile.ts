@@ -14,7 +14,7 @@ export const DEFAULT_READER_SAFETY_GUARDRAILS = [
   "explicit harm to children",
   "extreme gore",
 ];
-export const READER_PROFILE_PREFERENCES_VERSION = "v1";
+export const READER_PROFILE_PREFERENCES_VERSION = "v2";
 export const MAX_READER_HARD_AVOIDANCES = 10;
 export const MAX_READER_HARD_AVOIDANCE_LENGTH = 60;
 
@@ -86,6 +86,10 @@ export type ReaderProfilePreferences = {
   narrativePressure: ReaderProfileNarrativePressure;
   episodeEndingShape: ReaderProfileEpisodeEndingShape;
   protagonistLens: ReaderProfileProtagonistLens;
+  narrativePressurePreferences?: string[];
+  episodeEndingShapePreferences?: string[];
+  protagonistLensPreferences?: string[];
+  storyFitProfileVersion?: "v1" | "v2";
   updatedAt?: string;
 };
 
@@ -100,54 +104,129 @@ export const DEFAULT_READER_PROFILE_PREFERENCES: ReaderProfilePreferences = {
   narrativePressure: "not-set",
   episodeEndingShape: "not-set",
   protagonistLens: "not-set",
+  narrativePressurePreferences: [],
+  episodeEndingShapePreferences: [],
+  protagonistLensPreferences: [],
+  storyFitProfileVersion: "v2",
 };
 
-const APPROVED_STORY_FIT_TYPE_LABELS = new Set([
-  "Small-Town Dread",
-  "Gothic Shadows",
-  "Uncanny",
-  "Cosmic Horror",
-  "Weird Nature",
-  "Haunted Past",
-  "Creature Unease",
-  "Dark Fairy Tale",
-  "Psychological Dread",
-  "Small-town dread",
-  "Speculative mystery",
-  "Hidden-world adventure",
-  "Folkloric quest",
-  "Strange road / borderland",
-  "Haunted object or house",
-  "Near-future anomaly",
-  "Animal companion mystery",
-  "Family secret",
-]);
-const APPROVED_STORY_FIT_INGREDIENT_LABELS = new Set([
-  "A hidden past resurfacing",
-  "An impossible object, map, or key",
-  "A moral bargain with a cost",
-  "A secret society or institution",
-  "A creature or presence not fully understood",
-  "Memory or time behaving strangely",
-  "Rules-based magic",
-  "Strange technology or AI",
-  "A disappearance or investigation",
-  "Family legacy with consequences",
-  "A place that changes when entered",
-  "A friendship or team tested by pressure",
-  "Magic with rules",
-  "Strange technology",
-  "Ancient folklore",
-  "Ordinary place made uncanny",
-  "Found map / key / object",
-  "Secret society or order",
-  "Companion animal",
-  "Family legacy",
-  "Lost town / lost road",
-  "Moral bargain",
-  "Unreliable memory",
-  "Hidden room / hidden archive",
-]);
+export const STORY_FIT_SELECTION_LIMITS = {
+  preferredStoryTypes: 6,
+  emotionalPromises: 6,
+  favoriteStoryWorlds: 8,
+  storyIngredients: 10,
+  characterLensPreferences: 6,
+  narrativePressurePreferences: 4,
+  episodeEndingShapePreferences: 4,
+  hardAvoidances: MAX_READER_HARD_AVOIDANCES,
+} as const;
+
+export type StoryFitOption = {
+  label: string;
+  description: string;
+};
+
+export const STORY_FIT_STORY_TYPE_OPTIONS: StoryFitOption[] = [
+  { label: "Small-Town Dread", description: "Ordinary places hiding something rotten beneath the surface." },
+  { label: "Gothic Shadows", description: "Old guilt, inheritance, decay, obsession, locked rooms, portraits, letters, and old sins." },
+  { label: "Uncanny", description: "Familiar people, rooms, objects, routines, or animals made subtly wrong." },
+  { label: "Cosmic Horror", description: "Human life brushing against something vast, ancient, indifferent, or impossible to understand." },
+  { label: "Weird Nature", description: "Forests, trails, animals, weather, water, fungus, or landscapes behaving with alien intention." },
+  { label: "Haunted Past", description: "Memory, grief, guilt, family history, old violence, or buried truth returning." },
+  { label: "Creature Unease", description: "Something living is watching, changing, imitating, nesting, hunting, or learning." },
+  { label: "Dark Fairy Tale", description: "Folklore rules, bargains, woods, thresholds, transformations, beautiful cruelty, and storybook logic turned dangerous." },
+  { label: "Psychological Dread", description: "Paranoia, obsession, identity fracture, unreliable perception, guilt, or emotional collapse." },
+];
+export const STORY_FIT_EMOTIONAL_PROMISE_OPTIONS: StoryFitOption[] = [
+  { label: "A world I can disappear into", description: "Immersive place, texture, atmosphere, and continuity." },
+  { label: "A mystery I need answered", description: "Questions, clues, pressure, and revelation." },
+  { label: "Dread without nihilism", description: "Darkness with meaning, not empty despair." },
+  { label: "Wonder and awe", description: "The strange, vast, beautiful, or impossible." },
+  { label: "Characters I care about", description: "People worth following across episodes." },
+  { label: "Momentum into the next episode", description: "Forward pull, unresolved pressure, and serial energy." },
+  { label: "Emotional release", description: "Fear, grief, relief, catharsis, or recognition." },
+  { label: "Meaning under pressure", description: "The story tests values, identity, and choice." },
+  { label: "Comfort with teeth", description: "A safe reading feeling with real bite." },
+  { label: "Moral trouble", description: "Choices with costs and no clean answer." },
+  { label: "Strange beauty", description: "Eerie images, uncanny grace, and memorable atmosphere." },
+  { label: "Hope that feels earned", description: "Light that survives contact with darkness." },
+];
+export const STORY_FIT_WORLD_OPTIONS: StoryFitOption[] = [
+  { label: "Small town / neighborhood", description: "Local streets, neighbors, schools, churches, stores, and old secrets." },
+  { label: "School, library, museum, or institution", description: "Rules, records, archives, students, staff, collections, and locked rooms." },
+  { label: "Old house, estate, hotel, or gothic interior", description: "Architecture with memory, inheritance, rooms, corridors, and hidden histories." },
+  { label: "Forest, trail, mountain, river, or wilderness", description: "Nature with pressure, silence, hunger, pattern, or intention." },
+  { label: "Deep space, derelict ship, station, or isolated colony", description: "Isolation, signals, hulls, void, machinery, crew pressure, and hostile unknowns." },
+  { label: "Lab, research site, corporate facility, or experiment zone", description: "Containment, protocols, specimens, corporate secrecy, and controlled disaster." },
+  { label: "Ocean, island, coast, or lighthouse", description: "Water, fog, isolation, wreckage, storms, and things below." },
+  { label: "Road, motel, borderland, or lost highway", description: "Transit, liminal stops, strange towns, and roads that do not behave." },
+  { label: "City, underground, subway, or hidden district", description: "Crowds, tunnels, infrastructure, hidden communities, and urban wrongness." },
+  { label: "Folklore threshold, fairy-tale woods, or old bargain place", description: "Crossings, rules, promises, names, debts, and old powers." },
+  { label: "Ordinary home or suburb made wrong", description: "Domestic safety bent into unease." },
+  { label: "Ancient ruin, buried town, or lost archive", description: "Old records, buried structures, erased people, and history returning." },
+];
+export const STORY_FIT_INGREDIENT_OPTIONS: StoryFitOption[] = [
+  { label: "Hidden past resurfacing", description: "Old truth comes back with consequences." },
+  { label: "Impossible object, map, key, or signal", description: "A specific artifact or message that should not exist." },
+  { label: "Moral bargain with a cost", description: "Power, safety, knowledge, or survival requires payment." },
+  { label: "Secret society, order, or institution", description: "Organized secrecy with rules and reach." },
+  { label: "Creature or presence not fully understood", description: "A living pressure that resists easy explanation." },
+  { label: "Memory or time behaving strangely", description: "Recall, sequence, age, repetition, or duration becomes unstable." },
+  { label: "Rules-based magic", description: "The impossible follows discoverable laws and consequences." },
+  { label: "Strange technology or AI", description: "Machines, systems, signals, or intelligence behaving beyond intent." },
+  { label: "Disappearance or investigation", description: "Someone or something is missing, and the search changes the seeker." },
+  { label: "Family legacy with consequences", description: "Inheritance, bloodline, duty, debt, or old protection turns active." },
+  { label: "Place that changes when entered", description: "Location behaves differently once crossed." },
+  { label: "Friendship, duo, trio, or team tested by pressure", description: "Relationships are stressed by fear, secrecy, and choice." },
+  { label: "Companion animal", description: "An animal matters to the mystery, bond, danger, or survival." },
+  { label: "Containment breach", description: "Something held back gets out, or something outside gets in." },
+  { label: "Expedition gone wrong", description: "A planned journey, survey, rescue, or study becomes a trap." },
+  { label: "Signal from somewhere impossible", description: "A message arrives from a place, time, mind, machine, or entity that should not speak." },
+];
+export const STORY_FIT_CHARACTER_LENS_OPTIONS: StoryFitOption[] = [
+  { label: "Ordinary person pulled in", description: "A grounded person is forced into the impossible." },
+  { label: "Investigator / seeker", description: "Someone needs the truth and keeps digging." },
+  { label: "Caretaker / protector", description: "Someone acts because another person, place, or creature needs protection." },
+  { label: "Reluctant keeper / heir", description: "Someone inherits a duty, secret, curse, object, or role." },
+  { label: "Outsider / newcomer", description: "A person enters a place with rules they do not yet understand." },
+  { label: "Animal-bonded protagonist", description: "A bond with an animal shapes perception, danger, or survival." },
+  { label: "Duo", description: "Two leads with contrasting needs, trust, or secrets." },
+  { label: "Trio / ensemble", description: "A small group whose relationships matter to the plot." },
+  { label: "Surprise me", description: "Let Lantyrn choose the best lens for the story." },
+];
+export const STORY_FIT_NARRATIVE_PRESSURE_OPTIONS: StoryFitOption[] = [
+  { label: "Gentle unease", description: "Low pressure, subtle wrongness, and emotional safety." },
+  { label: "Balanced tension", description: "A steady mix of atmosphere, mystery, danger, and character pressure." },
+  { label: "Dark and intense", description: "Harder fear, sharper stakes, and less comfort." },
+  { label: "High dread", description: "Heavy dread, threat, and escalation." },
+  { label: "Slow-burn atmospheric", description: "Patient escalation through place, mood, and implication." },
+  { label: "Fast danger / chase pressure", description: "Threat moves quickly and forces action." },
+  { label: "Psychological pressure", description: "Fear works through perception, guilt, obsession, identity, or doubt." },
+  { label: "Cosmic scale pressure", description: "The pressure comes from vastness, insignificance, alien logic, or impossible scale." },
+];
+export const STORY_FIT_EPISODE_ENDING_OPTIONS: StoryFitOption[] = [
+  { label: "Resolved incident", description: "This episode answers its immediate problem." },
+  { label: "Open mystery", description: "The larger question remains active." },
+  { label: "Next-episode pull", description: "The ending creates a clear desire to continue." },
+  { label: "Quiet aftermath", description: "The ending lands emotionally after the event." },
+  { label: "Emotional aftershock", description: "The ending leaves the character changed or shaken." },
+  { label: "New clue revealed", description: "A fresh piece of information reframes what came before." },
+  { label: "Door opens into bigger world", description: "The ending reveals a wider storyworld or deeper system." },
+  { label: "Consequence lands", description: "A prior choice or event produces a cost." },
+];
+
+export const STORY_FIT_PRESSURE_TO_LEGACY: Record<string, ReaderProfileNarrativePressure> = { "Gentle unease": "gentle-unease", "Balanced tension": "balanced-tension", "Dark and intense": "dark-intense", "High dread": "high-dread", "Slow-burn atmospheric": "gentle-unease", "Fast danger / chase pressure": "dark-intense", "Psychological pressure": "balanced-tension", "Cosmic scale pressure": "high-dread" };
+export const STORY_FIT_ENDING_TO_LEGACY: Record<string, ReaderProfileEpisodeEndingShape> = { "Resolved incident": "resolved-incident", "Open mystery": "open-mystery", "Next-episode pull": "next-episode-pull", "Quiet aftermath": "quiet-aftermath", "Emotional aftershock": "quiet-aftermath", "New clue revealed": "open-mystery", "Door opens into bigger world": "next-episode-pull", "Consequence lands": "resolved-incident" };
+export const STORY_FIT_CHARACTER_LENS_TO_LEGACY: Record<string, ReaderProfileProtagonistLens> = { "Ordinary person pulled in": "ordinary-person-pulled-in", "Investigator / seeker": "investigator-seeker", "Caretaker / protector": "caretaker-protector", "Reluctant keeper / heir": "reluctant-keeper-heir", "Outsider / newcomer": "outsider-newcomer", "Animal-bonded protagonist": "animal-bonded-protagonist", "Duo": "surprise-me", "Trio / ensemble": "surprise-me", "Surprise me": "surprise-me" };
+
+const APPROVED_STORY_FIT_TYPE_LABELS = new Set([...STORY_FIT_STORY_TYPE_OPTIONS.map((option) => option.label), "Small-town dread", "Speculative mystery", "Hidden-world adventure", "Folkloric quest", "Strange road / borderland", "Haunted object or house", "Near-future anomaly", "Animal companion mystery", "Family secret"]);
+const APPROVED_STORY_FIT_INGREDIENT_LABELS = new Set([...STORY_FIT_INGREDIENT_OPTIONS.map((option) => option.label), "A hidden past resurfacing", "An impossible object, map, or key", "A moral bargain with a cost", "A secret society or institution", "A creature or presence not fully understood", "A disappearance or investigation", "A place that changes when entered", "A friendship or team tested by pressure", "Magic with rules", "Strange technology", "Ancient folklore", "Ordinary place made uncanny", "Found map / key / object", "Secret society or order", "Family legacy", "Lost town / lost road", "Moral bargain", "Unreliable memory", "Hidden room / hidden archive"]);
+const APPROVED_STORY_FIT_EMOTIONAL_PROMISE_LABELS = new Set(STORY_FIT_EMOTIONAL_PROMISE_OPTIONS.map((option) => option.label));
+const APPROVED_STORY_FIT_WORLD_LABELS = new Set(STORY_FIT_WORLD_OPTIONS.map((option) => option.label));
+const APPROVED_STORY_FIT_CHARACTER_LENS_LABELS = new Set(STORY_FIT_CHARACTER_LENS_OPTIONS.map((option) => option.label));
+const APPROVED_STORY_FIT_PRESSURE_LABELS = new Set(STORY_FIT_NARRATIVE_PRESSURE_OPTIONS.map((option) => option.label));
+const APPROVED_STORY_FIT_ENDING_LABELS = new Set(STORY_FIT_EPISODE_ENDING_OPTIONS.map((option) => option.label));
+
 export type ReaderFeedbackRating = StoryFeedbackRating;
 export type ReaderFeedbackEvent = {
   id: string;
@@ -623,45 +702,78 @@ export function normalizeReaderProfile(value: unknown): ReaderProfile {
 
 export function normalizeReaderProfilePreferences(value: unknown): ReaderProfilePreferences {
   const candidate = isRecord(value) ? value : {};
-  const explicitStoryTypes = filterApprovedPreferenceItems(readStringArray(candidate.preferredStoryTypes), APPROVED_STORY_FIT_TYPE_LABELS);
   const legacyMoodValues = readStringArray(candidate.preferredMoods);
+  const explicitStoryTypes = filterApprovedPreferenceItems(readStringArray(candidate.preferredStoryTypes), APPROVED_STORY_FIT_TYPE_LABELS, STORY_FIT_SELECTION_LIMITS.preferredStoryTypes);
   const preferredStoryTypes = explicitStoryTypes.length
     ? explicitStoryTypes
-    : filterApprovedPreferenceItems(legacyMoodValues, APPROVED_STORY_FIT_TYPE_LABELS);
-  const explicitIngredients = filterApprovedPreferenceItems(readStringArray(candidate.storyIngredients), APPROVED_STORY_FIT_INGREDIENT_LABELS);
+    : filterApprovedPreferenceItems(legacyMoodValues, APPROVED_STORY_FIT_TYPE_LABELS, STORY_FIT_SELECTION_LIMITS.preferredStoryTypes);
+  const explicitIngredients = filterApprovedPreferenceItems(readStringArray(candidate.storyIngredients), APPROVED_STORY_FIT_INGREDIENT_LABELS, STORY_FIT_SELECTION_LIMITS.storyIngredients);
   const legacyGenreValues = readStringArray(candidate.preferredGenres);
   const storyIngredients = explicitIngredients.length
     ? explicitIngredients
     : migrateLegacyGenreIngredients(legacyGenreValues);
+  const fallbackNarrativePressure = isReaderProfileNarrativePressure(candidate.narrativePressure) ? candidate.narrativePressure : migrateStoryIntensity(candidate.storyIntensity ?? legacyMoodValues);
+  const fallbackEndingShape = isReaderProfileEpisodeEndingShape(candidate.episodeEndingShape) ? candidate.episodeEndingShape : migrateEndingPreference(candidate.endingPreference);
+  const fallbackProtagonistLens = isReaderProfileProtagonistLens(candidate.protagonistLens) ? candidate.protagonistLens : migrateHeroPreference(candidate.heroPreference);
+  const hasPressurePreferences = Array.isArray(candidate.narrativePressurePreferences);
+  const hasEndingPreferences = Array.isArray(candidate.episodeEndingShapePreferences);
+  const hasLensPreferences = Array.isArray(candidate.protagonistLensPreferences);
+  const narrativePressurePreferences = hasPressurePreferences
+    ? filterApprovedPreferenceItems(readStringArray(candidate.narrativePressurePreferences), APPROVED_STORY_FIT_PRESSURE_LABELS, STORY_FIT_SELECTION_LIMITS.narrativePressurePreferences)
+    : legacyNarrativePressureToStoryFitPreference(fallbackNarrativePressure);
+  const episodeEndingShapePreferences = hasEndingPreferences
+    ? filterApprovedPreferenceItems(readStringArray(candidate.episodeEndingShapePreferences), APPROVED_STORY_FIT_ENDING_LABELS, STORY_FIT_SELECTION_LIMITS.episodeEndingShapePreferences)
+    : legacyEpisodeEndingToStoryFitPreference(fallbackEndingShape);
+  const protagonistLensPreferences = hasLensPreferences
+    ? filterApprovedPreferenceItems(readStringArray(candidate.protagonistLensPreferences), APPROVED_STORY_FIT_CHARACTER_LENS_LABELS, STORY_FIT_SELECTION_LIMITS.characterLensPreferences)
+    : legacyProtagonistLensToStoryFitPreference(fallbackProtagonistLens);
 
   return {
-    preferredStoryTypes: preferredStoryTypes.slice(0, 12),
-    emotionalPromises: readStringArray(candidate.emotionalPromises).reduce((items, item) => addUniquePreferenceItem(items, item, 12), [] as string[]),
-    favoriteStoryWorlds: readStringArray(candidate.favoriteStoryWorlds).reduce((items, item) => addUniquePreferenceItem(items, item, 12), [] as string[]),
-    storyIngredients: storyIngredients.slice(0, 12),
-    characterLensPreferences: readStringArray(candidate.characterLensPreferences).reduce((items, item) => addUniquePreferenceItem(items, item, 12), [] as string[]),
-    hardAvoidances: readStringArray(candidate.hardAvoidances).reduce((items, item) => addUniquePreferenceItem(items, item, MAX_READER_HARD_AVOIDANCES), [] as string[]),
+    preferredStoryTypes,
+    emotionalPromises: filterApprovedPreferenceItems(readStringArray(candidate.emotionalPromises), APPROVED_STORY_FIT_EMOTIONAL_PROMISE_LABELS, STORY_FIT_SELECTION_LIMITS.emotionalPromises),
+    favoriteStoryWorlds: filterApprovedPreferenceItems(readStringArray(candidate.favoriteStoryWorlds), APPROVED_STORY_FIT_WORLD_LABELS, STORY_FIT_SELECTION_LIMITS.favoriteStoryWorlds),
+    storyIngredients: storyIngredients.slice(0, STORY_FIT_SELECTION_LIMITS.storyIngredients),
+    characterLensPreferences: filterApprovedPreferenceItems(readStringArray(candidate.characterLensPreferences), APPROVED_STORY_FIT_CHARACTER_LENS_LABELS, STORY_FIT_SELECTION_LIMITS.characterLensPreferences),
+    hardAvoidances: readStringArray(candidate.hardAvoidances).reduce((items, item) => addUniquePreferenceItem(items, item, STORY_FIT_SELECTION_LIMITS.hardAvoidances), [] as string[]),
     contentLane: isReaderProfileContentLane(candidate.contentLane) ? candidate.contentLane : "not-set",
-    narrativePressure: isReaderProfileNarrativePressure(candidate.narrativePressure) ? candidate.narrativePressure : migrateStoryIntensity(candidate.storyIntensity ?? legacyMoodValues),
-    episodeEndingShape: isReaderProfileEpisodeEndingShape(candidate.episodeEndingShape) ? candidate.episodeEndingShape : migrateEndingPreference(candidate.endingPreference),
-    protagonistLens: isReaderProfileProtagonistLens(candidate.protagonistLens) ? candidate.protagonistLens : migrateHeroPreference(candidate.heroPreference),
+    narrativePressure: narrativePressurePreferences.length ? STORY_FIT_PRESSURE_TO_LEGACY[narrativePressurePreferences[0]] ?? "not-set" : fallbackNarrativePressure,
+    episodeEndingShape: episodeEndingShapePreferences.length ? STORY_FIT_ENDING_TO_LEGACY[episodeEndingShapePreferences[0]] ?? "not-set" : fallbackEndingShape,
+    protagonistLens: protagonistLensPreferences.length ? STORY_FIT_CHARACTER_LENS_TO_LEGACY[protagonistLensPreferences[0]] ?? "not-set" : fallbackProtagonistLens,
+    narrativePressurePreferences,
+    episodeEndingShapePreferences,
+    protagonistLensPreferences,
+    storyFitProfileVersion: "v2",
     ...(typeof candidate.updatedAt === "string" && candidate.updatedAt.trim() ? { updatedAt: candidate.updatedAt } : {}),
   };
 }
 
-
-function filterApprovedPreferenceItems(values: string[], approvedLabels: Set<string>): string[] {
+function filterApprovedPreferenceItems(values: string[], approvedLabels: Set<string>, maxItems: number): string[] {
   return values.reduce((items, value) => {
     const approved = Array.from(approvedLabels).find((label) => label.toLowerCase() === value.trim().toLowerCase());
-    return approved ? addUniquePreferenceItem(items, approved, 12) : items;
+    return approved ? addUniquePreferenceItem(items, approved, maxItems) : items;
   }, [] as string[]);
+}
+
+function legacyNarrativePressureToStoryFitPreference(value: ReaderProfileNarrativePressure): string[] {
+  const match = Object.entries(STORY_FIT_PRESSURE_TO_LEGACY).find(([, legacy]) => legacy === value);
+  return match && value !== "not-set" ? [match[0]] : [];
+}
+
+function legacyEpisodeEndingToStoryFitPreference(value: ReaderProfileEpisodeEndingShape): string[] {
+  const match = Object.entries(STORY_FIT_ENDING_TO_LEGACY).find(([, legacy]) => legacy === value);
+  return match && value !== "not-set" ? [match[0]] : [];
+}
+
+function legacyProtagonistLensToStoryFitPreference(value: ReaderProfileProtagonistLens): string[] {
+  const match = Object.entries(STORY_FIT_CHARACTER_LENS_TO_LEGACY).find(([, legacy]) => legacy === value);
+  return match && value !== "not-set" ? [match[0]] : [];
 }
 
 function migrateLegacyGenreIngredients(values: string[]): string[] {
   return values.reduce((items, value) => {
     const normalized = normalizePreferenceText(value).toLowerCase();
-    if (normalized === "fantasy") return addUniquePreferenceItem(items, "Magic with rules", 12);
-    if (normalized === "science fiction" || normalized === "sci-fi" || normalized === "sci fi") return addUniquePreferenceItem(items, "Strange technology", 12);
+    if (normalized === "fantasy") return addUniquePreferenceItem(items, "Rules-based magic", STORY_FIT_SELECTION_LIMITS.storyIngredients);
+    if (normalized === "science fiction" || normalized === "sci-fi" || normalized === "sci fi") return addUniquePreferenceItem(items, "Strange technology or AI", STORY_FIT_SELECTION_LIMITS.storyIngredients);
     return items;
   }, [] as string[]);
 }
@@ -679,7 +791,7 @@ export function addUniquePreferenceItem(items: string[], next: string, maxItems:
 }
 
 export function hasReaderProfilePreferences(preferences: ReaderProfilePreferences): boolean {
-  return Boolean(preferences.preferredStoryTypes.length || (preferences.emotionalPromises?.length ?? 0) || (preferences.favoriteStoryWorlds?.length ?? 0) || preferences.storyIngredients.length || (preferences.characterLensPreferences?.length ?? 0) || preferences.hardAvoidances.length || preferences.contentLane !== "not-set" || preferences.narrativePressure !== "not-set" || preferences.episodeEndingShape !== "not-set" || preferences.protagonistLens !== "not-set");
+  return Boolean(preferences.preferredStoryTypes.length || (preferences.emotionalPromises?.length ?? 0) || (preferences.favoriteStoryWorlds?.length ?? 0) || preferences.storyIngredients.length || (preferences.characterLensPreferences?.length ?? 0) || (preferences.narrativePressurePreferences?.length ?? 0) || (preferences.episodeEndingShapePreferences?.length ?? 0) || (preferences.protagonistLensPreferences?.length ?? 0) || preferences.hardAvoidances.length || preferences.contentLane !== "not-set" || preferences.narrativePressure !== "not-set" || preferences.episodeEndingShape !== "not-set" || preferences.protagonistLens !== "not-set");
 }
 
 export function saveReaderProfilePreferences(nextPreferences: ReaderProfilePreferences, profile?: ReaderProfile, persist = true): ReaderProfile {
@@ -1291,5 +1403,22 @@ function normalizeStoryFeedbackMetadata(value: unknown): StoryFeedbackMetadata |
 }
 
 export function buildGenerationReaderProfileInput(profile: CanonicalReaderProfile): object {
-  return { readerId: profile.readerId, canonicalProfileVersion: profile.version, generationUsingCanonicalProfile: true, preferredDuration: profile.preferences.preferredDuration ?? profile.onboarding?.preferredDuration ?? null, preferredFormat: profile.preferences.preferredFormat ?? profile.onboarding?.preferredFormat ?? null, hardAvoidances: profile.preferences.hardAvoidances, explicitReaderPreferences: profile.preferences.explicitReaderPreferences, fearIntensity: profile.preferences.fearIntensity, weirdnessTolerance: profile.preferences.weirdnessTolerance, supernaturalAffinity: profile.preferences.supernaturalAffinity, ambiguityTolerance: profile.preferences.ambiguityTolerance, goreTolerance: profile.preferences.goreTolerance, sleepSafePreference: profile.preferences.sleepSafePreference, signals: profile.signals, feedbackSummary: { feedbackSignalCount: profile.signals.feedbackSignalCount, favoriteCount: profile.signals.favoriteCount, savedForLaterCount: profile.signals.savedForLaterCount, recentRatings: profile.recentFeedback?.slice(0, 5).map((event) => ({ rating: event.rating, reasons: event.reasons, storyTitle: event.storyTitle ?? null })) ?? [] } };
+  const explicit = normalizeReaderProfilePreferences(profile.preferences.explicitReaderPreferences);
+  const compactExplicitReaderPreferences = {
+    storyFitProfileVersion: explicit.storyFitProfileVersion,
+    preferredStoryTypes: explicit.preferredStoryTypes,
+    emotionalPromises: explicit.emotionalPromises ?? [],
+    favoriteStoryWorlds: explicit.favoriteStoryWorlds ?? [],
+    storyIngredients: explicit.storyIngredients,
+    characterLensPreferences: explicit.characterLensPreferences ?? [],
+    protagonistLensPreferences: explicit.protagonistLensPreferences ?? [],
+    narrativePressurePreferences: explicit.narrativePressurePreferences ?? [],
+    episodeEndingShapePreferences: explicit.episodeEndingShapePreferences ?? [],
+    hardAvoidances: explicit.hardAvoidances,
+    contentLane: explicit.contentLane,
+    narrativePressure: explicit.narrativePressure,
+    episodeEndingShape: explicit.episodeEndingShape,
+    protagonistLens: explicit.protagonistLens,
+  };
+  return { readerId: profile.readerId, canonicalProfileVersion: profile.version, generationUsingCanonicalProfile: true, preferredDuration: profile.preferences.preferredDuration ?? profile.onboarding?.preferredDuration ?? null, preferredFormat: profile.preferences.preferredFormat ?? profile.onboarding?.preferredFormat ?? null, hardAvoidances: profile.preferences.hardAvoidances, explicitReaderPreferences: compactExplicitReaderPreferences, fearIntensity: profile.preferences.fearIntensity, weirdnessTolerance: profile.preferences.weirdnessTolerance, supernaturalAffinity: profile.preferences.supernaturalAffinity, ambiguityTolerance: profile.preferences.ambiguityTolerance, goreTolerance: profile.preferences.goreTolerance, sleepSafePreference: profile.preferences.sleepSafePreference, signals: profile.signals, feedbackSummary: { feedbackSignalCount: profile.signals.feedbackSignalCount, favoriteCount: profile.signals.favoriteCount, savedForLaterCount: profile.signals.savedForLaterCount, recentRatings: profile.recentFeedback?.slice(0, 5).map((event) => ({ rating: event.rating, reasons: event.reasons, storyTitle: event.storyTitle ?? null })) ?? [] } };
 }
