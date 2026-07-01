@@ -3919,6 +3919,7 @@ export default function Home() {
 
   const closeMeetBloodWick = useCallback(() => {
     setIsMeetBloodWickOpen(false);
+    window.dispatchEvent(new CustomEvent("lantern:close-mobile-menu"));
   }, []);
 
   useEffect(() => {
@@ -11159,6 +11160,13 @@ function MobileTopHeader({
   onOpenMeetBloodWick: () => void;
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleCloseMobileMenu = () => setIsMenuOpen(false);
+
+    window.addEventListener("lantern:close-mobile-menu", handleCloseMobileMenu);
+    return () => window.removeEventListener("lantern:close-mobile-menu", handleCloseMobileMenu);
+  }, []);
 
   const handleNavigate = (view: AppView) => {
     setIsMenuOpen(false);

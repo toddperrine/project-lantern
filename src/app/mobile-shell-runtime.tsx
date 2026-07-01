@@ -324,6 +324,7 @@ function closeMobileMenu() {
 }
 
 function openMeetBloodWickModal() {
+  window.dispatchEvent(new CustomEvent("lantern:close-mobile-menu"));
   closeMobileMenu();
   closeAccountModal();
   closeRecapModal();
