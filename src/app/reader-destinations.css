@@ -909,7 +909,7 @@
 }
 
 
-.project-lantern-shell .bloodwick-meet-modal-backdrop {
+.project-lantern-shell .bloodwick-welcome-modal-backdrop {
   position: fixed !important;
   inset: 0 !important;
   z-index: 140 !important;
@@ -920,14 +920,14 @@
   opacity: 1 !important;
 }
 
-.project-lantern-shell .bloodwick-meet-modal[role="dialog"] {
+.project-lantern-shell .bloodwick-welcome-modal[role="dialog"] {
   position: relative !important;
   inset: auto !important;
   z-index: auto !important;
   display: block !important;
   align-items: initial !important;
   width: min(100%, 31rem) !important;
-  max-height: min(84vh, 38rem) !important;
+  max-height: min(84vh, 42rem) !important;
   overflow-y: auto !important;
   border: 1px solid rgb(107 112 120 / 0.34) !important;
   border-radius: 1.25rem !important;
@@ -938,41 +938,47 @@
   opacity: 1 !important;
 }
 
-.project-lantern-shell .bloodwick-meet-modal-header {
-  display: flex !important;
-  align-items: flex-start !important;
-  justify-content: space-between !important;
-  gap: 1rem !important;
+.project-lantern-shell .bloodwick-welcome-modal-header {
   background: transparent !important;
   color: #F2F1ED !important;
   padding: 0 !important;
 }
 
-.project-lantern-shell .bloodwick-meet-modal-eyebrow {
+.project-lantern-shell .bloodwick-welcome-modal-kicker {
   margin: 0 !important;
   color: #B87333 !important;
 }
 
-.project-lantern-shell .bloodwick-meet-modal-title,
-.project-lantern-shell .bloodwick-meet-modal h2,
-.project-lantern-shell .bloodwick-meet-modal h3 {
+.project-lantern-shell .bloodwick-welcome-modal-title,
+.project-lantern-shell .bloodwick-welcome-modal h2,
+.project-lantern-shell .bloodwick-welcome-modal h3 {
   color: #F2F1ED !important;
 }
 
-.project-lantern-shell .bloodwick-meet-modal-body {
+.project-lantern-shell .bloodwick-welcome-modal-image {
+  display: block !important;
+  width: 100% !important;
+  max-height: 280px !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  border: 1px solid rgb(107 112 120 / 0.28) !important;
+  border-radius: 1rem !important;
+}
+
+.project-lantern-shell .bloodwick-welcome-modal-body {
   background: transparent !important;
   color: rgb(242 241 237 / 0.78) !important;
 }
 
-.project-lantern-shell .bloodwick-meet-modal-body p {
+.project-lantern-shell .bloodwick-welcome-modal-body p {
   color: rgb(242 241 237 / 0.78) !important;
 }
 
-.project-lantern-shell .bloodwick-meet-modal-body em {
+.project-lantern-shell .bloodwick-welcome-modal-body em {
   color: #F2F1ED !important;
 }
 
-.project-lantern-shell .bloodwick-meet-modal-close {
+.project-lantern-shell .bloodwick-welcome-modal-close {
   border: 1px solid rgb(107 112 120 / 0.4) !important;
   background: rgb(11 11 13 / 0.84) !important;
   color: #F2F1ED !important;

@@ -4050,7 +4050,7 @@ export default function Home() {
               onClick={openMeetBloodWick}
               type="button"
             >
-              Meet BloodWick
+              Welcome to BloodWick
             </button>
             <NavTabs activeView={activeView} onChange={navigateToView} />
           </div>
@@ -11242,7 +11242,7 @@ function MobileTopHeader({
               }}
               type="button"
             >
-              Meet BloodWick
+              Welcome to BloodWick
             </button>
           </div>
         </nav>
@@ -11263,32 +11263,37 @@ function MeetBloodWickModal({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="bloodwick-meet-modal-backdrop" onClick={onClose}>
+    <div className="bloodwick-welcome-modal-backdrop" onClick={onClose}>
       <div
-        aria-labelledby="meet-bloodwick-title"
+        aria-labelledby="welcome-bloodwick-title"
         aria-modal="true"
-        className="bloodwick-meet-modal"
+        className="bloodwick-welcome-modal"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
       >
-        <div className="bloodwick-meet-modal-header">
-          <p className="bloodwick-meet-modal-eyebrow">Bloodwick</p>
-          <button
-            aria-label="Close Meet BloodWick"
-            className="bloodwick-meet-modal-close"
-            onClick={onClose}
-            type="button"
-          >
-            ×
-          </button>
+        <div className="bloodwick-welcome-modal-header">
+          <p className="bloodwick-welcome-modal-kicker">BLOODWICK</p>
         </div>
-        <h2 className="bloodwick-meet-modal-title" id="meet-bloodwick-title">Meet BloodWick</h2>
-        <div className="bloodwick-meet-modal-body">
+        <h2 className="bloodwick-welcome-modal-title" id="welcome-bloodwick-title">Welcome to BloodWick</h2>
+        <img
+          alt="Welcome to BloodWick"
+          className="bloodwick-welcome-modal-image"
+          src="/artwork/Welcome%20to%20BloodWick.png"
+        />
+        <div className="bloodwick-welcome-modal-body">
           <p>BloodWick is more than our name. Over the centuries, <em>wick</em> has meant the hidden thread that drinks fuel and feeds a flame, a village or dwelling place, something alive and quick with life, and, in older forms, something wicked, strange, or threatening.</p>
           <p>BloodWick is the immortal, hungry black thread that catches fire. BloodWick is the place at the end of the road where every evil thing lurks and you are moments away from a painful death. BloodWick is a story’s wicked driving force, the thing that keeps you reading and needing more.</p>
           <p>BloodWick is all of these things.</p>
           <p>Enjoy BloodWick.</p>
         </div>
+        <button
+          aria-label="Close Welcome to BloodWick"
+          className="bloodwick-welcome-modal-close"
+          onClick={onClose}
+          type="button"
+        >
+          Close
+        </button>
       </div>
     </div>
   );

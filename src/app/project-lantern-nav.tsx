@@ -28,7 +28,7 @@ export function ProjectLanternNav() {
           onClick={openMeetBloodWick}
           type="button"
         >
-          Meet BloodWick
+          Welcome to BloodWick
         </button>
         {NAV_ITEMS.map((item) => {
           const isActive = item.view === activeView;
