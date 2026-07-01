@@ -29,10 +29,10 @@ import { useEffect } from "react";
 const MOBILE_QUERY = "(max-width: 767px)";
 const DEMO_LATEST_STORY_STORAGE_KEY = "projectLantern.demoLatestStory.v1";
 const DEMO_LATEST_STORY_ID = "demo-the-half-life-of-magic";
-const NAV_ORDER = ["Home", "Stories", "Account"];
+const NAV_ORDER = ["Home", "Shelf", "Account"];
 const VIEW_BY_LABEL: Record<string, string> = {
   Home: "home",
-  Stories: "library",
+  Shelf: "library",
   Account: "account"
 };
 const TEXT_REPLACEMENTS: Array<[RegExp, string]> = [
@@ -413,8 +413,6 @@ function openMobileMenu() {
       }
     });
   }
-  const demoActive = isDemoStoryActive();
-  const anyStory = demoActive || hasRealStorySignal();
   menu.innerHTML = `
     <div data-mobile-menu-sheet="true">
       <div data-mobile-menu-header="true">
@@ -423,8 +421,6 @@ function openMobileMenu() {
       </div>
       <div data-mobile-menu-list="true">
         ${NAV_ORDER.map((label) => `<button data-mobile-menu-nav="${label}" type="button">${label}</button>`).join("")}
-        ${!anyStory ? `<button data-mobile-menu-load-demo="true" type="button">Load demo story</button>` : ""}
-        ${demoActive ? `<button data-mobile-menu-clear-demo="true" type="button">Clear demo story</button>` : ""}
       </div>
     </div>
   `;
