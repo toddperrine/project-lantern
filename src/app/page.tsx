@@ -14,7 +14,7 @@ import { useSearchParams } from "next/navigation";
 import { BloodwickHomeHero } from "@/components/home/BloodwickHomeHero";
 import { ContinueEpisodeCard } from "@/components/home/ContinueEpisodeCard";
 import { FearMoodGrid } from "@/components/home/FearMoodGrid";
-import { HOME_SECTION_ORDER } from "@/components/home/home-section-order";
+import { HOME_DASHBOARD_COLUMNS } from "@/components/home/home-dashboard-order";
 import { StoryQueueCard } from "@/components/home/StoryQueueCard";
 import {
   DEFAULT_EERIE_SAFETY_GUARDRAILS,
@@ -92,6 +92,7 @@ import {
   STORY_TYPE_CHIPS,
   getStoryTypePrimaryCategory,
   getStoryTypePromptRequirements,
+  getStoryTypeChipLabel,
   getStoryTypeStartCopy,
   getStoryTypeTextCompatibility,
   type StoryTypeChip,
@@ -3973,6 +3974,39 @@ export default function Home() {
             pendingStoryTitle={pendingStoryStart?.title ?? null}
           />
         ) : null}
+        {activeView === "home" ? (
+          <HomeView
+            activeMood={activeMood}
+            canUseDemoStory={!hasRealLatestStory}
+            continueDirection={continueDirection}
+            hasDemoStory={Boolean(demoStory)}
+            isDirectionOpen={isDirectionOpen}
+            isGenerating={isGenerating}
+            isContinuationGenerating={isContinuationGenerating}
+            isNewStoryGenerating={isNewStoryGenerating}
+            latestStory={latestStory}
+            onClearDemoStory={handleClearDemoStory}
+            onContinue={handleContinueLatest}
+            onDirectionChange={setContinueDirection}
+            onExportStory={handleExportLatestStory}
+            onLoadDemoStory={handleLoadDemoStory}
+            onMoodSelect={handleMoodSelect}
+            onOpenLibrary={() => navigateToView("library")}
+            onStartNewStory={handleStartSomethingNew}
+            onStartRecommendation={handleStartRecommendation}
+            onToggleDirection={() => setIsDirectionOpen((current) => !current)}
+            showStoryStartOptions={isStoryStartSelectionOpen}
+            readyStoryQueue={readyStoryQueue}
+            savedForLaterStoryQueue={savedForLaterStoryQueue}
+            onPassReadyStory={handlePassReadyStory}
+            onReadReadyStory={handleReadReadyStory}
+            onSaveReadyStoryForLater={handleSaveReadyStoryForLater}
+            suggestedStarts={suggestedStarts}
+            showStoryFitPrompt={shouldShowFirstRunStoryFitPrompt}
+            onStartStoryFitSetup={handleOpenStoryFitOnboarding}
+            onSkipStoryFitSetup={handleSkipStoryFitOnboarding}
+          />
+        ) : null}
         {activeView === "home" &&
         currentGeneratedStory &&
         generatedStoryPresentation ? (
@@ -4013,40 +4047,17 @@ export default function Home() {
             story={currentGeneratedStory}
           />
         ) : null}
-        {activeView === "home" &&
-        !(currentGeneratedStory && generatedStoryPresentation) ? (
-          <HomeView
-            activeMood={activeMood}
-            canUseDemoStory={!hasRealLatestStory}
-            continueDirection={continueDirection}
-            hasDemoStory={Boolean(demoStory)}
-            isDirectionOpen={isDirectionOpen}
-            isGenerating={isGenerating}
-            isContinuationGenerating={isContinuationGenerating}
-            isNewStoryGenerating={isNewStoryGenerating}
-            latestStory={latestStory}
-            onClearDemoStory={handleClearDemoStory}
-            onContinue={handleContinueLatest}
-            onDirectionChange={setContinueDirection}
-            onExportStory={handleExportLatestStory}
-            onLoadDemoStory={handleLoadDemoStory}
-            onMoodSelect={handleMoodSelect}
-            onOpenLibrary={() => navigateToView("library")}
-            onStartNewStory={handleStartSomethingNew}
-            onStartRecommendation={handleStartRecommendation}
-            onToggleDirection={() => setIsDirectionOpen((current) => !current)}
-            showStoryStartOptions={isStoryStartSelectionOpen}
-            readyStoryQueue={readyStoryQueue}
-            savedForLaterStoryQueue={savedForLaterStoryQueue}
-            onPassReadyStory={handlePassReadyStory}
-            onReadReadyStory={handleReadReadyStory}
-            onSaveReadyStoryForLater={handleSaveReadyStoryForLater}
-            suggestedStarts={suggestedStarts}
-            showStoryFitPrompt={shouldShowFirstRunStoryFitPrompt}
-            onStartStoryFitSetup={handleOpenStoryFitOnboarding}
-            onSkipStoryFitSetup={handleSkipStoryFitOnboarding}
-            diagnosticsPanels={diagnosticsPanels}
-          />
+        {activeView === "home" ? (
+          <>
+            <MobileDeveloperDiagnostics>
+              {diagnosticsPanels}
+            </MobileDeveloperDiagnostics>
+            <div className="hidden min-w-0 gap-3 md:grid">
+              <DesktopDeveloperDiagnostics>
+                {diagnosticsPanels}
+              </DesktopDeveloperDiagnostics>
+            </div>
+          </>
         ) : null}
         {activeView === "library" ? (
           <LibraryView
@@ -4994,7 +5005,6 @@ function MobileDeveloperDiagnostics({ children }: { children: ReactNode }) {
 }
 
 function HomeView(props: {
-  diagnosticsPanels: ReactNode;
   showStoryFitPrompt?: boolean;
   onStartStoryFitSetup?: () => void;
   onSkipStoryFitSetup?: () => void;
@@ -5026,10 +5036,6 @@ function HomeView(props: {
   suggestedStarts: StoryStart[];
 }) {
   const {
-    diagnosticsPanels,
-    showStoryFitPrompt = false,
-    onStartStoryFitSetup,
-    onSkipStoryFitSetup,
     activeMood,
     canUseDemoStory,
     continueDirection,
@@ -5058,15 +5064,30 @@ function HomeView(props: {
     suggestedStarts,
   } = props;
   const [isRecapOpen, setIsRecapOpen] = useState(false);
+  const continueColumnRef = useRef<HTMLDivElement | null>(null);
+  const startColumnRef = useRef<HTMLDivElement | null>(null);
   const storyBrief = latestStory ? createStoryBrief(latestStory) : null;
-  void HOME_SECTION_ORDER;
+  void HOME_DASHBOARD_COLUMNS;
+
+  const focusDashboardColumn = useCallback((column: "continue" | "start") => {
+    const node = column === "continue" ? continueColumnRef.current : startColumnRef.current;
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "start" });
+    node.focus({ preventScroll: true });
+  }, []);
+
+  const latestStoryTypeLabel = latestStory
+    ? getStoryTypeChipLabel(latestStory.selectedStoryTypeChipId) ??
+      getStoryTypeChipLabel(latestStory.selectedStoryTypeChipLabel) ??
+      getStoryTypeChipLabel(latestStory.genrePreset)
+    : null;
 
   return (
     <div className="grid min-w-0 max-w-full gap-6 overflow-x-hidden md:gap-8">
       <BloodwickHomeHero
         body="Start a series. Return whenever you want. Bloodwick keeps the dread alive."
-        onPrimaryAction={onStartNewStory}
-        onSecondaryAction={latestStory ? () => onContinue() : undefined}
+        onPrimaryAction={() => focusDashboardColumn("start")}
+        onSecondaryAction={latestStory ? () => focusDashboardColumn("continue") : undefined}
         onTertiaryAction={onOpenLibrary}
         primaryActionLabel="Start Something New"
         secondaryActionLabel={
@@ -5075,65 +5096,72 @@ function HomeView(props: {
         tertiaryActionLabel="Stories"
         title="Scary stories that know what haunts you."
       />
-      {latestStory && storyBrief ? (
-        <ContinueEpisodeCard
-          direction={continueDirection}
-          heroName={storyBrief.heroName}
-          heroRole={storyBrief.heroRole}
-          hook={storyBrief.hook}
-          isDirectionOpen={isDirectionOpen}
-          isGenerating={isContinuationGenerating}
-          isRecapOpen={isRecapOpen}
-          onCloseRecap={() => setIsRecapOpen(false)}
-          onContinue={onContinue}
-          onDirectionChange={onDirectionChange}
-          onExport={onExportStory}
-          onOpenRecap={() => setIsRecapOpen(true)}
-          onToggleDirection={onToggleDirection}
-          recap={storyBrief.recap}
-          struggle={storyBrief.struggle}
-          title={latestStory.title}
-        />
-      ) : null}
-      <ReadyStoryQueuePanel
-        isGenerating={isGenerating}
-        items={readyStoryQueue}
-        onPass={onPassReadyStory}
-        onRead={onReadReadyStory}
-        onSaveForLater={onSaveReadyStoryForLater}
-        savedForLaterCount={savedForLaterStoryQueue.length}
-      />
-      <FearMoodGrid activeMood={activeMood} onSelect={onMoodSelect} />
-      {!showStoryStartOptions ? (
-        <StartSomethingNewPanel
-          canUseDemoStory={false}
-          hasDemoStory={hasDemoStory}
+      <div className="grid min-w-0 gap-4 lg:grid-cols-3" data-home-dashboard="three-actions">
+        <div ref={continueColumnRef} tabIndex={-1} className="min-w-0 scroll-mt-4 focus:outline-none">
+          {latestStory && storyBrief ? (
+            <ContinueEpisodeCard
+              direction={continueDirection}
+              hook={storyBrief.hook}
+              isDirectionOpen={isDirectionOpen}
+              isGenerating={isContinuationGenerating}
+              isRecapOpen={isRecapOpen}
+              onCloseRecap={() => setIsRecapOpen(false)}
+              onContinue={onContinue}
+              onDirectionChange={onDirectionChange}
+              onExport={onExportStory}
+              onOpenRecap={() => setIsRecapOpen(true)}
+              onToggleDirection={onToggleDirection}
+              recap={storyBrief.recap}
+              storyTypeLabel={latestStoryTypeLabel}
+              title={latestStory.title}
+            />
+          ) : (
+            <section className="min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
+                Continue a series
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-bloodwick-white">
+                No series in progress yet.
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-bloodwick-white/68">
+                Start something new to begin your first Bloodwick series.
+              </p>
+            </section>
+          )}
+        </div>
+        <div ref={startColumnRef} tabIndex={-1} className="grid min-w-0 scroll-mt-4 gap-4 focus:outline-none">
+          <FearMoodGrid activeMood={activeMood} onSelect={onMoodSelect} />
+          {!showStoryStartOptions ? (
+            <StartSomethingNewPanel
+              canUseDemoStory={false}
+              hasDemoStory={hasDemoStory}
+              isGenerating={isGenerating}
+              isNewStoryGenerating={isNewStoryGenerating}
+              onClearDemoStory={onClearDemoStory}
+              onLoadDemoStory={onLoadDemoStory}
+              onStartNewStory={onStartNewStory}
+              selectedStoryTypeLabel={getStoryTypeChip(activeMood).label}
+            />
+          ) : (
+            <SuggestedStoryStarts
+              activeMood={activeMood}
+              canUseDemoStory={false}
+              hasDemoStory={hasDemoStory}
+              onClearDemoStory={onClearDemoStory}
+              onLoadDemoStory={onLoadDemoStory}
+              stories={suggestedStarts}
+              onStart={onStartRecommendation}
+            />
+          )}
+        </div>
+        <ReadyStoryQueuePanel
           isGenerating={isGenerating}
-          isNewStoryGenerating={isNewStoryGenerating}
-          onClearDemoStory={onClearDemoStory}
-          onLoadDemoStory={onLoadDemoStory}
-          onStartNewStory={onStartNewStory}
-          selectedStoryTypeLabel={getStoryTypeChip(activeMood).label}
+          items={readyStoryQueue}
+          onPass={onPassReadyStory}
+          onRead={onReadReadyStory}
+          onSaveForLater={onSaveReadyStoryForLater}
+          savedForLaterCount={savedForLaterStoryQueue.length}
         />
-      ) : null}
-      {showStoryStartOptions ? (
-        <SuggestedStoryStarts
-          activeMood={activeMood}
-          canUseDemoStory={false}
-          hasDemoStory={hasDemoStory}
-          onClearDemoStory={onClearDemoStory}
-          onLoadDemoStory={onLoadDemoStory}
-          stories={suggestedStarts}
-          onStart={onStartRecommendation}
-        />
-      ) : null}
-      <MobileDeveloperDiagnostics>
-        {diagnosticsPanels}
-      </MobileDeveloperDiagnostics>
-      <div className="hidden min-w-0 gap-3 md:grid">
-        <DesktopDeveloperDiagnostics>
-          {diagnosticsPanels}
-        </DesktopDeveloperDiagnostics>
       </div>
     </div>
   );
@@ -6003,11 +6031,8 @@ function MobileMoodPicker({
   return (
     <section className="min-w-0">
       <h2 className="text-xl font-semibold leading-tight text-paper">
-        What kind of fear are you in the mood for?
+        What kind of fear are you in the mood for right now?
       </h2>
-      <p className="mt-1 text-sm leading-5 text-paper/60">
-        Choose the flavor of dread for your next story.
-      </p>
       <div className="mt-3 flex min-w-0 flex-wrap gap-2">
         {AVAILABLE_MOOD_CHIPS.map((mood) => {
           const chip = getStoryTypeChip(mood);
@@ -6048,27 +6073,8 @@ function StartSomethingNewPanel({
 }) {
   const startCopy = getStoryTypeStartCopy(selectedStoryTypeLabel);
   return (
-    <section className="min-w-0 rounded-md border border-lantern-gold/25 bg-paper/10 p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
-        Start Something New
-      </p>
-      <h2 className="mt-2 text-2xl font-semibold text-paper md:text-3xl">
-        Let Bloodwick find your next story.
-      </h2>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-paper/65">
-        Pick a story type above, then start a story shaped by that choice.
-      </p>
-      <div className="mt-4 min-w-0 rounded-md border border-lantern-gold/25 bg-night-ink/35 p-3">
-        <p className="break-words text-sm font-semibold leading-6 text-lantern-gold">
-          {startCopy.confirmation}
-        </p>
-        {startCopy.detail ? (
-          <p className="mt-1 break-words text-xs leading-5 text-paper/65">
-            {startCopy.detail}
-          </p>
-        ) : null}
-      </div>
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+    <section className="min-w-0 rounded-md border border-lantern-gold/25 bg-paper/10 p-4">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           className="inline-flex min-w-0 items-center gap-2 whitespace-normal rounded-md bg-lantern-gold px-5 py-3 text-left text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-60"
           disabled={isGenerating}
@@ -6251,7 +6257,7 @@ function CurrentStoryCard({
           <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
             <div className="min-w-0 rounded-md border border-aged-brass/20 bg-white/65 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-aged-brass">
-                Last time recap preview
+                Last time
               </p>
               <p className="mt-2 text-sm leading-6 text-primary-dark/75">
                 {brief.recap}
@@ -6262,7 +6268,7 @@ function CurrentStoryCard({
                 <HeroPortrait name={brief.heroName} size="large" />
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lantern-gold/75">
-                    Hero / heroine
+                    Protagonist
                   </p>
                   <p className="mt-1 text-lg font-semibold text-primary-light">
                     {brief.heroName}
@@ -6423,11 +6429,8 @@ function MoodPicker({
     <section className={hasCurrentStory ? "min-w-0" : "min-w-0 pt-1"}>
       <div className="max-w-3xl">
         <h2 className="text-2xl font-semibold text-paper md:text-3xl">
-          What kind of fear are you in the mood for?
+          What kind of fear are you in the mood for right now?
         </h2>
-        <p className="mt-2 text-sm leading-6 text-paper/62">
-          Choose the flavor of dread for your next story.
-        </p>
         {!hasCurrentStory ? (
           <p className="mt-3 text-sm leading-6 text-paper/70">
             Start your first story. Once you have one in progress, your next
@@ -6547,7 +6550,7 @@ function StoryStartCard({
             <HeroPortrait name={story.heroName} />
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">
-                Hero / heroine
+                Protagonist
               </p>
               <p className="mt-1 text-sm font-semibold text-paper">
                 {story.heroName}

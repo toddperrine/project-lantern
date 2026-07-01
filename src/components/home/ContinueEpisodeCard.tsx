@@ -2,9 +2,7 @@ export type ContinueEpisodeCardProps = {
   title: string;
   hook: string;
   recap: string;
-  heroName: string;
-  heroRole: string;
-  struggle: string;
+  storyTypeLabel?: string | null;
   direction: string;
   isDirectionOpen: boolean;
   isGenerating: boolean;
@@ -20,8 +18,6 @@ export type ContinueEpisodeCardProps = {
 export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
   const {
     direction,
-    heroName,
-    heroRole,
     hook,
     isDirectionOpen,
     isGenerating,
@@ -33,64 +29,37 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
     onOpenRecap,
     onToggleDirection,
     recap,
-    struggle,
+    storyTypeLabel,
     title,
   } = props;
   const directionId = "continue-episode-direction";
+  const recapId = "last-time-recap-dialog";
 
   return (
     <section className="min-w-0 overflow-hidden rounded-bloodwick-lg border border-bloodwick-red/25 bg-bloodwick-obsidian/75 shadow-bloodwick-soft">
-      <div className="grid min-w-0 gap-5 p-5 sm:p-6 lg:p-7">
+      <div className="grid min-w-0 gap-5 p-4 sm:p-5">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
-            Current Story / Next Chapter
+            Continue a series
           </p>
-          <h2 className="mt-2 text-3xl font-semibold leading-tight text-bloodwick-white md:text-5xl">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {storyTypeLabel ? (
+              <span className="rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold text-bloodwick-white/78">
+                {storyTypeLabel}
+              </span>
+            ) : null}
+          </div>
+          <h2 className="mt-3 text-2xl font-semibold leading-tight text-bloodwick-white">
             {title}
           </h2>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-bloodwick-white/68">
+          <p className="mt-3 text-sm leading-6 text-bloodwick-white/68">
             {hook}
           </p>
         </div>
 
-        <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="min-w-0 rounded-bloodwick-sm border border-bloodwick-white/10 bg-bloodwick-white/[0.06] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-bloodwick-copper">
-              Last time recap preview
-            </p>
-            <p className="mt-2 text-sm leading-6 text-bloodwick-white/68">
-              {recap}
-            </p>
-          </div>
-          <div className="min-w-0 rounded-bloodwick-sm border border-bloodwick-red/20 bg-bloodwick-plum/55 p-4">
-            <div className="flex items-center gap-3">
-              <div
-                className="flex size-12 shrink-0 items-center justify-center rounded-full border border-bloodwick-red/35 bg-bloodwick-red/10 text-sm font-semibold text-bloodwick-white"
-                aria-hidden="true"
-              >
-                {getInitials(heroName || title)}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-bloodwick-copper">
-                  Hero / heroine
-                </p>
-                <p className="mt-1 text-lg font-semibold text-bloodwick-white">
-                  {heroName || "Unknown"}
-                </p>
-                <p className="mt-1 text-xs leading-5 text-bloodwick-white/55">
-                  {heroRole}
-                </p>
-              </div>
-            </div>
-            <p className="mt-4 text-sm leading-6 text-bloodwick-white/70">
-              {struggle}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <div className="flex flex-col gap-2">
           <button
-            className="rounded-xl bg-bloodwick-red px-5 py-3 text-sm font-semibold text-bloodwick-white transition hover:bg-bloodwick-red/90 disabled:cursor-not-allowed disabled:opacity-55"
+            className="rounded-xl bg-bloodwick-red px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:bg-bloodwick-red/90 disabled:cursor-not-allowed disabled:opacity-55"
             disabled={isGenerating}
             onClick={() => onContinue()}
             type="button"
@@ -100,7 +69,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
           <button
             aria-controls={directionId}
             aria-expanded={isDirectionOpen}
-            className="rounded-xl border border-bloodwick-copper/50 bg-bloodwick-copper/10 px-5 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper disabled:cursor-not-allowed disabled:opacity-55"
+            className="rounded-xl border border-bloodwick-copper/50 bg-bloodwick-copper/10 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper disabled:cursor-not-allowed disabled:opacity-55"
             disabled={isGenerating}
             onClick={onToggleDirection}
             type="button"
@@ -108,16 +77,16 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
             Next Chapter with Input
           </button>
           <button
-            aria-controls="last-chapter-recap-preview"
+            aria-controls={recapId}
             aria-expanded={isRecapOpen}
-            className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-5 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
+            className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
             onClick={onOpenRecap}
             type="button"
           >
-            Last Chapter Recap
+            Recap
           </button>
           <button
-            className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-5 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
+            className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
             onClick={onExport}
             type="button"
           >
@@ -153,44 +122,32 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
         ) : null}
 
         {isRecapOpen ? (
-          <div
-            className="rounded-bloodwick-sm border border-bloodwick-white/10 bg-bloodwick-white/[0.06] p-4"
-            id="last-chapter-recap-preview"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-bloodwick-copper">
-                  Last Chapter Recap
-                </p>
-                <h3 className="mt-1 text-xl font-semibold text-bloodwick-white">
-                  {title}
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
+            <div
+              aria-modal="true"
+              className="max-h-[82vh] w-full max-w-xl overflow-auto rounded-bloodwick-lg border border-bloodwick-white/15 bg-bloodwick-obsidian p-5 shadow-bloodwick-soft"
+              id={recapId}
+              role="dialog"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="text-2xl font-semibold text-bloodwick-white">
+                  Last time
                 </h3>
+                <button
+                  className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-3 py-2 text-sm font-semibold text-bloodwick-white"
+                  onClick={onCloseRecap}
+                  type="button"
+                >
+                  Close
+                </button>
               </div>
-              <button
-                className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-3 py-2 text-sm font-semibold text-bloodwick-white"
-                onClick={onCloseRecap}
-                type="button"
-              >
-                Close
-              </button>
+              <p className="mt-4 text-sm leading-6 text-bloodwick-white/72">
+                {recap}
+              </p>
             </div>
-            <p className="mt-3 text-sm leading-6 text-bloodwick-white/68">
-              {recap}
-            </p>
           </div>
         ) : null}
       </div>
     </section>
-  );
-}
-
-function getInitials(value: string): string {
-  return (
-    value
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase())
-      .join("") || "BW"
   );
 }

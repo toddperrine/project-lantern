@@ -1,3 +1,4 @@
+import { getStoryTypeChipLabel } from "@/lib/story-types";
 import {
   formatReadyStoryCreatorCredit,
   type ReadyStoryQueueItem,
@@ -22,14 +23,17 @@ export function StoryQueueCard(props: StoryQueueCardProps) {
         ? "Preparation failed — Read can try again"
         : "Queued";
   const sourceLabel = getBloodwickSourceLabel(item);
+  const storyTypeLabel = getStoryTypeChipLabel(item.mood) ?? getStoryTypeChipLabel(item.genre);
 
   return (
     <article className="grid min-w-0 overflow-hidden rounded-bloodwick border border-bloodwick-white/10 bg-bloodwick-obsidian/70 shadow-bloodwick-soft md:grid-cols-[minmax(0,1fr)_180px]">
       <div className="min-w-0 p-4 sm:p-5">
         <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-bloodwick-white/78">
-            {item.mood || item.genre}
-          </span>
+          {storyTypeLabel ? (
+            <span className="rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold text-bloodwick-white/78">
+              {storyTypeLabel}
+            </span>
+          ) : null}
           <span className="rounded-full border border-bloodwick-white/12 bg-bloodwick-white/[0.06] px-3 py-1 text-xs font-semibold text-bloodwick-white/60">
             {statusLabel}
           </span>

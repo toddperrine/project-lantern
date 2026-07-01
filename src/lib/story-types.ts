@@ -70,9 +70,25 @@ export function getStoryTypeStartCopy(storyTypeLabel?: string | null): { confirm
   }
 
   return {
-    confirmation: `Selected story type: ${label}`,
-    detail: "Bloodwick will use this to shape the next story.",
+    confirmation: "",
+    detail: "",
     button: `Start ${label} Story`,
     loading: `Writing a ${label} story for you…`
   };
+}
+
+
+export function getStoryTypeChipLabel(value?: string | null): string | null {
+  if (!value) return null;
+
+  const normalized = value.toLowerCase().trim();
+
+  const match = STORY_TYPE_CHIPS.find((chip) => {
+    return (
+      chip.id.toLowerCase() === normalized ||
+      chip.label.toLowerCase() === normalized
+    );
+  });
+
+  return match?.label ?? null;
 }
