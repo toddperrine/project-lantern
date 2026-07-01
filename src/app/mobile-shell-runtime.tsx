@@ -433,7 +433,7 @@ function openMobileMenu() {
       </div>
       <div data-mobile-menu-list="true">
         ${NAV_ORDER.map((label) => `<button data-mobile-menu-nav="${label}" type="button">${label}</button>`).join("")}
-        <button data-mobile-menu-meet-bloodwick="true" type="button">Meet BloodWick</button>
+        <button data-mobile-menu-meet-bloodwick="true" type="button">Welcome to BloodWick</button>
       </div>
     </div>
   `;

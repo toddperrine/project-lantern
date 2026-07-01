@@ -1365,37 +1365,35 @@ textarea {
   color: var(--bloodwick-white);
 }
 
-.bloodwick-meet-modal-backdrop {
+.bloodwick-welcome-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 140;
   display: grid;
   place-items: center;
-  background: rgb(11 11 13 / 0.82);
+  background: rgb(11 11 13 / 0.78);
   padding: 1rem;
 }
 
-.bloodwick-meet-modal {
+.bloodwick-welcome-modal {
   width: min(100%, 31rem);
-  max-height: min(84vh, 38rem);
+  max-height: min(84vh, 42rem);
   overflow-y: auto;
-  border: 1px solid rgb(107 112 120 / 0.38);
+  border: 1px solid rgb(107 112 120 / 0.34);
   border-radius: 1.25rem;
-  background: rgb(11 11 13 / 0.98);
+  background: rgb(11 11 13 / 0.96);
   color: #F2F1ED;
   padding: 1rem;
-  box-shadow: 0 1.5rem 4rem rgb(11 11 13 / 0.72);
+  box-shadow: 0 24px 80px rgb(11 11 13 / 0.72);
   opacity: 1;
 }
 
-.bloodwick-meet-modal-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
+.bloodwick-welcome-modal-header {
+  background: transparent;
+  color: #F2F1ED;
 }
 
-.bloodwick-meet-modal-eyebrow {
+.bloodwick-welcome-modal-kicker {
   margin: 0;
   color: #B87333;
   font-size: 0.72rem;
@@ -1405,7 +1403,7 @@ textarea {
   text-transform: uppercase;
 }
 
-.bloodwick-meet-modal-title {
+.bloodwick-welcome-modal-title {
   margin: 0.25rem 0 0;
   color: #F2F1ED;
   font-size: 1.55rem;
@@ -1413,36 +1411,56 @@ textarea {
   line-height: 1.12;
 }
 
-.bloodwick-meet-modal-body {
+.bloodwick-welcome-modal h2,
+.bloodwick-welcome-modal h3 {
+  color: #F2F1ED;
+}
+
+.bloodwick-welcome-modal-image {
+  display: block;
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  object-position: center;
+  border: 1px solid rgb(107 112 120 / 0.28);
+  border-radius: 1rem;
+  margin-top: 1rem;
+}
+
+.bloodwick-welcome-modal-body {
   display: grid;
   gap: 0.85rem;
   margin-top: 1rem;
-  color: rgb(242 241 237 / 0.84);
+  background: transparent;
+  color: rgb(242 241 237 / 0.78);
   font-size: 0.95rem;
   line-height: 1.62;
 }
 
-.bloodwick-meet-modal-body p {
+.bloodwick-welcome-modal-body p {
   margin: 0;
+  color: rgb(242 241 237 / 0.78);
 }
 
-.bloodwick-meet-modal-body em {
+.bloodwick-welcome-modal-body em {
   color: #F2F1ED;
 }
 
-.bloodwick-meet-modal-close {
+.bloodwick-welcome-modal-close {
   min-height: 44px;
   min-width: 44px;
-  border: 1px solid rgb(242 241 237 / 0.2);
+  width: 100%;
+  margin-top: 1rem;
+  border: 1px solid rgb(107 112 120 / 0.4);
   border-radius: 0.75rem;
-  background: rgb(242 241 237 / 0.08);
+  background: rgb(11 11 13 / 0.84);
   color: #F2F1ED;
-  font-size: 1.35rem;
+  font-size: 0.95rem;
   font-weight: 800;
   line-height: 1;
 }
 
-.bloodwick-meet-modal-close:focus-visible {
+.bloodwick-welcome-modal-close:focus-visible {
   outline: 3px solid #B87333;
   outline-offset: 2px;
 }
