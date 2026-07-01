@@ -29,17 +29,62 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.bloodwick-action-card {
-  flex: 0 0 min(86vw, 28rem);
-  min-width: 0;
+.bloodwick-action-carousel {
+  position: relative;
   overflow: hidden;
+  max-width: 100%;
+}
+
+.bloodwick-action-carousel__track {
+  display: flex;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bloodwick-action-carousel__track::-webkit-scrollbar {
+  display: none;
+}
+
+.bloodwick-action-carousel__panel {
+  flex: 0 0 100%;
   scroll-snap-align: start;
-  min-height: auto;
-  max-height: none;
+  overflow: visible;
   border: 1px solid rgb(var(--bloodwick-steel-gray-rgb) / 0.28);
   border-radius: 1.75rem;
   background: rgb(var(--bloodwick-obsidian-rgb) / 0.92);
-  box-shadow: 0 18px 60px rgb(var(--bloodwick-obsidian-rgb) / 0.36);
+  color: var(--bloodwick-warm-white);
+}
+
+.bloodwick-action-carousel__dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.bloodwick-action-carousel__dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(var(--bloodwick-steel-gray-rgb) / 0.55);
+  padding: 0;
+}
+
+.bloodwick-action-carousel__dot[aria-current="true"] {
+  background: var(--bloodwick-blood-red);
+}
+
+.bloodwick-action-card {
+  min-width: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 1.75rem;
+  background: transparent;
+  box-shadow: none;
   color: var(--bloodwick-warm-white);
   padding: 0.875rem;
 }
@@ -69,8 +114,8 @@
 }
 
 @media (min-width: 1180px) {
-  .bloodwick-action-card {
-    flex-basis: calc((100% - 2rem) / 3);
+  .bloodwick-action-carousel__panel {
+    flex-basis: 100%;
   }
 }
 

@@ -34,7 +34,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
   } = props;
   const directionId = "continue-episode-direction-dialog";
   const recapId = "last-time-recap-dialog";
-  const teaser = truncateWords(hook, 30);
+  const teaser = truncateWords(hook, 35);
 
   return (
     <article className="bloodwick-action-card">

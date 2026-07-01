@@ -5815,7 +5815,13 @@ function ReadyStoryQueuePanel({
   onRead: (item: ReadyStoryQueueItem) => void;
   onSaveForLater: (item: ReadyStoryQueueItem) => void;
 }) {
-  if (!items.length) {
+  const [visibleQueueIndex, setVisibleQueueIndex] = useState(0);
+  const visibleItems = items.slice(0, 3);
+  const visibleItem = visibleItems.length
+    ? visibleItems[visibleQueueIndex % visibleItems.length]
+    : null;
+
+  if (!visibleItem) {
     return (
       <article className="bloodwick-action-card">
         <p className="bloodwick-action-card__eyebrow">Waiting in the Dark</p>
@@ -5840,15 +5846,26 @@ function ReadyStoryQueuePanel({
       </p>
 
       <div className="mt-4 grid gap-3">
-        {items.slice(0, 3).map((item) => (
-          <StoryQueueCard
-            item={item}
-            key={item.id}
-            onPass={onPass}
-            onRead={onRead}
-            onSaveForLater={onSaveForLater}
-          />
-        ))}
+        <StoryQueueCard
+          item={visibleItem}
+          key={visibleItem.id}
+          onPass={onPass}
+          onRead={onRead}
+          onSaveForLater={onSaveForLater}
+        />
+        {visibleItems.length > 1 ? (
+          <button
+            className="rounded-xl border border-bloodwick-steel/40 bg-bloodwick-obsidian/60 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
+            onClick={() =>
+              setVisibleQueueIndex((currentIndex) =>
+                (currentIndex + 1) % visibleItems.length,
+              )
+            }
+            type="button"
+          >
+            More waiting stories
+          </button>
+        ) : null}
       </div>
     </article>
   );
