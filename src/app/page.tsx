@@ -909,6 +909,7 @@ export default function Home() {
     useState(false);
   const [isBloodwickSignInModalDismissed, setIsBloodwickSignInModalDismissed] =
     useState(false);
+  const [isMeetBloodWickOpen, setIsMeetBloodWickOpen] = useState(false);
   const [isCloudProjectsLoading, setIsCloudProjectsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [continueDirection, setContinueDirection] = useState("");
@@ -3912,6 +3913,21 @@ export default function Home() {
     !authState.currentUser &&
     !isBloodwickSignInModalDismissed;
 
+  const openMeetBloodWick = useCallback(() => {
+    setIsMeetBloodWickOpen(true);
+  }, []);
+
+  const closeMeetBloodWick = useCallback(() => {
+    setIsMeetBloodWickOpen(false);
+  }, []);
+
+  useEffect(() => {
+    const handleOpenMeetBloodWick = () => openMeetBloodWick();
+
+    window.addEventListener("lantern:open-meet-bloodwick", handleOpenMeetBloodWick);
+    return () => window.removeEventListener("lantern:open-meet-bloodwick", handleOpenMeetBloodWick);
+  }, [openMeetBloodWick]);
+
   const diagnosticsPanels = (
     <>
       <AppStateDiagnostics
@@ -4015,6 +4031,7 @@ export default function Home() {
             navigateHome();
           }}
           onNavigate={navigateToView}
+          onOpenMeetBloodWick={openMeetBloodWick}
         />
         <header className="hidden min-w-0 flex-col gap-5 border-b border-paper/10 pb-6 md:flex md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
@@ -4026,7 +4043,16 @@ export default function Home() {
               Start a series. Return whenever you want. Bloodwick keeps the dread alive.
             </p>
           </div>
-          <NavTabs activeView={activeView} onChange={navigateToView} />
+          <div className="flex min-w-0 flex-col items-stretch gap-2 md:items-end">
+            <button
+              className="w-full rounded-md border border-[#6B7078]/35 bg-[#0B0B0D]/60 px-3 py-2 text-center text-xs font-semibold leading-5 text-[#F2F1ED]/75 transition hover:border-[#B87333] hover:text-[#F2F1ED] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B87333] md:w-fit"
+              onClick={openMeetBloodWick}
+              type="button"
+            >
+              Meet BloodWick
+            </button>
+            <NavTabs activeView={activeView} onChange={navigateToView} />
+          </div>
         </header>
 
         <BloodwickSignInModal
@@ -4041,6 +4067,7 @@ export default function Home() {
           onSubmit={handleModalSignIn}
           password={modalSignInPassword}
         />
+        {isMeetBloodWickOpen ? <MeetBloodWickModal onClose={closeMeetBloodWick} /> : null}
         {activeView === "account" ? <AuthShell /> : null}
         {statusMessage ? <Status tone="info">{statusMessage}</Status> : null}
         {isGenerating ? (
@@ -11124,24 +11151,14 @@ function MobileTopHeader({
   activeView,
   onGoHome,
   onNavigate,
+  onOpenMeetBloodWick,
 }: {
   activeView: AppView;
   onGoHome: () => void;
   onNavigate: (view: AppView) => void;
+  onOpenMeetBloodWick: () => void;
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isMeetBloodWickOpen, setIsMeetBloodWickOpen] = useState(false);
-
-  useEffect(() => {
-    if (!isMeetBloodWickOpen) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsMeetBloodWickOpen(false);
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isMeetBloodWickOpen]);
 
   const handleNavigate = (view: AppView) => {
     setIsMenuOpen(false);
@@ -11213,7 +11230,7 @@ function MobileTopHeader({
               className="rounded-lg px-3 py-2 text-left text-sm font-semibold leading-tight text-paper/75 hover:bg-paper/10 hover:text-paper"
               onClick={() => {
                 setIsMenuOpen(false);
-                setIsMeetBloodWickOpen(true);
+                onOpenMeetBloodWick();
               }}
               type="button"
             >
@@ -11222,38 +11239,50 @@ function MobileTopHeader({
           </div>
         </nav>
       ) : null}
-
-      {isMeetBloodWickOpen ? (
-        <div className="bloodwick-meet-modal" onClick={() => setIsMeetBloodWickOpen(false)}>
-          <div
-            aria-labelledby="meet-bloodwick-title"
-            aria-modal="true"
-            className="bloodwick-meet-modal-panel"
-            onClick={(event) => event.stopPropagation()}
-            role="dialog"
-          >
-            <div className="bloodwick-meet-modal-header">
-              <p className="bloodwick-meet-modal-eyebrow">Bloodwick</p>
-              <button
-                aria-label="Close Meet BloodWick"
-                className="bloodwick-meet-modal-close"
-                onClick={() => setIsMeetBloodWickOpen(false)}
-                type="button"
-              >
-                ×
-              </button>
-            </div>
-            <h2 className="bloodwick-meet-modal-title" id="meet-bloodwick-title">Meet BloodWick</h2>
-            <div className="bloodwick-meet-modal-body">
-              <p>BloodWick is more than our name. Over the centuries, <em>wick</em> has meant the hidden thread that drinks fuel and feeds a flame, a village or dwelling place, something alive and quick with life, and, in older forms, something wicked, strange, or threatening.</p>
-              <p>BloodWick is the immortal, hungry black thread that catches fire. BloodWick is the place at the end of the road where every evil thing lurks and you are moments away from a painful death. BloodWick is a story’s wicked driving force, the thing that keeps you reading and needing more.</p>
-              <p>BloodWick is all of these things.</p>
-              <p>Enjoy BloodWick.</p>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </header>
+  );
+}
+
+
+function MeetBloodWickModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="bloodwick-meet-modal" onClick={onClose}>
+      <div
+        aria-labelledby="meet-bloodwick-title"
+        aria-modal="true"
+        className="bloodwick-meet-modal-panel"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <div className="bloodwick-meet-modal-header">
+          <p className="bloodwick-meet-modal-eyebrow">Bloodwick</p>
+          <button
+            aria-label="Close Meet BloodWick"
+            className="bloodwick-meet-modal-close"
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+        <h2 className="bloodwick-meet-modal-title" id="meet-bloodwick-title">Meet BloodWick</h2>
+        <div className="bloodwick-meet-modal-body">
+          <p>BloodWick is more than our name. Over the centuries, <em>wick</em> has meant the hidden thread that drinks fuel and feeds a flame, a village or dwelling place, something alive and quick with life, and, in older forms, something wicked, strange, or threatening.</p>
+          <p>BloodWick is the immortal, hungry black thread that catches fire. BloodWick is the place at the end of the road where every evil thing lurks and you are moments away from a painful death. BloodWick is a story’s wicked driving force, the thing that keeps you reading and needing more.</p>
+          <p>BloodWick is all of these things.</p>
+          <p>Enjoy BloodWick.</p>
+        </div>
+      </div>
+    </div>
   );
 }
 

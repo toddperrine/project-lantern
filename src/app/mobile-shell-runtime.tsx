@@ -323,41 +323,11 @@ function closeMobileMenu() {
   document.querySelector("[data-mobile-menu='true']")?.remove();
 }
 
-function closeMeetBloodWickModal() {
-  document.querySelector("[data-mobile-meet-bloodwick-modal='true']")?.remove();
-}
-
 function openMeetBloodWickModal() {
   closeMobileMenu();
   closeAccountModal();
   closeRecapModal();
-  closeMeetBloodWickModal();
-  const modal = document.createElement("div");
-  modal.dataset.mobileMeetBloodwickModal = "true";
-  modal.className = "bloodwick-meet-modal";
-  modal.setAttribute("role", "dialog");
-  modal.setAttribute("aria-modal", "true");
-  modal.setAttribute("aria-labelledby", "mobile-meet-bloodwick-title");
-  modal.innerHTML = `
-    <div class="bloodwick-meet-modal-panel">
-      <div class="bloodwick-meet-modal-header">
-        <p class="bloodwick-meet-modal-eyebrow">Bloodwick</p>
-        <button class="bloodwick-meet-modal-close" data-mobile-meet-bloodwick-close="true" type="button" aria-label="Close Meet BloodWick">×</button>
-      </div>
-      <h2 class="bloodwick-meet-modal-title" id="mobile-meet-bloodwick-title">Meet BloodWick</h2>
-      <div class="bloodwick-meet-modal-body">
-        <p>BloodWick is more than our name. Over the centuries, <em>wick</em> has meant the hidden thread that drinks fuel and feeds a flame, a village or dwelling place, something alive and quick with life, and, in older forms, something wicked, strange, or threatening.</p>
-        <p>BloodWick is the immortal, hungry black thread that catches fire. BloodWick is the place at the end of the road where every evil thing lurks and you are moments away from a painful death. BloodWick is a story’s wicked driving force, the thing that keeps you reading and needing more.</p>
-        <p>BloodWick is all of these things.</p>
-        <p>Enjoy BloodWick.</p>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  modal.addEventListener("click", (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (target === modal || target?.closest("[data-mobile-meet-bloodwick-close='true']")) closeMeetBloodWickModal();
-  });
+  window.dispatchEvent(new CustomEvent("lantern:open-meet-bloodwick"));
 }
 
 function openRecapModal() {
