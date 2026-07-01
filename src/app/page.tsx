@@ -5110,7 +5110,7 @@ function HomeView(props: {
               title={latestStory.title}
             />
           ) : (
-            <section className="bloodwick-home-card min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
+            <section className="bloodwick-home-card bloodwick-continue-card min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
                 Continue Your Series
               </p>
@@ -5821,7 +5821,7 @@ function ReadyStoryQueuePanel({
 }) {
   if (!items.length) {
     return (
-      <section className="bloodwick-home-section min-w-0 rounded-md border border-paper/10 bg-paper/5 p-5">
+      <section className="bloodwick-home-section bloodwick-story-queue-section min-w-0 rounded-md border border-paper/10 bg-paper/5 p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
           Stories waiting for you
         </p>
@@ -5837,7 +5837,7 @@ function ReadyStoryQueuePanel({
   }
 
   return (
-    <section className="bloodwick-home-section min-w-0 rounded-md border border-lantern-gold/20 bg-paper/10 p-5">
+    <section className="bloodwick-home-section bloodwick-story-queue-section min-w-0 rounded-md border border-lantern-gold/20 bg-paper/10 p-5">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
         Stories waiting for you
       </p>

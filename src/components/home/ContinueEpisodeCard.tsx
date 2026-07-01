@@ -38,7 +38,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
   const recapId = "last-time-recap-dialog";
 
   return (
-    <section className="bloodwick-home-card min-w-0 overflow-hidden rounded-bloodwick-lg border border-bloodwick-red/25 bg-bloodwick-obsidian/75 shadow-bloodwick-soft">
+    <section className="bloodwick-home-card bloodwick-continue-card min-w-0 overflow-hidden rounded-bloodwick-lg border border-bloodwick-red/25 bg-bloodwick-obsidian/75 shadow-bloodwick-soft">
       <div className="grid min-w-0 gap-5 p-4 sm:p-5">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
