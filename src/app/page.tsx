@@ -8048,6 +8048,7 @@ function SeriesLibraryGroup({
     () => group.episodes[0]?.story.id ?? "",
   );
   const [recapStory, setRecapStory] = useState<LibraryStory | null>(null);
+  const [deleteStory, setDeleteStory] = useState<LibraryStory | null>(null);
   const selectedEpisode =
     group.episodes.find((episode) => episode.story.id === selectedStoryId) ??
     group.episodes[0];
@@ -8136,7 +8137,7 @@ function SeriesLibraryGroup({
           <button
             aria-label="Delete episode"
             className="bloodwick-shelf-action-icon"
-            onClick={() => onDeleteStory(selectedStory.id)}
+            onClick={() => setDeleteStory(selectedStory)}
             type="button"
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
@@ -8179,6 +8180,16 @@ function SeriesLibraryGroup({
           title={recapStory.title}
         />
       ) : null}
+
+      {deleteStory ? (
+        <ShelfDeleteConfirmModal
+          onCancel={() => setDeleteStory(null)}
+          onConfirm={() => {
+            onDeleteStory(deleteStory.id);
+            setDeleteStory(null);
+          }}
+        />
+      ) : null}
     </article>
   );
 }
@@ -8193,28 +8204,71 @@ function ShelfRecapModal({
   title: string;
 }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-bloodwick-obsidian/70 p-4">
+    <div className="bloodwick-shelf-modal">
       <div
         aria-modal="true"
         aria-label={`${title} recap`}
-        className="max-h-[82vh] w-full max-w-xl overflow-auto rounded-bloodwick-lg border border-bloodwick-white/15 bg-bloodwick-obsidian p-5 shadow-bloodwick-soft"
+        className="bloodwick-shelf-modal-panel"
         role="dialog"
       >
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="text-2xl font-semibold text-bloodwick-white">
-            Last time
-          </h3>
+        <div className="bloodwick-shelf-modal-header">
+          <h3 className="bloodwick-shelf-modal-title">Last time</h3>
           <button
-            className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-3 py-2 text-sm font-semibold text-bloodwick-white"
+            className="bloodwick-shelf-modal-close"
             onClick={onClose}
             type="button"
           >
             Close
           </button>
         </div>
-        <p className="mt-4 text-sm leading-6 text-bloodwick-white/72">
-          {recap}
+        <p className="bloodwick-shelf-modal-body">{recap}</p>
+      </div>
+    </div>
+  );
+}
+
+function ShelfDeleteConfirmModal({
+  onCancel,
+  onConfirm,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="bloodwick-shelf-modal">
+      <div
+        aria-modal="true"
+        aria-labelledby="bloodwick-shelf-delete-title"
+        className="bloodwick-shelf-modal-panel bloodwick-shelf-confirm-panel"
+        role="dialog"
+      >
+        <div className="bloodwick-shelf-modal-header">
+          <h3
+            className="bloodwick-shelf-modal-title"
+            id="bloodwick-shelf-delete-title"
+          >
+            Delete episode?
+          </h3>
+        </div>
+        <p className="bloodwick-shelf-modal-body">
+          This will remove the selected episode from your Shelf.
         </p>
+        <div className="bloodwick-shelf-confirm-actions">
+          <button
+            className="bloodwick-shelf-confirm-cancel"
+            onClick={onCancel}
+            type="button"
+          >
+            Cancel
+          </button>
+          <button
+            className="bloodwick-shelf-confirm-delete"
+            onClick={onConfirm}
+            type="button"
+          >
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   );
