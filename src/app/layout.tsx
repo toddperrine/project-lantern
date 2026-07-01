@@ -13,8 +13,8 @@ import "./reader-destinations.css";
 import "./characters-card-layout.css";
 
 export const metadata: Metadata = {
-  title: "Lantyrn",
-  description: "A personalized streaming home for Living Series, Episodes, and story worlds."
+  title: "Bloodwick",
+  description: "A premium horror storytelling platform for living stories and serialized dread."
 };
 
 export default function RootLayout({

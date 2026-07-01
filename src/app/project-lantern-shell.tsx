@@ -1,5 +1,6 @@
 import { Suspense, type ReactNode } from "react";
 import { getBuildInfo } from "@/lib/build-info";
+import { BloodwickWordmark } from "@/components/bloodwick-brand";
 import { ProjectLanternNav } from "./project-lantern-nav";
 
 const PREVIEW_MODES = ["Tablet", "Full"] as const;
@@ -8,12 +9,12 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
   const buildInfo = getBuildInfo();
 
   return (
-    <div className="project-lantern-shell min-h-screen overflow-x-hidden bg-[#fbf7ef] text-primary-dark md:bg-[radial-gradient(circle_at_top,rgba(217,164,65,0.10),transparent_34%),linear-gradient(180deg,#0B1020_0%,#111827_46%,#0B1020_100%)] md:text-primary-light">
+    <div className="project-lantern-shell bloodwick-cinematic-bg min-h-screen overflow-x-hidden text-primary-light">
       <DevicePreviewModeStyles />
-      <header className="sticky top-0 z-20 hidden border-b border-lantern-gold/15 bg-night-ink/92 backdrop-blur md:block">
+      <header className="sticky top-0 z-20 hidden border-b border-bloodwick-white/10 bg-bloodwick-obsidian/92 shadow-bloodwick-soft backdrop-blur md:block">
         <div data-device-preview-header-inner className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-4 px-4 py-5 transition-[max-width,padding] duration-200 sm:px-5 md:flex-row md:items-center md:justify-between md:px-8 md:py-6">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between md:block">
-            <h1 className="text-2xl font-semibold tracking-tight text-primary-light">Project Lantern</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-primary-light"><BloodwickWordmark /></h1>
             <PreviewModeToggle />
           </div>
           <Suspense>
@@ -37,12 +38,12 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
 
 function PreviewModeToggle() {
   return (
-    <div aria-label="Preview mode" className="hidden w-fit rounded-md border border-warm-paper/10 bg-deep-navy/80 p-1 shadow-soft md:inline-flex" data-device-preview-toggle role="group">
+    <div aria-label="Preview mode" className="hidden w-fit rounded-md border border-bloodwick-white/10 bg-bloodwick-panel/80 p-1 shadow-bloodwick-soft md:inline-flex" data-device-preview-toggle role="group">
       {PREVIEW_MODES.map((mode) => {
         const value = mode.toLowerCase();
         const isFull = mode === "Full";
         return (
-          <button aria-pressed={isFull ? "true" : "false"} className={isFull ? "rounded-sm bg-lantern-gold px-2.5 py-1 text-xs font-semibold text-primary-dark transition" : "rounded-sm px-2.5 py-1 text-xs font-semibold text-muted-dark transition hover:text-primary-light"} data-device-preview-mode={value} key={mode} type="button">
+          <button aria-pressed={isFull ? "true" : "false"} className={isFull ? "rounded-sm bg-bloodwick-red px-2.5 py-1 text-xs font-semibold text-bloodwick-white transition" : "rounded-sm px-2.5 py-1 text-xs font-semibold text-bloodwick-white/60 transition hover:text-primary-light"} data-device-preview-mode={value} key={mode} type="button">
             {mode}
           </button>
         );
@@ -71,16 +72,16 @@ function DevicePreviewModeStyles() {
   [data-device-preview-stage="tablet"] {
     margin: 1.5rem auto 2.5rem;
     padding: 1rem;
-    border: 1px solid rgba(246, 239, 226, 0.12);
+    border: 1px solid rgba(242, 241, 237, 0.12);
     border-radius: 1.6rem;
-    background: linear-gradient(180deg, rgba(167, 199, 186, 0.12), rgba(11, 16, 32, 0.78));
+    background: var(--bloodwick-surface);
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
   }
 
   [data-device-preview-content="tablet"] {
     border: 1px solid rgba(246, 239, 226, 0.12);
     border-radius: 1.1rem;
-    background: #0B1020;
+    background: var(--bloodwick-obsidian);
     padding: 1.25rem;
     box-shadow: inset 0 0 0 1px rgba(11, 16, 32, 0.45);
     scrollbar-gutter: stable;
@@ -100,8 +101,8 @@ function DevicePreviewModeScript() {
     tablet: { contentMaxWidth: "820px", stageMaxWidth: "884px", headerMaxWidth: "884px" },
     full: { contentMaxWidth: "", stageMaxWidth: "", headerMaxWidth: "" }
   };
-  const selectedClass = "rounded-sm bg-lantern-gold px-2.5 py-1 text-xs font-semibold text-primary-dark transition";
-  const defaultClass = "rounded-sm px-2.5 py-1 text-xs font-semibold text-muted-dark transition hover:text-primary-light";
+  const selectedClass = "rounded-sm bg-bloodwick-red px-2.5 py-1 text-xs font-semibold text-bloodwick-white transition";
+  const defaultClass = "rounded-sm px-2.5 py-1 text-xs font-semibold text-bloodwick-white/60 transition hover:text-primary-light";
 
   function readMode() {
     if (mobileQuery.matches) return "full";

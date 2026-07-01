@@ -83,6 +83,7 @@ import type { CharacterArc, ContinuationGenerationDiagnostics, EndingType, Gener
 import { createInputArtifactId, createSavedProjectId, createSavedStory, persistInputArtifacts, persistSavedProjects, persistSavedStories, readInputArtifacts, readSavedProjects, readSavedStories, savedStoryToResponse } from "@/lib/project-persistence";
 import type { InputArtifact, InputArtifactType, SavedProject, SavedStory, UploadState } from "@/lib/project-persistence";
 import { APP_VERSION } from "@/lib/build-info";
+import { BloodwickWordmark } from "@/components/bloodwick-brand";
 import { useAuth, type AuthStatus } from "@/lib/auth";
 
 type AppView = "home" | "library" | "worlds" | "create" | "characters" | "account" | "mood-intake";
@@ -205,10 +206,7 @@ const AUTHENTICATED_STORY_LIBRARY_PROJECT_ID = "story-library";
 
 const NAV_ITEMS: { label: string; view: AppView }[] = [
   { label: "Home", view: "home" },
-  { label: "Story Library", view: "library" },
-  { label: "Worlds", view: "worlds" },
-  { label: "Create", view: "create" },
-  { label: "Characters", view: "characters" },
+  { label: "Stories", view: "library" },
   { label: "Account", view: "account" }
 ];
 
@@ -725,7 +723,7 @@ export default function Home() {
       setLibraryDiagnostics((current) => ({ ...current, source: "authenticated cloud", loadedCount: stories.length }));
     } catch (caughtError) {
       setSavedStories([]);
-      setStatusMessage(`Story Library unavailable: ${formatCaughtError(caughtError)}`);
+      setStatusMessage(`Stories unavailable: ${formatCaughtError(caughtError)}`);
       setLibraryDiagnostics((current) => ({ ...current, source: "authenticated cloud", loadedCount: 0 }));
     }
   }
@@ -1090,7 +1088,7 @@ export default function Home() {
 
     setPendingStoryStart(story);
     setMoodIntakeMode("story-start");
-    setStatusMessage("Tell Lantyrn what you need from this story.");
+    setStatusMessage("Tell Bloodwick what you need from this story.");
     navigateToView("mood-intake");
   }
 
@@ -1323,7 +1321,7 @@ export default function Home() {
 
     setPendingStoryStart(null);
     setMoodIntakeMode("generate");
-    setStatusMessage("Tell Lantyrn what you need before it writes.");
+    setStatusMessage("Tell Bloodwick what you need before it writes.");
     navigateToView("mood-intake");
   }
 
@@ -2158,7 +2156,7 @@ export default function Home() {
               onClick={() => navigateToView("library")}
               type="button"
             >
-              Story Library
+              Stories
             </button>
 
             <button
@@ -2168,19 +2166,11 @@ export default function Home() {
             >
               Account
             </button>
-
-            <button
-              className="min-h-12 w-full rounded-xl border border-paper/15 bg-paper/10 px-4 py-3 text-base font-semibold text-paper"
-              onClick={() => navigateToView("create")}
-              type="button"
-            >
-              Create
-            </button>
           </section>
         ) : null}
         <header className="hidden min-w-0 flex-col gap-5 border-b border-paper/10 pb-6 md:flex md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold sm:tracking-[0.22em]">Lantyrn</p>
+            <p className="bloodwick-kicker">Bloodwick</p>
             <h1 className="mt-2 max-w-4xl text-3xl font-semibold leading-tight tracking-tight text-paper md:text-5xl">Living stories, ready when you are</h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-paper/70">Open the latest episode, remember what mattered, and choose what kind of story should find you next.</p>
           </div>
@@ -2203,7 +2193,7 @@ export default function Home() {
           />
         ) : null}
         {activeView === "home" && currentGeneratedStory && generatedStoryPresentation ? <EpisodeReader feedback={currentStoryFeedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} isGenerating={isContinuationGenerating} onContinue={generatedStoryPresentation === "saved-episode" ? handleSavedEpisodeNext : handleReaderContinue} onExport={handleExportLatestStory} onFeedbackChange={handleStoryFeedbackChange} onFeedbackDraftStateChange={handleFeedbackDraftStateChange} onScrollResetDiagnostics={setReaderScrollDiagnostics} onStartDifferent={handleReaderStartDifferent} eyebrow={generatedStoryPresentation === "first-episode" ? "New Story" : generatedStoryPresentation === "saved-episode" ? "Saved Episode" : "Next Episode"} continueLabel={generatedStoryPresentation === "saved-episode" ? "Next Episode" : "Continue this story"} episodeNumber={currentSeriesEpisode?.episodeNumber ?? null} generationProfileSnapshot={storyResponse?.metadata.diagnostics.readerProfileSnapshot ?? storyResponse?.metadata.diagnostics.readerProfileGenerationSnapshot} story={currentGeneratedStory} /> : null}
-        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <div className="hidden md:block"><HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onOpenCreate={() => navigateToView("create")} onOpenLibrary={() => navigateToView("library")} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} showStoryFitPrompt={shouldShowFirstRunStoryFitPrompt} onStartStoryFitSetup={handleOpenStoryFitOnboarding} onSkipStoryFitSetup={handleSkipStoryFitOnboarding} /></div> : null}
+        {activeView === "home" && !(currentGeneratedStory && generatedStoryPresentation) ? <div className="hidden md:block"><HomeView activeMood={activeMood} canUseDemoStory={!hasRealLatestStory} continueDirection={continueDirection} hasDemoStory={Boolean(demoStory)} isDirectionOpen={isDirectionOpen} isGenerating={isGenerating} isContinuationGenerating={isContinuationGenerating} isNewStoryGenerating={isNewStoryGenerating} latestStory={latestStory} onClearDemoStory={handleClearDemoStory} onContinue={handleContinueLatest} onDirectionChange={setContinueDirection} onExportStory={handleExportLatestStory} onLoadDemoStory={handleLoadDemoStory} onMoodSelect={handleMoodSelect} onOpenLibrary={() => navigateToView("library")} onStartNewStory={handleStartSomethingNew} onStartRecommendation={handleStartRecommendation} onToggleDirection={() => setIsDirectionOpen((current) => !current)} showStoryStartOptions={isStoryStartSelectionOpen} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} onPassReadyStory={handlePassReadyStory} onReadReadyStory={handleReadReadyStory} onSaveReadyStoryForLater={handleSaveReadyStoryForLater} suggestedStarts={suggestedStarts} showStoryFitPrompt={shouldShowFirstRunStoryFitPrompt} onStartStoryFitSetup={handleOpenStoryFitOnboarding} onSkipStoryFitSetup={handleSkipStoryFitOnboarding} /></div> : null}
         {activeView === "library" ? <LibraryView cloudMessage={cloudProjectMessage} cloudProjects={cloudProjects} isCloudLoading={isCloudProjectsLoading} onDeleteCloudProject={handleDeleteCloudProject} onDeleteProject={handleDeleteProject} onDeleteStory={handleDeleteStory} onLoadCloudProject={handleLoadCloudProject} onLoadProject={handleLoadProject} onMoveSavedForLaterToWaitingQueue={handleMoveSavedForLaterStoryToWaitingQueue} onContinueSavedStoryById={handleContinueSavedStoryById} onOpenSavedStoryById={handleRestoreStoryById} onProjectNameChange={setProjectName} onReadSavedForLater={handleReadSavedForLaterStory} onRefreshCloud={handleRefreshCloudProjects} onRemoveSavedForLater={handleRemoveSavedForLaterStory} onSaveCloudProject={handleSaveCloudProject} onSaveProject={handleSaveProject} onSaveStory={handleSaveStory} projectName={projectName} savedForLaterStoryQueue={savedForLaterStoryQueue} savedProjects={savedProjects} savedStories={savedStories} selectedCloudProjectId={selectedCloudProjectId} selectedProjectId={selectedProjectId} storyResponse={storyResponse} /> : null}
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
@@ -2415,8 +2405,8 @@ function EpisodeReader({ continueLabel = "Continue this story", episodeNumber, e
       {story.id ? <StoryFeedbackPanel feedback={feedback} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} onDraftStateChange={onFeedbackDraftStateChange} onSave={(rating, reasons) => onFeedbackChange(story, rating, reasons)} storyId={story.id} /> : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <button className="inline-flex items-center gap-2 rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={onContinue} type="button">{isGenerating ? <><span className="size-4 animate-spin rounded-full border-2 border-night-ink/30 border-t-night-ink" aria-hidden="true" />Writing the next chapter…</> : continueLabel}</button>
-        <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-lantern-gold/50" onClick={onExport} type="button">Export</button>
-        <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-lantern-gold/50" onClick={onStartDifferent} type="button">Start something different</button>
+        <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-bloodwick-copper" onClick={onExport} type="button">Export</button>
+        <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-bloodwick-copper" onClick={onStartDifferent} type="button">Start something different</button>
       </div>
     </article>
   );
@@ -2519,7 +2509,7 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
         {STORY_FEEDBACK_RATING_OPTIONS.map((option) => (
           <button
             aria-pressed={draftRating === option.rating}
-            className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${draftRating === option.rating ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper hover:border-lantern-gold/50"}`}
+            className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${draftRating === option.rating ? "border-bloodwick-red bg-bloodwick-red text-bloodwick-white" : "border-paper/15 bg-paper/10 text-paper hover:border-bloodwick-copper"}`}
             key={option.rating}
             onClick={() => { setDraftClearedAfterSave(false); setClearedFeedbackStoryId(null); setDraftRating(option.rating); }}
             type="button"
@@ -2536,7 +2526,7 @@ function StoryFeedbackPanel({ feedback, generationBlockedBecauseUnsavedFeedback,
             return (
               <button
                 aria-pressed={isSelected}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${isSelected ? "border-lantern-gold bg-lantern-gold/90 text-night-ink" : "border-paper/15 bg-paper/10 text-paper/80 hover:border-lantern-gold/50"}`}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${isSelected ? "border-lantern-gold bg-lantern-gold/90 text-night-ink" : "border-paper/15 bg-paper/10 text-paper/80 hover:border-bloodwick-copper"}`}
                 key={option.reason}
                 onClick={() => toggleReason(option.reason)}
                 type="button"
@@ -2562,7 +2552,6 @@ function HomePrimaryActions({
   isGenerating,
   isNewStoryGenerating,
   onContinueLatest,
-  onOpenCreate,
   onOpenLibrary,
   onStartNewStory,
 }: {
@@ -2570,7 +2559,6 @@ function HomePrimaryActions({
   isGenerating: boolean;
   isNewStoryGenerating: boolean;
   onContinueLatest: () => void;
-  onOpenCreate: () => void;
   onOpenLibrary: () => void;
   onStartNewStory: () => void;
 }) {
@@ -2604,15 +2592,7 @@ function HomePrimaryActions({
         onClick={onOpenLibrary}
         type="button"
       >
-        Story Library
-      </button>
-
-      <button
-        className="min-h-12 w-full rounded-xl border border-paper/15 bg-paper/10 px-4 py-3 text-base font-semibold text-paper md:w-fit"
-        onClick={onOpenCreate}
-        type="button"
-      >
-        Create
+        Stories
       </button>
     </section>
   );
@@ -2627,8 +2607,8 @@ function MobileDeveloperDiagnostics({ children }: { children: ReactNode }) {
   );
 }
 
-function HomeView(props: { showStoryFitPrompt?: boolean; onStartStoryFitSetup?: () => void; onSkipStoryFitSetup?: () => void; activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; isContinuationGenerating: boolean; isNewStoryGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onPassReadyStory: (item: ReadyStoryQueueItem) => void; onReadReadyStory: (item: ReadyStoryQueueItem) => void; onSaveReadyStoryForLater: (item: ReadyStoryQueueItem) => void; onOpenCreate: () => void; onOpenLibrary: () => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
-  const { showStoryFitPrompt = false, onStartStoryFitSetup, onSkipStoryFitSetup, activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, isContinuationGenerating, isNewStoryGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onPassReadyStory, onReadReadyStory, onSaveReadyStoryForLater, onOpenCreate, onOpenLibrary, onStartNewStory, onStartRecommendation, onToggleDirection, readyStoryQueue, savedForLaterStoryQueue, showStoryStartOptions, suggestedStarts } = props;
+function HomeView(props: { showStoryFitPrompt?: boolean; onStartStoryFitSetup?: () => void; onSkipStoryFitSetup?: () => void; activeMood: Mood; canUseDemoStory: boolean; continueDirection: string; hasDemoStory: boolean; isDirectionOpen: boolean; isGenerating: boolean; isContinuationGenerating: boolean; isNewStoryGenerating: boolean; latestStory: LibraryStory | null; onClearDemoStory: () => void; onContinue: (direction?: string) => void; onDirectionChange: (value: string) => void; onExportStory: () => void; onLoadDemoStory: () => void; onMoodSelect: (mood: Mood) => void; onPassReadyStory: (item: ReadyStoryQueueItem) => void; onReadReadyStory: (item: ReadyStoryQueueItem) => void; onSaveReadyStoryForLater: (item: ReadyStoryQueueItem) => void; onOpenLibrary: () => void; onStartNewStory: () => void; onStartRecommendation: (story: StoryStart) => void; onToggleDirection: () => void; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; showStoryStartOptions: boolean; suggestedStarts: StoryStart[] }) {
+  const { showStoryFitPrompt = false, onStartStoryFitSetup, onSkipStoryFitSetup, activeMood, canUseDemoStory, continueDirection, hasDemoStory, isDirectionOpen, isGenerating, isContinuationGenerating, isNewStoryGenerating, latestStory, onClearDemoStory, onContinue, onDirectionChange, onExportStory, onLoadDemoStory, onMoodSelect, onPassReadyStory, onReadReadyStory, onSaveReadyStoryForLater, onOpenLibrary, onStartNewStory, onStartRecommendation, onToggleDirection, readyStoryQueue, savedForLaterStoryQueue, showStoryStartOptions, suggestedStarts } = props;
   const [isRecapOpen, setIsRecapOpen] = useState(false);
   const storyBrief = latestStory ? createStoryBrief(latestStory) : null;
 
@@ -2639,7 +2619,6 @@ function HomeView(props: { showStoryFitPrompt?: boolean; onStartStoryFitSetup?: 
         isGenerating={isGenerating}
         isNewStoryGenerating={isNewStoryGenerating}
         onContinueLatest={() => onContinue()}
-        onOpenCreate={onOpenCreate}
         onOpenLibrary={onOpenLibrary}
         onStartNewStory={onStartNewStory}
       />
@@ -2663,7 +2642,7 @@ function StoryFitFirstRunCard({ onSkip, onStart }: { onSkip: () => void; onStart
     <section className="min-w-0 rounded-xl border border-lantern-gold/35 bg-lantern-gold/10 p-4 shadow-soft">
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Story fit</p>
       <h2 className="mt-1 text-xl font-semibold text-paper">Set up your story fit</h2>
-      <p className="mt-2 text-sm leading-6 text-paper/70">Answer a few questions so Lantyrn can shape better episodes for you.</p>
+      <p className="mt-2 text-sm leading-6 text-paper/70">Answer a few questions so Bloodwick can shape better episodes for you.</p>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         <button className="min-h-11 rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-night-ink" onClick={onStart} type="button">Start setup</button>
         <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-3 text-sm font-semibold text-paper/75" onClick={onSkip} type="button">Skip for now</button>
@@ -2756,7 +2735,7 @@ function StoryFitOnboardingPanel({ initialPreferences, onCancel, onSave }: { ini
   return (
     <section className="mx-auto grid w-full max-w-3xl min-w-0 gap-4 overflow-x-hidden rounded-xl border border-lantern-gold/35 bg-night-ink/95 p-4 pb-24 shadow-soft sm:pb-4">
       <div className="flex min-w-0 items-start justify-between gap-3">
-        <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Story Fit Setup</p><h2 className="mt-1 text-2xl font-semibold text-paper">{steps[step]}</h2><p className="mt-2 text-sm leading-6 text-paper/65">Tell Lantyrn what kinds of stories you want to live inside. You can change this later.</p></div>
+        <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Story Fit Setup</p><h2 className="mt-1 text-2xl font-semibold text-paper">{steps[step]}</h2><p className="mt-2 text-sm leading-6 text-paper/65">Tell Bloodwick what kinds of stories you want to live inside. You can change this later.</p></div>
         <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper/70" onClick={onCancel} type="button">Cancel</button>
       </div>
       <p className="text-xs font-semibold text-paper/45">Step {step + 1} of {steps.length}</p>
@@ -2767,7 +2746,7 @@ function StoryFitOnboardingPanel({ initialPreferences, onCancel, onSave }: { ini
       {step === 4 ? <OnboardingChoiceGrid countLabel={`${countVisibleSelections(state.characterLensPreferences, STORY_FIT_CHARACTER_LENS_OPTIONS)} / ${STORY_FIT_SELECTION_LIMITS.characterLensPreferences} selected`} question="Character lens" helper={`Choose up to ${STORY_FIT_SELECTION_LIMITS.characterLensPreferences}.`} options={STORY_FIT_CHARACTER_LENS_OPTIONS} selected={state.characterLensPreferences} onSelect={(value) => { toggleLimitedItem("characterLensPreferences", value, STORY_FIT_SELECTION_LIMITS.characterLensPreferences, "Character lens", STORY_FIT_CHARACTER_LENS_OPTIONS); toggleLimitedItem("protagonistLensPreferences", value, STORY_FIT_SELECTION_LIMITS.characterLensPreferences, "Character lens", STORY_FIT_CHARACTER_LENS_OPTIONS); }} /> : null}
       {step === 5 ? <OnboardingChoiceGrid countLabel={`${countVisibleSelections(state.narrativePressurePreferences, STORY_FIT_NARRATIVE_PRESSURE_OPTIONS)} / ${STORY_FIT_SELECTION_LIMITS.narrativePressurePreferences} selected`} question="Narrative pressure / intensity" helper={`Choose up to ${STORY_FIT_SELECTION_LIMITS.narrativePressurePreferences}.`} options={STORY_FIT_NARRATIVE_PRESSURE_OPTIONS} selected={state.narrativePressurePreferences} onSelect={(value) => toggleLimitedItem("narrativePressurePreferences", value, STORY_FIT_SELECTION_LIMITS.narrativePressurePreferences, "Narrative pressure / intensity", STORY_FIT_NARRATIVE_PRESSURE_OPTIONS)} /> : null}
       {step === 6 ? <OnboardingChoiceGrid countLabel={`${countVisibleSelections(state.episodeEndingShapePreferences, STORY_FIT_EPISODE_ENDING_OPTIONS)} / ${STORY_FIT_SELECTION_LIMITS.episodeEndingShapePreferences} selected`} question="Episode ending shape" helper={`Choose up to ${STORY_FIT_SELECTION_LIMITS.episodeEndingShapePreferences}.`} options={STORY_FIT_EPISODE_ENDING_OPTIONS} selected={state.episodeEndingShapePreferences} onSelect={(value) => toggleLimitedItem("episodeEndingShapePreferences", value, STORY_FIT_SELECTION_LIMITS.episodeEndingShapePreferences, "Episode ending shape", STORY_FIT_EPISODE_ENDING_OPTIONS)} /> : null}
-      {step === 7 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Hard avoidances</h3><p className="text-sm leading-6 text-paper/60">Add anything Lantyrn should avoid. You can add up to {STORY_FIT_SELECTION_LIMITS.hardAvoidances}.</p><p className="text-xs font-semibold text-paper/45">{state.hardAvoidances.length} / {STORY_FIT_SELECTION_LIMITS.hardAvoidances} added</p><div className="grid gap-2"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">Starter suggestions</p><div className="flex flex-wrap gap-2">{HARD_AVOIDANCE_QUICK_ADD_OPTIONS.map((item) => <button className="min-h-11 rounded-full border border-paper/15 bg-paper/10 px-3 py-1.5 text-xs font-semibold text-paper/75" key={item} onClick={() => fillAvoidanceDraft(item)} type="button">{item}</button>)}</div></div><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={MAX_READER_HARD_AVOIDANCE_LENGTH} onChange={(event) => { setAvoidanceDraft(event.target.value); if (limitMessage) setLimitMessage(""); }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} placeholder="No dead pets, no gore..." value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={!canAddAvoidance} onClick={addAvoidance} type="button">Add</button></div>{avoidanceDraftIsDuplicate ? <p className="text-xs font-semibold text-lantern-gold">That hard avoidance is already added.</p> : null}<div className="flex flex-wrap gap-2">{state.hardAvoidances.map((item) => <button className="min-h-11 rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => setState((current) => ({ ...current, hardAvoidances: current.hardAvoidances.filter((value) => value !== item) }))} type="button">{item} ×</button>)}</div><p className="text-xs text-paper/45">Custom entries can be up to {MAX_READER_HARD_AVOIDANCE_LENGTH} characters each.</p></div> : null}
+      {step === 7 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Hard avoidances</h3><p className="text-sm leading-6 text-paper/60">Add anything Bloodwick should avoid. You can add up to {STORY_FIT_SELECTION_LIMITS.hardAvoidances}.</p><p className="text-xs font-semibold text-paper/45">{state.hardAvoidances.length} / {STORY_FIT_SELECTION_LIMITS.hardAvoidances} added</p><div className="grid gap-2"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">Starter suggestions</p><div className="flex flex-wrap gap-2">{HARD_AVOIDANCE_QUICK_ADD_OPTIONS.map((item) => <button className="min-h-11 rounded-full border border-paper/15 bg-paper/10 px-3 py-1.5 text-xs font-semibold text-paper/75" key={item} onClick={() => fillAvoidanceDraft(item)} type="button">{item}</button>)}</div></div><div className="flex flex-col gap-2 sm:flex-row"><input className="min-h-11 min-w-0 flex-1 rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper outline-none focus:border-lantern-gold" maxLength={MAX_READER_HARD_AVOIDANCE_LENGTH} onChange={(event) => { setAvoidanceDraft(event.target.value); if (limitMessage) setLimitMessage(""); }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAvoidance(); } }} placeholder="No dead pets, no gore..." value={avoidanceDraft} /><button className="min-h-11 rounded-md border border-lantern-gold/40 bg-lantern-gold/10 px-4 py-2 text-sm font-semibold text-lantern-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={!canAddAvoidance} onClick={addAvoidance} type="button">Add</button></div>{avoidanceDraftIsDuplicate ? <p className="text-xs font-semibold text-lantern-gold">That hard avoidance is already added.</p> : null}<div className="flex flex-wrap gap-2">{state.hardAvoidances.map((item) => <button className="min-h-11 rounded-full border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-1 text-xs font-semibold text-lantern-gold" key={item} onClick={() => setState((current) => ({ ...current, hardAvoidances: current.hardAvoidances.filter((value) => value !== item) }))} type="button">{item} ×</button>)}</div><p className="text-xs text-paper/45">Custom entries can be up to {MAX_READER_HARD_AVOIDANCE_LENGTH} characters each.</p></div> : null}
       {step === 8 ? <div className="grid gap-3"><h3 className="text-lg font-semibold text-paper">Review</h3><ProfileSummaryRow label="Story types" values={state.preferredStoryTypes} empty="Not set" /><ProfileSummaryRow label="What the story should give you" values={state.emotionalPromises} empty="Not set" /><ProfileSummaryRow label="Storyworlds / places" values={state.favoriteStoryWorlds} empty="Not set" /><ProfileSummaryRow label="Story ingredients" values={state.storyIngredients} empty="Not set" /><ProfileSummaryRow label="Character lens" values={state.characterLensPreferences} empty="Not set" /><ProfileSummaryRow label="Narrative pressure / intensity" values={state.narrativePressurePreferences} empty="Not set" /><ProfileSummaryRow label="Episode ending shape" values={state.episodeEndingShapePreferences} empty="Not set" /><ProfileSummaryRow label="Hard avoidances" values={state.hardAvoidances} empty="Not set" /><ProfileSummaryRow label="Content lane" values={state.contentLane === "not-set" ? [] : [selectedContentLaneLabel]} empty="Not set" /></div> : null}
       {limitMessage ? <p className="rounded-md border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-2 text-xs font-semibold text-lantern-gold">{limitMessage}</p> : null}
       <div className="sticky bottom-3 z-10 flex flex-col gap-2 rounded-lg border border-paper/10 bg-night-ink/95 p-2 sm:static sm:flex-row sm:border-0 sm:bg-transparent sm:p-0">
@@ -2780,7 +2759,7 @@ function StoryFitOnboardingPanel({ initialPreferences, onCancel, onSave }: { ini
 }
 
 function OnboardingChoiceGrid({ countLabel, helper, onSelect, options, question, selected }: { countLabel: string; helper?: string; onSelect: (value: string) => void; options: { label: string; description: string }[]; question: string; selected: string[] }) {
-  return <div className="grid gap-3"><div><h3 className="text-lg font-semibold text-paper">{question}</h3>{helper ? <p className="text-xs font-semibold text-paper/45">{helper}</p> : null}<p className="mt-1 text-xs font-semibold text-lantern-gold">{countLabel}</p></div><div className="grid min-w-0 gap-2 sm:grid-cols-2">{options.map((option) => <button className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm font-semibold ${selected.includes(option.label) ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper/75"}`} key={option.label} onClick={() => onSelect(option.label)} type="button"><span className="block break-words">{option.label}</span><span className={`mt-1 block text-xs font-normal leading-5 ${selected.includes(option.label) ? "text-night-ink/75" : "text-paper/50"}`}>{option.description}</span></button>)}</div></div>;
+  return <div className="grid gap-3"><div><h3 className="text-lg font-semibold text-paper">{question}</h3>{helper ? <p className="text-xs font-semibold text-paper/45">{helper}</p> : null}<p className="mt-1 text-xs font-semibold text-lantern-gold">{countLabel}</p></div><div className="grid min-w-0 gap-2 sm:grid-cols-2">{options.map((option) => <button className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm font-semibold ${selected.includes(option.label) ? "border-bloodwick-red bg-bloodwick-red text-bloodwick-white" : "border-paper/15 bg-paper/10 text-paper/75"}`} key={option.label} onClick={() => onSelect(option.label)} type="button"><span className="block break-words">{option.label}</span><span className={`mt-1 block text-xs font-normal leading-5 ${selected.includes(option.label) ? "text-night-ink/75" : "text-paper/50"}`}>{option.description}</span></button>)}</div></div>;
 }
 
 function ReadyStoryQueuePanel({
@@ -2815,7 +2794,7 @@ function ReadyStoryQueuePanel({
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">Stories waiting for you</p>
           <h2 className="mt-2 text-2xl font-semibold text-paper">Pick what should find you next.</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-paper/60">Read, pass, or save for later. Lantyrn learns from each story-level choice.</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-paper/60">Read, pass, or save for later. Bloodwick learns from each story-level choice.</p>
         </div>
         <p className="shrink-0 text-xs font-semibold text-paper/45">Saved for later: {savedForLaterCount}</p>
       </div>
@@ -2846,8 +2825,8 @@ function ReadyStoryQueuePanel({
 
               <div className="flex w-40 flex-col justify-center gap-2 border-l border-paper/10 bg-paper/5 p-3">
                 <button className="rounded-md bg-lantern-gold px-3 py-2 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating || isPreparing} onClick={() => onRead(item)} type="button">{isPreparing ? "Preparing…" : "Read"}</button>
-                <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-sm font-semibold text-paper hover:border-lantern-gold/50 disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={() => onPass(item)} type="button">Pass</button>
-                <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-sm font-semibold text-paper hover:border-lantern-gold/50 disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={() => onSaveForLater(item)} type="button">Save for later</button>
+                <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-sm font-semibold text-paper hover:border-bloodwick-copper disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={() => onPass(item)} type="button">Pass</button>
+                <button className="rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-sm font-semibold text-paper hover:border-bloodwick-copper disabled:cursor-not-allowed disabled:opacity-50" disabled={isGenerating} onClick={() => onSaveForLater(item)} type="button">Save for later</button>
               </div>
             </article>
           );
@@ -2866,12 +2845,12 @@ function MobileCurrentStoryCard({ brief, isGenerating, isRecapOpen, onCloseRecap
 }
 
 function MobileMoodPicker({ activeMood, onSelect }: { activeMood: Mood; onSelect: (mood: Mood) => void }) {
-  return <section className="min-w-0"><h2 className="text-xl font-semibold leading-tight text-paper">What kind of fear are you in the mood for?</h2><p className="mt-1 text-sm leading-5 text-paper/60">Choose the flavor of dread for your next story.</p><div className="mt-3 flex min-w-0 flex-wrap gap-2">{AVAILABLE_MOOD_CHIPS.map((mood) => { const chip = getStoryTypeChip(mood); return <button className={`rounded-full border px-3 py-2 text-sm font-semibold transition ${activeMood === mood ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper"}`} key={mood} onClick={() => onSelect(mood)} type="button">{chip.label}</button>; })}</div></section>;
+  return <section className="min-w-0"><h2 className="text-xl font-semibold leading-tight text-paper">What kind of fear are you in the mood for?</h2><p className="mt-1 text-sm leading-5 text-paper/60">Choose the flavor of dread for your next story.</p><div className="mt-3 flex min-w-0 flex-wrap gap-2">{AVAILABLE_MOOD_CHIPS.map((mood) => { const chip = getStoryTypeChip(mood); return <button className={`rounded-full border px-3 py-2 text-sm font-semibold transition ${activeMood === mood ? "border-bloodwick-red bg-bloodwick-red text-bloodwick-white" : "border-paper/15 bg-paper/10 text-paper"}`} key={mood} onClick={() => onSelect(mood)} type="button">{chip.label}</button>; })}</div></section>;
 }
 
 function StartSomethingNewPanel({ canUseDemoStory, hasDemoStory, isGenerating, isNewStoryGenerating, onClearDemoStory, onLoadDemoStory, onStartNewStory, selectedStoryTypeLabel }: { canUseDemoStory: boolean; hasDemoStory: boolean; isGenerating: boolean; isNewStoryGenerating: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStartNewStory: () => void; selectedStoryTypeLabel?: string | null }) {
   const startCopy = getStoryTypeStartCopy(selectedStoryTypeLabel);
-  return <section className="min-w-0 rounded-md border border-lantern-gold/25 bg-paper/10 p-5"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">Start Something New</p><h2 className="mt-2 text-2xl font-semibold text-paper md:text-3xl">Let Lantyrn find your next story.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-paper/65">Pick a story type above, then start a story shaped by that choice.</p><div className="mt-4 min-w-0 rounded-md border border-lantern-gold/25 bg-night-ink/35 p-3"><p className="break-words text-sm font-semibold leading-6 text-lantern-gold">{startCopy.confirmation}</p>{startCopy.detail ? <p className="mt-1 break-words text-xs leading-5 text-paper/65">{startCopy.detail}</p> : null}</div><div className="mt-4 flex flex-wrap items-center gap-2"><button className="inline-flex min-w-0 items-center gap-2 whitespace-normal rounded-md bg-lantern-gold px-5 py-3 text-left text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-60" disabled={isGenerating} onClick={onStartNewStory} type="button">{isNewStoryGenerating ? <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-night-ink/30 border-t-night-ink" aria-hidden="true" /> : null}<span className="min-w-0 break-words">{isNewStoryGenerating ? startCopy.loading : startCopy.button}</span></button>{canUseDemoStory ? (hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo story</SmallButton> : <SmallButton onClick={onLoadDemoStory}>Load demo story</SmallButton>) : null}</div>{isNewStoryGenerating ? <p className="mt-3 flex min-w-0 items-center gap-2 text-sm font-semibold text-lantern-gold"><span aria-hidden="true">⌛</span><span className="min-w-0 break-words">{startCopy.loading}</span></p> : null}</section>;
+  return <section className="min-w-0 rounded-md border border-lantern-gold/25 bg-paper/10 p-5"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">Start Something New</p><h2 className="mt-2 text-2xl font-semibold text-paper md:text-3xl">Let Bloodwick find your next story.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-paper/65">Pick a story type above, then start a story shaped by that choice.</p><div className="mt-4 min-w-0 rounded-md border border-lantern-gold/25 bg-night-ink/35 p-3"><p className="break-words text-sm font-semibold leading-6 text-lantern-gold">{startCopy.confirmation}</p>{startCopy.detail ? <p className="mt-1 break-words text-xs leading-5 text-paper/65">{startCopy.detail}</p> : null}</div><div className="mt-4 flex flex-wrap items-center gap-2"><button className="inline-flex min-w-0 items-center gap-2 whitespace-normal rounded-md bg-lantern-gold px-5 py-3 text-left text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-60" disabled={isGenerating} onClick={onStartNewStory} type="button">{isNewStoryGenerating ? <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-night-ink/30 border-t-night-ink" aria-hidden="true" /> : null}<span className="min-w-0 break-words">{isNewStoryGenerating ? startCopy.loading : startCopy.button}</span></button>{canUseDemoStory ? (hasDemoStory ? <SmallButton onClick={onClearDemoStory}>Clear demo story</SmallButton> : <SmallButton onClick={onLoadDemoStory}>Load demo story</SmallButton>) : null}</div>{isNewStoryGenerating ? <p className="mt-3 flex min-w-0 items-center gap-2 text-sm font-semibold text-lantern-gold"><span aria-hidden="true">⌛</span><span className="min-w-0 break-words">{startCopy.loading}</span></p> : null}</section>;
 }
 
 function MobileSuggestedStoryStarts({ activeMood, canUseDemoStory, hasDemoStory, onClearDemoStory, onLoadDemoStory, onStart, stories }: { activeMood: Mood; canUseDemoStory: boolean; hasDemoStory: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStart: (story: StoryStart) => void; stories: StoryStart[] }) {
@@ -2893,7 +2872,7 @@ function RecapPanel({ brief, onClose, title }: { brief: StoryBrief; onClose: () 
 function RecapBlock({ body, title }: { body: string; title: string }) { return <section className="rounded-md border border-aged-brass/20 bg-white/65 p-4"><h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-aged-brass">{title}</h4><p className="mt-2 text-sm leading-6 text-primary-dark/75">{body}</p></section>; }
 
 function MoodPicker({ activeMood, hasCurrentStory, onSelect }: { activeMood: Mood; hasCurrentStory: boolean; onSelect: (mood: Mood) => void }) {
-  return <section className={hasCurrentStory ? "min-w-0" : "min-w-0 pt-1"}><div className="max-w-3xl"><h2 className="text-2xl font-semibold text-paper md:text-3xl">What kind of fear are you in the mood for?</h2><p className="mt-2 text-sm leading-6 text-paper/62">Choose the flavor of dread for your next story.</p>{!hasCurrentStory ? <p className="mt-3 text-sm leading-6 text-paper/70">Start your first story. Once you have one in progress, your next chapter will appear here.</p> : null}</div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{AVAILABLE_MOOD_CHIPS.map((mood) => <button className={`min-w-0 rounded-md border px-4 py-4 text-left transition ${activeMood === mood ? "border-lantern-gold bg-lantern-gold text-night-ink shadow-soft" : "border-paper/15 bg-paper/10 text-paper hover:border-lantern-gold/50 hover:bg-paper/15"}`} key={mood} onClick={() => onSelect(mood)} type="button"><span className="block text-base font-semibold">{getStoryTypeChip(mood).label}</span><span className="mt-2 block text-xs leading-5 opacity-70">{moodDescription(mood)}</span></button>)}</div></section>;
+  return <section className={hasCurrentStory ? "min-w-0" : "min-w-0 pt-1"}><div className="max-w-3xl"><h2 className="text-2xl font-semibold text-paper md:text-3xl">What kind of fear are you in the mood for?</h2><p className="mt-2 text-sm leading-6 text-paper/62">Choose the flavor of dread for your next story.</p>{!hasCurrentStory ? <p className="mt-3 text-sm leading-6 text-paper/70">Start your first story. Once you have one in progress, your next chapter will appear here.</p> : null}</div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{AVAILABLE_MOOD_CHIPS.map((mood) => <button className={`min-w-0 rounded-md border px-4 py-4 text-left transition ${activeMood === mood ? "border-bloodwick-red bg-bloodwick-red text-bloodwick-white shadow-soft" : "border-paper/15 bg-paper/10 text-paper hover:border-bloodwick-copper hover:bg-paper/15"}`} key={mood} onClick={() => onSelect(mood)} type="button"><span className="block text-base font-semibold">{getStoryTypeChip(mood).label}</span><span className="mt-2 block text-xs leading-5 opacity-70">{moodDescription(mood)}</span></button>)}</div></section>;
 }
 
 function SuggestedStoryStarts({ activeMood, canUseDemoStory, hasDemoStory, onClearDemoStory, onLoadDemoStory, onStart, stories }: { activeMood: Mood; canUseDemoStory: boolean; hasDemoStory: boolean; onClearDemoStory: () => void; onLoadDemoStory: () => void; onStart: (story: StoryStart) => void; stories: StoryStart[] }) {
@@ -2981,14 +2960,14 @@ function AccountView({ accountProfileActionDiagnostics, authState, canonicalProf
 
   return (
     <section className="mx-auto grid w-full max-w-5xl min-w-0 gap-5 pb-8 md:pb-0">
-      <PageHeading eyebrow="Account" title="Account / Profile" body="A snapshot of your current Lantyrn profile, saved content, reader preferences, and future data controls." />
+      <PageHeading eyebrow="Account" title="Account / Profile" body="A snapshot of your current Bloodwick profile, saved content, reader preferences, and future data controls." />
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <article className="grid min-w-0 gap-3 rounded-xl border border-lantern-gold/25 bg-lantern-gold/10 p-4 shadow-soft lg:col-span-2">
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-lantern-gold">Current status</p><h2 className="mt-1 text-2xl font-semibold leading-tight text-paper">{summary.displayName}</h2></div><span className="w-fit rounded-md border border-paper/15 bg-night-ink/70 px-2.5 py-1 text-xs font-semibold capitalize text-paper/70">{summary.accountMode}</span></div>
           {summary.profileId ? <p className="text-sm font-semibold text-paper/80">Profile ID: {summary.profileId}</p> : null}
           <p className="text-sm leading-6 text-paper/70">{summary.statusText}</p>
         </article>
-        <AccountCard title="What Lantyrn knows so far">
+        <AccountCard title="What Bloodwick knows so far">
           <ProfileSummaryRow label="Story types" values={summary.preferredStoryTypes} empty="Not set" />
           <ProfileSummaryRow label="What the story should give you" values={summary.emotionalPromises} empty="Not set" />
           <ProfileSummaryRow label="Storyworlds / places" values={summary.favoriteStoryWorlds} empty="Not set" />
@@ -3030,7 +3009,7 @@ function AccountView({ accountProfileActionDiagnostics, authState, canonicalProf
           <PreferenceSelect label="Protagonist lens" options={PROTAGONIST_LENS_OPTIONS} value={readerPreferences.protagonistLens} onChange={(value) => updatePreferences({ protagonistLens: value as typeof readerPreferences.protagonistLens, protagonistLensPreferences: value === "not-set" ? [] : [PROTAGONIST_LENS_OPTIONS.find((option) => option.value === value)?.label ?? ""] })} />
           <p className={`text-xs font-semibold ${saveStatus === "error" ? "text-red-200" : "text-paper/50"}`}>{saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "Could not save locally" : "Saved"}</p>
         </AccountCard>
-        <AccountCard title="Your saved Lantyrn content">{savedCountEntries.length ? <dl className="grid gap-3 sm:grid-cols-2">{savedCountEntries.map((entry) => <div className="rounded-md border border-paper/10 bg-night-ink/45 p-3" key={entry.label}><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{entry.label}</dt><dd className="mt-1 text-2xl font-semibold text-paper">{entry.value}</dd></div>)}</dl> : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved items found yet.</p>}<button className="mt-4 min-h-11 w-full rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-night-ink sm:w-fit" onClick={onOpenLibrary} type="button">Go to Library</button></AccountCard>
+        <AccountCard title="Your saved Bloodwick content">{savedCountEntries.length ? <dl className="grid gap-3 sm:grid-cols-2">{savedCountEntries.map((entry) => <div className="rounded-md border border-paper/10 bg-night-ink/45 p-3" key={entry.label}><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{entry.label}</dt><dd className="mt-1 text-2xl font-semibold text-paper">{entry.value}</dd></div>)}</dl> : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved items found yet.</p>}<button className="mt-4 min-h-11 w-full rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-night-ink sm:w-fit" onClick={onOpenLibrary} type="button">Go to Stories</button></AccountCard>
         <AccountCard title="Data controls">
           <div className="grid gap-2">
             <button className="min-h-11 rounded-md border border-lantern-gold/45 bg-lantern-gold/10 px-4 py-3 text-left text-sm font-semibold text-lantern-gold" onClick={exportAccountData} type="button">Export account data</button>
@@ -3166,7 +3145,7 @@ function downloadJsonFile(filename: string, data: unknown) {
 }
 
 function PreferenceChipGroup({ label, onToggle, options, selected }: { label: string; onToggle: (value: string) => void; options: string[]; selected: string[] }) {
-  return <div className="grid gap-2"><p className="text-sm font-semibold text-paper">{label}</p><div className="flex flex-wrap gap-2">{options.map((option) => { const isSelected = selected.includes(option); return <button className={`min-h-10 rounded-full border px-3 py-2 text-xs font-semibold transition ${isSelected ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper/70"}`} key={option} onClick={() => onToggle(option)} type="button">{option}</button>; })}</div></div>;
+  return <div className="grid gap-2"><p className="text-sm font-semibold text-paper">{label}</p><div className="flex flex-wrap gap-2">{options.map((option) => { const isSelected = selected.includes(option); return <button className={`min-h-10 rounded-full border px-3 py-2 text-xs font-semibold transition ${isSelected ? "border-bloodwick-red bg-bloodwick-red text-bloodwick-white" : "border-paper/15 bg-paper/10 text-paper/70"}`} key={option} onClick={() => onToggle(option)} type="button">{option}</button>; })}</div></div>;
 }
 
 function PreferenceSelect({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: { label: string; value: string }[]; value: string }) {
@@ -3188,7 +3167,7 @@ function LibraryView(props: { cloudMessage: string; cloudProjects: CloudProjectS
   const seriesGroups = groupStoriesBySeries(libraryStoryRows.map((row) => row.story)).map((group) => ({ ...group, episodes: group.episodes.map((episode) => ({ ...episode, row: libraryStoryRows[episode.originalIndex] })) }));
   const hasGeneratedStoryRows = seriesGroups.length > 0;
 
-  return <section className="grid min-w-0 gap-5 pb-8 md:pb-0"><PageHeading eyebrow="Library" title="Story Library" body="Saved and recent stories live here as a separate destination." /><div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,420px)_1fr]"><section className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4"><h2 className="text-xl font-semibold text-paper">Library Tools</h2><p className="mt-1 text-sm leading-6 text-paper/65">Save stories and move project workspaces between local and cloud storage.</p><button className="mt-4 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={!storyResponse} onClick={onSaveStory} type="button">Save Current Story</button><label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-paper">Project Name</span><input className="rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper" onChange={(event) => onProjectNameChange(event.target.value)} placeholder="My story project" value={projectName} /></label><div className="mt-3 flex flex-wrap gap-2"><SmallButton onClick={onSaveProject}>Save Project</SmallButton><SmallButton disabled={!selectedProjectId} onClick={onDeleteProject}>Delete Project</SmallButton><SmallButton disabled={isCloudLoading} onClick={onRefreshCloud}>{isCloudLoading ? "Syncing..." : "Refresh Cloud"}</SmallButton><SmallButton disabled={isCloudLoading} onClick={onSaveCloudProject}>Save to Cloud</SmallButton><SmallButton disabled={isCloudLoading || !selectedCloudProjectId} onClick={onDeleteCloudProject}>Delete Cloud</SmallButton></div><SelectLibrary label="Load Project" onChange={onLoadProject} options={savedProjects.map((project) => ({ label: `${project.name} - ${formatDateTime(project.updatedAt)}`, value: project.id }))} value={selectedProjectId} /><SelectLibrary label="Load Cloud Project" onChange={onLoadCloudProject} options={cloudProjects.map((project) => ({ label: `${project.name} - ${formatDateTime(project.updatedAt)}`, value: project.id }))} value={selectedCloudProjectId} />{cloudMessage ? <p className="mt-3 rounded-md border border-lantern-gold/25 bg-paper/10 px-3 py-2 text-xs leading-5 text-paper/65">{cloudMessage}</p> : null}</section><section className="grid min-w-0 gap-3"><section className="grid min-w-0 gap-3 rounded-md border border-lantern-gold/20 bg-lantern-gold/5 p-4"><div><h2 className="text-lg font-semibold text-paper">Saved for later</h2><p className="mt-1 text-sm leading-6 text-paper/60">Ready story choices you saved from the desktop queue.</p></div>{savedForLaterStoryQueue.length ? savedForLaterStoryQueue.map((item) => <SavedForLaterStoryCard item={item} key={item.id} onMoveToWaitingQueue={() => onMoveSavedForLaterToWaitingQueue(item)} onRead={() => onReadSavedForLater(item)} onRemove={() => onRemoveSavedForLater(item)} />) : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved-for-later stories yet.</p>}</section>{!hasGeneratedStoryRows ? <EmptyPanel title="No saved or recent stories yet" body="Generate a story or save one locally and it will appear here." /> : null}{seriesGroups.map((group) => <SeriesLibraryGroup key={group.seriesId} group={group} onContinueSavedStoryById={onContinueSavedStoryById} onDeleteStory={onDeleteStory} onOpenSavedStoryById={onOpenSavedStoryById} />)}</section></div></section>;
+  return <section className="grid min-w-0 gap-5 pb-8 md:pb-0"><PageHeading eyebrow="Library" title="Stories" body="Saved and recent stories live here as a separate destination." /><div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,420px)_1fr]"><section className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4"><h2 className="text-xl font-semibold text-paper">Library Tools</h2><p className="mt-1 text-sm leading-6 text-paper/65">Save stories and move project workspaces between local and cloud storage.</p><button className="mt-4 rounded-md bg-lantern-gold px-4 py-2 text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-50" disabled={!storyResponse} onClick={onSaveStory} type="button">Save Current Story</button><label className="mt-4 flex flex-col gap-2"><span className="text-sm font-semibold text-paper">Project Name</span><input className="rounded-md border border-paper/15 bg-night-ink px-3 py-2 text-sm text-paper" onChange={(event) => onProjectNameChange(event.target.value)} placeholder="My story project" value={projectName} /></label><div className="mt-3 flex flex-wrap gap-2"><SmallButton onClick={onSaveProject}>Save Project</SmallButton><SmallButton disabled={!selectedProjectId} onClick={onDeleteProject}>Delete Project</SmallButton><SmallButton disabled={isCloudLoading} onClick={onRefreshCloud}>{isCloudLoading ? "Syncing..." : "Refresh Cloud"}</SmallButton><SmallButton disabled={isCloudLoading} onClick={onSaveCloudProject}>Save to Cloud</SmallButton><SmallButton disabled={isCloudLoading || !selectedCloudProjectId} onClick={onDeleteCloudProject}>Delete Cloud</SmallButton></div><SelectLibrary label="Load Project" onChange={onLoadProject} options={savedProjects.map((project) => ({ label: `${project.name} - ${formatDateTime(project.updatedAt)}`, value: project.id }))} value={selectedProjectId} /><SelectLibrary label="Load Cloud Project" onChange={onLoadCloudProject} options={cloudProjects.map((project) => ({ label: `${project.name} - ${formatDateTime(project.updatedAt)}`, value: project.id }))} value={selectedCloudProjectId} />{cloudMessage ? <p className="mt-3 rounded-md border border-lantern-gold/25 bg-paper/10 px-3 py-2 text-xs leading-5 text-paper/65">{cloudMessage}</p> : null}</section><section className="grid min-w-0 gap-3"><section className="grid min-w-0 gap-3 rounded-md border border-lantern-gold/20 bg-lantern-gold/5 p-4"><div><h2 className="text-lg font-semibold text-paper">Saved for later</h2><p className="mt-1 text-sm leading-6 text-paper/60">Ready story choices you saved from the desktop queue.</p></div>{savedForLaterStoryQueue.length ? savedForLaterStoryQueue.map((item) => <SavedForLaterStoryCard item={item} key={item.id} onMoveToWaitingQueue={() => onMoveSavedForLaterToWaitingQueue(item)} onRead={() => onReadSavedForLater(item)} onRemove={() => onRemoveSavedForLater(item)} />) : <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">No saved-for-later stories yet.</p>}</section>{!hasGeneratedStoryRows ? <EmptyPanel title="No saved or recent stories yet" body="Generate a story or save one locally and it will appear here." /> : null}{seriesGroups.map((group) => <SeriesLibraryGroup key={group.seriesId} group={group} onContinueSavedStoryById={onContinueSavedStoryById} onDeleteStory={onDeleteStory} onOpenSavedStoryById={onOpenSavedStoryById} />)}</section></div></section>;
 }
 
 type LibraryStoryRow = { story: SavedStory; kind: "saved" };
@@ -3299,7 +3278,7 @@ function MoodIntakeView({ onCancel, onSubmit, pendingStoryTitle }: { onCancel: (
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">Reader pulse</p>
         <h2 className="mt-2 text-2xl font-semibold leading-tight text-paper">What do you need from this story?</h2>
         <p className="mt-2 text-sm leading-6 text-paper/65">
-          {pendingStoryTitle ? `${pendingStoryTitle} is ready. First, tell Lantyrn what kind of reading moment this should become.` : "Before Lantyrn writes, give it the shape of your day and the kind of story you want right now."}
+          {pendingStoryTitle ? `${pendingStoryTitle} is ready. First, tell Bloodwick what kind of reading moment this should become.` : "Before Bloodwick writes, give it the shape of your day and the kind of story you want right now."}
         </p>
       </div>
 
@@ -3319,7 +3298,7 @@ function MoodIntakeView({ onCancel, onSubmit, pendingStoryTitle }: { onCancel: (
 
         <div className="flex flex-col gap-2 sm:flex-row">
           <button className="rounded-md bg-lantern-gold px-5 py-3 text-sm font-semibold text-night-ink transition disabled:cursor-not-allowed disabled:opacity-50" disabled={!canSubmit} type="submit">Save pulse</button>
-          <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-lantern-gold/50" onClick={onCancel} type="button">Cancel</button>
+          <button className="rounded-md border border-paper/15 bg-paper/10 px-5 py-3 text-sm font-semibold text-paper transition hover:border-bloodwick-copper" onClick={onCancel} type="button">Cancel</button>
         </div>
       </form>
     </section>
@@ -3331,7 +3310,7 @@ function IntakeTextArea({ label, onChange, placeholder, required = false, value 
 }
 
 function SegmentedChoice({ label, onChange, options, value }: { label: string; onChange: (value: string) => void; options: { label: string; value: string }[]; value: string }) {
-  return <div className="grid gap-2"><p className="text-sm font-semibold text-paper">{label}</p><div className="grid grid-cols-3 gap-2">{options.map((option) => <button className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${value === option.value ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper"}`} key={option.value} onClick={() => onChange(option.value)} type="button">{option.label}</button>)}</div></div>;
+  return <div className="grid gap-2"><p className="text-sm font-semibold text-paper">{label}</p><div className="grid grid-cols-3 gap-2">{options.map((option) => <button className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${value === option.value ? "border-bloodwick-red bg-bloodwick-red text-bloodwick-white" : "border-paper/15 bg-paper/10 text-paper"}`} key={option.value} onClick={() => onChange(option.value)} type="button">{option.label}</button>)}</div></div>;
 }
 
 function createEmptyLastNewStoryPersonalization(): LastNewStoryPersonalization {
@@ -3843,7 +3822,7 @@ function ReaderProfileDiagnostics({ canonicalProfile, cloudSync, lastGenerationU
             {JSON.stringify({ canonicalProfile, readerIdStorageKey: READER_ID_STORAGE_KEY, canonicalProfileStorageKey: CANONICAL_READER_PROFILE_STORAGE_KEY, storageKey: READER_PROFILE_STORAGE_KEY, profileIdStorageKey: READER_PROFILE_ID_STORAGE_KEY, cloudSync, ...profile }, null, 2)}
           </pre>
         </details>
-        <button className="w-fit rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper hover:border-lantern-gold/50" onClick={onClear} type="button">Clear reader profile</button>
+        <button className="w-fit rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper hover:border-bloodwick-copper" onClick={onClear} type="button">Clear reader profile</button>
       </div>
     </details>
   );
@@ -3995,7 +3974,7 @@ function EerieReaderProfileDiagnostics({ onClear, profile }: { onClear: () => vo
         <pre className="max-h-72 overflow-auto rounded-md border border-paper/10 bg-night-ink p-3 text-[0.7rem] leading-5 text-paper/70">
           {JSON.stringify({ profileExists, ...diagnostics }, null, 2)}
         </pre>
-        <button className="w-fit rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper hover:border-lantern-gold/50" onClick={onClear} type="button">Clear eerie reader profile</button>
+        <button className="w-fit rounded-md border border-paper/15 bg-paper/10 px-3 py-2 text-xs font-semibold text-paper hover:border-bloodwick-copper" onClick={onClear} type="button">Clear eerie reader profile</button>
       </div>
     </details>
   );
@@ -4043,11 +4022,7 @@ function MobileTopHeader({ onGoHome }: { onGoHome: () => void }) {
         }}
       >
         <span className="grid place-items-center">
-          <img
-            alt="Lantyrn"
-            className="block h-8 w-32 min-w-0 object-contain [filter:invert(96%)_sepia(9%)_saturate(363%)_hue-rotate(352deg)_brightness(102%)_contrast(93%)]"
-            src="/artwork/lantyrn-wordmark.svg"
-          />
+          <BloodwickWordmark className="text-sm" />
           <span className="mt-0.5 text-center text-[0.65rem] font-semibold leading-none text-paper/45">v{APP_VERSION}</span>
         </span>
       </a>
@@ -4064,11 +4039,11 @@ function MobileTopHeader({ onGoHome }: { onGoHome: () => void }) {
 }
 
 function MobileBottomNav({ activeView, onChange }: { activeView: AppView; onChange: (view: AppView) => void }) {
-  return <nav aria-label="Mobile primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-paper/10 bg-night-ink/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] pt-2 backdrop-blur md:hidden"><div className="mx-auto grid max-w-lg grid-cols-6 gap-1">{NAV_ITEMS.map((item) => <button aria-current={activeView === item.view ? "page" : undefined} className={`rounded-xl px-1 py-2 text-[0.66rem] font-semibold leading-tight ${activeView === item.view ? "bg-lantern-gold text-night-ink" : "text-paper/65"}`} key={item.view} onClick={() => onChange(item.view)} type="button">{item.label}</button>)}</div></nav>;
+  return <nav aria-label="Mobile primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-paper/10 bg-night-ink/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] pt-2 backdrop-blur md:hidden"><div className="mx-auto grid max-w-lg grid-cols-3 gap-1">{NAV_ITEMS.map((item) => <button aria-current={activeView === item.view ? "page" : undefined} className={`rounded-xl px-1 py-2 text-[0.66rem] font-semibold leading-tight ${activeView === item.view ? "bg-bloodwick-red text-bloodwick-white" : "text-paper/65"}`} key={item.view} onClick={() => onChange(item.view)} type="button">{item.label}</button>)}</div></nav>;
 }
 
 function NavTabs({ activeView, onChange }: { activeView: AppView; onChange: (view: AppView) => void }) {
-  return <nav aria-label="Primary" className="w-full min-w-0 md:max-w-xl"><div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:justify-end">{NAV_ITEMS.map((tab) => <button aria-current={activeView === tab.view ? "page" : undefined} className={`min-w-0 rounded-md border px-2.5 py-2 text-center text-xs font-semibold leading-5 transition sm:px-3 ${activeView === tab.view ? "border-lantern-gold bg-lantern-gold text-night-ink" : "border-paper/15 bg-paper/10 text-paper hover:border-lantern-gold/50"}`} key={tab.view} onClick={() => onChange(tab.view)} type="button">{tab.label}</button>)}</div></nav>;
+  return <nav aria-label="Primary" className="w-full min-w-0 md:max-w-xl"><div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:justify-end">{NAV_ITEMS.map((tab) => <button aria-current={activeView === tab.view ? "page" : undefined} className={`min-w-0 rounded-md border px-2.5 py-2 text-center text-xs font-semibold leading-5 transition sm:px-3 ${activeView === tab.view ? "border-bloodwick-red bg-bloodwick-red text-bloodwick-white" : "border-paper/15 bg-paper/10 text-paper hover:border-bloodwick-copper"}`} key={tab.view} onClick={() => onChange(tab.view)} type="button">{tab.label}</button>)}</div></nav>;
 }
 
 function PageHeading({ body, eyebrow, title }: { body: string; eyebrow: string; title: string }) { return <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">{eyebrow}</p><h2 className="mt-2 text-2xl font-semibold leading-tight text-paper md:text-3xl">{title}</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-paper/65">{body}</p></div>; }
