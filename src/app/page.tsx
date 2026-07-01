@@ -129,6 +129,8 @@ type CloudReaderProfileStatus = "pending" | "synced" | "unavailable" | "error" |
 type AccountMode = "guest" | "signed-in" | "unknown";
 type AccountDataMode = "signed-in" | "browser-profile" | "local-profile" | "unknown";
 type AccountDataClearConfirmation = "story-fit-preferences" | "local-reader-memory" | null;
+type AccountProfileActionStatus = "idle" | "blocked" | "refreshing" | "saving" | "success" | "error";
+type AccountProfileActionDiagnostics = { lastAccountProfileAction: string; lastAccountProfileActionStatus: AccountProfileActionStatus; lastAccountProfileActionMessage: string; lastAccountProfileActionAt: string; accountProfileRefreshBlockedReason: string; accountProfileSaveBlockedReason: string };
 type AccountProfileSummary = { displayName: string; profileId?: string; accountMode: AccountMode; statusText: string; preferredStoryTypes: string[]; emotionalPromises: string[]; favoriteStoryWorlds: string[]; storyIngredients: string[]; characterLensPreferences: string[]; narrativePressurePreferences: string[]; episodeEndingShapePreferences: string[]; hardAvoidances: string[]; explicitDetails: string[]; continuationPreference?: string; recentFeedback: string[]; confidenceLabel: string; counts: { savedStories?: number; series?: number; characters?: number; storySparks?: number } };
 type ReaderPreferencesSaveStatus = "saved" | "saving" | "error";
 type StoryFitOnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -141,7 +143,7 @@ const STORY_FIT_ONBOARDING_STORAGE_KEY = "projectLantern.storyFitOnboarding.v1";
 const STORY_FIT_ONBOARDING_LAST_OPENED_KEY = "projectLantern.storyFitOnboarding.lastOpenedAt.v1";
 const STORY_FIT_ONBOARDING_LAST_SAVED_KEY = "projectLantern.storyFitOnboarding.lastSavedAt.v1";
 
-type AccountDataExportV1 = { exportVersion: "account-data-v1"; exportedAt: string; appVersion?: string; account: { accountMode: AccountDataMode; profileId?: string; email?: string }; storyFitPreferences?: unknown; readerProfile?: unknown; feedbackSignals?: unknown; savedContentSummary: { savedStories?: number; series?: number; characters?: number; worlds?: number; storySparks?: number }; savedContent?: { stories?: unknown[]; series?: unknown[]; characters?: unknown[]; worlds?: unknown[]; storySparks?: unknown[] } };
+type AccountDataExportV1 = { exportVersion: "account-data-v1"; exportedAt: string; appVersion?: string; account: { accountMode: AccountDataMode; profileId?: string; email?: string }; storyFitProfileV2Preferences?: unknown; storyFitPreferences?: unknown; readerProfile?: unknown; feedbackSignals?: unknown; savedContentSummary: { savedStories?: number; series?: number; characters?: number; worlds?: number; storySparks?: number }; savedContent?: { stories?: unknown[]; series?: unknown[]; characters?: unknown[]; worlds?: unknown[]; storySparks?: unknown[] } };
 type CloudReaderProfileSyncState = {
   profileId: string;
   status: CloudReaderProfileStatus;
@@ -470,6 +472,7 @@ export default function Home() {
   const [isStoryFitOnboardingOpen, setIsStoryFitOnboardingOpen] = useState(false);
   const [canonicalReaderProfile, setCanonicalReaderProfile] = useState<CanonicalReaderProfile | null>(null);
   const [cloudReaderProfileSync, setCloudReaderProfileSync] = useState<CloudReaderProfileSyncState>(EMPTY_CLOUD_READER_PROFILE_SYNC);
+  const [accountProfileActionDiagnostics, setAccountProfileActionDiagnostics] = useState<AccountProfileActionDiagnostics>({ lastAccountProfileAction: "none", lastAccountProfileActionStatus: "idle", lastAccountProfileActionMessage: "none", lastAccountProfileActionAt: "", accountProfileRefreshBlockedReason: "none", accountProfileSaveBlockedReason: "none" });
   const [eerieReaderProfile, setEerieReaderProfile] = useState<EerieReaderProfile>(createDefaultEerieReaderProfile());
   const [pendingStoryStart, setPendingStoryStart] = useState<StoryStart | null>(null);
   const [moodIntakeMode, setMoodIntakeMode] = useState<MoodIntakeMode>(null);
@@ -595,11 +598,93 @@ export default function Home() {
     return Boolean(authState.getAccessToken());
   }
 
+  function updateAccountProfileActionDiagnostics(update: Partial<AccountProfileActionDiagnostics>) {
+    setAccountProfileActionDiagnostics((current) => ({ ...current, ...update }));
+  }
+
+  async function handleRefreshAccountProfile() {
+    const actionAt = new Date().toISOString();
+    if (authState.authConfigured && !authState.currentUser) {
+      const message = "Sign in to refresh your account profile.";
+      updateCloudReaderProfileSync({ status: "blocked", lastLoadStatus: "signed out", lastBlockedProfileAction: "manual refresh while signed out" });
+      updateAccountProfileActionDiagnostics({ lastAccountProfileAction: "refresh", lastAccountProfileActionStatus: "blocked", lastAccountProfileActionMessage: message, lastAccountProfileActionAt: actionAt, accountProfileRefreshBlockedReason: "signed out" });
+      setStatusMessage(message);
+      return;
+    }
+    if (!authState.authConfigured) {
+      const message = "Auth is disabled. Local profile data is already available on this device.";
+      updateCloudReaderProfileSync({ source: "auth-disabled fallback", status: "synced", lastLoadStatus: "auth disabled", lastSyncAt: actionAt, lastError: "" });
+      updateAccountProfileActionDiagnostics({ lastAccountProfileAction: "refresh", lastAccountProfileActionStatus: "success", lastAccountProfileActionMessage: message, lastAccountProfileActionAt: actionAt, accountProfileRefreshBlockedReason: "auth disabled" });
+      setStatusMessage(message);
+      return;
+    }
+    const currentUser = authState.currentUser;
+    if (!currentUser) return;
+    const profileId = `reader-profile-${currentUser.id}`;
+    updateCloudReaderProfileSync({ profileId, ownerId: currentUser.id, source: "authenticated cloud", status: "pending", lastLoadStatus: "loading", localUpdatedAt: readerProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+    updateAccountProfileActionDiagnostics({ lastAccountProfileAction: "refresh", lastAccountProfileActionStatus: "refreshing", lastAccountProfileActionMessage: "Refreshing…", lastAccountProfileActionAt: actionAt, accountProfileRefreshBlockedReason: "none" });
+    try {
+      const response = await fetch("/api/reader-profile", { cache: "no-store", headers: authHeaders() });
+      const payload = (await response.json().catch(() => ({}))) as ReaderProfileSaveResponse;
+      if (!response.ok) throw new Error(payload.error ?? "Reader profile cloud load failed.");
+      const cloudProfile = normalizeCloudReaderProfile(payload.profile);
+      if (!cloudProfile) {
+        const message = "No account profile found yet. Local profile was kept.";
+        updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? currentUser.id, source: "authenticated cloud", status: "not found", cloudProfileExists: false, lastLoadStatus: "not found", localUpdatedAt: readerProfile.updatedAt, lastSyncAt: new Date().toISOString(), lastError: "", ...cloudDiagnosticUpdate(payload.diagnostic) });
+        updateAccountProfileActionDiagnostics({ lastAccountProfileActionStatus: "success", lastAccountProfileActionMessage: message, lastAccountProfileActionAt: new Date().toISOString() });
+        setStatusMessage(message);
+        return;
+      }
+      const localEffectivelyEmpty = !readerProfile.profileExists && !hasReaderProfilePreferences(readerProfile.explicitReaderPreferences) && !hasReaderMemorySignals(readerProfile, canonicalReaderProfile);
+      const cloudNewerOrEqual = isCloudProfileNewerOrEqual(cloudProfile.updatedAt, readerProfile.updatedAt);
+      const appliedCloud = cloudNewerOrEqual || localEffectivelyEmpty;
+      if (appliedCloud) {
+        setReaderProfile(cloudProfile);
+        setHasLoadedReaderProfileState(true);
+        setCanonicalReaderProfile(canonicalReaderProfileFromReaderProfile(cloudProfile, currentUser.id, "cloud"));
+      }
+      const message = appliedCloud ? "Account profile refreshed." : "Local profile is newer than the account copy. Use Save profile to account to update cloud.";
+      updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? currentUser.id, source: "authenticated cloud", status: "synced", cloudUpdatedAt: cloudProfile.updatedAt, localUpdatedAt: appliedCloud ? cloudProfile.updatedAt : readerProfile.updatedAt, cloudProfileExists: true, lastLoadStatus: appliedCloud ? "success" : "local-newer-kept", lastSyncAt: new Date().toISOString(), lastError: "", ...cloudDiagnosticUpdate(payload.diagnostic) });
+      updateAccountProfileActionDiagnostics({ lastAccountProfileActionStatus: "success", lastAccountProfileActionMessage: message, lastAccountProfileActionAt: new Date().toISOString() });
+      setStatusMessage(message);
+    } catch (caughtError) {
+      const message = "Could not refresh account profile. Local profile was kept.";
+      updateCloudReaderProfileSync({ profileId, status: "error", lastLoadStatus: "error", lastError: sanitizeAccountProfileError(caughtError), localUpdatedAt: readerProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+      updateAccountProfileActionDiagnostics({ lastAccountProfileActionStatus: "error", lastAccountProfileActionMessage: message, lastAccountProfileActionAt: new Date().toISOString() });
+      setStatusMessage(message);
+    }
+  }
+
+  async function handleSaveAccountProfile() {
+    const actionAt = new Date().toISOString();
+    if (authState.authConfigured && !authState.currentUser) {
+      const message = "Sign in to save your profile to your account.";
+      updateCloudReaderProfileSync({ status: "blocked", lastSaveOutcome: "error", lastBlockedProfileAction: "manual save while signed out" });
+      updateAccountProfileActionDiagnostics({ lastAccountProfileAction: "save", lastAccountProfileActionStatus: "blocked", lastAccountProfileActionMessage: message, lastAccountProfileActionAt: actionAt, accountProfileSaveBlockedReason: "signed out" });
+      setStatusMessage(message);
+      return;
+    }
+    const profileId = authState.currentUser?.id ? `reader-profile-${authState.currentUser.id}` : cloudReaderProfileSync.profileId || readOrCreateReaderProfileId();
+    updateAccountProfileActionDiagnostics({ lastAccountProfileAction: "save", lastAccountProfileActionStatus: "saving", lastAccountProfileActionMessage: "Saving…", lastAccountProfileActionAt: actionAt, accountProfileSaveBlockedReason: "none" });
+    try {
+      await saveReaderProfileToCloud(profileId, readerProfile);
+      const message = "Profile saved to account.";
+      updateAccountProfileActionDiagnostics({ lastAccountProfileActionStatus: "success", lastAccountProfileActionMessage: message, lastAccountProfileActionAt: new Date().toISOString() });
+      setStatusMessage(message);
+    } catch (caughtError) {
+      const message = "Could not save profile to account. Local profile was kept.";
+      updateCloudReaderProfileSync({ profileId, status: "error", lastSaveOutcome: "error", lastError: sanitizeAccountProfileError(caughtError), localUpdatedAt: readerProfile.updatedAt, localProfileExists: readerProfileExistsInLocalStorage() });
+      updateAccountProfileActionDiagnostics({ lastAccountProfileActionStatus: "error", lastAccountProfileActionMessage: message, lastAccountProfileActionAt: new Date().toISOString() });
+      setStatusMessage(message);
+    }
+  }
 
   async function loadAuthenticatedReaderProfile() {
     if (!authState.currentUser) return;
-    const profileId = `reader-profile-${authState.currentUser.id}`;
-    updateCloudReaderProfileSync({ profileId, ownerId: authState.currentUser.id, source: "authenticated cloud", status: "pending", lastLoadStatus: "loading", localProfileExists: readerProfileExistsInLocalStorage() });
+    const currentUser = authState.currentUser;
+    if (!currentUser) return;
+    const profileId = `reader-profile-${currentUser.id}`;
+    updateCloudReaderProfileSync({ profileId, ownerId: currentUser.id, source: "authenticated cloud", status: "pending", lastLoadStatus: "loading", localProfileExists: readerProfileExistsInLocalStorage() });
     try {
       const response = await fetch(`/api/reader-profile`, { cache: "no-store", headers: authHeaders() });
       const payload = await response.json().catch(() => ({})) as ReaderProfileSaveResponse;
@@ -608,22 +693,22 @@ export default function Home() {
         return;
       }
       if (!response.ok) {
-        updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? authState.currentUser.id, source: "authenticated cloud", status: "error", lastLoadStatus: "error", lastError: payload.error ?? "Reader profile cloud load failed.", localProfileExists: readerProfileExistsInLocalStorage(), ...cloudDiagnosticUpdate(payload.diagnostic) });
+        updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? currentUser.id, source: "authenticated cloud", status: "error", lastLoadStatus: "error", lastError: payload.error ?? "Reader profile cloud load failed.", localProfileExists: readerProfileExistsInLocalStorage(), ...cloudDiagnosticUpdate(payload.diagnostic) });
         return;
       }
       const cloudProfile = normalizeCloudReaderProfile(payload.profile);
       if (cloudProfile) {
         setReaderProfile(cloudProfile);
         setHasLoadedReaderProfileState(true);
-        setCanonicalReaderProfile(canonicalReaderProfileFromReaderProfile(cloudProfile, authState.currentUser.id, "cloud"));
-        updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? authState.currentUser.id, source: "authenticated cloud", status: "synced", cloudUpdatedAt: cloudProfile.updatedAt, localUpdatedAt: cloudProfile.updatedAt, cloudProfileExists: true, lastLoadStatus: "success", lastError: "", initializedDefaultCloudProfile: false, ...cloudDiagnosticUpdate(payload.diagnostic) });
+        setCanonicalReaderProfile(canonicalReaderProfileFromReaderProfile(cloudProfile, currentUser.id, "cloud"));
+        updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? currentUser.id, source: "authenticated cloud", status: "synced", cloudUpdatedAt: cloudProfile.updatedAt, localUpdatedAt: cloudProfile.updatedAt, cloudProfileExists: true, lastLoadStatus: "success", lastError: "", initializedDefaultCloudProfile: false, ...cloudDiagnosticUpdate(payload.diagnostic) });
         return;
       }
       const defaultProfile = createEmptyReaderProfile();
       setReaderProfile(defaultProfile);
       setHasLoadedReaderProfileState(true);
       setCanonicalReaderProfile(canonicalReaderProfileFromReaderProfile(defaultProfile, authState.currentUser.id, "cloud"));
-      updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? authState.currentUser.id, source: "authenticated cloud", status: "not found", cloudProfileExists: false, lastLoadStatus: "not_found_then_initializing", localUpdatedAt: defaultProfile.updatedAt, lastError: "", initializedDefaultCloudProfile: true, ...cloudDiagnosticUpdate(payload.diagnostic) });
+      updateCloudReaderProfileSync({ profileId, ownerId: payload.ownerId ?? currentUser.id, source: "authenticated cloud", status: "not found", cloudProfileExists: false, lastLoadStatus: "not_found_then_initializing", localUpdatedAt: defaultProfile.updatedAt, lastError: "", initializedDefaultCloudProfile: true, ...cloudDiagnosticUpdate(payload.diagnostic) });
       await saveReaderProfileToCloud(profileId, defaultProfile);
       updateCloudReaderProfileSync({ status: "synced", cloudProfileExists: true, lastLoadStatus: "not_found_then_initialized", lastError: "", initializedDefaultCloudProfile: true });
     } catch (caughtError) {
@@ -1985,6 +2070,7 @@ export default function Home() {
     setReaderProfile(emptyProfile);
     setCanonicalReaderProfile(resetCanonicalProfile);
     setReaderPreferencesSaveStatus("saved");
+    void syncReaderProfileToCloud(emptyProfile);
     setStatusMessage("Local reader memory and profile signals cleared.");
   }
 
@@ -2015,7 +2101,7 @@ export default function Home() {
   const isContinuationGenerating = isGenerating && generationSource === "continue-story";
   const diagnosticsPanels = (
     <>
-      <AppStateDiagnostics accountSummary={accountProfileSummary} activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationFailureDiagnostic={lastGenerationFailureDiagnostic} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} storyResponseEpisodeMomentum={storyResponse?.metadata.diagnostics.episodeMomentum ?? null} storyTypeSelectionDiagnostics={storyTypeSelectionDiagnostics} storyFitOnboardingAvailable={shouldShowFirstRunStoryFitPrompt || isStoryFitOnboardingOpen} storyFitOnboardingDismissed={storyFitOnboardingDismissed} storyFitOnboardingCompleted={hasReaderProfilePreferences(readerProfile.explicitReaderPreferences)} storyFitOnboardingLastOpenedAt={storyFitOnboardingLastOpenedAt} storyFitOnboardingLastSavedAt={storyFitOnboardingLastSavedAt} />
+      <AppStateDiagnostics accountSummary={accountProfileSummary} activeView={activeView} activeCommittedSeriesId={activeCommittedSeriesId} activeCommittedStoryId={activeCommittedStoryId} currentEpisodeNumber={currentSeriesEpisode?.episodeNumber ?? null} currentStoryFeedback={currentStoryFeedback} currentStoryId={currentStoryId} feedbackDraftHasUnsavedChanges={feedbackDraftHasUnsavedChanges} feedbackSaveBlockedBecauseRatingMissing={feedbackSaveBlockedBecauseRatingMissing} generationBlockedBecauseUnsavedFeedback={generationBlockedBecauseUnsavedFeedback} generationSource={generationSource} isGenerating={isGenerating} lastContinuationBlockedBecauseContextMissing={lastContinuationBlockedBecauseContextMissing} lastContinuationContextIncluded={lastContinuationContextIncluded} lastGenerationCancelledOrAborted={lastGenerationCancelledOrAborted} lastGenerationFailureDiagnostic={lastGenerationFailureDiagnostic} lastGenerationTrigger={lastGenerationTrigger} lastLibraryOpenedEpisodeNumber={lastLibraryOpenedEpisodeNumber} lastLibraryOpenedStoryId={lastLibraryOpenedStoryId} lastNewStoryPersonalization={lastNewStoryPersonalization} lastReadyStoryPreparationOutcome={lastReadyStoryPreparationOutcome} lastReadyStoryPreparationStatus={readyStoryPreparationStatus} lastReadyStoryQueueAction={lastReadyStoryQueueAction} lastRequestIncludedContinuationStoryId={lastRequestIncludedContinuationStoryId} pendingGenerationMode={pendingGenerationMode} readerScrollDiagnostics={readerScrollDiagnostics} profile={readerProfile} readyStoryQueue={readyStoryQueue} savedForLaterStoryQueue={savedForLaterStoryQueue} storyResponseEpisodeMomentum={storyResponse?.metadata.diagnostics.episodeMomentum ?? null} storyTypeSelectionDiagnostics={storyTypeSelectionDiagnostics} storyFitOnboardingAvailable={shouldShowFirstRunStoryFitPrompt || isStoryFitOnboardingOpen} storyFitOnboardingDismissed={storyFitOnboardingDismissed} storyFitOnboardingCompleted={hasReaderProfilePreferences(readerProfile.explicitReaderPreferences)} storyFitOnboardingLastOpenedAt={storyFitOnboardingLastOpenedAt} storyFitOnboardingLastSavedAt={storyFitOnboardingLastSavedAt} cloudSync={cloudReaderProfileSync} accountProfileActionDiagnostics={accountProfileActionDiagnostics} />
       <ReaderProfileDiagnostics canonicalProfile={canonicalReaderProfile} cloudSync={cloudReaderProfileSync} lastGenerationUsedCanonicalProfile={Boolean(canonicalReaderProfile?.signals.lastGenerationUsedCanonicalProfile || lastNewStoryPersonalization.responseSnapshot?.canonicalReaderProfileUsed)} onClear={handleClearReaderProfile} profile={readerProfile} />
       <EerieReaderProfileDiagnostics profile={eerieReaderProfile} onClear={handleClearEerieReaderProfile} />
       <AuthDiagnostics appActionsGated={authState.appActionsGated} authConfigured={authState.authConfigured} authFlow={authState.authFlow} authMode={authState.authMode} authStatus={authState.authStatus} cognitoUserId={authState.currentUser?.id ?? ""} currentUserEmail={authState.currentUser?.email ?? ""} lastAuthStep={authState.lastAuthStep} lastCognitoErrorCode={authState.lastCognitoErrorCode} libraryDiagnostics={libraryDiagnostics} profileLibraryMode={authState.profileLibraryMode} region={authState.region} resetFlowState={authState.resetFlowState} />
@@ -2122,7 +2208,7 @@ export default function Home() {
         {activeView === "worlds" ? <WorldsView onOpenStory={handleStartRecommendation} /> : null}
         {activeView === "create" ? <CreateView canGenerate={canGenerate} characterArc={characterArc} characterProfiles={characterProfiles} endingType={endingType} genrePreset={genrePreset} inputArtifacts={inputArtifacts} isGenerating={isGenerating} lengthTarget={lengthTarget} narrativeArchitecture={narrativeArchitecture} onChangeCharacterArc={setCharacterArc} onChangeCharacterProfiles={setCharacterProfiles} onChangeEndingType={setEndingType} onChangeGenre={setGenrePreset} onChangeLengthTarget={setLengthTarget} onChangeNarrative={setNarrativeArchitecture} onChangeStoryRules={setStoryRules} onChangeStorySeed={setStorySeed} onChangeWorld={setWorldBible} onClear={clearCurrentInputs} onGenerate={handleCreateGenerateClick} onSaveInputArtifact={handleSaveInputArtifact} onSelectInputArtifact={handleSelectInputArtifact} storyRules={storyRules} storySeed={storySeed} worldBible={worldBible} /> : null}
         {activeView === "characters" ? <CharactersView onOpenStory={handleStartRecommendation} /> : null}
-        {activeView === "account" ? <AccountView authState={authState} canonicalProfile={canonicalReaderProfile} inputArtifacts={inputArtifacts} onClearLocalReaderMemory={handleClearLocalReaderMemory} onClearStoryFitPreferences={handleClearStoryFitPreferences} onOpenLibrary={() => navigateToView("library")} onReaderPreferencesChange={handleReaderPreferencesChange} readerPreferences={readerProfile.explicitReaderPreferences} readerProfile={readerProfile} savedForLaterStoryQueue={savedForLaterStoryQueue} savedStories={savedStories} saveStatus={readerPreferencesSaveStatus} summary={accountProfileSummary} onOpenStoryFitOnboarding={handleOpenStoryFitOnboarding} /> : null}
+        {activeView === "account" ? <AccountView authState={authState} canonicalProfile={canonicalReaderProfile} inputArtifacts={inputArtifacts} onClearLocalReaderMemory={handleClearLocalReaderMemory} cloudReaderProfileSync={cloudReaderProfileSync} accountProfileActionDiagnostics={accountProfileActionDiagnostics} onRefreshAccountProfile={handleRefreshAccountProfile} onSaveAccountProfile={handleSaveAccountProfile} onClearStoryFitPreferences={handleClearStoryFitPreferences} onOpenLibrary={() => navigateToView("library")} onReaderPreferencesChange={handleReaderPreferencesChange} readerPreferences={readerProfile.explicitReaderPreferences} readerProfile={readerProfile} savedForLaterStoryQueue={savedForLaterStoryQueue} savedStories={savedStories} saveStatus={readerPreferencesSaveStatus} summary={accountProfileSummary} onOpenStoryFitOnboarding={handleOpenStoryFitOnboarding} /> : null}
         {activeView !== "home" ? <MobileDeveloperDiagnostics>{diagnosticsPanels}</MobileDeveloperDiagnostics> : null}
       </section>
       <MobileBottomNav activeView={activeView} onChange={navigateToView} />
@@ -2851,12 +2937,16 @@ const NARRATIVE_PRESSURE_OPTIONS = [{ label: "Not set", value: "not-set" }, ...O
 const EPISODE_ENDING_SHAPE_OPTIONS = [{ label: "Not set", value: "not-set" }, ...Object.entries(STORY_FIT_ENDING_TO_LEGACY).map(([label, value]) => ({ label, value }))];
 const PROTAGONIST_LENS_OPTIONS = [{ label: "Not set", value: "not-set" }, ...Object.entries(STORY_FIT_CHARACTER_LENS_TO_LEGACY).map(([label, value]) => ({ label, value }))];
 
-function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocalReaderMemory, onClearStoryFitPreferences, onOpenLibrary, onOpenStoryFitOnboarding, onReaderPreferencesChange, readerPreferences, readerProfile, savedForLaterStoryQueue, savedStories, saveStatus, summary }: { authState: ReturnType<typeof useAuth>; canonicalProfile: CanonicalReaderProfile | null; inputArtifacts: InputArtifact[]; onClearLocalReaderMemory: () => void; onClearStoryFitPreferences: () => void; onOpenLibrary: () => void; onOpenStoryFitOnboarding: () => void; onReaderPreferencesChange: (preferences: ReaderProfile["explicitReaderPreferences"]) => void; readerPreferences: ReaderProfile["explicitReaderPreferences"]; readerProfile: ReaderProfile; savedForLaterStoryQueue: ReadyStoryQueueItem[]; savedStories: SavedStory[]; saveStatus: ReaderPreferencesSaveStatus; summary: AccountProfileSummary }) {
+function AccountView({ accountProfileActionDiagnostics, authState, canonicalProfile, cloudReaderProfileSync, inputArtifacts, onClearLocalReaderMemory, onClearStoryFitPreferences, onOpenLibrary, onOpenStoryFitOnboarding, onReaderPreferencesChange, onRefreshAccountProfile, onSaveAccountProfile, readerPreferences, readerProfile, savedForLaterStoryQueue, savedStories, saveStatus, summary }: { accountProfileActionDiagnostics: AccountProfileActionDiagnostics; authState: ReturnType<typeof useAuth>; canonicalProfile: CanonicalReaderProfile | null; cloudReaderProfileSync: CloudReaderProfileSyncState; inputArtifacts: InputArtifact[]; onClearLocalReaderMemory: () => void; onClearStoryFitPreferences: () => void; onOpenLibrary: () => void; onOpenStoryFitOnboarding: () => void; onReaderPreferencesChange: (preferences: ReaderProfile["explicitReaderPreferences"]) => void; onRefreshAccountProfile: () => void; onSaveAccountProfile: () => void; readerPreferences: ReaderProfile["explicitReaderPreferences"]; readerProfile: ReaderProfile; savedForLaterStoryQueue: ReadyStoryQueueItem[]; savedStories: SavedStory[]; saveStatus: ReaderPreferencesSaveStatus; summary: AccountProfileSummary }) {
   const [avoidanceDraft, setAvoidanceDraft] = useState("");
   const [dataControlMessage, setDataControlMessage] = useState("");
   const [pendingClearConfirmation, setPendingClearConfirmation] = useState<AccountDataClearConfirmation>(null);
   const accountMode = getAccountDataMode(authState, readerProfile, canonicalProfile);
   const accountRows = getAccountDataStatusRows({ accountMode, authState, canonicalProfile, readerProfile, summary });
+  const storyFitSelectedCount = countStoryFitSelections(readerProfile.explicitReaderPreferences);
+  const accountProfileSyncRows = getAccountProfileSyncRows({ authState, cloudReaderProfileSync, readerProfile, savedStoriesCount: savedStories.length, storyFitSelectedCount });
+  const isRefreshingAccountProfile = accountProfileActionDiagnostics.lastAccountProfileAction === "refresh" && accountProfileActionDiagnostics.lastAccountProfileActionStatus === "refreshing";
+  const isSavingAccountProfile = accountProfileActionDiagnostics.lastAccountProfileAction === "save" && accountProfileActionDiagnostics.lastAccountProfileActionStatus === "saving";
   const savedCountEntries = [
     typeof summary.counts.savedStories === "number" ? { label: "Saved stories", value: summary.counts.savedStories } : null,
     typeof summary.counts.series === "number" ? { label: "Series / storyworlds", value: summary.counts.series } : null,
@@ -2917,6 +3007,18 @@ function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocal
             {accountRows.map((row) => <div className="rounded-md border border-paper/10 bg-night-ink/45 px-3 py-2" key={row.label}><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{row.label}</dt><dd className="mt-1 break-words text-sm font-semibold text-paper/80">{row.value}</dd></div>)}
           </dl>
         </AccountCard>
+        <AccountCard title="Account profile sync">
+          <dl className="grid min-w-0 gap-2 sm:grid-cols-2">
+            {accountProfileSyncRows.map((row) => <div className="min-w-0 rounded-md border border-paper/10 bg-night-ink/45 px-3 py-2" key={row.label}><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-paper/45">{row.label}</dt><dd className="mt-1 break-words text-sm font-semibold text-paper/80">{row.value}</dd></div>)}
+          </dl>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <button className="min-h-11 rounded-md border border-lantern-gold/45 bg-lantern-gold/10 px-4 py-3 text-left text-sm font-semibold text-lantern-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={isRefreshingAccountProfile} onClick={onRefreshAccountProfile} type="button">{isRefreshingAccountProfile ? "Refreshing…" : "Refresh account profile"}</button>
+            <button className="min-h-11 rounded-md border border-lantern-gold/45 bg-lantern-gold/10 px-4 py-3 text-left text-sm font-semibold text-lantern-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={isSavingAccountProfile} onClick={onSaveAccountProfile} type="button">{isSavingAccountProfile ? "Saving…" : "Save profile to account"}</button>
+            <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-3 text-left text-sm font-semibold text-paper/80" onClick={onOpenStoryFitOnboarding} type="button">Edit Story Fit Profile</button>
+            <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-3 text-left text-sm font-semibold text-paper/80" onClick={exportAccountData} type="button">Export account data</button>
+          </div>
+          {accountProfileActionDiagnostics.lastAccountProfileActionMessage !== "none" ? <p className="mt-3 rounded-md border border-lantern-gold/25 bg-lantern-gold/10 px-3 py-2 text-sm font-semibold text-lantern-gold">{accountProfileActionDiagnostics.lastAccountProfileActionMessage}</p> : null}
+        </AccountCard>
         <AccountCard title="Story fit preferences">
           <button className="min-h-11 w-full rounded-md border border-lantern-gold/45 bg-lantern-gold/10 px-4 py-3 text-left text-sm font-semibold text-lantern-gold sm:w-fit" onClick={onOpenStoryFitOnboarding} type="button">Edit via guided setup</button>
           <PreferenceChipGroup label="Preferred story types" options={READER_STORY_TYPE_OPTIONS} selected={readerPreferences.preferredStoryTypes} onToggle={(value) => toggleItem("preferredStoryTypes", value)} />
@@ -2934,7 +3036,7 @@ function AccountView({ authState, canonicalProfile, inputArtifacts, onClearLocal
             <button className="min-h-11 rounded-md border border-lantern-gold/45 bg-lantern-gold/10 px-4 py-3 text-left text-sm font-semibold text-lantern-gold" onClick={exportAccountData} type="button">Export account data</button>
             <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-3 text-left text-sm font-semibold text-paper/80" onClick={() => { setPendingClearConfirmation("story-fit-preferences"); setDataControlMessage(""); }} type="button">Clear Story Fit Preferences</button>
             <button className="min-h-11 rounded-md border border-paper/15 bg-paper/10 px-4 py-3 text-left text-sm font-semibold text-paper/80" onClick={() => { setPendingClearConfirmation("local-reader-memory"); setDataControlMessage(""); }} type="button">Clear local reader memory/profile signals</button>
-            <button className="min-h-11 cursor-not-allowed rounded-md border border-paper/12 bg-paper/5 px-4 py-3 text-left text-sm font-semibold text-paper/45" disabled type="button">Delete account/data — Coming soon</button>
+            <button className="min-h-11 cursor-not-allowed rounded-md border border-paper/12 bg-paper/5 px-4 py-3 text-left text-sm font-semibold text-paper/45" disabled type="button">Account deletion is not available yet.</button>
           </div>
           {pendingClearConfirmation ? (
             <div className="rounded-md border border-lantern-gold/35 bg-night-ink/70 p-3">
@@ -2981,6 +3083,55 @@ function formatAccountDataMode(accountMode: AccountDataMode) {
   return "Unknown";
 }
 
+function maskAccountIdentifier(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length <= 12) return trimmed ? "••••" : "none";
+  return `${trimmed.slice(0, 6)}…${trimmed.slice(-4)}`;
+}
+
+function countStoryFitSelections(preferences: ReaderProfile["explicitReaderPreferences"]): number {
+  return [preferences.preferredStoryTypes, preferences.emotionalPromises, preferences.favoriteStoryWorlds, preferences.storyIngredients, preferences.characterLensPreferences, preferences.protagonistLensPreferences, preferences.narrativePressurePreferences, preferences.episodeEndingShapePreferences, preferences.hardAvoidances].reduce((total, value) => total + (Array.isArray(value) ? value.length : 0), 0);
+}
+
+function hasStoryFitProfileV2Selections(preferences: ReaderProfile["explicitReaderPreferences"]): boolean {
+  return countStoryFitSelections(preferences) > 0;
+}
+
+function isCloudProfileNewerOrEqual(cloudUpdatedAt: string, localUpdatedAt: string): boolean {
+  if (!cloudUpdatedAt) return false;
+  if (!localUpdatedAt) return true;
+  return cloudUpdatedAt >= localUpdatedAt;
+}
+
+function sanitizeAccountProfileError(error: unknown): string {
+  return formatErrorMessage(error).replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [redacted]").slice(0, 160) || "Reader profile sync failed.";
+}
+
+function getAccountProfileModeLabel(authState: ReturnType<typeof useAuth>) {
+  if (!authState.authConfigured) return "auth disabled";
+  return authState.currentUser ? "signed in" : "signed out";
+}
+
+function getAccountProfileSyncRows({ authState, cloudReaderProfileSync, readerProfile, savedStoriesCount, storyFitSelectedCount }: { authState: ReturnType<typeof useAuth>; cloudReaderProfileSync: CloudReaderProfileSyncState; readerProfile: ReaderProfile; savedStoriesCount: number; storyFitSelectedCount: number }) {
+  return [
+    { label: "Account mode", value: getAccountProfileModeLabel(authState) },
+    { label: "Signed-in email", value: authState.currentUser?.email ?? "none" },
+    { label: "Profile source", value: cloudReaderProfileSync.source },
+    { label: "Cloud profile status", value: cloudReaderProfileSync.status },
+    { label: "Last cloud load status", value: cloudReaderProfileSync.lastLoadStatus || "none" },
+    { label: "Last save outcome", value: cloudReaderProfileSync.lastSaveOutcome },
+    { label: "Local profile updated", value: readerProfile.updatedAt || "none" },
+    { label: "Cloud profile updated", value: cloudReaderProfileSync.cloudUpdatedAt || "none" },
+    { label: "Last sync time", value: cloudReaderProfileSync.lastSyncAt || "none" },
+    { label: "Story Fit Profile version", value: readerProfile.explicitReaderPreferences.storyFitProfileVersion || "none" },
+    { label: "Story Fit Profile saved", value: hasStoryFitProfileV2Selections(readerProfile.explicitReaderPreferences) ? "yes" : "no" },
+    { label: "Story Fit selected count total", value: String(storyFitSelectedCount) },
+    { label: "Saved stories count", value: String(savedStoriesCount) },
+    { label: "Last sync error", value: cloudReaderProfileSync.lastError ? sanitizeAccountProfileError(cloudReaderProfileSync.lastError) : "none" },
+    cloudReaderProfileSync.ownerId && cloudReaderProfileSync.ownerId !== "none" ? { label: "Account id", value: maskAccountIdentifier(cloudReaderProfileSync.ownerId) } : null,
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
+}
+
 function hasReaderMemorySignals(readerProfile: ReaderProfile, canonicalProfile: CanonicalReaderProfile | null) {
   return Boolean(readerProfile.profileExists || readerProfile.latestMood || readerProfile.moodHistory.length || readerProfile.storyFeedbackSignals?.length || readerProfile.readyStoryQueueSignals?.length || canonicalProfile?.signals.feedbackSignalCount || canonicalProfile?.signals.storyCardSignalCount || canonicalProfile?.signals.savedForLaterCount);
 }
@@ -2994,6 +3145,7 @@ function buildAccountDataExport({ accountMode, authState, canonicalProfile, inpu
     exportedAt: new Date().toISOString(),
     appVersion: APP_VERSION,
     account: { accountMode, ...(summary.profileId ? { profileId: summary.profileId } : {}), ...(authState.currentUser?.email ? { email: authState.currentUser.email } : {}) },
+    storyFitProfileV2Preferences: { ...readerProfile.explicitReaderPreferences },
     storyFitPreferences: readerProfile.explicitReaderPreferences,
     readerProfile: { local: readerProfile, canonical: canonicalProfile },
     feedbackSignals: { local: readerProfile.storyFeedbackSignals ?? [], canonicalRecentFeedback: canonicalProfile?.recentFeedback ?? [] },
@@ -3403,7 +3555,7 @@ function getGenerationTriggerLabel(generationMode: GenerationMode, source: Reade
   return "Create";
 }
 
-function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeriesId, activeCommittedStoryId, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationFailureDiagnostic, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics, storyFitOnboardingAvailable, storyFitOnboardingDismissed, storyFitOnboardingCompleted, storyFitOnboardingLastOpenedAt, storyFitOnboardingLastSavedAt }: { accountSummary: AccountProfileSummary; activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationFailureDiagnostic: GenerationFailureDiagnostic; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: StoryTypeSelectionDiagnostics; storyFitOnboardingAvailable: boolean; storyFitOnboardingDismissed: boolean; storyFitOnboardingCompleted: boolean; storyFitOnboardingLastOpenedAt: string; storyFitOnboardingLastSavedAt: string }) {
+function AppStateDiagnostics({ accountProfileActionDiagnostics, accountSummary, activeView, activeCommittedSeriesId, activeCommittedStoryId, cloudSync, currentEpisodeNumber, currentStoryFeedback, currentStoryId, feedbackDraftHasUnsavedChanges, feedbackSaveBlockedBecauseRatingMissing, generationBlockedBecauseUnsavedFeedback, generationSource, isGenerating, lastContinuationBlockedBecauseContextMissing, lastContinuationContextIncluded, lastGenerationCancelledOrAborted, lastGenerationFailureDiagnostic, lastGenerationTrigger, lastLibraryOpenedEpisodeNumber, lastLibraryOpenedStoryId, lastNewStoryPersonalization, lastReadyStoryPreparationOutcome, lastReadyStoryPreparationStatus, lastReadyStoryQueueAction, lastRequestIncludedContinuationStoryId, pendingGenerationMode, profile, readerScrollDiagnostics, readyStoryQueue, savedForLaterStoryQueue, storyResponseEpisodeMomentum, storyTypeSelectionDiagnostics, storyFitOnboardingAvailable, storyFitOnboardingDismissed, storyFitOnboardingCompleted, storyFitOnboardingLastOpenedAt, storyFitOnboardingLastSavedAt }: { accountProfileActionDiagnostics: AccountProfileActionDiagnostics; accountSummary: AccountProfileSummary; cloudSync: CloudReaderProfileSyncState; activeView: AppView; activeCommittedSeriesId: string; activeCommittedStoryId: string; currentEpisodeNumber: number | null; currentStoryFeedback: StoryFeedbackSignal | null; currentStoryId: string; feedbackDraftHasUnsavedChanges: boolean; feedbackSaveBlockedBecauseRatingMissing: boolean; generationBlockedBecauseUnsavedFeedback: boolean; generationSource: GenerationSource; isGenerating: boolean; lastContinuationBlockedBecauseContextMissing: boolean; lastContinuationContextIncluded: boolean; lastGenerationCancelledOrAborted: boolean; lastGenerationFailureDiagnostic: GenerationFailureDiagnostic; lastGenerationTrigger: string; lastLibraryOpenedEpisodeNumber: number | null; lastLibraryOpenedStoryId: string; lastNewStoryPersonalization: LastNewStoryPersonalization; lastReadyStoryPreparationOutcome: string; lastReadyStoryPreparationStatus: string; lastReadyStoryQueueAction: string; lastRequestIncludedContinuationStoryId: boolean; pendingGenerationMode: GenerationMode | "none"; profile: ReaderProfile; readerScrollDiagnostics: ReaderScrollDiagnostics; readyStoryQueue: ReadyStoryQueueItem[]; savedForLaterStoryQueue: ReadyStoryQueueItem[]; storyResponseEpisodeMomentum: EpisodeMomentumDiagnostics | null; storyTypeSelectionDiagnostics: StoryTypeSelectionDiagnostics; storyFitOnboardingAvailable: boolean; storyFitOnboardingDismissed: boolean; storyFitOnboardingCompleted: boolean; storyFitOnboardingLastOpenedAt: string; storyFitOnboardingLastSavedAt: string }) {
   return (
     <details className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-3 text-xs text-paper/65">
       <summary className="cursor-pointer font-semibold text-paper/75">App state diagnostics</summary>
@@ -3433,6 +3585,19 @@ function AppStateDiagnostics({ accountSummary, activeView, activeCommittedSeries
         <p><span className="font-semibold text-paper/80">storyFitV2PluralEndingPresent:</span> {Array.isArray(profile.explicitReaderPreferences.episodeEndingShapePreferences) ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">storyFitV2PluralLensPresent:</span> {Array.isArray(profile.explicitReaderPreferences.protagonistLensPreferences) ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">accountMode:</span> {accountSummary.accountMode}</p>
+        <p><span className="font-semibold text-paper/80">accountProfileSyncControlsVersion:</span> v1</p>
+        <p><span className="font-semibold text-paper/80">lastAccountProfileAction:</span> {accountProfileActionDiagnostics.lastAccountProfileAction}</p>
+        <p><span className="font-semibold text-paper/80">lastAccountProfileActionStatus:</span> {accountProfileActionDiagnostics.lastAccountProfileActionStatus}</p>
+        <p><span className="font-semibold text-paper/80">lastAccountProfileActionMessage:</span> {accountProfileActionDiagnostics.lastAccountProfileActionMessage}</p>
+        <p><span className="font-semibold text-paper/80">lastAccountProfileActionAt:</span> {accountProfileActionDiagnostics.lastAccountProfileActionAt || "none"}</p>
+        <p><span className="font-semibold text-paper/80">accountProfileLocalUpdatedAt:</span> {profile.updatedAt || "none"}</p>
+        <p><span className="font-semibold text-paper/80">accountProfileCloudUpdatedAt:</span> {cloudSync.cloudUpdatedAt || "none"}</p>
+        <p><span className="font-semibold text-paper/80">accountProfileLocalNewerThanCloud:</span> {cloudSync.cloudUpdatedAt && profile.updatedAt > cloudSync.cloudUpdatedAt ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">accountProfileCloudProfileExists:</span> {cloudSync.cloudProfileExists ? "true" : "false"}</p>
+        <p><span className="font-semibold text-paper/80">accountProfileStoryFitVersion:</span> {profile.explicitReaderPreferences.storyFitProfileVersion || "none"}</p>
+        <p><span className="font-semibold text-paper/80">accountProfileStoryFitSelectedCount:</span> {countStoryFitSelections(profile.explicitReaderPreferences)}</p>
+        <p><span className="font-semibold text-paper/80">accountProfileRefreshBlockedReason:</span> {accountProfileActionDiagnostics.accountProfileRefreshBlockedReason}</p>
+        <p><span className="font-semibold text-paper/80">accountProfileSaveBlockedReason:</span> {accountProfileActionDiagnostics.accountProfileSaveBlockedReason}</p>
         <p><span className="font-semibold text-paper/80">profileSummaryAvailable:</span> {(accountSummary.preferredStoryTypes.length || accountSummary.emotionalPromises.length || accountSummary.favoriteStoryWorlds.length || accountSummary.storyIngredients.length || accountSummary.characterLensPreferences.length || accountSummary.hardAvoidances.length || accountSummary.recentFeedback.length) ? "true" : "false"}</p>
         <p><span className="font-semibold text-paper/80">savedContentCountsAvailable:</span> true</p>
         <p><span className="font-semibold text-paper/80">Generation in progress:</span> {isGenerating ? "yes" : "no"}</p>
@@ -3595,7 +3760,7 @@ function ReaderProfileDiagnostics({ canonicalProfile, cloudSync, lastGenerationU
           <p><span className="font-semibold text-paper/80">Canonical profile exists:</span> {canonicalProfile ? "yes" : "no"}</p>
           <p><span className="font-semibold text-paper/80">Profile source:</span> {cloudSync.source}</p>
           <p><span className="font-semibold text-paper/80">Canonical/effective profile source:</span> {cloudSync.source === "authenticated cloud" ? "authenticated cloud" : canonicalProfile?.source ?? "default"}</p>
-          <p><span className="font-semibold text-paper/80">Active Reader Profile owner id:</span> {cloudSync.ownerId}</p>
+          <p><span className="font-semibold text-paper/80">Active Reader Profile owner id:</span> {maskAccountIdentifier(cloudSync.ownerId)}</p>
           <p><span className="font-semibold text-paper/80">Cloud profile exists for current user:</span> {cloudSync.cloudProfileExists ? "yes" : "no"}</p>
           <p><span className="font-semibold text-paper/80">Last cloud profile load status:</span> {cloudSync.lastLoadStatus}</p>
           <p><span className="font-semibold text-paper/80">Initialized default cloud profile:</span> {cloudSync.initializedDefaultCloudProfile ? "yes" : "no"}</p>
