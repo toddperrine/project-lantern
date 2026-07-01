@@ -11130,6 +11130,18 @@ function MobileTopHeader({
   onNavigate: (view: AppView) => void;
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMeetBloodWickOpen, setIsMeetBloodWickOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isMeetBloodWickOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsMeetBloodWickOpen(false);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isMeetBloodWickOpen]);
 
   const handleNavigate = (view: AppView) => {
     setIsMenuOpen(false);
@@ -11197,8 +11209,49 @@ function MobileTopHeader({
                 {item.label}
               </button>
             ))}
+            <button
+              className="rounded-lg px-3 py-2 text-left text-sm font-semibold leading-tight text-paper/75 hover:bg-paper/10 hover:text-paper"
+              onClick={() => {
+                setIsMenuOpen(false);
+                setIsMeetBloodWickOpen(true);
+              }}
+              type="button"
+            >
+              Meet BloodWick
+            </button>
           </div>
         </nav>
+      ) : null}
+
+      {isMeetBloodWickOpen ? (
+        <div className="bloodwick-meet-modal" onClick={() => setIsMeetBloodWickOpen(false)}>
+          <div
+            aria-labelledby="meet-bloodwick-title"
+            aria-modal="true"
+            className="bloodwick-meet-modal-panel"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="bloodwick-meet-modal-header">
+              <p className="bloodwick-meet-modal-eyebrow">Bloodwick</p>
+              <button
+                aria-label="Close Meet BloodWick"
+                className="bloodwick-meet-modal-close"
+                onClick={() => setIsMeetBloodWickOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            <h2 className="bloodwick-meet-modal-title" id="meet-bloodwick-title">Meet BloodWick</h2>
+            <div className="bloodwick-meet-modal-body">
+              <p>BloodWick is more than our name. Over the centuries, <em>wick</em> has meant the hidden thread that drinks fuel and feeds a flame, a village or dwelling place, something alive and quick with life, and, in older forms, something wicked, strange, or threatening.</p>
+              <p>BloodWick is the immortal, hungry black thread that catches fire. BloodWick is the place at the end of the road where every evil thing lurks and you are moments away from a painful death. BloodWick is a story’s wicked driving force, the thing that keeps you reading and needing more.</p>
+              <p>BloodWick is all of these things.</p>
+              <p>Enjoy BloodWick.</p>
+            </div>
+          </div>
+        </div>
       ) : null}
     </header>
   );
