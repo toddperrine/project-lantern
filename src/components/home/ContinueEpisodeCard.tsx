@@ -38,11 +38,12 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
   const recapId = "last-time-recap-dialog";
 
   return (
-    <section className="min-w-0 overflow-hidden rounded-bloodwick-lg border border-bloodwick-red/25 bg-bloodwick-obsidian/75 shadow-bloodwick-soft">
-      <div className="grid min-w-0 gap-5 p-4 sm:p-5">
+    <article className="bloodwick-action-card">
+      <div className="grid min-w-0 gap-4">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
-            Continue Your Series
+          <p className="bloodwick-action-card__eyebrow">Return to the Dread</p>
+          <p className="bloodwick-action-card__description">
+            Pick up where the last episode left its mark.
           </p>
           <p className="mt-3 text-sm font-semibold text-bloodwick-white/62">
             {seriesTitle}
@@ -96,7 +97,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
         </div>
 
         {isDirectionOpen ? (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
+          <div className="fixed inset-0 z-50 grid place-items-center bg-[rgb(var(--bloodwick-obsidian-rgb)/0.82)] p-4">
             <div
               aria-modal="true"
               className="max-h-[82vh] w-full max-w-xl overflow-auto rounded-bloodwick-lg border border-bloodwick-white/15 bg-bloodwick-obsidian p-5 shadow-bloodwick-soft"
@@ -151,7 +152,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
         ) : null}
 
         {isRecapOpen ? (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
+          <div className="fixed inset-0 z-50 grid place-items-center bg-[rgb(var(--bloodwick-obsidian-rgb)/0.82)] p-4">
             <div
               aria-modal="true"
               className="max-h-[82vh] w-full max-w-xl overflow-auto rounded-bloodwick-lg border border-bloodwick-white/15 bg-bloodwick-obsidian p-5 shadow-bloodwick-soft"
@@ -177,6 +178,6 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
           </div>
         ) : null}
       </div>
-    </section>
+    </article>
   );
 }

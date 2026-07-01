@@ -7,9 +7,9 @@ export function BloodwickHomeHero(props: BloodwickHomeHeroProps) {
   const { body, title } = props;
 
   return (
-    <section className="relative isolate min-w-0 overflow-hidden rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/80 p-5 shadow-bloodwick-soft sm:p-6 lg:p-8">
+    <section className="relative isolate min-w-0 overflow-hidden rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-obsidian/80 p-5 shadow-bloodwick-soft sm:p-6 lg:p-8">
       <div
-        className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,rgba(229,9,20,0.18),transparent_34%),linear-gradient(135deg,rgba(36,18,31,0.95),rgba(11,11,13,0.92)_46%,rgba(11,11,13,1))]"
+        className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,rgb(var(--bloodwick-blood-red-rgb)/0.18),transparent_34%),linear-gradient(135deg,rgb(var(--bloodwick-blood-red-rgb)/0.16),rgb(var(--bloodwick-obsidian-rgb)/0.92)_46%,rgb(var(--bloodwick-obsidian-rgb)/1))]"
         aria-hidden="true"
       />
       <div

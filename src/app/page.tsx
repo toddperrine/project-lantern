@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { useSearchParams } from "next/navigation";
+import { BloodwickHomeActionRail } from "@/components/home/BloodwickHomeActionRail";
 import { BloodwickHomeHero } from "@/components/home/BloodwickHomeHero";
 import { ContinueEpisodeCard } from "@/components/home/ContinueEpisodeCard";
 import { FearMoodGrid } from "@/components/home/FearMoodGrid";
@@ -3948,7 +3949,8 @@ export default function Home() {
               Scary stories that know what haunts you.
             </h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-paper/70">
-              Start a series. Return whenever you want. Bloodwick keeps the dread alive.
+              Start a series. Return whenever you want. Bloodwick keeps the
+              dread alive.
             </p>
           </div>
           <NavTabs activeView={activeView} onChange={navigateToView} />
@@ -5067,6 +5069,15 @@ function HomeView(props: {
   const [isRecapOpen, setIsRecapOpen] = useState(false);
   const storyBrief = latestStory ? createStoryBrief(latestStory) : null;
   void HOME_DASHBOARD_COLUMNS;
+  void canUseDemoStory;
+  void hasDemoStory;
+  void onClearDemoStory;
+  void onLoadDemoStory;
+  void onOpenLibrary;
+  void onStartRecommendation;
+  void savedForLaterStoryQueue;
+  void showStoryStartOptions;
+  void suggestedStarts;
 
   const latestStoryTypeLabel = getHomeFearLabel(
     latestStory
@@ -5092,72 +5103,55 @@ function HomeView(props: {
         body="Start a series. Return whenever you want. Bloodwick keeps the dread alive."
         title="Scary stories that know what haunts you."
       />
-      <div className="grid min-w-0 gap-4 md:grid-cols-2" data-home-dashboard="reader-actions">
-        <div className="min-w-0">
-          {latestStory && storyBrief ? (
-            <ContinueEpisodeCard
-              direction={continueDirection}
-              hook={storyBrief.hook}
-              isDirectionOpen={isDirectionOpen}
-              isGenerating={isContinuationGenerating}
-              isRecapOpen={isRecapOpen}
-              onCloseRecap={() => setIsRecapOpen(false)}
-              onContinue={onContinue}
-              onDirectionChange={onDirectionChange}
-              onExport={onExportStory}
-              onOpenRecap={() => setIsRecapOpen(true)}
-              onToggleDirection={onToggleDirection}
-              recap={storyBrief.recap}
-              seriesTitle={latestSeriesTitle}
-              storyTypeLabel={latestStoryTypeLabel}
-              title={latestStory.title}
-            />
-          ) : (
-            <section className="min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
-                Continue Your Series
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold text-bloodwick-white">
-                No series in progress yet.
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-bloodwick-white/68">
-                Start something new to begin your first Bloodwick series.
-              </p>
-            </section>
-          )}
-        </div>
-        <div className="grid min-w-0 gap-4">
-          <FearMoodGrid activeMood={activeMood} onSelect={onMoodSelect} />
-          {!showStoryStartOptions ? (
-            <StartSomethingNewPanel
-              canUseDemoStory={false}
-              hasDemoStory={hasDemoStory}
-              isGenerating={isGenerating}
-              isNewStoryGenerating={isNewStoryGenerating}
-              onClearDemoStory={onClearDemoStory}
-              onLoadDemoStory={onLoadDemoStory}
-              onStartNewStory={onStartNewStory}
-              selectedStoryTypeLabel={getStoryTypeChip(activeMood).label}
-            />
-          ) : (
-            <SuggestedStoryStarts
-              activeMood={activeMood}
-              canUseDemoStory={false}
-              hasDemoStory={hasDemoStory}
-              onClearDemoStory={onClearDemoStory}
-              onLoadDemoStory={onLoadDemoStory}
-              stories={suggestedStarts}
-              onStart={onStartRecommendation}
-            />
-          )}
-        </div>
-      </div>
-      <ReadyStoryQueuePanel
-        items={readyStoryQueue}
-        onPass={onPassReadyStory}
-        onRead={onReadReadyStory}
-        onSaveForLater={onSaveReadyStoryForLater}
-      />
+      <BloodwickHomeActionRail>
+        {latestStory && storyBrief ? (
+          <ContinueEpisodeCard
+            direction={continueDirection}
+            hook={storyBrief.hook}
+            isDirectionOpen={isDirectionOpen}
+            isGenerating={isContinuationGenerating}
+            isRecapOpen={isRecapOpen}
+            onCloseRecap={() => setIsRecapOpen(false)}
+            onContinue={onContinue}
+            onDirectionChange={onDirectionChange}
+            onExport={onExportStory}
+            onOpenRecap={() => setIsRecapOpen(true)}
+            onToggleDirection={onToggleDirection}
+            recap={storyBrief.recap}
+            seriesTitle={latestSeriesTitle}
+            storyTypeLabel={latestStoryTypeLabel}
+            title={latestStory.title}
+          />
+        ) : (
+          <article className="bloodwick-action-card">
+            <p className="bloodwick-action-card__eyebrow">
+              Return to the Dread
+            </p>
+            <p className="bloodwick-action-card__description">
+              Pick up where the last episode left its mark.
+            </p>
+            <h2 className="mt-5 text-2xl font-semibold text-bloodwick-white">
+              No series in progress yet.
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-bloodwick-white/68">
+              Light a new wick to begin your first Bloodwick series.
+            </p>
+          </article>
+        )}
+        <FearMoodGrid
+          activeMood={activeMood}
+          isGenerating={isGenerating}
+          isNewStoryGenerating={isNewStoryGenerating}
+          onSelect={onMoodSelect}
+          onStartNewStory={onStartNewStory}
+        />
+        <ReadyStoryQueuePanel
+          items={readyStoryQueue}
+          onPass={onPassReadyStory}
+          onRead={onReadReadyStory}
+          onSaveForLater={onSaveReadyStoryForLater}
+        />
+      </BloodwickHomeActionRail>
     </div>
   );
 }
@@ -5824,29 +5818,30 @@ function ReadyStoryQueuePanel({
 }) {
   if (!items.length) {
     return (
-      <section className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
-          Stories waiting for you
+      <article className="bloodwick-action-card">
+        <p className="bloodwick-action-card__eyebrow">Waiting in the Dark</p>
+        <p className="bloodwick-action-card__description">
+          Story sparks ready to read, pass, or save.
         </p>
-        <h2 className="mt-2 text-2xl font-semibold text-paper">
+        <h2 className="mt-5 text-2xl font-semibold text-bloodwick-white">
           No waiting stories right now.
         </h2>
-        <p className="mt-2 text-sm leading-6 text-paper/60">
-          Use Start Something New to generate a story while the queue learns
-          what to prepare next.
+        <p className="mt-2 text-sm leading-6 text-bloodwick-white/68">
+          Light a new wick to help Bloodwick prepare the next spark.
         </p>
-      </section>
+      </article>
     );
   }
 
   return (
-    <section className="min-w-0 rounded-md border border-lantern-gold/20 bg-paper/10 p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
-        Stories waiting for you
+    <article className="bloodwick-action-card">
+      <p className="bloodwick-action-card__eyebrow">Waiting in the Dark</p>
+      <p className="bloodwick-action-card__description">
+        Story sparks ready to read, pass, or save.
       </p>
 
       <div className="mt-4 grid gap-3">
-        {items.map((item) => (
+        {items.slice(0, 3).map((item) => (
           <StoryQueueCard
             item={item}
             key={item.id}
@@ -5856,7 +5851,7 @@ function ReadyStoryQueuePanel({
           />
         ))}
       </div>
-    </section>
+    </article>
   );
 }
 

@@ -4,6 +4,63 @@
 
 :root {
   color-scheme: dark;
+  --bloodwick-obsidian: #0B0B0D;
+  --bloodwick-blood-red: #E50914;
+  --bloodwick-warm-white: #F2F1ED;
+  --bloodwick-steel-gray: #6B7078;
+  --bloodwick-copper-amber: #B87333;
+
+  --bloodwick-obsidian-rgb: 11 11 13;
+  --bloodwick-blood-red-rgb: 229 9 20;
+  --bloodwick-warm-white-rgb: 242 241 237;
+  --bloodwick-steel-gray-rgb: 107 112 120;
+  --bloodwick-copper-amber-rgb: 184 115 51;
+}
+
+.bloodwick-action-rail {
+  display: flex;
+  gap: 1rem;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 0.25rem;
+  padding-bottom: 0.5rem;
+}
+
+.bloodwick-action-card {
+  flex: 0 0 min(88vw, 28rem);
+  min-width: 0;
+  overflow: hidden;
+  scroll-snap-align: start;
+  border: 1px solid rgb(var(--bloodwick-warm-white-rgb) / 0.1);
+  border-radius: 1.75rem;
+  background:
+    linear-gradient(145deg, rgb(var(--bloodwick-warm-white-rgb) / 0.08), transparent 42%),
+    rgb(var(--bloodwick-obsidian-rgb) / 0.78);
+  box-shadow: 0 18px 60px rgb(var(--bloodwick-obsidian-rgb) / 0.36);
+  padding: 1rem;
+}
+
+.bloodwick-action-card__eyebrow {
+  color: var(--bloodwick-copper-amber);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.bloodwick-action-card__description {
+  margin-top: 0.5rem;
+  color: rgb(var(--bloodwick-warm-white-rgb) / 0.68);
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+}
+
+@media (min-width: 1180px) {
+  .bloodwick-action-card {
+    flex-basis: calc((100% - 2rem) / 3);
+  }
 }
 
 * {
@@ -571,11 +628,11 @@ textarea {
     --bloodwick-white: #f2f1ed;
     --bloodwick-steel: #6b7078;
     --bloodwick-copper: #b87333;
-    --bloodwick-panel: #151216;
-    --bloodwick-plum: #24121f;
-    --bloodwick-surface: linear-gradient(180deg, rgba(36, 18, 31, 0.78), rgba(21, 18, 22, 0.96));
+    --bloodwick-panel: var(--bloodwick-obsidian);
+    --bloodwick-plum: rgb(var(--bloodwick-blood-red-rgb) / 0.16);
+    --bloodwick-surface: linear-gradient(180deg, rgb(var(--bloodwick-blood-red-rgb) / 0.12), rgb(var(--bloodwick-obsidian-rgb) / 0.96));
     --bloodwick-surface-raised: linear-gradient(145deg, rgba(242, 241, 237, 0.08), rgba(229, 9, 20, 0.05) 42%, rgba(11, 11, 13, 0.88));
-    --bloodwick-glow: 0 22px 70px rgba(0, 0, 0, 0.44);
+    --bloodwick-glow: 0 22px 70px rgb(var(--bloodwick-obsidian-rgb) / 0.44);
     --bloodwick-red-glow: 0 18px 42px rgba(229, 9, 20, 0.24);
     --bloodwick-radius-sm: 0.8rem;
     --bloodwick-radius: 1.25rem;
@@ -589,7 +646,7 @@ textarea {
     background:
       radial-gradient(circle at 18% 0%, rgba(229, 9, 20, 0.2), transparent 22rem),
       radial-gradient(circle at 88% 8%, rgba(184, 115, 51, 0.14), transparent 24rem),
-      linear-gradient(145deg, var(--bloodwick-obsidian) 0%, var(--bloodwick-panel) 58%, #070708 100%);
+      linear-gradient(145deg, var(--bloodwick-obsidian) 0%, var(--bloodwick-panel) 58%, rgb(var(--bloodwick-obsidian-rgb) / 1) 100%);
     color: var(--bloodwick-white);
   }
 
@@ -623,7 +680,7 @@ textarea {
     justify-content: center;
     gap: 0.5rem;
     border-radius: 999px;
-    background: linear-gradient(135deg, var(--bloodwick-red), #9f0710);
+    background: linear-gradient(135deg, var(--bloodwick-red), rgb(var(--bloodwick-blood-red-rgb) / 0.68));
     color: var(--bloodwick-white);
     font-weight: 800;
     letter-spacing: -0.01em;

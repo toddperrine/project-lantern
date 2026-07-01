@@ -28,9 +28,7 @@ const config: Config = {
           red: "#E50914",
           white: "#F2F1ED",
           steel: "#6B7078",
-          copper: "#B87333",
-          panel: "#151216",
-          plum: "#24121F"
+          copper: "#B87333"
         }
       },
       boxShadow: {

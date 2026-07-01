@@ -5,27 +5,39 @@ export type FearMoodGridProps = {
   activeMood: StoryTypeChipId;
   onSelect: (mood: StoryTypeChipId) => void;
   heading?: string;
+  isGenerating?: boolean;
+  isNewStoryGenerating?: boolean;
+  onStartNewStory: () => void;
 };
 
 export function FearMoodGrid({
   heading = "What kind of fear are you in the mood for right now?",
   ...props
 }: FearMoodGridProps) {
-  const { activeMood, onSelect } = props;
+  const {
+    activeMood,
+    isGenerating = false,
+    isNewStoryGenerating = false,
+    onSelect,
+    onStartNewStory,
+  } = props;
   const [focusedMood, setFocusedMood] = useState<StoryTypeChipId | null>(null);
-  const selectedChip = STORY_TYPE_CHIPS.find((chip) => chip.id === activeMood) ?? STORY_TYPE_CHIPS[0];
+  const selectedChip =
+    STORY_TYPE_CHIPS.find((chip) => chip.id === activeMood) ??
+    STORY_TYPE_CHIPS[0];
 
   return (
-    <section className="min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-4 shadow-bloodwick-soft sm:p-5">
+    <article className="bloodwick-action-card">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
-          Start something new
+        <p className="bloodwick-action-card__eyebrow">Light a New Wick</p>
+        <p className="bloodwick-action-card__description">
+          Choose a fear and start a new series.
         </p>
-        <h2 className="mt-2 text-2xl font-semibold leading-tight text-bloodwick-white">
+        <h2 className="mt-4 text-lg font-semibold leading-tight text-bloodwick-white">
           {heading}
         </h2>
       </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-4 grid gap-2 grid-cols-2">
         {STORY_TYPE_CHIPS.map((chip) => {
           const isSelected = chip.id === activeMood;
           const tooltipId = `fear-help-${chip.id}`;
@@ -60,6 +72,22 @@ export function FearMoodGrid({
       <p className="mt-4 rounded-xl border border-bloodwick-white/10 bg-bloodwick-white/[0.06] p-3 text-sm leading-6 text-bloodwick-white/68 md:hidden">
         {selectedChip.guidance}
       </p>
-    </section>
+      <button
+        className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-bloodwick-red px-4 py-3 text-sm font-semibold text-bloodwick-white disabled:cursor-not-allowed disabled:opacity-55"
+        disabled={isGenerating}
+        onClick={onStartNewStory}
+        type="button"
+      >
+        {isNewStoryGenerating ? (
+          <span
+            className="size-4 shrink-0 animate-spin rounded-full border-2 border-bloodwick-obsidian/30 border-t-bloodwick-obsidian"
+            aria-hidden="true"
+          />
+        ) : null}
+        {isNewStoryGenerating
+          ? `Writing a ${selectedChip.label} story for you…`
+          : `Start ${selectedChip.label} Story`}
+      </button>
+    </article>
   );
 }
