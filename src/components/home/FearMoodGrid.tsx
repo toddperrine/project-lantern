@@ -16,7 +16,7 @@ export function FearMoodGrid({
   const selectedChip = STORY_TYPE_CHIPS.find((chip) => chip.id === activeMood) ?? STORY_TYPE_CHIPS[0];
 
   return (
-    <section className="min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-4 shadow-bloodwick-soft sm:p-5">
+    <section className="bloodwick-home-card min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-4 shadow-bloodwick-soft sm:p-5">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
           Start something new
@@ -34,7 +34,7 @@ export function FearMoodGrid({
               <button
                 aria-describedby={tooltipId}
                 aria-pressed={isSelected}
-                className={`min-h-12 w-full min-w-0 rounded-xl border px-3 py-2 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white ${isSelected ? "border-bloodwick-red bg-bloodwick-red text-bloodwick-white shadow-bloodwick-red" : "border-bloodwick-white/12 bg-bloodwick-white/[0.06] text-bloodwick-white hover:border-bloodwick-copper hover:bg-bloodwick-white/10"}`}
+                className={`bloodwick-fear-chip min-h-12 w-full min-w-0 rounded-xl border px-3 py-2 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white ${isSelected ? "border-bloodwick-red bg-bloodwick-red text-bloodwick-white shadow-bloodwick-red" : "border-bloodwick-white/12 bg-bloodwick-white/[0.06] text-bloodwick-white hover:border-bloodwick-copper hover:bg-bloodwick-white/10"}`}
                 onBlur={() => setFocusedMood(null)}
                 onClick={() => onSelect(chip.id)}
                 onFocus={() => setFocusedMood(chip.id)}

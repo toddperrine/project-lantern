@@ -19,7 +19,7 @@ export function StoryQueueCard(props: StoryQueueCardProps) {
   const blurb = truncateWords(item.premise, 20);
 
   return (
-    <article className="grid min-w-0 gap-4 overflow-hidden rounded-bloodwick border border-bloodwick-white/10 bg-bloodwick-obsidian/70 p-4 shadow-bloodwick-soft md:grid-cols-[minmax(0,1fr)_220px] sm:p-5">
+    <article className="bloodwick-story-queue-card grid min-w-0 gap-4 overflow-hidden rounded-bloodwick border border-bloodwick-white/10 bg-bloodwick-obsidian/70 p-4 shadow-bloodwick-soft md:grid-cols-[minmax(0,1fr)_220px] sm:p-5">
       <div className="min-w-0">
         <span className="inline-flex rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold text-bloodwick-white/78">
           {storyTypeLabel}

@@ -5087,11 +5087,8 @@ function HomeView(props: {
     : "Series Title";
 
   return (
-    <div className="grid min-w-0 max-w-full gap-6 overflow-x-hidden md:gap-8">
-      <BloodwickHomeHero
-        body="Start a series. Return whenever you want. Bloodwick keeps the dread alive."
-        title="Scary stories that know what haunts you."
-      />
+    <div className="bloodwick-home grid min-w-0 max-w-full gap-6 overflow-x-hidden md:gap-8">
+      <BloodwickHomeHero />
       <div className="grid min-w-0 gap-4 md:grid-cols-2" data-home-dashboard="reader-actions">
         <div className="min-w-0">
           {latestStory && storyBrief ? (
@@ -5113,7 +5110,7 @@ function HomeView(props: {
               title={latestStory.title}
             />
           ) : (
-            <section className="min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
+            <section className="bloodwick-home-card bloodwick-continue-card min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
                 Continue Your Series
               </p>
@@ -5824,7 +5821,7 @@ function ReadyStoryQueuePanel({
 }) {
   if (!items.length) {
     return (
-      <section className="min-w-0 rounded-md border border-paper/10 bg-paper/5 p-5">
+      <section className="bloodwick-home-section bloodwick-story-queue-section min-w-0 rounded-md border border-paper/10 bg-paper/5 p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
           Stories waiting for you
         </p>
@@ -5840,7 +5837,7 @@ function ReadyStoryQueuePanel({
   }
 
   return (
-    <section className="min-w-0 rounded-md border border-lantern-gold/20 bg-paper/10 p-5">
+    <section className="bloodwick-home-section bloodwick-story-queue-section min-w-0 rounded-md border border-lantern-gold/20 bg-paper/10 p-5">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
         Stories waiting for you
       </p>
@@ -6058,10 +6055,10 @@ function StartSomethingNewPanel({
 }) {
   const startCopy = getStoryTypeStartCopy(selectedStoryTypeLabel);
   return (
-    <section className="min-w-0 rounded-md border border-lantern-gold/25 bg-paper/10 p-4">
+    <section className="bloodwick-home-card bloodwick-start-panel min-w-0 rounded-md border border-lantern-gold/25 bg-paper/10 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <button
-          className="inline-flex min-w-0 items-center gap-2 whitespace-normal rounded-md bg-lantern-gold px-5 py-3 text-left text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-60"
+          className="bloodwick-start-button inline-flex min-w-0 items-center gap-2 whitespace-normal rounded-md bg-lantern-gold px-5 py-3 text-left text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-60"
           disabled={isGenerating}
           onClick={onStartNewStory}
           type="button"

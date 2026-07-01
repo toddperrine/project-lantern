@@ -37,6 +37,103 @@ textarea {
   background: rgba(217, 164, 65, 0.32);
 }
 
+.bloodwick-home-mural {
+  overflow: hidden;
+  border-radius: 1.5rem;
+  background: rgb(11 11 13 / 0.92);
+  border: 1px solid rgb(107 112 120 / 0.22);
+}
+
+.bloodwick-home-mural__image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  object-position: center;
+}
+
+@media (max-width: 767px) {
+  .bloodwick-home .bloodwick-home-card,
+  .bloodwick-home .bloodwick-home-section,
+  .bloodwick-home .bloodwick-story-queue-card {
+    background: rgb(11 11 13 / 0.92) !important;
+    color: var(--bloodwick-white) !important;
+    border-color: rgb(107 112 120 / 0.28) !important;
+  }
+
+  .bloodwick-home .bloodwick-home-card h1,
+  .bloodwick-home .bloodwick-home-card h2,
+  .bloodwick-home .bloodwick-home-card h3,
+  .bloodwick-home .bloodwick-home-section h1,
+  .bloodwick-home .bloodwick-home-section h2,
+  .bloodwick-home .bloodwick-home-section h3,
+  .bloodwick-home .bloodwick-story-queue-card h3 {
+    color: var(--bloodwick-white) !important;
+    opacity: 1 !important;
+  }
+
+  .bloodwick-home .bloodwick-home-card p,
+  .bloodwick-home .bloodwick-home-section p,
+  .bloodwick-home .bloodwick-story-queue-card p {
+    color: rgb(242 241 237 / 0.78) !important;
+    opacity: 1 !important;
+  }
+
+  .bloodwick-home .bloodwick-home-card span,
+  .bloodwick-home .bloodwick-home-section span,
+  .bloodwick-home .bloodwick-story-queue-card span {
+    color: rgb(242 241 237 / 0.78) !important;
+    opacity: 1 !important;
+  }
+
+  .bloodwick-home .bloodwick-home-card > p:first-child,
+  .bloodwick-home .bloodwick-home-section > p:first-child,
+  .bloodwick-home .bloodwick-continue-card > div > div > p:first-child,
+  .bloodwick-home .bloodwick-story-queue-section > p:first-child {
+    color: var(--bloodwick-copper) !important;
+  }
+
+  .bloodwick-home .bloodwick-fear-chip {
+    background: rgb(11 11 13 / 0.86) !important;
+    color: var(--bloodwick-white) !important;
+    border-color: rgb(107 112 120 / 0.55) !important;
+    opacity: 1 !important;
+  }
+
+  .bloodwick-home .bloodwick-fear-chip[aria-pressed="true"] {
+    background: var(--bloodwick-red) !important;
+    color: var(--bloodwick-white) !important;
+    border-color: var(--bloodwick-red) !important;
+  }
+
+  .bloodwick-home .bloodwick-fear-chip span {
+    color: inherit !important;
+  }
+
+  .bloodwick-home .bloodwick-start-button,
+  .bloodwick-home .bloodwick-continue-card button:first-of-type,
+  .bloodwick-home .bloodwick-story-queue-card button:first-of-type {
+    background: var(--bloodwick-red) !important;
+    color: var(--bloodwick-white) !important;
+    border-color: var(--bloodwick-red) !important;
+    opacity: 1 !important;
+  }
+
+  .bloodwick-home .bloodwick-continue-card button:not(:first-of-type),
+  .bloodwick-home .bloodwick-story-queue-card button:not(:first-of-type) {
+    background: rgb(11 11 13 / 0.86) !important;
+    color: var(--bloodwick-white) !important;
+    border-color: rgb(107 112 120 / 0.55) !important;
+    opacity: 1 !important;
+  }
+
+  .bloodwick-home .bloodwick-start-button span,
+  .bloodwick-home .bloodwick-continue-card button,
+  .bloodwick-home .bloodwick-story-queue-card button {
+    color: inherit !important;
+  }
+}
+
 .project-lantern-shell main > section > header p:first-child::after {
   content: " v0.1.7";
   margin-left: 0.65rem;

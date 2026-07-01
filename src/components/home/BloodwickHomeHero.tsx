@@ -1,32 +1,11 @@
-export type BloodwickHomeHeroProps = {
-  title: string;
-  body: string;
-};
-
-export function BloodwickHomeHero(props: BloodwickHomeHeroProps) {
-  const { body, title } = props;
-
+export function BloodwickHomeHero() {
   return (
-    <section className="relative isolate min-w-0 overflow-hidden rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/80 p-5 shadow-bloodwick-soft sm:p-6 lg:p-8">
-      <div
-        className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,rgba(229,9,20,0.18),transparent_34%),linear-gradient(135deg,rgba(36,18,31,0.95),rgba(11,11,13,0.92)_46%,rgba(11,11,13,1))]"
-        aria-hidden="true"
+    <section className="bloodwick-home-mural" aria-label="Bloodwick">
+      <img
+        src="/artwork/home-carousel-mural.png"
+        alt="Bloodwick horror story mural"
+        className="bloodwick-home-mural__image"
       />
-      <div
-        className="absolute right-5 top-5 -z-10 size-28 rounded-full border border-bloodwick-red/20 bg-bloodwick-red/5 blur-sm"
-        aria-hidden="true"
-      />
-      <div className="max-w-3xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-bloodwick-red">
-          Bloodwick
-        </p>
-        <h1 className="mt-4 text-4xl font-semibold leading-[0.95] tracking-tight text-bloodwick-white sm:text-5xl lg:text-6xl">
-          {title}
-        </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-bloodwick-white/72">
-          {body}
-        </p>
-      </div>
     </section>
   );
 }
