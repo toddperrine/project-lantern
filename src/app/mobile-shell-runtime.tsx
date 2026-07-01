@@ -323,6 +323,14 @@ function closeMobileMenu() {
   document.querySelector("[data-mobile-menu='true']")?.remove();
 }
 
+function openMeetBloodWickModal() {
+  window.dispatchEvent(new CustomEvent("lantern:close-mobile-menu"));
+  closeMobileMenu();
+  closeAccountModal();
+  closeRecapModal();
+  window.dispatchEvent(new CustomEvent("lantern:open-meet-bloodwick"));
+}
+
 function openRecapModal() {
   closeMobileMenu();
   closeAccountModal();
@@ -402,6 +410,10 @@ function openMobileMenu() {
         closeMobileMenu();
         return;
       }
+      if (target?.closest("[data-mobile-menu-meet-bloodwick='true']")) {
+        openMeetBloodWickModal();
+        return;
+      }
       if (target?.closest("[data-mobile-menu-load-demo='true']")) {
         closeMobileMenu();
         loadDemoStory();
@@ -421,6 +433,7 @@ function openMobileMenu() {
       </div>
       <div data-mobile-menu-list="true">
         ${NAV_ORDER.map((label) => `<button data-mobile-menu-nav="${label}" type="button">${label}</button>`).join("")}
+        <button data-mobile-menu-meet-bloodwick="true" type="button">Meet BloodWick</button>
       </div>
     </div>
   `;
