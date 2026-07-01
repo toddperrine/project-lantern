@@ -13,17 +13,17 @@ export function BloodwickHomeHero(props: BloodwickHomeHeroProps) {
         aria-hidden="true"
       />
       <div
-        className="absolute right-5 top-5 -z-10 size-28 rounded-full border border-bloodwick-red/20 bg-bloodwick-red/5 blur-sm"
+        className="absolute right-5 top-5 -z-10 size-28 rounded-full border border-bloodwick-red/20 bg-bloodwick-red/5"
         aria-hidden="true"
       />
-      <div className="max-w-3xl">
+      <div className="relative z-10 max-w-3xl">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-bloodwick-red">
           Bloodwick
         </p>
         <h1 className="mt-4 text-4xl font-semibold leading-[0.95] tracking-tight text-bloodwick-white sm:text-5xl lg:text-6xl">
           {title}
         </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-bloodwick-white/72">
+        <p className="mt-4 max-w-2xl text-base leading-7 text-bloodwick-white">
           {body}
         </p>
       </div>

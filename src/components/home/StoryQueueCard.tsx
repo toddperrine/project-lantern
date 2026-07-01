@@ -26,16 +26,16 @@ export function StoryQueueCard(props: StoryQueueCardProps) {
   const blurb = truncateWords(item.premise, 12);
 
   return (
-    <article className="grid min-w-0 gap-2 overflow-hidden rounded-bloodwick-sm border border-bloodwick-white/10 bg-bloodwick-obsidian/70 p-2.5">
+    <article className="grid min-w-0 gap-2 overflow-hidden rounded-bloodwick-sm border border-bloodwick-steel/30 bg-bloodwick-obsidian/80 p-2.5">
       <div className="min-w-0">
-        <span className="inline-flex rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold text-bloodwick-white/78">
+        <span className="inline-flex rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold text-bloodwick-white">
           {storyTypeLabel}
         </span>
         <h3 className="mt-2 text-sm font-semibold leading-5 text-bloodwick-white">
           {item.title}
         </h3>
         {blurb ? (
-          <p className="mt-1 text-xs leading-5 text-bloodwick-white/66">
+          <p className="mt-1 text-xs leading-5 text-bloodwick-white/72">
             {blurb}
           </p>
         ) : null}
@@ -50,14 +50,14 @@ export function StoryQueueCard(props: StoryQueueCardProps) {
           {isPreparing ? "Preparing…" : "Read"}
         </button>
         <button
-          className="rounded-lg border border-bloodwick-white/15 bg-bloodwick-white/10 px-2 py-1.5 text-xs font-semibold text-bloodwick-white hover:border-bloodwick-copper"
+          className="rounded-lg border border-bloodwick-steel/40 bg-bloodwick-obsidian/60 px-2 py-1.5 text-xs font-semibold text-bloodwick-white hover:border-bloodwick-copper"
           onClick={() => onPass(item)}
           type="button"
         >
           Pass
         </button>
         <button
-          className="rounded-lg border border-bloodwick-white/15 bg-bloodwick-white/10 px-2 py-1.5 text-xs font-semibold text-bloodwick-white hover:border-bloodwick-copper"
+          className="rounded-lg border border-bloodwick-steel/40 bg-bloodwick-obsidian/60 px-2 py-1.5 text-xs font-semibold text-bloodwick-white hover:border-bloodwick-copper"
           onClick={() => onSaveForLater(item)}
           type="button"
         >

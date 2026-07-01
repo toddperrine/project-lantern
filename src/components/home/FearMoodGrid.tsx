@@ -46,7 +46,7 @@ export function FearMoodGrid({
               <button
                 aria-describedby={tooltipId}
                 aria-pressed={isSelected}
-                className={`min-h-9 w-full min-w-0 rounded-lg border px-2 py-1.5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white ${isSelected ? "border-bloodwick-red bg-bloodwick-red text-bloodwick-white shadow-bloodwick-red" : "border-bloodwick-white/12 bg-bloodwick-white/[0.06] text-bloodwick-white hover:border-bloodwick-copper hover:bg-bloodwick-white/10"}`}
+                className={`min-h-9 w-full min-w-0 rounded-lg border px-2 py-1.5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white ${isSelected ? "border-bloodwick-red bg-bloodwick-red text-bloodwick-white shadow-bloodwick-red" : "border-bloodwick-steel/40 bg-bloodwick-obsidian/60 text-bloodwick-white hover:border-bloodwick-copper hover:bg-bloodwick-obsidian/80"}`}
                 onBlur={() => setFocusedMood(null)}
                 onClick={() => onSelect(chip.id)}
                 onFocus={() => setFocusedMood(chip.id)}
@@ -69,7 +69,7 @@ export function FearMoodGrid({
           );
         })}
       </div>
-      <p className="mt-3 max-h-16 overflow-hidden rounded-xl border border-bloodwick-white/10 bg-bloodwick-white/[0.06] p-2 text-xs leading-5 text-bloodwick-white/68 md:hidden">
+      <p className="mt-3 max-h-16 overflow-hidden rounded-xl border border-bloodwick-steel/40 bg-bloodwick-obsidian/70 p-2 text-xs leading-5 text-bloodwick-white/68 md:hidden">
         {selectedChip.guidance}
       </p>
       <button

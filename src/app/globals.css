@@ -26,22 +26,31 @@
   scroll-snap-type: x mandatory;
   scroll-padding-inline: 0.25rem;
   padding-bottom: 0.75rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .bloodwick-action-card {
-  flex: 0 0 min(88vw, 28rem);
+  flex: 0 0 min(86vw, 28rem);
   min-width: 0;
   overflow: hidden;
   scroll-snap-align: start;
-  min-height: 16rem;
-  max-height: 22rem;
-  border: 1px solid rgb(var(--bloodwick-warm-white-rgb) / 0.1);
+  min-height: auto;
+  max-height: none;
+  border: 1px solid rgb(var(--bloodwick-steel-gray-rgb) / 0.28);
   border-radius: 1.75rem;
-  background:
-    linear-gradient(145deg, rgb(var(--bloodwick-warm-white-rgb) / 0.08), transparent 42%),
-    rgb(var(--bloodwick-obsidian-rgb) / 0.78);
+  background: rgb(var(--bloodwick-obsidian-rgb) / 0.92);
   box-shadow: 0 18px 60px rgb(var(--bloodwick-obsidian-rgb) / 0.36);
+  color: var(--bloodwick-warm-white);
   padding: 0.875rem;
+}
+
+.bloodwick-action-card * {
+  color: inherit;
+}
+
+.bloodwick-action-card p,
+.bloodwick-action-card small {
+  color: rgb(var(--bloodwick-warm-white-rgb) / 0.72);
 }
 
 .bloodwick-action-card__eyebrow {

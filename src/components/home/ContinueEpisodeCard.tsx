@@ -34,6 +34,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
   } = props;
   const directionId = "continue-episode-direction-dialog";
   const recapId = "last-time-recap-dialog";
+  const teaser = truncateWords(hook, 30);
 
   return (
     <article className="bloodwick-action-card">
@@ -43,14 +44,14 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
           <p className="bloodwick-action-card__description">
             Pick up where the last episode left its mark.
           </p>
-          <p className="mt-3 text-sm font-semibold text-bloodwick-white/62">
+          <p className="mt-3 text-sm font-semibold text-bloodwick-white/72">
             {seriesTitle}
           </p>
-          <span className="mt-3 inline-flex rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold text-bloodwick-white/78">
+          <span className="mt-3 inline-flex rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold text-bloodwick-white">
             {storyTypeLabel}
           </span>
           <p className="mt-3 max-h-24 overflow-hidden text-sm leading-6 text-bloodwick-white/72">
-            {hook}
+            {teaser}
           </p>
         </div>
 
@@ -66,7 +67,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
           <button
             aria-controls={recapId}
             aria-expanded={isRecapOpen}
-            className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
+            className="rounded-xl border border-bloodwick-steel/40 bg-bloodwick-obsidian/60 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
             onClick={onOpenRecap}
             type="button"
           >
@@ -75,7 +76,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
           <button
             aria-controls={directionId}
             aria-expanded={isDirectionOpen}
-            className="rounded-xl border border-bloodwick-copper/50 bg-bloodwick-copper/10 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper disabled:cursor-not-allowed disabled:opacity-55"
+            className="rounded-xl border border-bloodwick-copper/50 bg-bloodwick-obsidian/60 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper disabled:cursor-not-allowed disabled:opacity-55"
             disabled={isGenerating}
             onClick={onToggleDirection}
             type="button"
@@ -83,7 +84,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
             Next Chapter with Input
           </button>
           <button
-            className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
+            className="rounded-xl border border-bloodwick-steel/40 bg-bloodwick-obsidian/60 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
             onClick={onExport}
             type="button"
           >
@@ -104,7 +105,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
                   Guide the next chapter
                 </h3>
                 <button
-                  className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-3 py-2 text-sm font-semibold text-bloodwick-white"
+                  className="rounded-xl border border-bloodwick-steel/40 bg-bloodwick-obsidian/60 px-3 py-2 text-sm font-semibold text-bloodwick-white"
                   onClick={onToggleDirection}
                   type="button"
                 >
@@ -124,7 +125,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
               </label>
               <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <button
-                  className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
+                  className="rounded-xl border border-bloodwick-steel/40 bg-bloodwick-obsidian/60 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
                   onClick={onToggleDirection}
                   type="button"
                 >
@@ -159,7 +160,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
                   Last time
                 </h3>
                 <button
-                  className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-3 py-2 text-sm font-semibold text-bloodwick-white"
+                  className="rounded-xl border border-bloodwick-steel/40 bg-bloodwick-obsidian/60 px-3 py-2 text-sm font-semibold text-bloodwick-white"
                   onClick={onCloseRecap}
                   type="button"
                 >
@@ -175,4 +176,14 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
       </div>
     </article>
   );
+}
+
+function truncateWords(
+  value: string | undefined | null,
+  maxWords: number,
+): string {
+  if (!value) return "";
+  const words = value.trim().split(/\s+/);
+  if (words.length <= maxWords) return value.trim();
+  return `${words.slice(0, maxWords).join(" ")}…`;
 }
