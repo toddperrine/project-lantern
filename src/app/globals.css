@@ -939,3 +939,44 @@ textarea {
 .bloodwick-sign-in-modal__secondary {
   color: #B87333;
 }
+
+.bloodwick-back-to-top {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  z-index: 40;
+  display: flex;
+  width: 3.25rem;
+  height: 3.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgb(242 241 237 / 0.82);
+  border-radius: 999px;
+  background: var(--bloodwick-red);
+  color: var(--bloodwick-white);
+  box-shadow:
+    0 0 0 1px rgb(11 11 13 / 0.72),
+    0 0 28px rgb(229 9 20 / 0.45);
+}
+
+.bloodwick-back-to-top__icon {
+  display: block;
+  color: var(--bloodwick-white);
+  font-size: 2rem;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgb(11 11 13 / 0.65);
+  transform: translateY(-2px);
+}
+
+.bloodwick-back-to-top:hover {
+  border-color: var(--bloodwick-white);
+  box-shadow:
+    0 0 0 1px rgb(11 11 13 / 0.72),
+    0 0 32px rgb(229 9 20 / 0.55);
+}
+
+.bloodwick-back-to-top:focus-visible {
+  outline: 3px solid var(--bloodwick-copper);
+  outline-offset: 3px;
+}
