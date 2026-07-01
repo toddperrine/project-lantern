@@ -92,6 +92,7 @@ import {
   STORY_TYPE_CHIPS,
   getStoryTypePrimaryCategory,
   getStoryTypePromptRequirements,
+  getHomeFearLabel,
   getStoryTypeChipLabel,
   getStoryTypeStartCopy,
   getStoryTypeTextCompatibility,
@@ -5067,11 +5068,23 @@ function HomeView(props: {
   const storyBrief = latestStory ? createStoryBrief(latestStory) : null;
   void HOME_DASHBOARD_COLUMNS;
 
-  const latestStoryTypeLabel = latestStory
-    ? getStoryTypeChipLabel(latestStory.selectedStoryTypeChipId) ??
-      getStoryTypeChipLabel(latestStory.selectedStoryTypeChipLabel) ??
-      getStoryTypeChipLabel(latestStory.genrePreset)
-    : null;
+  const latestStoryTypeLabel = getHomeFearLabel(
+    latestStory
+      ? [
+          latestStory.selectedStoryTypeChipId,
+          latestStory.selectedStoryTypeChipLabel,
+          latestStory.genrePreset,
+          latestStory.title,
+          storyBrief?.hook,
+          latestStory.story,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : null,
+  );
+  const latestSeriesTitle = latestStory
+    ? getLibraryStorySeriesTitle(latestStory)
+    : "Series Title";
 
   return (
     <div className="grid min-w-0 max-w-full gap-6 overflow-x-hidden md:gap-8">
@@ -5095,13 +5108,14 @@ function HomeView(props: {
               onOpenRecap={() => setIsRecapOpen(true)}
               onToggleDirection={onToggleDirection}
               recap={storyBrief.recap}
+              seriesTitle={latestSeriesTitle}
               storyTypeLabel={latestStoryTypeLabel}
               title={latestStory.title}
             />
           ) : (
-            <section className="h-full min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
+            <section className="min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
-                Continue a series
+                Continue Your Series
               </p>
               <h2 className="mt-2 text-2xl font-semibold text-bloodwick-white">
                 No series in progress yet.
@@ -5146,6 +5160,17 @@ function HomeView(props: {
       />
     </div>
   );
+}
+
+function getLibraryStorySeriesTitle(story: LibraryStory): string {
+  const candidate = story as LibraryStory & {
+    seriesTitle?: string | null;
+    metadata?: { seriesTitle?: string | null };
+  };
+  const explicitTitle =
+    candidate.seriesTitle?.trim() || candidate.metadata?.seriesTitle?.trim();
+
+  return explicitTitle || "Series Title";
 }
 
 function DesktopDeveloperDiagnostics({ children }: { children: ReactNode }) {

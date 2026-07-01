@@ -1,8 +1,9 @@
 export type ContinueEpisodeCardProps = {
   title: string;
+  seriesTitle: string;
   hook: string;
   recap: string;
-  storyTypeLabel?: string | null;
+  storyTypeLabel: string;
   direction: string;
   isDirectionOpen: boolean;
   isGenerating: boolean;
@@ -19,6 +20,7 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
   const {
     direction,
     hook,
+    seriesTitle,
     isDirectionOpen,
     isGenerating,
     isRecapOpen,
@@ -36,17 +38,18 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
   const recapId = "last-time-recap-dialog";
 
   return (
-    <section className="flex h-full min-w-0 flex-col overflow-hidden rounded-bloodwick-lg border border-bloodwick-red/25 bg-bloodwick-obsidian/75 shadow-bloodwick-soft">
-      <div className="flex h-full min-w-0 flex-col gap-5 p-4 sm:p-5">
+    <section className="min-w-0 overflow-hidden rounded-bloodwick-lg border border-bloodwick-red/25 bg-bloodwick-obsidian/75 shadow-bloodwick-soft">
+      <div className="grid min-w-0 gap-5 p-4 sm:p-5">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
-            Continue a series
+            Continue Your Series
           </p>
-          {storyTypeLabel ? (
-            <span className="mt-3 inline-flex rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold text-bloodwick-white/78">
-              {storyTypeLabel}
-            </span>
-          ) : null}
+          <p className="mt-3 text-sm font-semibold text-bloodwick-white/62">
+            {seriesTitle}
+          </p>
+          <span className="mt-3 inline-flex rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold text-bloodwick-white/78">
+            {storyTypeLabel}
+          </span>
           <h2 className="mt-3 text-2xl font-semibold leading-tight text-bloodwick-white">
             {title}
           </h2>
@@ -55,14 +58,23 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
           </p>
         </div>
 
-        <div className="mt-auto grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-2">
           <button
             className="rounded-xl bg-bloodwick-red px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:bg-bloodwick-red/90 disabled:cursor-not-allowed disabled:opacity-55"
             disabled={isGenerating}
             onClick={() => onContinue()}
             type="button"
           >
-            {isGenerating ? "Writing the next chapter…" : "Next Chapter"}
+            {isGenerating ? "Writing the next chapter…" : "Read"}
+          </button>
+          <button
+            aria-controls={recapId}
+            aria-expanded={isRecapOpen}
+            className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
+            onClick={onOpenRecap}
+            type="button"
+          >
+            Recap
           </button>
           <button
             aria-controls={directionId}
@@ -73,15 +85,6 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
             type="button"
           >
             Next Chapter with Input
-          </button>
-          <button
-            aria-controls={recapId}
-            aria-expanded={isRecapOpen}
-            className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
-            onClick={onOpenRecap}
-            type="button"
-          >
-            Recap
           </button>
           <button
             className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-4 py-3 text-sm font-semibold text-bloodwick-white transition hover:border-bloodwick-copper"
