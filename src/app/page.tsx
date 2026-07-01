@@ -5088,10 +5088,7 @@ function HomeView(props: {
 
   return (
     <div className="grid min-w-0 max-w-full gap-6 overflow-x-hidden md:gap-8">
-      <BloodwickHomeHero
-        body="Start a series. Return whenever you want. Bloodwick keeps the dread alive."
-        title="Scary stories that know what haunts you."
-      />
+      <BloodwickHomeHero />
       <div className="grid min-w-0 gap-4 md:grid-cols-2" data-home-dashboard="reader-actions">
         <div className="min-w-0">
           {latestStory && storyBrief ? (
