@@ -1,16 +1,24 @@
-export function BloodwickHomeHero(props: {
-  onStartNew: () => void;
-  onContinueLatest?: () => void;
-  hasLatestEpisode: boolean;
-  isGenerating?: boolean;
-  isNewStoryGenerating?: boolean;
-}) {
+export type BloodwickHomeHeroProps = {
+  title: string;
+  body: string;
+  primaryActionLabel: "Start Something New";
+  onPrimaryAction: () => void;
+  secondaryActionLabel?: "Continue Latest Episode";
+  onSecondaryAction?: () => void;
+  tertiaryActionLabel: "Stories";
+  onTertiaryAction: () => void;
+};
+
+export function BloodwickHomeHero(props: BloodwickHomeHeroProps) {
   const {
-    hasLatestEpisode,
-    isGenerating = false,
-    isNewStoryGenerating = false,
-    onContinueLatest,
-    onStartNew,
+    body,
+    onPrimaryAction,
+    onSecondaryAction,
+    onTertiaryAction,
+    primaryActionLabel,
+    secondaryActionLabel,
+    tertiaryActionLabel,
+    title,
   } = props;
 
   return (
@@ -28,29 +36,35 @@ export function BloodwickHomeHero(props: {
           Bloodwick
         </p>
         <h1 className="mt-4 text-4xl font-semibold leading-[0.95] tracking-tight text-bloodwick-white sm:text-5xl lg:text-6xl">
-          Living stories, ready when you are
+          {title}
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-bloodwick-white/72">
-          Open the latest episode, remember what mattered, and choose what kind
-          of story should find you next.
+          {body}
         </p>
       </div>
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <button
-          className="min-h-12 rounded-xl bg-bloodwick-red px-5 py-3 text-base font-semibold text-bloodwick-white shadow-bloodwick-red transition hover:bg-bloodwick-red/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isGenerating}
-          onClick={onStartNew}
+          className="min-h-12 rounded-xl bg-bloodwick-red px-5 py-3 text-base font-semibold text-bloodwick-white shadow-bloodwick-red transition hover:bg-bloodwick-red/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white"
+          onClick={onPrimaryAction}
           type="button"
         >
-          {isNewStoryGenerating ? "Writing…" : "Start Something New"}
+          {primaryActionLabel}
         </button>
+        {secondaryActionLabel && onSecondaryAction ? (
+          <button
+            className="min-h-12 rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-5 py-3 text-base font-semibold text-bloodwick-white transition hover:border-bloodwick-copper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white"
+            onClick={onSecondaryAction}
+            type="button"
+          >
+            {secondaryActionLabel}
+          </button>
+        ) : null}
         <button
-          className="min-h-12 rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-5 py-3 text-base font-semibold text-bloodwick-white transition hover:border-bloodwick-copper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white disabled:cursor-not-allowed disabled:opacity-45"
-          disabled={!hasLatestEpisode || isGenerating || !onContinueLatest}
-          onClick={onContinueLatest}
+          className="min-h-12 rounded-xl border border-bloodwick-white/15 bg-transparent px-5 py-3 text-base font-semibold text-bloodwick-white/78 transition hover:border-bloodwick-copper hover:text-bloodwick-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white"
+          onClick={onTertiaryAction}
           type="button"
         >
-          Continue Latest Episode
+          {tertiaryActionLabel}
         </button>
       </div>
     </section>

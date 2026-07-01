@@ -3,14 +3,15 @@ import {
   type ReadyStoryQueueItem,
 } from "@/lib/ready-story-queue";
 
-export function StoryQueueCard(props: {
+export type StoryQueueCardProps = {
   item: ReadyStoryQueueItem;
-  isGenerating?: boolean;
-  onRead: () => void;
-  onPass: () => void;
-  onSaveForLater: () => void;
-}) {
-  const { isGenerating = false, item, onPass, onRead, onSaveForLater } = props;
+  onRead: (item: ReadyStoryQueueItem) => void;
+  onPass: (item: ReadyStoryQueueItem) => void;
+  onSaveForLater: (item: ReadyStoryQueueItem) => void;
+};
+
+export function StoryQueueCard(props: StoryQueueCardProps) {
+  const { item, onPass, onRead, onSaveForLater } = props;
   const isPreparing = item.generationStatus === "generating";
   const isReady = item.generationStatus === "ready" && item.generatedStory;
   const statusLabel = isReady
@@ -56,24 +57,22 @@ export function StoryQueueCard(props: {
       <div className="flex flex-col justify-center gap-2 border-t border-bloodwick-white/10 bg-bloodwick-white/[0.04] p-4 md:border-l md:border-t-0">
         <button
           className="rounded-xl bg-bloodwick-red px-3 py-2 text-sm font-semibold text-bloodwick-white disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={isGenerating || isPreparing}
-          onClick={onRead}
+          disabled={isPreparing}
+          onClick={() => onRead(item)}
           type="button"
         >
           {isPreparing ? "Preparing…" : "Read"}
         </button>
         <button
-          className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-3 py-2 text-sm font-semibold text-bloodwick-white hover:border-bloodwick-copper disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={isGenerating}
-          onClick={onPass}
+          className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-3 py-2 text-sm font-semibold text-bloodwick-white hover:border-bloodwick-copper"
+          onClick={() => onPass(item)}
           type="button"
         >
           Pass
         </button>
         <button
-          className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-3 py-2 text-sm font-semibold text-bloodwick-white hover:border-bloodwick-copper disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={isGenerating}
-          onClick={onSaveForLater}
+          className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-3 py-2 text-sm font-semibold text-bloodwick-white hover:border-bloodwick-copper"
+          onClick={() => onSaveForLater(item)}
           type="button"
         >
           Save for later

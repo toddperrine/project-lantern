@@ -13,10 +13,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { BloodwickHomeHero } from "@/components/home/BloodwickHomeHero";
 import { ContinueEpisodeCard } from "@/components/home/ContinueEpisodeCard";
-import {
-  FearMoodGrid,
-  storyTypeChipOptions,
-} from "@/components/home/FearMoodGrid";
+import { FearMoodGrid } from "@/components/home/FearMoodGrid";
 import { HOME_SECTION_ORDER } from "@/components/home/home-section-order";
 import { StoryQueueCard } from "@/components/home/StoryQueueCard";
 import {
@@ -5049,6 +5046,7 @@ function HomeView(props: {
     onExportStory,
     onLoadDemoStory,
     onMoodSelect,
+    onOpenLibrary,
     onPassReadyStory,
     onReadReadyStory,
     onSaveReadyStoryForLater,
@@ -5062,17 +5060,21 @@ function HomeView(props: {
   } = props;
   const [isRecapOpen, setIsRecapOpen] = useState(false);
   const storyBrief = latestStory ? createStoryBrief(latestStory) : null;
-  const moodOptions = storyTypeChipOptions();
   void HOME_SECTION_ORDER;
 
   return (
     <div className="grid min-w-0 max-w-full gap-6 overflow-x-hidden md:gap-8">
       <BloodwickHomeHero
-        hasLatestEpisode={Boolean(latestStory)}
-        isGenerating={isGenerating}
-        isNewStoryGenerating={isNewStoryGenerating}
-        onContinueLatest={latestStory ? () => onContinue() : undefined}
-        onStartNew={onStartNewStory}
+        body="Open the latest episode, remember what mattered, and choose what kind of story should find you next."
+        onPrimaryAction={onStartNewStory}
+        onSecondaryAction={latestStory ? () => onContinue() : undefined}
+        onTertiaryAction={onOpenLibrary}
+        primaryActionLabel="Start Something New"
+        secondaryActionLabel={
+          latestStory ? "Continue Latest Episode" : undefined
+        }
+        tertiaryActionLabel="Stories"
+        title="Living stories, ready when you are"
       />
       {showStoryFitPrompt && onStartStoryFitSetup && onSkipStoryFitSetup ? (
         <StoryFitFirstRunCard
@@ -5083,27 +5085,20 @@ function HomeView(props: {
       {latestStory && storyBrief ? (
         <ContinueEpisodeCard
           direction={continueDirection}
-          genreLabel={getLibraryStoryCategoryLabel(latestStory)}
+          heroName={storyBrief.heroName}
+          heroRole={storyBrief.heroRole}
+          hook={storyBrief.hook}
           isDirectionOpen={isDirectionOpen}
           isGenerating={isContinuationGenerating}
+          isRecapOpen={isRecapOpen}
+          onCloseRecap={() => setIsRecapOpen(false)}
+          onContinue={onContinue}
           onDirectionChange={onDirectionChange}
           onExport={onExportStory}
-          onLastChapterRecap={() => setIsRecapOpen(true)}
-          onNextChapter={() => onContinue()}
-          onNextChapterWithInput={onToggleDirection}
-          onSubmitDirection={() => onContinue(continueDirection)}
-          protagonistName={storyBrief.heroName}
-          protagonistRole={storyBrief.heroRole}
-          protagonistStruggle={storyBrief.struggle}
-          recapPreview={storyBrief.recap}
-          summary={storyBrief.hook}
-          title={latestStory.title}
-        />
-      ) : null}
-      {isRecapOpen && latestStory && storyBrief ? (
-        <RecapPanel
-          brief={storyBrief}
-          onClose={() => setIsRecapOpen(false)}
+          onOpenRecap={() => setIsRecapOpen(true)}
+          onToggleDirection={onToggleDirection}
+          recap={storyBrief.recap}
+          struggle={storyBrief.struggle}
           title={latestStory.title}
         />
       ) : null}
@@ -5115,17 +5110,19 @@ function HomeView(props: {
         onSaveForLater={onSaveReadyStoryForLater}
         savedForLaterCount={savedForLaterStoryQueue.length}
       />
-      <FearMoodGrid
-        canUseDemoStory={canUseDemoStory}
-        hasDemoStory={hasDemoStory}
-        isGenerating={isGenerating}
-        onClearDemoStory={onClearDemoStory}
-        onLoadDemoStory={onLoadDemoStory}
-        onSelect={(id) => onMoodSelect(id as Mood)}
-        onStart={onStartNewStory}
-        options={moodOptions}
-        selectedId={activeMood}
-      />
+      <FearMoodGrid activeMood={activeMood} onSelect={onMoodSelect} />
+      {!showStoryStartOptions ? (
+        <StartSomethingNewPanel
+          canUseDemoStory={canUseDemoStory}
+          hasDemoStory={hasDemoStory}
+          isGenerating={isGenerating}
+          isNewStoryGenerating={isNewStoryGenerating}
+          onClearDemoStory={onClearDemoStory}
+          onLoadDemoStory={onLoadDemoStory}
+          onStartNewStory={onStartNewStory}
+          selectedStoryTypeLabel={getStoryTypeChip(activeMood).label}
+        />
+      ) : null}
       {showStoryStartOptions ? (
         <SuggestedStoryStarts
           activeMood={activeMood}
@@ -5845,12 +5842,11 @@ function ReadyStoryQueuePanel({
       <div className="mt-4 grid gap-3">
         {items.map((item) => (
           <StoryQueueCard
-            isGenerating={isGenerating}
             item={item}
             key={item.id}
-            onPass={() => onPass(item)}
-            onRead={() => onRead(item)}
-            onSaveForLater={() => onSaveForLater(item)}
+            onPass={onPass}
+            onRead={onRead}
+            onSaveForLater={onSaveForLater}
           />
         ))}
       </div>
