@@ -5075,12 +5075,6 @@ function HomeView(props: {
         tertiaryActionLabel="Stories"
         title="Scary stories that know what you like — new eerie episodes written for you on demand."
       />
-      {showStoryFitPrompt && onStartStoryFitSetup && onSkipStoryFitSetup ? (
-        <StoryFitFirstRunCard
-          onSkip={onSkipStoryFitSetup}
-          onStart={onStartStoryFitSetup}
-        />
-      ) : null}
       {latestStory && storyBrief ? (
         <ContinueEpisodeCard
           direction={continueDirection}
@@ -5112,7 +5106,7 @@ function HomeView(props: {
       <FearMoodGrid activeMood={activeMood} onSelect={onMoodSelect} />
       {!showStoryStartOptions ? (
         <StartSomethingNewPanel
-          canUseDemoStory={canUseDemoStory}
+          canUseDemoStory={false}
           hasDemoStory={hasDemoStory}
           isGenerating={isGenerating}
           isNewStoryGenerating={isNewStoryGenerating}
@@ -5125,7 +5119,7 @@ function HomeView(props: {
       {showStoryStartOptions ? (
         <SuggestedStoryStarts
           activeMood={activeMood}
-          canUseDemoStory={canUseDemoStory}
+          canUseDemoStory={false}
           hasDemoStory={hasDemoStory}
           onClearDemoStory={onClearDemoStory}
           onLoadDemoStory={onLoadDemoStory}
