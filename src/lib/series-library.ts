@@ -1,3 +1,4 @@
+import { getBloodwickSeriesDisplayTitle } from "./bloodwick-series-title";
 export type LibraryStoryForSeries = {
   id?: string;
   storyId?: string;
@@ -6,6 +7,8 @@ export type LibraryStoryForSeries = {
   parentSeriesId?: string | null;
   title?: string;
   genre?: string;
+  genrePreset?: string | null;
+  selectedStoryTypeChipLabel?: string | null;
   wordCount?: number;
   createdAt?: string;
   savedAt?: string;
@@ -62,15 +65,18 @@ export function getEffectiveCreatedAt(story: LibraryStoryForSeries): string | nu
 export function getSeriesDisplayTitle(episodes: Array<SeriesEpisode>): string {
   const first = episodes[0]?.story;
   const explicitSeriesTitle = first?.seriesTitle || first?.metadata?.seriesTitle;
-  if (explicitSeriesTitle?.trim()) return explicitSeriesTitle.trim();
-
   const heroName = first?.heroName || first?.protagonistName || first?.metadata?.heroName || first?.metadata?.protagonistName || first?.charactersUsed?.[0];
-  if (heroName?.trim()) return `${heroName.trim()} Series`;
-
   const firstTitle = episodes[0]?.title;
-  if (firstTitle?.trim()) return `Series starting with: ${firstTitle.trim()}`;
+  const latestTitle = episodes[episodes.length - 1]?.title;
 
-  return "Untitled Series";
+  return getBloodwickSeriesDisplayTitle({
+    explicitTitle: explicitSeriesTitle,
+    savedSeriesTitle: explicitSeriesTitle,
+    firstEpisodeTitle: firstTitle,
+    episodeTitle: latestTitle,
+    protagonistName: heroName,
+    fearCategory: first?.selectedStoryTypeChipLabel ?? first?.genrePreset ?? first?.genre,
+  });
 }
 
 export function groupStoriesBySeries<TStory extends LibraryStoryForSeries>(stories: TStory[]): LibrarySeriesGroup<TStory>[] {

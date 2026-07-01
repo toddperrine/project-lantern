@@ -38,6 +38,7 @@ export type SavedStory = {
   endingType: EndingType;
   lengthTarget: string;
   diagnosticsNotice: string | null;
+  seriesTitle?: string | null;
   seriesId?: string;
   parentSeriesId?: string | null;
   sourceStoryId?: string | null;
@@ -223,6 +224,7 @@ export function createSavedStory(response: GenerateStoryResponse, storyId = crea
     endingType: diagnostics.endingType,
     lengthTarget: diagnostics.lengthTarget,
     diagnosticsNotice: diagnostics.notice ?? diagnostics.underTargetNotice,
+    seriesTitle: response.metadata.seriesTitle ?? diagnostics.seriesTitle ?? null,
     seriesId: diagnostics.seriesId,
     parentSeriesId: diagnostics.parentSeriesId ?? null,
     sourceStoryId: diagnostics.sourceStoryId ?? null,
@@ -272,7 +274,8 @@ export function savedStoryToResponse(savedStory: SavedStory): GenerateStoryRespo
       charactersUsed: savedStory.charactersUsed,
       rulesReferenced: savedStory.rulesReferenced,
       source: savedStory.generatorSource,
-      diagnostics
+      seriesTitle: savedStory.seriesTitle ?? null,
+      diagnostics: { ...diagnostics, seriesTitle: savedStory.seriesTitle ?? null }
     }
   };
 }

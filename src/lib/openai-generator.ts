@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { BLOODWICK_SERIES_TITLE_PROMPT, getBloodwickSeriesDisplayTitle } from "./bloodwick-series-title";
 import { buildEpisodeMomentumObjective } from "./episode-momentum-engine";
 import { LENGTH_TARGETS } from "./types";
 import type { GenerateStoryRequest, GenerateStoryResponse, LengthTarget, StoryDiagnostics } from "./types";
@@ -11,6 +12,7 @@ import {
 
 type OpenAIStoryPayload = {
   story: string;
+  seriesTitle?: string | null;
   charactersUsed?: string[];
   rulesReferenced?: string[];
 };
@@ -464,6 +466,14 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
       : null;
   const blueprintNotice = buildBlueprintDiagnosticsNotice(blueprintResult);
   const ruleSources = `${input.worldBible}\n\n${input.storyRules || DEFAULT_NARRATIVE_RULES}`;
+  const seriesTitle = getBloodwickSeriesDisplayTitle({
+    generatedSeriesTitle: payload.seriesTitle,
+    firstEpisodeTitle: createStoryTitleFromText(story),
+    episodeTitle: createStoryTitleFromText(story),
+    protagonistName: normalizeList(payload.charactersUsed, inferCharactersUsed(story, input.characterProfiles))[0] ?? null,
+    fearCategory: input.selectedStoryTypeChipLabel ?? input.genrePreset,
+  });
+
   const rulesReferenced = cleanRulesReferenced(
     normalizeList(payload.rulesReferenced, inferRulesReferenced(story, ruleSources)),
     disallowedTerms
@@ -473,6 +483,7 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
     story,
     metadata: {
       wordCount,
+      seriesTitle,
       charactersUsed: normalizeList(payload.charactersUsed, inferCharactersUsed(story, input.characterProfiles)),
       rulesReferenced,
       source: "openai",
@@ -544,7 +555,8 @@ export async function generateOpenAIStory(input: GenerateStoryRequest): Promise<
         parentSeriesId: input.generationIdentity.parentSeriesId ?? null,
         continuationContextIncluded: input.continuationContextIncluded,
         newSeriesCreated: input.generationMode === "new_story",
-        generationTrigger: input.generationTrigger
+        generationTrigger: input.generationTrigger,
+        seriesTitle
       })
     }
   };
@@ -907,6 +919,7 @@ function buildStoryPrompt(
   const narrativeRules = input.storyRules.trim() || DEFAULT_NARRATIVE_RULES;
   const forbiddenRule = buildForbiddenLanguageRule(disallowedTerms);
   const beatWordBudgetInstruction = buildBeatWordBudgetInstruction(input, blueprint, lengthSpec);
+  const seriesTitlePrompt = input.generationMode === "new_story" ? `\n\n${BLOODWICK_SERIES_TITLE_PROMPT}\n\nReturn series_title as top-level JSON metadata. Do not include the series title as a heading inside story prose.` : "";
 
   return `Write the final story from this private blueprint. The blueprint is a hidden planning object. Do not summarize it, quote it, display it, or mention it.
 
@@ -935,7 +948,7 @@ Final story requirements:
 - For this length target, a valid blueprint has ${beatRange.min}-${beatRange.max} beats; treat all ${blueprint.sceneBeats.length} provided beats as mandatory.
 - Avoid abstract engine-like story terms such as "protocol" unless the story defines them in-world through concrete action, objects, and consequences.
 ${forbiddenRule}
-${buildEpisodeMomentumObjective(input)}
+${buildEpisodeMomentumObjective(input)}${seriesTitlePrompt}
 - If source concepts resemble forbidden language, translate them into story-world phenomena: ${STORY_WORLD_TRANSLATIONS.join(", ")}.
 
 PREMISE REQUIREMENTS JSON
@@ -1282,11 +1295,12 @@ function createGenerationStageError(
 }
 
 function parseStoryPayload(rawText: string): OpenAIStoryPayload {
-  const payload = normalizeStoryPayload(rawText);
+  const payload = normalizeStoryPayload(rawText) as ReturnType<typeof normalizeStoryPayload> & { seriesTitle?: unknown; series_title?: unknown };
   const story = normalizeStoryText(payload.story ?? rawText);
 
   return {
     story,
+    seriesTitle: typeof payload.seriesTitle === "string" ? payload.seriesTitle : typeof payload.series_title === "string" ? payload.series_title : null,
     charactersUsed: normalizeStringList(payload.charactersUsed),
     rulesReferenced: normalizeStringList(payload.rulesReferenced)
   };
@@ -1390,4 +1404,11 @@ function summarizeError(error: unknown): string {
     return error.message;
   }
   return "Unknown error";
+}
+
+function createStoryTitleFromText(story: string): string {
+  const firstLine = story.split(/\n+/).find((line) => line.trim())?.trim() ?? "Generated Story";
+  const firstSentence = firstLine.split(/[.!?]/)[0]?.trim() || firstLine;
+  const compact = firstSentence.replace(/^#+\s*/, "").replace(/\s+/g, " ").trim();
+  return compact.length <= 72 ? compact : `${compact.slice(0, 72).replace(/[\s,.;:]+$/g, "")}...`;
 }

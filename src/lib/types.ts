@@ -103,6 +103,7 @@ export type GenerateStoryRequest = {
 
 export type StoryMetadata = {
   wordCount: number;
+  seriesTitle?: string | null;
   charactersUsed: string[];
   rulesReferenced: string[];
   source: "openai" | "fallback";
@@ -234,6 +235,7 @@ export type StoryDiagnostics = {
   continuationContextIncluded: boolean;
   newSeriesCreated: boolean;
   generationTrigger: string;
+  seriesTitle?: string | null;
   episodeMomentum?: {
     active: boolean;
     activation_reason: string;

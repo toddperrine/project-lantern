@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const { findLibraryStoryById, findLibraryStoryBySavedId, findNextSavedEpisodeInSeries, groupStoriesBySeries } = await import("./series-library.ts");
+import jitiModule from "jiti";
+
+const jiti = jitiModule(import.meta.url);
+const { findLibraryStoryById, findLibraryStoryBySavedId, findNextSavedEpisodeInSeries, groupStoriesBySeries } = await jiti.import("./series-library.ts", { default: false });
 
 test("groups same-series stories into ordered episode numbers and separates other series", () => {
   const groups = groupStoriesBySeries([
@@ -17,7 +20,7 @@ test("groups same-series stories into ordered episode numbers and separates othe
   assert.equal(calder.episodeCount, 3);
   assert.deepEqual(calder.episodes.map((episode) => episode.title), ["First", "Second", "Third"]);
   assert.deepEqual(calder.episodes.map((episode) => episode.episodeNumber), [1, 2, 3]);
-  assert.equal(calder.title, "Calder Voss Series");
+  assert.equal(calder.title, "The Hidden Town");
   assert.equal(amoma.episodeCount, 1);
 });
 
@@ -40,7 +43,7 @@ test("treats a story without seriesId as a standalone one-episode group", () => 
 
 test("falls back to first episode title when no hero or protagonist exists", () => {
   const groups = groupStoriesBySeries([{ id: "story-id", seriesId: "series-id", title: "A Lonely Door" }]);
-  assert.equal(groups[0].title, "Series starting with: A Lonely Door");
+  assert.equal(groups[0].title, "The Hidden Door");
 });
 
 test("finds the next saved episode in the current series", () => {
