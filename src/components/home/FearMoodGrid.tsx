@@ -14,7 +14,6 @@ export function FearMoodGrid({
   const { activeMood, onSelect } = props;
   const [focusedMood, setFocusedMood] = useState<StoryTypeChipId | null>(null);
   const selectedChip = STORY_TYPE_CHIPS.find((chip) => chip.id === activeMood) ?? STORY_TYPE_CHIPS[0];
-  const helpChip = STORY_TYPE_CHIPS.find((chip) => chip.id === focusedMood) ?? selectedChip;
 
   return (
     <section className="min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-4 shadow-bloodwick-soft sm:p-5">
@@ -60,9 +59,6 @@ export function FearMoodGrid({
       </div>
       <p className="mt-4 rounded-xl border border-bloodwick-white/10 bg-bloodwick-white/[0.06] p-3 text-sm leading-6 text-bloodwick-white/68 md:hidden">
         {selectedChip.guidance}
-      </p>
-      <p className="mt-4 hidden rounded-xl border border-bloodwick-white/10 bg-bloodwick-white/[0.06] p-3 text-sm leading-6 text-bloodwick-white/68 md:block">
-        {helpChip.guidance}
       </p>
     </section>
   );

@@ -5064,17 +5064,8 @@ function HomeView(props: {
     suggestedStarts,
   } = props;
   const [isRecapOpen, setIsRecapOpen] = useState(false);
-  const continueColumnRef = useRef<HTMLDivElement | null>(null);
-  const startColumnRef = useRef<HTMLDivElement | null>(null);
   const storyBrief = latestStory ? createStoryBrief(latestStory) : null;
   void HOME_DASHBOARD_COLUMNS;
-
-  const focusDashboardColumn = useCallback((column: "continue" | "start") => {
-    const node = column === "continue" ? continueColumnRef.current : startColumnRef.current;
-    if (!node) return;
-    node.scrollIntoView({ behavior: "smooth", block: "start" });
-    node.focus({ preventScroll: true });
-  }, []);
 
   const latestStoryTypeLabel = latestStory
     ? getStoryTypeChipLabel(latestStory.selectedStoryTypeChipId) ??
@@ -5086,18 +5077,10 @@ function HomeView(props: {
     <div className="grid min-w-0 max-w-full gap-6 overflow-x-hidden md:gap-8">
       <BloodwickHomeHero
         body="Start a series. Return whenever you want. Bloodwick keeps the dread alive."
-        onPrimaryAction={() => focusDashboardColumn("start")}
-        onSecondaryAction={latestStory ? () => focusDashboardColumn("continue") : undefined}
-        onTertiaryAction={onOpenLibrary}
-        primaryActionLabel="Start Something New"
-        secondaryActionLabel={
-          latestStory ? "Continue Latest Episode" : undefined
-        }
-        tertiaryActionLabel="Stories"
         title="Scary stories that know what haunts you."
       />
-      <div className="grid min-w-0 gap-4 lg:grid-cols-3" data-home-dashboard="three-actions">
-        <div ref={continueColumnRef} tabIndex={-1} className="min-w-0 scroll-mt-4 focus:outline-none">
+      <div className="grid min-w-0 gap-4 md:grid-cols-2" data-home-dashboard="reader-actions">
+        <div className="min-w-0">
           {latestStory && storyBrief ? (
             <ContinueEpisodeCard
               direction={continueDirection}
@@ -5116,7 +5099,7 @@ function HomeView(props: {
               title={latestStory.title}
             />
           ) : (
-            <section className="min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
+            <section className="h-full min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
                 Continue a series
               </p>
@@ -5129,7 +5112,7 @@ function HomeView(props: {
             </section>
           )}
         </div>
-        <div ref={startColumnRef} tabIndex={-1} className="grid min-w-0 scroll-mt-4 gap-4 focus:outline-none">
+        <div className="grid min-w-0 gap-4">
           <FearMoodGrid activeMood={activeMood} onSelect={onMoodSelect} />
           {!showStoryStartOptions ? (
             <StartSomethingNewPanel
@@ -5154,15 +5137,13 @@ function HomeView(props: {
             />
           )}
         </div>
-        <ReadyStoryQueuePanel
-          isGenerating={isGenerating}
-          items={readyStoryQueue}
-          onPass={onPassReadyStory}
-          onRead={onReadReadyStory}
-          onSaveForLater={onSaveReadyStoryForLater}
-          savedForLaterCount={savedForLaterStoryQueue.length}
-        />
       </div>
+      <ReadyStoryQueuePanel
+        items={readyStoryQueue}
+        onPass={onPassReadyStory}
+        onRead={onReadReadyStory}
+        onSaveForLater={onSaveReadyStoryForLater}
+      />
     </div>
   );
 }
@@ -5806,19 +5787,15 @@ function OnboardingChoiceGrid({
 }
 
 function ReadyStoryQueuePanel({
-  isGenerating,
   items,
   onPass,
   onRead,
   onSaveForLater,
-  savedForLaterCount,
 }: {
-  isGenerating: boolean;
   items: ReadyStoryQueueItem[];
   onPass: (item: ReadyStoryQueueItem) => void;
   onRead: (item: ReadyStoryQueueItem) => void;
   onSaveForLater: (item: ReadyStoryQueueItem) => void;
-  savedForLaterCount: number;
 }) {
   if (!items.length) {
     return (
@@ -5833,32 +5810,15 @@ function ReadyStoryQueuePanel({
           Use Start Something New to generate a story while the queue learns
           what to prepare next.
         </p>
-        <p className="mt-3 text-xs text-paper/45">
-          Saved for later: {savedForLaterCount}
-        </p>
       </section>
     );
   }
 
   return (
     <section className="min-w-0 rounded-md border border-lantern-gold/20 bg-paper/10 p-5">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
-            Stories waiting for you
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold text-paper">
-            Pick what should find you next.
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-paper/60">
-            Read, pass, or save for later. Bloodwick learns from each
-            story-level choice.
-          </p>
-        </div>
-        <p className="shrink-0 text-xs font-semibold text-paper/45">
-          Saved for later: {savedForLaterCount}
-        </p>
-      </div>
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
+        Stories waiting for you
+      </p>
 
       <div className="mt-4 grid gap-3">
         {items.map((item) => (
