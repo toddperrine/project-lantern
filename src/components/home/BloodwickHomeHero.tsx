@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
 
-const BLOODWICK_LORE = `Over the centuries, wick has meant the hidden thread that drinks fuel and feeds a flame, a village or dwelling place, something alive and quick with life, and, in older forms, something wicked, strange, or threatening.
+const BLOODWICK_LORE = `Over the centuries, blood has meant lineage, hunger, sacrifice, inheritance, and life itself. Wick has meant the hidden thread that drinks fuel and feeds a flame, a village or dwelling place, something alive and quick with life, and, in older forms, something wicked, strange, or threatening.
 
 BloodWick is the immortal, hungry black thread that catches fire. BloodWick is the place at the end of the road where every evil thing lurks and you are moments away from a painful death. BloodWick is a story’s wicked driving force, the thing that keeps you reading and needing more.
 
