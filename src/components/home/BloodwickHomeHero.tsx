@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const BLOODWICK_LORE = `Over the centuries, blood has meant lineage, hunger, sacrifice, inheritance, and life itself. Wick has meant the hidden thread that drinks fuel and feeds a flame, a village or dwelling place, something alive and quick with life, and, in older forms, something wicked, strange, or threatening.
 
@@ -30,26 +31,8 @@ export function BloodwickHomeHero() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isLoreOpen]);
 
-  return (
-    <section className="bloodwick-home-hero" aria-label="Bloodwick">
-      <Image
-        src="/artwork/Welcome to BloodWick.png"
-        alt="Welcome to BloodWick town artwork"
-        className="bloodwick-home-hero-image"
-        fill
-        priority
-        sizes="(max-width: 767px) 100vw, (max-width: 1279px) 90vw, 1216px"
-      />
-      <button
-        type="button"
-        className="bloodwick-home-hero-lore-trigger"
-        aria-label="Open BloodWick lore"
-        onClick={() => setIsLoreOpen(true)}
-      >
-        <span aria-hidden="true">i</span>
-      </button>
-
-      {isLoreOpen ? (
+  const loreDialog = isLoreOpen
+    ? createPortal(
         <div className="bloodwick-home-hero-lore-backdrop" onClick={() => setIsLoreOpen(false)}>
           <div
             role="dialog"
@@ -76,8 +59,32 @@ export function BloodwickHomeHero() {
               Close
             </button>
           </div>
-        </div>
-      ) : null}
-    </section>
+        </div>,
+        document.body,
+      )
+    : null;
+
+  return (
+    <>
+      <section className="bloodwick-home-hero" aria-label="Bloodwick">
+        <Image
+          src="/artwork/Welcome to BloodWick.png"
+          alt="Welcome to BloodWick town artwork"
+          className="bloodwick-home-hero-image"
+          fill
+          priority
+          sizes="(max-width: 767px) 100vw, (max-width: 1279px) 90vw, 1216px"
+        />
+        <button
+          type="button"
+          className="bloodwick-home-hero-lore-trigger"
+          aria-label="Open BloodWick lore"
+          onClick={() => setIsLoreOpen(true)}
+        >
+          <span aria-hidden="true">i</span>
+        </button>
+      </section>
+      {loreDialog}
+    </>
   );
 }

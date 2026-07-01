@@ -1467,7 +1467,6 @@ textarea {
 
 .bloodwick-home-hero {
   position: relative;
-  isolation: isolate;
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: 1.5rem;
@@ -1546,16 +1545,18 @@ textarea {
 .bloodwick-home-hero-lore-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 9990;
   display: grid;
   place-items: center;
-  padding: clamp(1rem, 4vw, 2rem);
+  padding: clamp(0.75rem, 3vw, 2rem);
   background: rgb(11 11 13 / 0.82);
 }
 
 .bloodwick-home-hero-lore-dialog {
+  position: relative;
+  z-index: 9991;
   width: min(100%, 42rem);
-  max-height: min(86vh, 46rem);
+  max-height: min(88vh, 46rem);
   overflow: auto;
   border-radius: 1.25rem;
   border: 1px solid rgb(184 115 51 / 0.42);
@@ -1563,8 +1564,8 @@ textarea {
     linear-gradient(
       145deg,
       #0B0B0D 0%,
-      rgb(11 11 13 / 0.96) 62%,
-      rgb(229 9 20 / 0.16) 100%
+      rgb(11 11 13 / 0.97) 68%,
+      rgb(229 9 20 / 0.14) 100%
     );
   color: #F2F1ED;
   box-shadow:
@@ -1595,7 +1596,7 @@ textarea {
   gap: 1rem;
   padding: 0;
   background: transparent !important;
-  color: rgb(242 241 237 / 0.84) !important;
+  color: rgb(242 241 237 / 0.86) !important;
   font-size: clamp(1rem, 2.5vw, 1.08rem);
   line-height: 1.65;
 }
@@ -1604,7 +1605,7 @@ textarea {
   margin: 0;
   padding: 0;
   background: transparent !important;
-  color: rgb(242 241 237 / 0.84) !important;
+  color: rgb(242 241 237 / 0.86) !important;
   line-height: 1.65;
 }
 
@@ -1632,13 +1633,13 @@ textarea {
 @media (max-width: 767px) {
   .bloodwick-home-hero-lore-backdrop {
     align-items: center;
-    padding: max(0.625rem, env(safe-area-inset-top)) 0.625rem max(0.625rem, env(safe-area-inset-bottom));
+    padding: max(0.75rem, env(safe-area-inset-top)) 0.75rem max(0.75rem, env(safe-area-inset-bottom));
   }
 
   .bloodwick-home-hero-lore-dialog {
     width: min(100%, calc(100vw - 1.25rem));
     max-height: min(88vh, 42rem);
-    padding: 1rem 1rem max(1rem, env(safe-area-inset-bottom));
+    padding: 1.125rem 1.125rem max(1.125rem, env(safe-area-inset-bottom));
     background:
       linear-gradient(
         145deg,
@@ -1653,12 +1654,12 @@ textarea {
     margin-top: 1rem;
     padding: 0 0.125rem;
     background: transparent !important;
-    color: rgb(242 241 237 / 0.86) !important;
+    color: rgb(242 241 237 / 0.88) !important;
   }
 
   .bloodwick-home-hero-lore-body p {
     background: transparent !important;
-    color: rgb(242 241 237 / 0.86) !important;
+    color: rgb(242 241 237 / 0.88) !important;
     font-size: 1rem;
     line-height: 1.65;
   }
