@@ -7937,7 +7937,6 @@ function LibraryView(props: {
   const {
     onDeleteStory,
     onMoveSavedForLaterToWaitingQueue,
-    onContinueSavedStoryById,
     onOpenSavedStoryById,
     onReadSavedForLater,
     onRemoveSavedForLater,
@@ -7960,14 +7959,16 @@ function LibraryView(props: {
   const hasGeneratedStoryRows = seriesGroups.length > 0;
 
   return (
-    <section className="grid min-w-0 gap-5 pb-8 md:pb-0">
-      <PageHeading
-        eyebrow="SHELF"
-        title="Shelf"
-        body="Saved and recent Bloodwick stories live here."
-      />
-      <section className="grid min-w-0 gap-3">
-        <section className="grid min-w-0 gap-3 rounded-md border border-lantern-gold/20 bg-lantern-gold/5 p-4">
+    <section className="bloodwick-shelf mx-auto grid w-full max-w-4xl min-w-0 gap-5 pb-8 md:pb-0">
+      <div className="bloodwick-shelf-header p-4 md:p-5">
+        <PageHeading
+          eyebrow="SHELF"
+          title="Shelf"
+          body="Saved and recent Bloodwick stories live here."
+        />
+      </div>
+      <section className="grid min-w-0 gap-4">
+        <section className="bloodwick-shelf-saved-later grid min-w-0 gap-3 p-4">
           <div>
             <h2 className="text-lg font-semibold text-paper">
               Saved for later
@@ -7989,7 +7990,7 @@ function LibraryView(props: {
               />
             ))
           ) : (
-            <p className="rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm text-paper/60">
+            <p className="bloodwick-shelf-meta rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm">
               No saved-for-later stories yet.
             </p>
           )}
@@ -8000,15 +8001,16 @@ function LibraryView(props: {
             body="Generate a story or save one for later and it will appear here."
           />
         ) : null}
-        {seriesGroups.map((group) => (
-          <SeriesLibraryGroup
-            key={group.seriesId}
-            group={group}
-            onContinueSavedStoryById={onContinueSavedStoryById}
-            onDeleteStory={onDeleteStory}
-            onOpenSavedStoryById={onOpenSavedStoryById}
-          />
-        ))}
+        <div className="bloodwick-shelf-series-list">
+          {seriesGroups.map((group) => (
+            <SeriesLibraryGroup
+              key={group.seriesId}
+              group={group}
+              onDeleteStory={onDeleteStory}
+              onOpenSavedStoryById={onOpenSavedStoryById}
+            />
+          ))}
+        </div>
       </section>
     </section>
   );
@@ -8022,136 +8024,56 @@ type LibrarySeriesGroupWithRows = Omit<
 
 function SeriesLibraryGroup({
   group,
-  onContinueSavedStoryById,
   onDeleteStory,
   onOpenSavedStoryById,
 }: {
   group: LibrarySeriesGroupWithRows;
-  onContinueSavedStoryById: (storyId: string) => void;
   onDeleteStory: (storyId: string) => void;
   onOpenSavedStoryById: (storyId: string) => void;
 }) {
   const updatedLabel = group.lastUpdatedAt
     ? `Last updated ${formatDateTime(group.lastUpdatedAt)}`
     : "Not updated yet";
+  const title = group.title?.trim() || "Untitled Series";
+  const fearTag = group.episodes
+    .map((episode) => getLibraryStoryCategoryLabel(episode.story).trim())
+    .find(Boolean);
 
-  return (
-    <>
-      <article
-        className="grid w-full min-w-0 max-w-full gap-4 rounded-xl border border-paper/12 bg-paper/10 p-4 md:hidden"
-        data-mobile-library-series-group="true"
-      >
-        <div className="min-w-0 max-w-full">
-          <h3 className="break-words text-xl font-semibold leading-tight text-paper">
-            {group.title}
-          </h3>
-          <p className="mt-1 break-words text-sm leading-6 text-paper/60">
-            {group.episodeCount}{" "}
-            {group.episodeCount === 1 ? "Episode" : "Episodes"} | {updatedLabel}
-          </p>
-        </div>
-
-        <div className="grid w-full min-w-0 max-w-full gap-3">
-          {group.episodes.map((episode) => (
-            <MobileLibraryEpisodeCard
-              episode={episode}
-              key={episode.story.id}
-              onContinueSavedStoryById={onContinueSavedStoryById}
-              onOpenSavedStoryById={onOpenSavedStoryById}
-            />
-          ))}
-        </div>
-      </article>
-      <article
-        className="hidden min-w-0 max-w-full rounded-md border border-paper/12 bg-paper/10 p-4 md:block"
-        data-mobile-library-desktop-group="true"
-      >
-        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0 max-w-full">
-            <h3 className="break-words text-lg font-semibold text-paper">
-              {group.title}
-            </h3>
-            <p className="mt-1 break-words text-sm leading-6 text-paper/60">
-              {group.episodeCount}{" "}
-              {group.episodeCount === 1 ? "Episode" : "Episodes"} |{" "}
-              {updatedLabel}
-            </p>
-          </div>
-          <span className="w-fit rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-2 py-1 text-xs font-semibold text-lantern-gold">
-            Series
-          </span>
-        </div>
-
-        <div className="mt-4 grid min-w-0 gap-3">
-          {group.episodes.map((episode) => (
-            <StoryLibraryCard
-              badge={`Episode ${episode.episodeNumber}`}
-              key={episode.story.id}
-              onDelete={() => onDeleteStory(episode.story.id)}
-              onOpen={() => onOpenSavedStoryById(episode.story.id)}
-              story={episode.story}
-            />
-          ))}
-        </div>
-      </article>
-    </>
-  );
-}
-
-function MobileLibraryEpisodeCard({
-  episode,
-  onContinueSavedStoryById,
-  onOpenSavedStoryById,
-}: {
-  episode: SeriesEpisode<LibraryStory> & { row: LibraryStoryRow };
-  onContinueSavedStoryById: (storyId: string) => void;
-  onOpenSavedStoryById: (storyId: string) => void;
-}) {
   return (
     <article
-      className="grid w-full min-w-0 max-w-full gap-3 rounded-xl border border-paper/10 bg-night-ink/70 p-4"
-      data-mobile-library-episode-card="true"
-      data-mobile-library-layout="stacked-card"
-      key={episode.story.id}
+      className="bloodwick-shelf-series-card"
+      data-mobile-library-series-group="true"
     >
-      <div className="grid min-w-0 gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
-          Episode {episode.episodeNumber}
-        </p>
-        <h4 className="break-words text-lg font-semibold leading-snug text-paper">
-          {episode.story.title}
-        </h4>
-        <p className="break-words text-xs leading-5 text-paper/50">
-          {formatDateTime(episode.story.createdAt)} ·{" "}
-          {episode.story.wordCount.toLocaleString()} words ·{" "}
-          {getLibraryStoryCategoryLabel(episode.story)}
-        </p>
-        <p className="line-clamp-4 break-words text-sm leading-6 text-paper/70">
-          {truncateText(episode.story.story, 260)}
-        </p>
+      <div className="bloodwick-shelf-series-header">
+        <div className="min-w-0">
+          <h3 className="bloodwick-shelf-series-title break-words text-lg font-semibold leading-tight">
+            {title}
+          </h3>
+          <p className="bloodwick-shelf-meta mt-1 text-sm leading-6">
+            {group.episodeCount}{" "}
+            {group.episodeCount === 1 ? "Episode" : "Episodes"} · {updatedLabel}
+          </p>
+        </div>
+        {fearTag ? (
+          <span className="bloodwick-shelf-tag">{fearTag}</span>
+        ) : null}
       </div>
-      <div
-        className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2"
-        data-mobile-library-card-actions="true"
-      >
-        <button
-          className="min-h-11 rounded-md bg-lantern-gold px-4 py-3 text-sm font-semibold text-night-ink"
-          onClick={() => onOpenSavedStoryById(episode.story.id)}
-          type="button"
-        >
-          Open Story
-        </button>
-        <button
-          className="min-h-11 rounded-md border border-lantern-gold/45 bg-paper/10 px-4 py-3 text-sm font-semibold text-lantern-gold"
-          onClick={() => onContinueSavedStoryById(episode.story.id)}
-          type="button"
-        >
-          Continue Series
-        </button>
+
+      <div className="bloodwick-shelf-episode-list">
+        {group.episodes.map((episode) => (
+          <StoryLibraryCard
+            badge={`Episode ${episode.episodeNumber}`}
+            key={episode.story.id}
+            onDelete={() => onDeleteStory(episode.story.id)}
+            onOpen={() => onOpenSavedStoryById(episode.story.id)}
+            story={episode.story}
+          />
+        ))}
       </div>
     </article>
   );
 }
+
 
 function SavedForLaterStoryCard({
   item,
@@ -8165,19 +8087,21 @@ function SavedForLaterStoryCard({
   onRemove: () => void;
 }) {
   return (
-    <article className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <article className="bloodwick-shelf-series-card min-w-0">
+      <div className="bloodwick-shelf-series-header">
         <div className="min-w-0">
-          <h3 className="text-lg font-semibold text-paper">{item.title}</h3>
-          <p className="mt-1 text-sm leading-6 text-paper/60">
+          <h3 className="bloodwick-shelf-series-title text-base font-semibold">
+            {item.title}
+          </h3>
+          <p className="bloodwick-shelf-meta mt-1 text-sm leading-6">
             {item.genre} | {item.mood}
           </p>
         </div>
-        <span className="w-fit rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-2 py-1 text-xs font-semibold text-lantern-gold">
-          Saved for later
-        </span>
+        <span className="bloodwick-shelf-tag">Saved for later</span>
       </div>
-      <p className="mt-3 text-sm leading-6 text-paper/70">{item.premise}</p>
+      <p className="bloodwick-shelf-meta mt-3 text-sm leading-6">
+        {item.premise}
+      </p>
       <p className="mt-2 text-xs font-semibold text-lantern-gold/80">
         {formatReadyStoryCreatorCredit(item)}
       </p>
@@ -8228,28 +8152,42 @@ function StoryLibraryCard({
   story: LibraryStory;
 }) {
   return (
-    <article className="min-w-0 rounded-md border border-paper/12 bg-paper/10 p-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h3 className="text-lg font-semibold text-paper">{story.title}</h3>
-          <p className="mt-1 text-sm leading-6 text-paper/60">
-            {formatDateTime(story.createdAt)} |{" "}
-            {story.wordCount.toLocaleString()} words |{" "}
-            {getLibraryStoryCategoryLabel(story)}
+    <article
+      className="bloodwick-shelf-episode-row"
+      data-mobile-library-episode-card="true"
+    >
+      <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {badge ? <span className="bloodwick-shelf-tag">{badge}</span> : null}
+          <p className="bloodwick-shelf-meta text-xs leading-5">
+            {formatDateTime(story.createdAt)} · {story.wordCount.toLocaleString()}
+            words · {getLibraryStoryCategoryLabel(story)}
           </p>
         </div>
-        {badge ? (
-          <span className="w-fit rounded-md border border-lantern-gold/35 bg-lantern-gold/10 px-2 py-1 text-xs font-semibold text-lantern-gold">
-            {badge}
-          </span>
-        ) : null}
+        <h4 className="bloodwick-shelf-episode-title mt-2 break-words text-base font-semibold leading-snug">
+          {story.title}
+        </h4>
       </div>
-      <p className="mt-3 text-sm leading-6 text-paper/70">
-        {truncateText(story.story, 220)}
-      </p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <SmallButton onClick={onOpen}>Open</SmallButton>
-        {onDelete ? <SmallButton onClick={onDelete}>Delete</SmallButton> : null}
+      <div
+        className="bloodwick-shelf-actions"
+        data-mobile-library-card-actions="true"
+      >
+        <button
+          className="min-h-10 rounded-md bg-bloodwick-red px-4 py-2 text-sm font-semibold text-bloodwick-white"
+          onClick={onOpen}
+          type="button"
+        >
+          Open
+        </button>
+        {onDelete ? (
+          <button
+            className="min-h-10 rounded-md border border-bloodwick-white/15 bg-transparent px-4 py-2 text-sm font-semibold text-bloodwick-white"
+            onClick={onDelete}
+            type="button"
+          >
+            Delete
+          </button>
+        ) : null}
       </div>
     </article>
   );
