@@ -10,8 +10,8 @@ import {
   useRef,
   useState,
 } from "react";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { BloodwickHomeHero } from "@/components/home/BloodwickHomeHero";
 import { ContinueEpisodeCard } from "@/components/home/ContinueEpisodeCard";
 import { FearMoodGrid } from "@/components/home/FearMoodGrid";
 import { HOME_DASHBOARD_COLUMNS } from "@/components/home/home-dashboard-order";
@@ -3941,16 +3941,7 @@ export default function Home() {
             navigateHome();
           }}
         />
-        <header className="hidden min-w-0 flex-col gap-5 border-b border-paper/10 pb-6 md:flex md:flex-row md:items-end md:justify-between">
-          <div className="min-w-0">
-            <p className="bloodwick-kicker">Bloodwick</p>
-            <h1 className="mt-2 max-w-4xl text-3xl font-semibold leading-tight tracking-tight text-paper md:text-5xl">
-              Scary stories that know what haunts you.
-            </h1>
-            <p className="mt-3 max-w-2xl text-base leading-7 text-paper/70">
-              Start a series. Return whenever you want. Bloodwick keeps the dread alive.
-            </p>
-          </div>
+        <header className="hidden min-w-0 border-b border-paper/10 pb-6 md:flex md:justify-end">
           <NavTabs activeView={activeView} onChange={navigateToView} />
         </header>
 
@@ -5086,78 +5077,135 @@ function HomeView(props: {
     ? getLibraryStorySeriesTitle(latestStory)
     : "Series Title";
 
+  const [activeCarouselPanel, setActiveCarouselPanel] = useState(0);
+  const carouselDotLabels = [
+    "Show Bloodwick mural",
+    "Show Return to the Dread",
+    "Show Light a New Wick",
+    "Show Waiting in the Dark",
+  ];
+
   return (
     <div className="grid min-w-0 max-w-full gap-6 overflow-x-hidden md:gap-8">
-      <BloodwickHomeHero
-        body="Start a series. Return whenever you want. Bloodwick keeps the dread alive."
-        title="Scary stories that know what haunts you."
-      />
-      <div className="grid min-w-0 gap-4 md:grid-cols-2" data-home-dashboard="reader-actions">
-        <div className="min-w-0">
-          {latestStory && storyBrief ? (
-            <ContinueEpisodeCard
-              direction={continueDirection}
-              hook={storyBrief.hook}
-              isDirectionOpen={isDirectionOpen}
-              isGenerating={isContinuationGenerating}
-              isRecapOpen={isRecapOpen}
-              onCloseRecap={() => setIsRecapOpen(false)}
-              onContinue={onContinue}
-              onDirectionChange={onDirectionChange}
-              onExport={onExportStory}
-              onOpenRecap={() => setIsRecapOpen(true)}
-              onToggleDirection={onToggleDirection}
-              recap={storyBrief.recap}
-              seriesTitle={latestSeriesTitle}
-              storyTypeLabel={latestStoryTypeLabel}
-              title={latestStory.title}
-            />
-          ) : (
-            <section className="min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
-                Continue Your Series
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold text-bloodwick-white">
-                No series in progress yet.
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-bloodwick-white/68">
-                Start something new to begin your first Bloodwick series.
-              </p>
-            </section>
-          )}
+      <section
+        aria-label="Bloodwick carousel"
+        className="min-w-0 overflow-hidden rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-black shadow-bloodwick-soft"
+      >
+        <div className="grid min-w-0">
+          <article
+            aria-label="Bloodwick mural artwork"
+            hidden={activeCarouselPanel !== 0}
+          >
+            <div className="relative h-[min(72vw,30rem)] w-full overflow-hidden rounded-bloodwick-lg md:h-[28rem]">
+              <Image
+                alt="Bloodwick horror story mural"
+                className="object-cover object-center"
+                fill
+                priority
+                sizes="(min-width: 768px) 80rem, 100vw"
+                src="/artwork/home-carousel-mural.png"
+              />
+            </div>
+          </article>
+          <article
+            aria-label="Return to the Dread"
+            hidden={activeCarouselPanel !== 1}
+          >
+            <div className="min-w-0 p-4 sm:p-5">
+              {latestStory && storyBrief ? (
+                <ContinueEpisodeCard
+                  direction={continueDirection}
+                  hook={storyBrief.hook}
+                  isDirectionOpen={isDirectionOpen}
+                  isGenerating={isContinuationGenerating}
+                  isRecapOpen={isRecapOpen}
+                  onCloseRecap={() => setIsRecapOpen(false)}
+                  onContinue={onContinue}
+                  onDirectionChange={onDirectionChange}
+                  onExport={onExportStory}
+                  onOpenRecap={() => setIsRecapOpen(true)}
+                  onToggleDirection={onToggleDirection}
+                  recap={storyBrief.recap}
+                  seriesTitle={latestSeriesTitle}
+                  storyTypeLabel={latestStoryTypeLabel}
+                  title={latestStory.title}
+                />
+              ) : (
+                <section className="min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
+                    Return to the Dread
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold text-bloodwick-white">
+                    No series in progress yet.
+                  </h2>
+                  <p className="mt-3 text-sm leading-6 text-bloodwick-white/68">
+                    Start something new to begin your first Bloodwick series.
+                  </p>
+                </section>
+              )}
+            </div>
+          </article>
+          <article
+            aria-label="Light a New Wick"
+            hidden={activeCarouselPanel !== 2}
+          >
+            <div className="grid min-w-0 gap-4 p-4 sm:p-5">
+              <FearMoodGrid activeMood={activeMood} onSelect={onMoodSelect} />
+              {!showStoryStartOptions ? (
+                <StartSomethingNewPanel
+                  canUseDemoStory={false}
+                  hasDemoStory={hasDemoStory}
+                  isGenerating={isGenerating}
+                  isNewStoryGenerating={isNewStoryGenerating}
+                  onClearDemoStory={onClearDemoStory}
+                  onLoadDemoStory={onLoadDemoStory}
+                  onStartNewStory={onStartNewStory}
+                  selectedStoryTypeLabel={getStoryTypeChip(activeMood).label}
+                />
+              ) : (
+                <SuggestedStoryStarts
+                  activeMood={activeMood}
+                  canUseDemoStory={false}
+                  hasDemoStory={hasDemoStory}
+                  onClearDemoStory={onClearDemoStory}
+                  onLoadDemoStory={onLoadDemoStory}
+                  stories={suggestedStarts}
+                  onStart={onStartRecommendation}
+                />
+              )}
+            </div>
+          </article>
+          <article
+            aria-label="Waiting in the Dark"
+            hidden={activeCarouselPanel !== 3}
+          >
+            <div className="min-w-0 p-4 sm:p-5">
+              <ReadyStoryQueuePanel
+                items={readyStoryQueue}
+                onPass={onPassReadyStory}
+                onRead={onReadReadyStory}
+                onSaveForLater={onSaveReadyStoryForLater}
+              />
+            </div>
+          </article>
         </div>
-        <div className="grid min-w-0 gap-4">
-          <FearMoodGrid activeMood={activeMood} onSelect={onMoodSelect} />
-          {!showStoryStartOptions ? (
-            <StartSomethingNewPanel
-              canUseDemoStory={false}
-              hasDemoStory={hasDemoStory}
-              isGenerating={isGenerating}
-              isNewStoryGenerating={isNewStoryGenerating}
-              onClearDemoStory={onClearDemoStory}
-              onLoadDemoStory={onLoadDemoStory}
-              onStartNewStory={onStartNewStory}
-              selectedStoryTypeLabel={getStoryTypeChip(activeMood).label}
+        <div className="flex justify-center gap-2 px-4 pb-4 pt-3">
+          {carouselDotLabels.map((label, index) => (
+            <button
+              aria-current={activeCarouselPanel === index ? "true" : undefined}
+              aria-label={label}
+              className={`size-3 rounded-full border border-bloodwick-white/30 ${
+                activeCarouselPanel === index
+                  ? "bg-bloodwick-red"
+                  : "bg-transparent"
+              }`}
+              key={label}
+              onClick={() => setActiveCarouselPanel(index)}
+              type="button"
             />
-          ) : (
-            <SuggestedStoryStarts
-              activeMood={activeMood}
-              canUseDemoStory={false}
-              hasDemoStory={hasDemoStory}
-              onClearDemoStory={onClearDemoStory}
-              onLoadDemoStory={onLoadDemoStory}
-              stories={suggestedStarts}
-              onStart={onStartRecommendation}
-            />
-          )}
+          ))}
         </div>
-      </div>
-      <ReadyStoryQueuePanel
-        items={readyStoryQueue}
-        onPass={onPassReadyStory}
-        onRead={onReadReadyStory}
-        onSaveForLater={onSaveReadyStoryForLater}
-      />
+      </section>
     </div>
   );
 }
