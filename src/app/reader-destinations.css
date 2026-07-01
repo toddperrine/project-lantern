@@ -915,7 +915,7 @@
   z-index: 140 !important;
   display: grid !important;
   place-items: center !important;
-  background: rgb(11 11 13 / 0.82) !important;
+  background: rgb(11 11 13 / 0.78) !important;
   padding: 1rem !important;
   opacity: 1 !important;
 }
@@ -953,7 +953,9 @@
   color: #B87333 !important;
 }
 
-.project-lantern-shell .bloodwick-meet-modal-title {
+.project-lantern-shell .bloodwick-meet-modal-title,
+.project-lantern-shell .bloodwick-meet-modal h2,
+.project-lantern-shell .bloodwick-meet-modal h3 {
   color: #F2F1ED !important;
 }
 

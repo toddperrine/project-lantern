@@ -16,9 +16,20 @@ export function ProjectLanternNav() {
   const searchParams = useSearchParams();
   const activeView = searchParams.get("view") ?? "home";
 
+  const openMeetBloodWick = () => {
+    window.dispatchEvent(new CustomEvent("lantern:open-meet-bloodwick"));
+  };
+
   return (
     <nav aria-label="Bloodwick" className="w-full min-w-0 md:w-auto">
       <div className="flex min-w-0 flex-wrap gap-2 md:justify-end">
+        <button
+          className={NAV_DEFAULT_CLASS}
+          onClick={openMeetBloodWick}
+          type="button"
+        >
+          Meet BloodWick
+        </button>
         {NAV_ITEMS.map((item) => {
           const isActive = item.view === activeView;
 

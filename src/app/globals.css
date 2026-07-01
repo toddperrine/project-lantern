@@ -1371,7 +1371,7 @@ textarea {
   z-index: 140;
   display: grid;
   place-items: center;
-  background: rgb(11 11 13 / 0.82);
+  background: rgb(11 11 13 / 0.78);
   padding: 1rem;
 }
 
@@ -1379,12 +1379,12 @@ textarea {
   width: min(100%, 31rem);
   max-height: min(84vh, 38rem);
   overflow-y: auto;
-  border: 1px solid rgb(107 112 120 / 0.38);
+  border: 1px solid rgb(107 112 120 / 0.34);
   border-radius: 1.25rem;
-  background: rgb(11 11 13 / 0.98);
+  background: rgb(11 11 13 / 0.96);
   color: #F2F1ED;
   padding: 1rem;
-  box-shadow: 0 1.5rem 4rem rgb(11 11 13 / 0.72);
+  box-shadow: 0 24px 80px rgb(11 11 13 / 0.72);
   opacity: 1;
 }
 
@@ -1393,6 +1393,8 @@ textarea {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+  background: transparent;
+  color: #F2F1ED;
 }
 
 .bloodwick-meet-modal-eyebrow {
@@ -1413,17 +1415,24 @@ textarea {
   line-height: 1.12;
 }
 
+.bloodwick-meet-modal h2,
+.bloodwick-meet-modal h3 {
+  color: #F2F1ED;
+}
+
 .bloodwick-meet-modal-body {
   display: grid;
   gap: 0.85rem;
   margin-top: 1rem;
-  color: rgb(242 241 237 / 0.84);
+  background: transparent;
+  color: rgb(242 241 237 / 0.78);
   font-size: 0.95rem;
   line-height: 1.62;
 }
 
 .bloodwick-meet-modal-body p {
   margin: 0;
+  color: rgb(242 241 237 / 0.78);
 }
 
 .bloodwick-meet-modal-body em {
@@ -1433,9 +1442,9 @@ textarea {
 .bloodwick-meet-modal-close {
   min-height: 44px;
   min-width: 44px;
-  border: 1px solid rgb(242 241 237 / 0.2);
+  border: 1px solid rgb(107 112 120 / 0.4);
   border-radius: 0.75rem;
-  background: rgb(242 241 237 / 0.08);
+  background: rgb(11 11 13 / 0.84);
   color: #F2F1ED;
   font-size: 1.35rem;
   font-weight: 800;
