@@ -17,6 +17,7 @@ import { ContinueEpisodeCard } from "@/components/home/ContinueEpisodeCard";
 import { FearMoodGrid } from "@/components/home/FearMoodGrid";
 import { HOME_DASHBOARD_COLUMNS } from "@/components/home/home-dashboard-order";
 import { StoryQueueCard } from "@/components/home/StoryQueueCard";
+import { MobileBackToTopButton } from "@/components/navigation/MobileBackToTopButton";
 import {
   DEFAULT_EERIE_SAFETY_GUARDRAILS,
   EERIE_READER_PROFILE_STORAGE_KEY,
@@ -3995,9 +3996,10 @@ export default function Home() {
   );
 
   return (
-    <main className="min-h-screen overflow-x-hidden px-3 pb-24 pt-3 text-paper sm:px-4 md:px-8 md:py-7">
+    <main className="min-h-screen overflow-x-hidden px-3 pb-6 pt-3 text-paper sm:px-4 md:px-8 md:py-7">
       <section className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-5 md:gap-6">
         <MobileTopHeader
+          activeView={activeView}
           onGoHome={() => {
             if (typeof window !== "undefined") {
               window.dispatchEvent(
@@ -4006,6 +4008,7 @@ export default function Home() {
             }
             navigateHome();
           }}
+          onNavigate={navigateToView}
         />
         <header className="hidden min-w-0 flex-col gap-5 border-b border-paper/10 pb-6 md:flex md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
@@ -4232,7 +4235,7 @@ export default function Home() {
           </MobileDeveloperDiagnostics>
         ) : null}
       </section>
-      <MobileBottomNav activeView={activeView} onChange={navigateToView} />
+      <MobileBackToTopButton />
     </main>
   );
 }
@@ -11117,12 +11120,34 @@ function formatPreferencePair(preference: {
   return `${preference.value.toFixed(2)} / ${preference.confidence.toFixed(2)}`;
 }
 
-function MobileTopHeader({ onGoHome }: { onGoHome: () => void }) {
+function MobileTopHeader({
+  activeView,
+  onGoHome,
+  onNavigate,
+}: {
+  activeView: AppView;
+  onGoHome: () => void;
+  onNavigate: (view: AppView) => void;
+}) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const handleNavigate = (view: AppView) => {
+    setIsMenuOpen(false);
+    if (view === "home") {
+      onGoHome();
+      return;
+    }
+    onNavigate(view);
+  };
+
   return (
     <header className="relative h-12 w-full min-w-0 py-1 md:hidden">
       <button
+        aria-expanded={isMenuOpen}
         aria-label="Open menu"
+        aria-controls="mobile-top-menu"
         className="absolute left-0 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-xl text-paper"
+        onClick={() => setIsMenuOpen((current) => !current)}
         type="button"
       >
         <span aria-hidden="true">☰</span>
@@ -11148,40 +11173,34 @@ function MobileTopHeader({ onGoHome }: { onGoHome: () => void }) {
       <button
         aria-label="Open profile"
         className="absolute right-0 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-paper/10 bg-paper/10 text-lg text-paper"
+        onClick={() => handleNavigate("account")}
         type="button"
       >
         <span aria-hidden="true">♡</span>
       </button>
-    </header>
-  );
-}
 
-function MobileBottomNav({
-  activeView,
-  onChange,
-}: {
-  activeView: AppView;
-  onChange: (view: AppView) => void;
-}) {
-  return (
-    <nav
-      aria-label="Mobile primary"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-paper/10 bg-night-ink/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] pt-2 backdrop-blur md:hidden"
-    >
-      <div className="mx-auto grid max-w-lg grid-cols-3 gap-1">
-        {NAV_ITEMS.map((item) => (
-          <button
-            aria-current={activeView === item.view ? "page" : undefined}
-            className={`rounded-xl px-1 py-2 text-[0.66rem] font-semibold leading-tight ${activeView === item.view ? "bg-bloodwick-red text-bloodwick-white" : "text-paper/65"}`}
-            key={item.view}
-            onClick={() => onChange(item.view)}
-            type="button"
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-    </nav>
+      {isMenuOpen ? (
+        <nav
+          aria-label="Mobile primary"
+          className="absolute left-0 right-0 top-12 z-30 rounded-xl border border-paper/10 bg-night-ink/95 p-2 shadow-soft backdrop-blur"
+          id="mobile-top-menu"
+        >
+          <div className="grid gap-1">
+            {NAV_ITEMS.map((item) => (
+              <button
+                aria-current={activeView === item.view ? "page" : undefined}
+                className={`rounded-lg px-3 py-2 text-left text-sm font-semibold leading-tight ${activeView === item.view ? "bg-bloodwick-red text-bloodwick-white" : "text-paper/75 hover:bg-paper/10 hover:text-paper"}`}
+                key={item.view}
+                onClick={() => handleNavigate(item.view)}
+                type="button"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      ) : null}
+    </header>
   );
 }
 

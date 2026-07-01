@@ -939,3 +939,37 @@ textarea {
 .bloodwick-sign-in-modal__secondary {
   color: #B87333;
 }
+
+.bloodwick-back-to-top {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  z-index: 40;
+  display: none;
+  width: 3rem;
+  height: 3rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(107 112 120 / 0.45);
+  border-radius: 999px;
+  background: rgb(11 11 13 / 0.92);
+  color: var(--bloodwick-white);
+  box-shadow: 0 0 24px rgb(229 9 20 / 0.18);
+}
+
+.bloodwick-back-to-top svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: currentColor;
+}
+
+.bloodwick-back-to-top:focus-visible {
+  outline: 2px solid var(--bloodwick-copper);
+  outline-offset: 3px;
+}
+
+@media (max-width: 767px) {
+  .bloodwick-back-to-top {
+    display: flex;
+  }
+}
