@@ -11263,11 +11263,11 @@ function MeetBloodWickModal({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="bloodwick-meet-modal" onClick={onClose}>
+    <div className="bloodwick-meet-modal-backdrop" onClick={onClose}>
       <div
         aria-labelledby="meet-bloodwick-title"
         aria-modal="true"
-        className="bloodwick-meet-modal-panel"
+        className="bloodwick-meet-modal"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
       >

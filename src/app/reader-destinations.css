@@ -907,3 +907,71 @@
     text-align: center !important;
   }
 }
+
+
+.project-lantern-shell .bloodwick-meet-modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 140 !important;
+  display: grid !important;
+  place-items: center !important;
+  background: rgb(11 11 13 / 0.82) !important;
+  padding: 1rem !important;
+  opacity: 1 !important;
+}
+
+.project-lantern-shell .bloodwick-meet-modal[role="dialog"] {
+  position: relative !important;
+  inset: auto !important;
+  z-index: auto !important;
+  display: block !important;
+  align-items: initial !important;
+  width: min(100%, 31rem) !important;
+  max-height: min(84vh, 38rem) !important;
+  overflow-y: auto !important;
+  border: 1px solid rgb(107 112 120 / 0.34) !important;
+  border-radius: 1.25rem !important;
+  background: rgb(11 11 13 / 0.96) !important;
+  color: #F2F1ED !important;
+  padding: 1rem !important;
+  box-shadow: 0 24px 80px rgb(11 11 13 / 0.72) !important;
+  opacity: 1 !important;
+}
+
+.project-lantern-shell .bloodwick-meet-modal-header {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 1rem !important;
+  background: transparent !important;
+  color: #F2F1ED !important;
+  padding: 0 !important;
+}
+
+.project-lantern-shell .bloodwick-meet-modal-eyebrow {
+  margin: 0 !important;
+  color: #B87333 !important;
+}
+
+.project-lantern-shell .bloodwick-meet-modal-title {
+  color: #F2F1ED !important;
+}
+
+.project-lantern-shell .bloodwick-meet-modal-body {
+  background: transparent !important;
+  color: rgb(242 241 237 / 0.78) !important;
+}
+
+.project-lantern-shell .bloodwick-meet-modal-body p {
+  color: rgb(242 241 237 / 0.78) !important;
+}
+
+.project-lantern-shell .bloodwick-meet-modal-body em {
+  color: #F2F1ED !important;
+}
+
+.project-lantern-shell .bloodwick-meet-modal-close {
+  border: 1px solid rgb(107 112 120 / 0.4) !important;
+  background: rgb(11 11 13 / 0.84) !important;
+  color: #F2F1ED !important;
+}

@@ -1212,6 +1212,7 @@ textarea {
   color: var(--bloodwick-white);
   padding: 1rem;
   box-shadow: 0 1.5rem 4rem rgb(11 11 13 / 0.72);
+  opacity: 1;
 }
 
 .bloodwick-shelf-confirm-panel {
@@ -1364,7 +1365,7 @@ textarea {
   color: var(--bloodwick-white);
 }
 
-.bloodwick-meet-modal {
+.bloodwick-meet-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 140;
@@ -1374,7 +1375,7 @@ textarea {
   padding: 1rem;
 }
 
-.bloodwick-meet-modal-panel {
+.bloodwick-meet-modal {
   width: min(100%, 31rem);
   max-height: min(84vh, 38rem);
   overflow-y: auto;
@@ -1384,6 +1385,7 @@ textarea {
   color: #F2F1ED;
   padding: 1rem;
   box-shadow: 0 1.5rem 4rem rgb(11 11 13 / 0.72);
+  opacity: 1;
 }
 
 .bloodwick-meet-modal-header {
