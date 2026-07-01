@@ -8124,69 +8124,71 @@ function SeriesLibraryGroup({
           {group.episodeCount === 1 ? "Episode" : "Episodes"} · {updatedLabel}
         </p>
       </div>
-      <div className="bloodwick-shelf-series-controls">
-        <label className="grid gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-paper/60">
-          <span>Choose episode</span>
-          <select
-            className="bloodwick-shelf-episode-select"
-            onChange={(event) => setSelectedStoryId(event.target.value)}
-            value={selectedEpisode?.story.id ?? ""}
-          >
-            {group.episodes.map((episode) => (
-              <option key={episode.story.id} value={episode.story.id}>
-                {`Episode ${episode.episodeNumber} · ${formatDateTime(episode.story.createdAt)}`}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {selectedEpisode ? (
-          <div className="bloodwick-shelf-selected-episode">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <span className="bloodwick-shelf-tag">
-                Episode {selectedEpisode.episodeNumber}
+      {selectedEpisode ? (
+        <div
+          className="bloodwick-shelf-episode-rail"
+          data-mobile-library-card-actions="true"
+        >
+          <div className="bloodwick-shelf-episode-picker">
+            {group.episodeCount > 1 ? (
+              <label className="bloodwick-shelf-episode-select-label">
+                <span className="sr-only">Choose episode</span>
+                <select
+                  className="bloodwick-shelf-episode-select"
+                  onChange={(event) => setSelectedStoryId(event.target.value)}
+                  value={selectedEpisode.story.id}
+                >
+                  {group.episodes.map((episode) => (
+                    <option key={episode.story.id} value={episode.story.id}>
+                      {`Ep. ${episode.episodeNumber} · ${formatDateTime(episode.story.createdAt)}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <span className="bloodwick-shelf-episode-pill">
+                Ep. {selectedEpisode.episodeNumber}
               </span>
-              <p className="bloodwick-shelf-meta text-xs leading-5">
-                {formatDateTime(selectedEpisode.story.createdAt)}
-                {selectedEpisode.story.wordCount
-                  ? ` · ${selectedEpisode.story.wordCount.toLocaleString()} words`
-                  : ""}
-                {selectedFearTag ? ` · ${selectedFearTag}` : ""}
-              </p>
-            </div>
-            <h4 className="bloodwick-shelf-selected-episode-title mt-2 break-words text-base font-semibold leading-snug">
-              {selectedEpisode.story.title}
-            </h4>
-            <div
-              className="bloodwick-shelf-actions"
-              data-mobile-library-card-actions="true"
-            >
-              <button
-                className="min-h-11 rounded-md bg-bloodwick-red px-4 py-2 text-sm font-semibold text-bloodwick-white"
-                onClick={() => onOpenSavedStoryById(selectedEpisode.story.id)}
-                type="button"
-              >
-                Open
-              </button>
-              <button
-                className="min-h-11 rounded-md border border-bloodwick-white/15 bg-transparent px-4 py-2 text-sm font-semibold text-bloodwick-white disabled:cursor-not-allowed disabled:opacity-55"
-                disabled={!selectedRecap}
-                onClick={() => setRecapEpisode(selectedEpisode)}
-                type="button"
-              >
-                Recap
-              </button>
-              <button
-                className="min-h-11 rounded-md border border-bloodwick-white/15 bg-transparent px-4 py-2 text-sm font-semibold text-bloodwick-white"
-                onClick={() => onDeleteStory(selectedEpisode.story.id)}
-                type="button"
-              >
-                Delete
-              </button>
-            </div>
+            )}
           </div>
-        ) : null}
-      </div>
+          <span className="bloodwick-shelf-episode-pill">
+            {formatDateTime(selectedEpisode.story.createdAt)}
+          </span>
+          {selectedEpisode.story.wordCount ? (
+            <span className="bloodwick-shelf-episode-pill">
+              {selectedEpisode.story.wordCount.toLocaleString()} words
+            </span>
+          ) : null}
+          {selectedFearTag ? (
+            <span className="bloodwick-shelf-episode-pill">
+              {selectedFearTag}
+            </span>
+          ) : null}
+          <button
+            className="bloodwick-shelf-action-primary"
+            onClick={() => onOpenSavedStoryById(selectedEpisode.story.id)}
+            type="button"
+          >
+            Open
+          </button>
+          <button
+            className="bloodwick-shelf-action-secondary"
+            disabled={!selectedRecap}
+            onClick={() => setRecapEpisode(selectedEpisode)}
+            type="button"
+          >
+            Recap
+          </button>
+          <button
+            aria-label={`Delete ${title}`}
+            className="bloodwick-shelf-action-icon"
+            onClick={() => onDeleteStory(selectedEpisode.story.id)}
+            type="button"
+          >
+            🗑
+          </button>
+        </div>
+      ) : null}
       {recapEpisode ? (
         <ShelfRecapModal
           body={getShelfEpisodeRecap(recapEpisode.story)}
