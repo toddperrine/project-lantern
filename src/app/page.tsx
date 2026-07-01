@@ -10,7 +10,6 @@ import {
   useRef,
   useState,
 } from "react";
-import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { BloodwickSignInModal } from "@/components/auth/BloodwickSignInModal";
 import { BloodwickHomeHero } from "@/components/home/BloodwickHomeHero";
@@ -8070,36 +8069,42 @@ function SeriesLibraryGroup({
       className="bloodwick-shelf-series-card"
       data-mobile-library-series-group="true"
     >
-      <div className="bloodwick-shelf-series-cover" aria-hidden="true">
+      <div className="bloodwick-shelf-series-media">
         {fearArt.src ? (
-          <Image
-            alt=""
-            className="bloodwick-shelf-series-cover-image"
-            fill
-            sizes="(max-width: 767px) 100vw, 896px"
-            src={fearArt.src}
-          />
+          <>
+            <img
+              alt=""
+              aria-hidden="true"
+              className="bloodwick-shelf-series-image"
+              onError={(event) => {
+                event.currentTarget.style.display = "none";
+                event.currentTarget
+                  .closest(".bloodwick-shelf-series-media")
+                  ?.classList.add("bloodwick-shelf-series-media--fallback");
+              }}
+              src={fearArt.src}
+            />
+            <div className="bloodwick-shelf-series-image-overlay" aria-hidden="true" />
+          </>
         ) : (
-          <div className="bloodwick-shelf-series-cover-fallback" />
+          <div className="bloodwick-shelf-series-image-fallback" aria-hidden="true" />
         )}
-        <div className="bloodwick-shelf-series-cover-overlay" />
       </div>
-      <div className="bloodwick-shelf-series-body">
+      <div className="bloodwick-shelf-series-main">
         <div className="bloodwick-shelf-series-header">
-          <div className="min-w-0">
-            <h3 className="bloodwick-shelf-series-title break-words text-lg font-semibold leading-tight">
-              {title}
-            </h3>
-            <p className="bloodwick-shelf-meta mt-1 text-sm leading-6">
-              {group.episodeCount}{" "}
-              {group.episodeCount === 1 ? "Episode" : "Episodes"} · {updatedLabel}
-            </p>
-          </div>
+          <h3 className="bloodwick-shelf-series-title break-words text-lg font-semibold leading-tight">
+            {title}
+          </h3>
           {fearTag ? (
             <span className="bloodwick-shelf-tag">{fearTag}</span>
           ) : null}
         </div>
-
+        <p className="bloodwick-shelf-meta mt-1 text-sm leading-6">
+          {group.episodeCount}{" "}
+          {group.episodeCount === 1 ? "Episode" : "Episodes"} · {updatedLabel}
+        </p>
+      </div>
+      <div className="bloodwick-shelf-series-controls">
         <label className="grid gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-paper/60">
           <span>Choose episode</span>
           <select
