@@ -22,10 +22,34 @@ const config: Config = {
         "primary-dark": "#1B1A17",
         "muted-light": "#6F675A",
         "primary-light": "#F6EFE2",
-        "muted-dark": "#C9C0AE"
+        "muted-dark": "#C9C0AE",
+        bloodwick: {
+          obsidian: "#0B0B0D",
+          red: "#E50914",
+          white: "#F2F1ED",
+          steel: "#6B7078",
+          copper: "#B87333",
+          panel: "#151216",
+          plum: "#24121F"
+        }
       },
       boxShadow: {
-        soft: "0 18px 50px rgba(11, 16, 32, 0.22)"
+        soft: "0 18px 50px rgba(11, 16, 32, 0.22)",
+        "bloodwick-soft": "0 18px 60px rgba(0, 0, 0, 0.36)",
+        "bloodwick-red": "0 18px 42px rgba(229, 9, 20, 0.24)"
+      },
+      borderRadius: {
+        bloodwick: "1.25rem",
+        "bloodwick-sm": "0.8rem",
+        "bloodwick-lg": "1.75rem"
+      },
+      spacing: {
+        "bloodwick-1": "0.375rem",
+        "bloodwick-2": "0.75rem",
+        "bloodwick-3": "1rem",
+        "bloodwick-4": "1.5rem",
+        "bloodwick-5": "2rem",
+        "bloodwick-6": "3rem"
       }
     }
   },

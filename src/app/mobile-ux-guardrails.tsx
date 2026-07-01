@@ -2,8 +2,8 @@
 
 import { useEffect } from "react";
 
-const NAV_ORDER = ["Home", "Story Library", "Characters", "Worlds", "Create"];
-const NAV_ICONS: Record<string, string> = { Home: "H", "Story Library": "S", Characters: "C", Worlds: "W", Create: "+" };
+const NAV_ORDER = ["Home", "Stories", "Account"];
+const NAV_ICONS: Record<string, string> = { Home: "H", Stories: "S", Account: "A" };
 const START_ART_BY_TITLE: Record<string, string> = {
   "The Lighthouse Under Main Street": "lighthouse",
   "Orchard of Borrowed Moons": "moons",
@@ -55,7 +55,7 @@ function normalizeNav(nav: HTMLElement) {
 }
 
 function normalizePrimaryNavs() {
-  Array.from(document.querySelectorAll<HTMLElement>('nav[aria-label="Project Lantern"]')).forEach(normalizeNav);
+  Array.from(document.querySelectorAll<HTMLElement>('nav[aria-label="Bloodwick"]')).forEach(normalizeNav);
 }
 
 function clickButton(label: string) {

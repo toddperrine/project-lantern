@@ -337,7 +337,7 @@ export function ReaderMoodOnboarding() {
         <div className="flex flex-col gap-3">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lantern-gold">Start with the reader</p>
           <h2 className="text-3xl font-semibold leading-tight text-primary-light md:text-4xl">What are you in the mood for?</h2>
-          <p className="max-w-3xl text-base leading-7 text-muted-dark">Pick a mood and Project Lantern will tee up one story you can start immediately. Add details only if you want the idea shaped closer to you.</p>
+          <p className="max-w-3xl text-base leading-7 text-muted-dark">Pick a mood and Bloodwick will tee up one story you can start immediately. Add details only if you want the idea shaped closer to you.</p>
         </div>
         <div className="mt-6 flex flex-wrap gap-2.5">
           {MOOD_OPTIONS.map((mood) => (

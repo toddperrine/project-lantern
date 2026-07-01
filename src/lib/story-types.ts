@@ -62,7 +62,7 @@ export function getStoryTypeStartCopy(storyTypeLabel?: string | null): { confirm
   const label = storyTypeLabel?.trim();
   if (!label) {
     return {
-      confirmation: "No story type selected. Lantyrn will surprise you.",
+      confirmation: "No story type selected. Bloodwick will surprise you.",
       detail: "",
       button: "Start Something New",
       loading: "Writing the perfect story for you…"
@@ -71,7 +71,7 @@ export function getStoryTypeStartCopy(storyTypeLabel?: string | null): { confirm
 
   return {
     confirmation: `Selected story type: ${label}`,
-    detail: "Lantyrn will use this to shape the next story.",
+    detail: "Bloodwick will use this to shape the next story.",
     button: `Start ${label} Story`,
     loading: `Writing a ${label} story for you…`
   };

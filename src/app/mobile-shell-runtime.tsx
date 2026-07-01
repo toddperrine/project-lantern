@@ -29,13 +29,11 @@ import { useEffect } from "react";
 const MOBILE_QUERY = "(max-width: 767px)";
 const DEMO_LATEST_STORY_STORAGE_KEY = "projectLantern.demoLatestStory.v1";
 const DEMO_LATEST_STORY_ID = "demo-the-half-life-of-magic";
-const NAV_ORDER = ["Home", "Story Library", "Characters", "Worlds", "Create"];
+const NAV_ORDER = ["Home", "Stories", "Account"];
 const VIEW_BY_LABEL: Record<string, string> = {
   Home: "home",
-  "Story Library": "library",
-  Characters: "characters",
-  Worlds: "worlds",
-  Create: "create"
+  Stories: "library",
+  Account: "account"
 };
 const TEXT_REPLACEMENTS: Array<[RegExp, string]> = [
   [/Characters\s*\/\s*Cast/g, "Characters"],
@@ -310,7 +308,7 @@ function continueLatestStory() {
     nextButton.click();
     return;
   }
-  clickMobileNav("Create");
+  findButtonByText(/start something new/i)?.click();
 }
 
 function closeRecapModal() {
@@ -390,7 +388,7 @@ function openMobileMenu() {
     menu.dataset.mobileMenu = "true";
     menu.setAttribute("role", "dialog");
     menu.setAttribute("aria-modal", "true");
-    menu.setAttribute("aria-label", "Lantyrn menu");
+    menu.setAttribute("aria-label", "Bloodwick menu");
     document.body.appendChild(menu);
     menu.addEventListener("click", (event) => {
       const target = event.target instanceof Element ? event.target : null;
@@ -420,7 +418,7 @@ function openMobileMenu() {
   menu.innerHTML = `
     <div data-mobile-menu-sheet="true">
       <div data-mobile-menu-header="true">
-        <p>Lantyrn</p>
+        <p>Bloodwick</p>
         <button data-mobile-menu-close="true" type="button" aria-label="Close menu">×</button>
       </div>
       <div data-mobile-menu-list="true">
@@ -473,7 +471,7 @@ function latestStoryTitle(main?: HTMLElement) {
 
 function buildFallbackHome(hasStory = false, storyTitle = "The Half-Life of Magic") {
   return `
-    <section data-mobile-home-surface="true" aria-label="Lantyrn home">
+    <section data-mobile-home-surface="true" aria-label="Bloodwick home">
       <section data-mobile-home-gate="true">
         <p data-mobile-gate-welcome="true">Welcome back, Todd.</p>
         <h1 data-mobile-gate-question="true"><span>What would you</span><span>like to read?</span></h1>
@@ -526,7 +524,7 @@ function bindFallbackHome(fallback: HTMLElement) {
     if (target?.closest("[data-mobile-check-in-start='true']")) {
       event.preventDefault();
       resetMobileHomeGateState();
-      clickMobileNav("Create");
+      findButtonByText(/start something new/i)?.click();
       return;
     }
   });

@@ -71,11 +71,11 @@ export type FirstPartyCaptureTemplate<Type extends FirstPartyAssetType> = {
 };
 
 export const DEFAULT_FIRST_PARTY_IP_METADATA = {
-  source: "Project Lantern First-Party Library",
-  createdBy: "Project Lantern",
-  ipOwner: "Project Lantern",
+  source: "Bloodwick First-Party Library",
+  createdBy: "Bloodwick",
+  ipOwner: "Bloodwick",
   ipStatus: "first-party",
-  usageRights: "Company-owned content for Project Lantern product use."
+  usageRights: "Company-owned content for Bloodwick product use."
 } satisfies Pick<FirstPartyAssetMetadata, "source" | "createdBy" | "ipOwner" | "ipStatus" | "usageRights">;
 
 const SHARED_CAPTURE_REQUIRED_FIELDS = [

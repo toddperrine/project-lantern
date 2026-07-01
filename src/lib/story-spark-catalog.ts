@@ -37,7 +37,7 @@ export interface StorySparkCatalogItem {
   tags: string[];
   creator: StorySparkCreator;
   provenance: StorySparkProvenance;
-  ipMarking: "Project Lantern IP asset";
+  ipMarking: "Bloodwick Original";
   sourceArchivePath: string;
   sourceArchiveTitle: string;
 }
@@ -71,7 +71,7 @@ export const STORY_SPARK_CATALOG: StorySparkCatalogItem[] = [
     tags: ["dog", "hiking", "woods", "trail horror", "auditory horror", "uncanny companion", "low gore", "ambiguous ending"],
     creator: TODD_PERRINE_STORYSPARK_CREATOR,
     provenance: "human-created",
-    ipMarking: "Project Lantern IP asset",
+    ipMarking: "Bloodwick Original",
     sourceArchivePath: HUMAN_CREATED_STORYSPARK_ARCHIVE_PATH,
     sourceArchiveTitle: "Human-Created StorySparks — Dog Horror, Amoma, and Space Cowboy"
   },
@@ -92,7 +92,7 @@ export const STORY_SPARK_CATALOG: StorySparkCatalogItem[] = [
     tags: ["dogs", "contamination", "eye horror", "body horror", "domestic weird", "disappearing carcass", "transformation", "low-to-medium gore"],
     creator: TODD_PERRINE_STORYSPARK_CREATOR,
     provenance: "human-created",
-    ipMarking: "Project Lantern IP asset",
+    ipMarking: "Bloodwick Original",
     sourceArchivePath: HUMAN_CREATED_STORYSPARK_ARCHIVE_PATH,
     sourceArchiveTitle: "Human-Created StorySparks — Dog Horror, Amoma, and Space Cowboy"
   },
@@ -113,7 +113,7 @@ export const STORY_SPARK_CATALOG: StorySparkCatalogItem[] = [
     tags: ["runner", "dogs", "guilt", "trail", "moral horror", "ghost animals", "punishment", "rescue", "redemption", "low gore"],
     creator: TODD_PERRINE_STORYSPARK_CREATOR,
     provenance: "human-created",
-    ipMarking: "Project Lantern IP asset",
+    ipMarking: "Bloodwick Original",
     sourceArchivePath: HUMAN_CREATED_STORYSPARK_ARCHIVE_PATH,
     sourceArchiveTitle: "Human-Created StorySparks — Dog Horror, Amoma, and Space Cowboy"
   },
@@ -134,7 +134,7 @@ export const STORY_SPARK_CATALOG: StorySparkCatalogItem[] = [
     tags: ["Amoma", "tide pool", "luxury estate", "beach party", "cosmic horror", "eco-horror", "VanderMeer", "Lovecraftian", "wealth satire", "high weirdness"],
     creator: TODD_PERRINE_STORYSPARK_CREATOR,
     provenance: "human-created",
-    ipMarking: "Project Lantern IP asset",
+    ipMarking: "Bloodwick Original",
     sourceArchivePath: HUMAN_CREATED_STORYSPARK_ARCHIVE_PATH,
     sourceArchiveTitle: "Human-Created StorySparks — Dog Horror, Amoma, and Space Cowboy"
   },
@@ -155,7 +155,7 @@ export const STORY_SPARK_CATALOG: StorySparkCatalogItem[] = [
     tags: ["space cowboy", "sci-fi western", "virtual world", "metaverse horror", "sedation trap", "immersive frontier", "recursive nightmare", "frontier", "existential horror", "low gore"],
     creator: TODD_PERRINE_STORYSPARK_CREATOR,
     provenance: "human-created",
-    ipMarking: "Project Lantern IP asset",
+    ipMarking: "Bloodwick Original",
     sourceArchivePath: HUMAN_CREATED_STORYSPARK_ARCHIVE_PATH,
     sourceArchiveTitle: "Human-Created StorySparks — Dog Horror, Amoma, and Space Cowboy"
   }
