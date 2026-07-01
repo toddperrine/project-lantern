@@ -175,6 +175,10 @@ import { APP_VERSION } from "@/lib/build-info";
 import { BloodwickWordmark } from "@/components/bloodwick-brand";
 import { useAuth, type AuthStatus } from "@/lib/auth";
 import { getBloodwickSeriesDisplayTitle } from "@/lib/bloodwick-series-title";
+import {
+  getBloodwickFearArt,
+  normalizeBloodwickFearCategory,
+} from "@/lib/bloodwick-fear-art";
 
 const BLOODWICK_FIRST_OPEN_SIGN_IN_DISMISSED_KEY =
   "bloodwick:first-open-sign-in-dismissed";
@@ -8040,49 +8044,174 @@ function SeriesLibraryGroup({
   onDeleteStory: (storyId: string) => void;
   onOpenSavedStoryById: (storyId: string) => void;
 }) {
-  const updatedLabel = group.lastUpdatedAt
-    ? `Last updated ${formatDateTime(group.lastUpdatedAt)}`
-    : "Not updated yet";
-  const title = group.title?.trim() || "Untitled Series";
-  const fearTag = group.episodes
+  const [selectedStoryId, setSelectedStoryId] = useState(
+    () => group.episodes[0]?.story.id ?? "",
+  );
+  const [recapStory, setRecapStory] = useState<LibraryStory | null>(null);
+  const selectedEpisode =
+    group.episodes.find((episode) => episode.story.id === selectedStoryId) ??
+    group.episodes[0];
+  const selectedStory = selectedEpisode?.story;
+  const rawFearTag = group.episodes
     .map((episode) => getLibraryStoryCategoryLabel(episode.story).trim())
     .find(Boolean);
+  const normalizedFearTag = normalizeBloodwickFearCategory(rawFearTag);
+  const fearTag = normalizedFearTag ?? rawFearTag;
+  const fearArt = getBloodwickFearArt(normalizedFearTag);
+  const updatedLabel = group.lastUpdatedAt
+    ? `Updated ${formatDateTime(group.lastUpdatedAt)}`
+    : "Not updated yet";
+  const title = group.title?.trim() || "Untitled Series";
+  const recapText = selectedStory ? getShelfEpisodeRecapText(selectedStory) : "";
 
   return (
     <article
       className="bloodwick-shelf-series-card"
       data-mobile-library-series-group="true"
     >
-      <div className="bloodwick-shelf-series-header">
-        <div className="min-w-0">
-          <h3 className="bloodwick-shelf-series-title break-words text-lg font-semibold leading-tight">
-            {title}
-          </h3>
-          <p className="bloodwick-shelf-meta mt-1 text-sm leading-6">
-            {group.episodeCount}{" "}
-            {group.episodeCount === 1 ? "Episode" : "Episodes"} · {updatedLabel}
-          </p>
+      <div className="bloodwick-shelf-card-top">
+        <div className="bloodwick-shelf-series-media" aria-hidden="true">
+          {fearArt.src ? (
+            <img
+              alt=""
+              className="bloodwick-shelf-series-image"
+              src={fearArt.src}
+            />
+          ) : (
+            <div className="bloodwick-shelf-series-image-fallback" />
+          )}
+          <div className="bloodwick-shelf-series-image-overlay" />
         </div>
-        {fearTag ? (
-          <span className="bloodwick-shelf-tag">{fearTag}</span>
-        ) : null}
+        <div className="bloodwick-shelf-series-main">
+          <div className="min-w-0">
+            <h3 className="bloodwick-shelf-series-title break-words text-lg font-semibold leading-tight">
+              {title}
+            </h3>
+            {fearTag ? (
+              <span className="bloodwick-shelf-tag mt-2">{fearTag}</span>
+            ) : null}
+            <p className="bloodwick-shelf-meta mt-2 text-sm leading-6">
+              {group.episodeCount}{" "}
+              {group.episodeCount === 1 ? "Episode" : "Episodes"} · {updatedLabel}
+            </p>
+          </div>
+          {selectedStory ? (
+            <div className="bloodwick-shelf-selected-episode">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em]">
+                Selected episode
+              </p>
+              <h4 className="bloodwick-shelf-episode-title mt-1 break-words text-base font-semibold leading-snug">
+                Episode {selectedEpisode.episodeNumber}: {selectedStory.title}
+              </h4>
+              <p className="bloodwick-shelf-meta mt-1 text-xs leading-5">
+                {formatDateTime(selectedStory.createdAt)} · {selectedStory.wordCount.toLocaleString()}
+                words
+              </p>
+            </div>
+          ) : null}
+          {selectedStory ? (
+            <div
+              className="bloodwick-shelf-actions"
+              data-mobile-library-card-actions="true"
+            >
+              <button
+                className="bloodwick-shelf-action-primary"
+                onClick={() => onOpenSavedStoryById(selectedStory.id)}
+                type="button"
+              >
+                Open
+              </button>
+              <button
+                className="bloodwick-shelf-action-secondary"
+                disabled={!recapText}
+                onClick={() => setRecapStory(selectedStory)}
+                type="button"
+              >
+                Recap
+              </button>
+              <button
+                aria-label="Delete episode"
+                className="bloodwick-shelf-action-icon"
+                onClick={() => onDeleteStory(selectedStory.id)}
+                type="button"
+              >
+                Delete
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
 
-      <div className="bloodwick-shelf-episode-list">
-        {group.episodes.map((episode) => (
-          <StoryLibraryCard
-            badge={`Episode ${episode.episodeNumber}`}
-            key={episode.story.id}
-            onDelete={() => onDeleteStory(episode.story.id)}
-            onOpen={() => onOpenSavedStoryById(episode.story.id)}
-            story={episode.story}
-          />
-        ))}
+      <div className="bloodwick-shelf-episode-rail">
+        <div
+          className="bloodwick-shelf-episode-pills"
+          aria-label={`${title} episodes`}
+        >
+          {group.episodes.map((episode) => (
+            <button
+              aria-pressed={episode.story.id === selectedStory?.id}
+              className="bloodwick-shelf-episode-chip"
+              key={episode.story.id}
+              onClick={() => setSelectedStoryId(episode.story.id)}
+              type="button"
+            >
+              Ep. {episode.episodeNumber}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {recapStory ? (
+        <ShelfRecapModal
+          onClose={() => setRecapStory(null)}
+          recap={getShelfEpisodeRecapText(recapStory)}
+          title={recapStory.title}
+        />
+      ) : null}
     </article>
   );
 }
 
+function ShelfRecapModal({
+  onClose,
+  recap,
+  title,
+}: {
+  onClose: () => void;
+  recap: string;
+  title: string;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-bloodwick-obsidian/70 p-4">
+      <div
+        aria-modal="true"
+        aria-label={`${title} recap`}
+        className="max-h-[82vh] w-full max-w-xl overflow-auto rounded-bloodwick-lg border border-bloodwick-white/15 bg-bloodwick-obsidian p-5 shadow-bloodwick-soft"
+        role="dialog"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-2xl font-semibold text-bloodwick-white">
+            Last time
+          </h3>
+          <button
+            className="rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-3 py-2 text-sm font-semibold text-bloodwick-white"
+            onClick={onClose}
+            type="button"
+          >
+            Close
+          </button>
+        </div>
+        <p className="mt-4 text-sm leading-6 text-bloodwick-white/72">
+          {recap}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function getShelfEpisodeRecapText(story: LibraryStory): string {
+  return createStoryBrief(story).recap || truncateText(story.story, 900);
+}
 
 function SavedForLaterStoryCard({
   item,
@@ -8149,58 +8278,6 @@ function SavedForLaterStoryCard({
   );
 }
 
-function StoryLibraryCard({
-  badge,
-  onDelete,
-  onOpen,
-  story,
-}: {
-  badge?: string;
-  onDelete?: () => void;
-  onOpen: () => void;
-  story: LibraryStory;
-}) {
-  return (
-    <article
-      className="bloodwick-shelf-episode-row"
-      data-mobile-library-episode-card="true"
-    >
-      <div className="min-w-0">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          {badge ? <span className="bloodwick-shelf-tag">{badge}</span> : null}
-          <p className="bloodwick-shelf-meta text-xs leading-5">
-            {formatDateTime(story.createdAt)} · {story.wordCount.toLocaleString()}
-            words · {getLibraryStoryCategoryLabel(story)}
-          </p>
-        </div>
-        <h4 className="bloodwick-shelf-episode-title mt-2 break-words text-base font-semibold leading-snug">
-          {story.title}
-        </h4>
-      </div>
-      <div
-        className="bloodwick-shelf-actions"
-        data-mobile-library-card-actions="true"
-      >
-        <button
-          className="min-h-10 rounded-md bg-bloodwick-red px-4 py-2 text-sm font-semibold text-bloodwick-white"
-          onClick={onOpen}
-          type="button"
-        >
-          Open
-        </button>
-        {onDelete ? (
-          <button
-            className="min-h-10 rounded-md border border-bloodwick-white/15 bg-transparent px-4 py-2 text-sm font-semibold text-bloodwick-white"
-            onClick={onDelete}
-            type="button"
-          >
-            Delete
-          </button>
-        ) : null}
-      </div>
-    </article>
-  );
-}
 
 function CharactersView({
   onOpenStory,
