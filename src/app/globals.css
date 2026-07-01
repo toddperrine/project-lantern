@@ -946,44 +946,37 @@ textarea {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
   z-index: 40;
   display: flex;
-  width: 3rem;
-  height: 3rem;
+  width: 3.25rem;
+  height: 3.25rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgb(229 9 20 / 0.78);
+  border: 2px solid rgb(242 241 237 / 0.82);
   border-radius: 999px;
-  background: rgb(11 11 13 / 0.96);
+  background: var(--bloodwick-red);
   color: var(--bloodwick-white);
   box-shadow:
-    0 0 0 1px rgb(242 241 237 / 0.16),
-    0 0 24px rgb(229 9 20 / 0.32);
+    0 0 0 1px rgb(11 11 13 / 0.72),
+    0 0 28px rgb(229 9 20 / 0.45);
 }
 
 .bloodwick-back-to-top__icon {
   display: block;
   color: var(--bloodwick-white);
-  font-size: 1.65rem;
-  font-weight: 800;
+  font-size: 2rem;
+  font-weight: 900;
   line-height: 1;
-  text-shadow: 0 0 8px rgb(242 241 237 / 0.28);
-  transform: translateY(-1px);
-}
-
-.bloodwick-back-to-top svg,
-.bloodwick-back-to-top path {
-  color: var(--bloodwick-white);
-  fill: currentColor;
-  stroke: currentColor;
+  text-shadow: 0 1px 2px rgb(11 11 13 / 0.65);
+  transform: translateY(-2px);
 }
 
 .bloodwick-back-to-top:hover {
-  border-color: var(--bloodwick-red);
+  border-color: var(--bloodwick-white);
   box-shadow:
-    0 0 0 1px rgb(242 241 237 / 0.16),
-    0 0 28px rgb(229 9 20 / 0.36);
+    0 0 0 1px rgb(11 11 13 / 0.72),
+    0 0 32px rgb(229 9 20 / 0.55);
 }
 
 .bloodwick-back-to-top:focus-visible {
-  outline: 2px solid var(--bloodwick-copper);
+  outline: 3px solid var(--bloodwick-copper);
   outline-offset: 3px;
 }
