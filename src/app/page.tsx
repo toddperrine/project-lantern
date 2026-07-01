@@ -8003,7 +8003,7 @@ function LibraryView(props: {
               />
             ))
           ) : (
-            <p className="bloodwick-shelf-meta rounded-md border border-paper/12 bg-paper/10 px-3 py-3 text-sm">
+            <p className="bloodwick-shelf-empty-state bloodwick-shelf-meta rounded-md px-3 py-3 text-sm">
               No saved-for-later stories yet.
             </p>
           )}
@@ -8095,52 +8095,63 @@ function SeriesLibraryGroup({
               {group.episodeCount === 1 ? "Episode" : "Episodes"} · {updatedLabel}
             </p>
           </div>
-          {selectedStory ? (
-            <div className="bloodwick-shelf-selected-episode">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em]">
-                Selected episode
-              </p>
-              <h4 className="bloodwick-shelf-episode-title mt-1 break-words text-base font-semibold leading-snug">
-                Episode {selectedEpisode.episodeNumber}: {selectedStory.title}
-              </h4>
-              <p className="bloodwick-shelf-meta mt-1 text-xs leading-5">
-                {formatDateTime(selectedStory.createdAt)} · {selectedStory.wordCount.toLocaleString()}
-                words
-              </p>
-            </div>
-          ) : null}
-          {selectedStory ? (
-            <div
-              className="bloodwick-shelf-actions"
-              data-mobile-library-card-actions="true"
-            >
-              <button
-                className="bloodwick-shelf-action-primary"
-                onClick={() => onOpenSavedStoryById(selectedStory.id)}
-                type="button"
-              >
-                Open
-              </button>
-              <button
-                className="bloodwick-shelf-action-secondary"
-                disabled={!recapText}
-                onClick={() => setRecapStory(selectedStory)}
-                type="button"
-              >
-                Recap
-              </button>
-              <button
-                aria-label="Delete episode"
-                className="bloodwick-shelf-action-icon"
-                onClick={() => onDeleteStory(selectedStory.id)}
-                type="button"
-              >
-                Delete
-              </button>
-            </div>
-          ) : null}
         </div>
       </div>
+
+      {selectedStory ? (
+        <div className="bloodwick-shelf-selected-episode">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em]">
+            Selected episode
+          </p>
+          <h4 className="bloodwick-shelf-episode-title mt-1 break-words text-base font-semibold leading-snug">
+            Episode {selectedEpisode.episodeNumber}: {selectedStory.title}
+          </h4>
+          <p className="bloodwick-shelf-meta mt-1 text-xs leading-5">
+            {formatDateTime(selectedStory.createdAt)} · {selectedStory.wordCount.toLocaleString()}{" "}
+            words
+          </p>
+        </div>
+      ) : null}
+
+      {selectedStory ? (
+        <div
+          className="bloodwick-shelf-actions"
+          data-mobile-library-card-actions="true"
+        >
+          <button
+            className="bloodwick-shelf-action-primary"
+            onClick={() => onOpenSavedStoryById(selectedStory.id)}
+            type="button"
+          >
+            Open
+          </button>
+          <button
+            className="bloodwick-shelf-action-secondary"
+            disabled={!recapText}
+            onClick={() => setRecapStory(selectedStory)}
+            type="button"
+          >
+            Recap
+          </button>
+          <button
+            aria-label="Delete episode"
+            className="bloodwick-shelf-action-icon"
+            onClick={() => onDeleteStory(selectedStory.id)}
+            type="button"
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+              <path
+                d="M7 3.5h6M4.5 6h11M6 6l.7 10.5h6.6L14 6M8.5 8.5v5M11.5 8.5v5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.7"
+              />
+            </svg>
+          </button>
+        </div>
+      ) : null}
 
       <div className="bloodwick-shelf-episode-rail">
         <div
