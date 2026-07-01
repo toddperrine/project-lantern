@@ -1,25 +1,10 @@
 export type BloodwickHomeHeroProps = {
   title: string;
   body: string;
-  primaryActionLabel: "Start Something New";
-  onPrimaryAction: () => void;
-  secondaryActionLabel?: "Continue Latest Episode";
-  onSecondaryAction?: () => void;
-  tertiaryActionLabel: "Stories";
-  onTertiaryAction: () => void;
 };
 
 export function BloodwickHomeHero(props: BloodwickHomeHeroProps) {
-  const {
-    body,
-    onPrimaryAction,
-    onSecondaryAction,
-    onTertiaryAction,
-    primaryActionLabel,
-    secondaryActionLabel,
-    tertiaryActionLabel,
-    title,
-  } = props;
+  const { body, title } = props;
 
   return (
     <section className="relative isolate min-w-0 overflow-hidden rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/80 p-5 shadow-bloodwick-soft sm:p-6 lg:p-8">
@@ -41,31 +26,6 @@ export function BloodwickHomeHero(props: BloodwickHomeHeroProps) {
         <p className="mt-4 max-w-2xl text-base leading-7 text-bloodwick-white/72">
           {body}
         </p>
-      </div>
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <button
-          className="min-h-12 rounded-xl bg-bloodwick-red px-5 py-3 text-base font-semibold text-bloodwick-white shadow-bloodwick-red transition hover:bg-bloodwick-red/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white"
-          onClick={onPrimaryAction}
-          type="button"
-        >
-          {primaryActionLabel}
-        </button>
-        {secondaryActionLabel && onSecondaryAction ? (
-          <button
-            className="min-h-12 rounded-xl border border-bloodwick-white/15 bg-bloodwick-white/10 px-5 py-3 text-base font-semibold text-bloodwick-white transition hover:border-bloodwick-copper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white"
-            onClick={onSecondaryAction}
-            type="button"
-          >
-            {secondaryActionLabel}
-          </button>
-        ) : null}
-        <button
-          className="min-h-12 rounded-xl border border-bloodwick-white/15 bg-transparent px-5 py-3 text-base font-semibold text-bloodwick-white/78 transition hover:border-bloodwick-copper hover:text-bloodwick-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bloodwick-white"
-          onClick={onTertiaryAction}
-          type="button"
-        >
-          {tertiaryActionLabel}
-        </button>
       </div>
     </section>
   );

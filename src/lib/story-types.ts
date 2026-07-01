@@ -70,9 +70,141 @@ export function getStoryTypeStartCopy(storyTypeLabel?: string | null): { confirm
   }
 
   return {
-    confirmation: `Selected story type: ${label}`,
-    detail: "Bloodwick will use this to shape the next story.",
+    confirmation: "",
+    detail: "",
     button: `Start ${label} Story`,
     loading: `Writing a ${label} story for you…`
   };
+}
+
+
+export function getStoryTypeChipLabel(value?: string | null): string | null {
+  if (!value) return null;
+
+  const normalized = value.toLowerCase().trim();
+
+  const match = STORY_TYPE_CHIPS.find((chip) => {
+    return (
+      chip.id.toLowerCase() === normalized ||
+      chip.label.toLowerCase() === normalized ||
+      normalized.includes(chip.id.toLowerCase()) ||
+      normalized.includes(chip.label.toLowerCase())
+    );
+  });
+
+  return match?.label ?? null;
+}
+
+
+export const APPROVED_HOME_FEAR_LABELS = [
+  "Small-Town Dread",
+  "Uncanny",
+  "Weird Nature",
+  "Creature Unease",
+  "Psychological Dread",
+  "Gothic Shadows",
+  "Cosmic Horror",
+  "Haunted Past",
+  "Dark Fairy Tale",
+] as const;
+
+export type ApprovedHomeFearLabel = (typeof APPROVED_HOME_FEAR_LABELS)[number];
+
+const FALLBACK_HOME_FEAR_LABEL: ApprovedHomeFearLabel = "Small-Town Dread";
+
+export function getHomeFearLabel(value?: string | null): ApprovedHomeFearLabel {
+  if (!value) return FALLBACK_HOME_FEAR_LABEL;
+
+  const normalized = value.toLowerCase().trim();
+
+  const directMatch = STORY_TYPE_CHIPS.find((chip) => {
+    return (
+      chip.id.toLowerCase() === normalized ||
+      chip.label.toLowerCase() === normalized ||
+      normalized.includes(chip.id.toLowerCase()) ||
+      normalized.includes(chip.label.toLowerCase())
+    );
+  });
+
+  if (directMatch && isApprovedHomeFearLabel(directMatch.label)) {
+    return directMatch.label;
+  }
+
+  if (
+    normalized.includes("gothic") ||
+    normalized.includes("house") ||
+    normalized.includes("portrait") ||
+    normalized.includes("inheritance")
+  ) {
+    return "Gothic Shadows";
+  }
+
+  if (
+    normalized.includes("dog") ||
+    normalized.includes("animal") ||
+    normalized.includes("fur") ||
+    normalized.includes("creature")
+  ) {
+    return "Creature Unease";
+  }
+
+  if (
+    normalized.includes("woods") ||
+    normalized.includes("trail") ||
+    normalized.includes("forest") ||
+    normalized.includes("nature")
+  ) {
+    return "Weird Nature";
+  }
+
+  if (
+    normalized.includes("memory") ||
+    normalized.includes("guilt") ||
+    normalized.includes("past") ||
+    normalized.includes("left behind")
+  ) {
+    return "Haunted Past";
+  }
+
+  if (
+    normalized.includes("cosmic") ||
+    normalized.includes("ancient") ||
+    normalized.includes("impossible") ||
+    normalized.includes("vast")
+  ) {
+    return "Cosmic Horror";
+  }
+
+  if (
+    normalized.includes("uncanny") ||
+    normalized.includes("wrong") ||
+    normalized.includes("imitating") ||
+    normalized.includes("familiar")
+  ) {
+    return "Uncanny";
+  }
+
+  if (
+    normalized.includes("psychological") ||
+    normalized.includes("paranoia") ||
+    normalized.includes("identity") ||
+    normalized.includes("obsession")
+  ) {
+    return "Psychological Dread";
+  }
+
+  if (
+    normalized.includes("fairy") ||
+    normalized.includes("folklore") ||
+    normalized.includes("bargain") ||
+    normalized.includes("threshold")
+  ) {
+    return "Dark Fairy Tale";
+  }
+
+  return FALLBACK_HOME_FEAR_LABEL;
+}
+
+function isApprovedHomeFearLabel(value: string): value is ApprovedHomeFearLabel {
+  return APPROVED_HOME_FEAR_LABELS.some((label) => label === value);
 }
