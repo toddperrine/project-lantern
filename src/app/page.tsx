@@ -3943,11 +3943,10 @@ export default function Home() {
           <div className="min-w-0">
             <p className="bloodwick-kicker">Bloodwick</p>
             <h1 className="mt-2 max-w-4xl text-3xl font-semibold leading-tight tracking-tight text-paper md:text-5xl">
-              Living stories, ready when you are
+              Scary stories that know what you like — new eerie episodes written for you on demand.
             </h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-paper/70">
-              Open the latest episode, remember what mattered, and choose what
-              kind of story should find you next.
+              Start your scary series now. Continue whenever you want.
             </p>
           </div>
           <NavTabs activeView={activeView} onChange={navigateToView} />
@@ -5065,7 +5064,7 @@ function HomeView(props: {
   return (
     <div className="grid min-w-0 max-w-full gap-6 overflow-x-hidden md:gap-8">
       <BloodwickHomeHero
-        body="Open the latest episode, remember what mattered, and choose what kind of story should find you next."
+        body="Start your scary series now. Continue whenever you want."
         onPrimaryAction={onStartNewStory}
         onSecondaryAction={latestStory ? () => onContinue() : undefined}
         onTertiaryAction={onOpenLibrary}
@@ -5074,7 +5073,7 @@ function HomeView(props: {
           latestStory ? "Continue Latest Episode" : undefined
         }
         tertiaryActionLabel="Stories"
-        title="Living stories, ready when you are"
+        title="Scary stories that know what you like — new eerie episodes written for you on demand."
       />
       {showStoryFitPrompt && onStartStoryFitSetup && onSkipStoryFitSetup ? (
         <StoryFitFirstRunCard
