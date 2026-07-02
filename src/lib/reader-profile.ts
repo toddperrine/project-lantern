@@ -127,16 +127,16 @@ export type StoryFitOption = {
 };
 
 export const STORY_FIT_STORY_TYPE_OPTIONS: StoryFitOption[] = [
-  { label: "Small-Town Dread", description: "Ordinary places hiding something rotten beneath the surface." },
-  { label: "Gothic Shadows", description: "Old guilt, inheritance, decay, obsession, locked rooms, portraits, letters, and old sins." },
-  { label: "Uncanny", description: "Familiar people, rooms, objects, routines, or animals made subtly wrong." },
-  { label: "Cosmic Horror", description: "Human life brushing against something vast, ancient, indifferent, or impossible to understand." },
-  { label: "Weird Nature", description: "Forests, trails, animals, weather, water, fungus, or landscapes behaving with alien intention." },
-  { label: "Haunted Past", description: "Memory, grief, guilt, family history, old violence, or buried truth returning." },
-  { label: "Creature Unease", description: "Something living is watching, changing, imitating, nesting, hunting, or learning." },
-  { label: "Dark Fairy Tale", description: "Folklore rules, bargains, woods, thresholds, transformations, beautiful cruelty, and storybook logic turned dangerous." },
-  { label: "Psychological Dread", description: "Paranoia, obsession, identity fracture, unreliable perception, guilt, or emotional collapse." },
-  { label: "No-Exit Dread", description: "Trapped systems and sealed places where escape is impossible or the environment itself turns hostile." },
+  { label: "Small-Town", description: "Ordinary towns, neighborhoods, schools, roads, and families hiding something rotten beneath the surface." },
+  { label: "Gothic", description: "Decaying houses, old bloodlines, secrets, romance, inheritance, and dread-soaked atmosphere." },
+  { label: "Weird", description: "Reality bends in ways that feel impossible, uncanny, or wrong, often without clear rules or explanation." },
+  { label: "Cosmic", description: "Vast unknowable forces make human lives, beliefs, and sanity feel small and fragile." },
+  { label: "Folk", description: "Old land, old rituals, rural isolation, village belief, and inherited customs turn threatening." },
+  { label: "Supernatural", description: "Ghosts, curses, spirits, hauntings, and impossible forces break into the ordinary world." },
+  { label: "Monster", description: "Something living, hungry, changed, or inhuman stalks the edge of the story." },
+  { label: "Dark Fantasy", description: "Fairy-tale, mythic, or magical elements turn dangerous, beautiful, and morally unsafe." },
+  { label: "Psychological", description: "Fear comes from obsession, guilt, paranoia, memory, identity, and the instability of the mind." },
+  { label: "Isolation", description: "Trapped people face sealed spaces, hostile systems, or environments where escape may be impossible." },
 ];
 export const STORY_FIT_EMOTIONAL_PROMISE_OPTIONS: StoryFitOption[] = [
   { label: "A world I can disappear into", description: "Immersive place, texture, atmosphere, and continuity." },

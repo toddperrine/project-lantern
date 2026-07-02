@@ -1,31 +1,58 @@
 export type BloodwickFearCategory =
-  | "Small-Town Dread"
-  | "Uncanny"
-  | "Weird Nature"
-  | "Creature Unease"
-  | "Psychological Dread"
-  | "Gothic Shadows"
-  | "Cosmic Horror"
-  | "Haunted Past"
-  | "Dark Fairy Tale"
-  | "No-Exit Dread";
+  | "Small-Town"
+  | "Gothic"
+  | "Weird"
+  | "Cosmic"
+  | "Folk"
+  | "Supernatural"
+  | "Monster"
+  | "Dark Fantasy"
+  | "Psychological"
+  | "Isolation";
 
 export type BloodwickFearArtResult = {
   src: string | null;
   mode: "image" | "fallback";
 };
 
+const ISOLATION_ART_SRC = "/artwork/Bloodwick%20Image%20-%20Isolation.png";
+const ISOLATION_ART_EXISTS = false;
+
 export const BLOODWICK_FEAR_ART: Record<BloodwickFearCategory, string | null> = {
-  "Small-Town Dread": "/artwork/Bloodwick%20Image%20-%20Small%20Town%20Dread.png",
-  "Uncanny": "/artwork/Bloodwick%20Image%20-%20Uncanny.png",
-  "Weird Nature": "/artwork/Bloodwick%20Image%20-%20Weird%20Nature.png",
-  "Creature Unease": "/artwork/Bloodwick%20Image%20-%20Creature%20Unease.png",
-  "Psychological Dread": "/artwork/Bloodwick%20Image%20-%20Psychological%20Dread.png",
-  "Gothic Shadows": "/artwork/Bloodwick%20Image%20-%20Gothic%20Shadows.png",
-  "Cosmic Horror": "/artwork/Bloodwick%20Image%20-%20Cosmic%20Horror.png",
-  "Haunted Past": "/artwork/Bloodwick%20Image%20-%20Haunted%20Past.png",
-  "Dark Fairy Tale": "/artwork/Bloodwick%20Image%20-%20Dark%20Fairy%20Tale.png",
-  "No-Exit Dread": null,
+  "Small-Town": "/artwork/Bloodwick%20Image%20-%20Small%20Town%20Dread.png",
+  Gothic: "/artwork/Bloodwick%20Image%20-%20Gothic%20Shadows.png",
+  Weird: "/artwork/Bloodwick%20Image%20-%20Uncanny.png",
+  Cosmic: "/artwork/Bloodwick%20Image%20-%20Cosmic%20Horror.png",
+  Folk: "/artwork/Bloodwick%20Image%20-%20Weird%20Nature.png",
+  Supernatural: "/artwork/Bloodwick%20Image%20-%20Haunted%20Past.png",
+  Monster: "/artwork/Bloodwick%20Image%20-%20Creature%20Unease.png",
+  "Dark Fantasy": "/artwork/Bloodwick%20Image%20-%20Dark%20Fairy%20Tale.png",
+  Psychological: "/artwork/Bloodwick%20Image%20-%20Psychological%20Dread.png",
+  Isolation: ISOLATION_ART_EXISTS ? ISOLATION_ART_SRC : null,
+};
+
+const BLOODWICK_FEAR_CATEGORY_ALIASES: Record<string, BloodwickFearCategory> = {
+  "small town": "Small-Town",
+  "small town dread": "Small-Town",
+  "smalltown dread": "Small-Town",
+  gothic: "Gothic",
+  "gothic shadows": "Gothic",
+  weird: "Weird",
+  uncanny: "Weird",
+  cosmic: "Cosmic",
+  "cosmic horror": "Cosmic",
+  folk: "Folk",
+  "weird nature": "Folk",
+  supernatural: "Supernatural",
+  "haunted past": "Supernatural",
+  monster: "Monster",
+  "creature unease": "Monster",
+  "dark fantasy": "Dark Fantasy",
+  "dark fairy tale": "Dark Fantasy",
+  psychological: "Psychological",
+  "psychological dread": "Psychological",
+  isolation: "Isolation",
+  "no exit dread": "Isolation",
 };
 
 export function normalizeBloodwickFearCategory(
@@ -33,22 +60,12 @@ export function normalizeBloodwickFearCategory(
 ): BloodwickFearCategory | null {
   if (!value) return null;
 
-  const normalized = value.trim().toLowerCase();
-
-  if (
-    normalized === "small-town dread" ||
-    normalized === "small town dread" ||
-    normalized === "smalltown dread"
-  ) {
-    return "Small-Town Dread";
-  }
-
-  if (normalized === "no-exit dread" || normalized === "no exit dread") {
-    return "No-Exit Dread";
-  }
+  const normalized = normalizeBloodwickFearLookup(value);
+  const alias = BLOODWICK_FEAR_CATEGORY_ALIASES[normalized];
+  if (alias) return alias;
 
   const match = (Object.keys(BLOODWICK_FEAR_ART) as BloodwickFearCategory[]).find(
-    (category) => category.toLowerCase() === normalized
+    (category) => normalizeBloodwickFearLookup(category) === normalized
   );
 
   return match ?? null;
@@ -73,4 +90,8 @@ export function getBloodwickFearArt(
     src,
     mode: "image",
   };
+}
+
+function normalizeBloodwickFearLookup(value: string): string {
+  return value.trim().toLowerCase().replace(/-/g, " ").replace(/\s+/g, " ");
 }

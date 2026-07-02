@@ -56,29 +56,29 @@ export type BloodwickSeriesTitleInput = {
 
 const PLAIN_WEAK_TITLES = new Set(["series", "untitled", "untitled series", "bloodwick series"]);
 const FEAR_CATEGORY_TO_ANCHOR: Record<string, string> = {
-  "Small-Town Dread": "town",
-  "Uncanny": "mirror",
-  "Weird Nature": "orchard",
-  "Creature Unease": "dog",
-  "Psychological Dread": "room",
-  "Gothic Shadows": "house",
-  "Cosmic Horror": "signal",
-  "Haunted Past": "photograph",
-  "Dark Fairy Tale": "road",
-  "No-Exit Dread": "hatch",
+  "Small-Town": "town",
+  Weird: "mirror",
+  Folk: "orchard",
+  Monster: "dog",
+  Psychological: "room",
+  Gothic: "house",
+  Cosmic: "signal",
+  Supernatural: "photograph",
+  "Dark Fantasy": "road",
+  Isolation: "hatch",
 };
 
 const FEAR_CATEGORY_TO_PRESSURE: Record<string, string> = {
-  "Small-Town Dread": "hidden",
-  "Uncanny": "wrong",
-  "Weird Nature": "hungry",
-  "Creature Unease": "watching",
-  "Psychological Dread": "broken",
-  "Gothic Shadows": "hollow",
-  "Cosmic Horror": "midnight",
-  "Haunted Past": "borrowed",
-  "Dark Fairy Tale": "returning",
-  "No-Exit Dread": "sealed",
+  "Small-Town": "hidden",
+  Weird: "wrong",
+  Folk: "hungry",
+  Monster: "watching",
+  Psychological: "broken",
+  Gothic: "hollow",
+  Cosmic: "midnight",
+  Supernatural: "borrowed",
+  "Dark Fantasy": "returning",
+  Isolation: "sealed",
 };
 
 const DEFAULT_PROVISIONAL_ANCHOR = "town";
@@ -355,20 +355,20 @@ function tokenizeProvisionalTitleText(value: string): string[] {
 }
 
 function normalizeFearCategory(value?: string | null): string {
-  const normalized = String(value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+  const normalized = String(value ?? "").replace(/-/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
   const match = Object.keys(FEAR_CATEGORY_TO_ANCHOR).find((category) => category.toLowerCase() === normalized);
   if (match) return match;
-  if (normalized.includes("small-town") || normalized.includes("small town")) return "Small-Town Dread";
-  if (normalized.includes("uncanny")) return "Uncanny";
-  if (normalized.includes("weird nature") || normalized.includes("nature")) return "Weird Nature";
-  if (normalized.includes("creature")) return "Creature Unease";
-  if (normalized.includes("psychological")) return "Psychological Dread";
-  if (normalized.includes("no-exit") || normalized.includes("no exit")) return "No-Exit Dread";
-  if (normalized.includes("gothic")) return "Gothic Shadows";
-  if (normalized.includes("cosmic")) return "Cosmic Horror";
-  if (normalized.includes("haunted") || normalized.includes("past")) return "Haunted Past";
-  if (normalized.includes("fairy") || normalized.includes("folklore")) return "Dark Fairy Tale";
-  return "Small-Town Dread";
+  if (normalized.includes("small town")) return "Small-Town";
+  if (normalized.includes("uncanny") || normalized === "weird") return "Weird";
+  if (normalized.includes("weird nature") || normalized === "folk" || normalized.includes("ritual") || normalized.includes("village")) return "Folk";
+  if (normalized.includes("creature") || normalized.includes("monster")) return "Monster";
+  if (normalized.includes("psychological")) return "Psychological";
+  if (normalized.includes("no exit") || normalized.includes("isolation")) return "Isolation";
+  if (normalized.includes("gothic")) return "Gothic";
+  if (normalized.includes("cosmic")) return "Cosmic";
+  if (normalized.includes("haunted") || normalized.includes("past") || normalized.includes("supernatural")) return "Supernatural";
+  if (normalized.includes("fairy") || normalized.includes("fantasy") || normalized.includes("folklore")) return "Dark Fantasy";
+  return "Small-Town";
 }
 
 function toTitleWord(value: string): string {

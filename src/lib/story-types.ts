@@ -6,22 +6,27 @@ export type StoryTypeChip = {
 };
 
 export const STORY_TYPE_CHIPS = [
-  { id: "small-town-dread", label: "Small-Town Dread", guidance: "Ordinary towns, neighborhoods, schools, roads, or families hiding something rotten beneath the surface.", keywords: ["dread", "eerie", "small town", "secrets", "horror"] },
-  { id: "gothic-shadows", label: "Gothic Shadows", guidance: "Old houses, old guilt, decay, obsession, inheritance, locked rooms, portraits, letters, and old sins.", keywords: ["gothic", "eerie", "dark", "horror"] },
-  { id: "uncanny", label: "Uncanny", guidance: "Familiar people, rooms, objects, routines, or animals made subtly wrong.", keywords: ["uncanny", "unsettling", "eerie", "creepy"] },
-  { id: "cosmic-horror", label: "Cosmic Horror", guidance: "Human life brushing against something vast, ancient, indifferent, or impossible to understand.", keywords: ["cosmic horror", "impossible", "ancient", "reality", "dread"] },
-  { id: "weird-nature", label: "Weird Nature", guidance: "Forests, trails, animals, weather, water, fungus, or landscapes behaving with alien intention.", keywords: ["weird", "nature", "eerie", "unsettling", "ecological horror"] },
-  { id: "haunted-past", label: "Haunted Past", guidance: "Memory, grief, guilt, family history, old violence, or buried truth returning.", keywords: ["haunted", "dark", "memory", "guilt", "eerie"] },
-  { id: "creature-unease", label: "Creature Unease", guidance: "Something living is watching, changing, imitating, nesting, hunting, or learning.", keywords: ["creature", "creepy", "unsettling", "horror"] },
-  { id: "dark-fairy-tale", label: "Dark Fairy Tale", guidance: "Folklore rules, bargains, woods, thresholds, transformations, beautiful cruelty, and storybook logic turned dangerous.", keywords: ["dark fairy tale", "folklore", "eerie", "unsettling"] },
-  { id: "psychological-dread", label: "Psychological Dread", guidance: "Paranoia, obsession, identity fracture, unreliable perception, guilt, or emotional collapse.", keywords: ["psychological dread", "paranoia", "unsettling", "dark"] },
-  { id: "no-exit-dread", label: "No-Exit Dread", guidance: "Trapped systems and sealed places where escape is impossible or the environment itself turns hostile: spaceships, submarines, underwater labs, bunkers, mines, research stations, sealed apartment towers, storm-locked hospitals.", keywords: ["no-exit dread", "no exit dread", "trapped", "sealed", "escape", "spaceship", "submarine", "bunker", "mine", "research station", "hostile environment", "survival confinement"] }
+  { id: "small-town", label: "Small-Town", guidance: "Ordinary towns, neighborhoods, schools, roads, and families hiding something rotten beneath the surface.", keywords: ["small-town", "small town", "small-town dread", "small town dread", "dread", "eerie", "secrets", "horror"] },
+  { id: "gothic", label: "Gothic", guidance: "Decaying houses, old bloodlines, secrets, romance, inheritance, and dread-soaked atmosphere.", keywords: ["gothic", "gothic shadows", "old house", "bloodline", "inheritance", "atmosphere"] },
+  { id: "weird", label: "Weird", guidance: "Reality bends in ways that feel impossible, uncanny, or wrong, often without clear rules or explanation.", keywords: ["weird", "uncanny", "impossible", "wrong", "reality", "unsettling"] },
+  { id: "cosmic", label: "Cosmic", guidance: "Vast unknowable forces make human lives, beliefs, and sanity feel small and fragile.", keywords: ["cosmic", "cosmic horror", "vast", "unknowable", "ancient", "sanity"] },
+  { id: "folk", label: "Folk", guidance: "Old land, old rituals, rural isolation, village belief, and inherited customs turn threatening.", keywords: ["folk", "weird nature", "old land", "ritual", "rural", "village", "customs"] },
+  { id: "supernatural", label: "Supernatural", guidance: "Ghosts, curses, spirits, hauntings, and impossible forces break into the ordinary world.", keywords: ["supernatural", "haunted past", "ghost", "curse", "spirit", "haunting"] },
+  { id: "monster", label: "Monster", guidance: "Something living, hungry, changed, or inhuman stalks the edge of the story.", keywords: ["monster", "creature unease", "creature", "hungry", "inhuman", "stalks"] },
+  { id: "dark-fantasy", label: "Dark Fantasy", guidance: "Fairy-tale, mythic, or magical elements turn dangerous, beautiful, and morally unsafe.", keywords: ["dark fantasy", "dark fairy tale", "fairy-tale", "mythic", "magical", "folklore"] },
+  { id: "psychological", label: "Psychological", guidance: "Fear comes from obsession, guilt, paranoia, memory, identity, and the instability of the mind.", keywords: ["psychological", "psychological dread", "obsession", "guilt", "paranoia", "identity"] },
+  { id: "isolation", label: "Isolation", guidance: "Trapped people face sealed spaces, hostile systems, or environments where escape may be impossible.", keywords: ["isolation", "no-exit dread", "no exit dread", "trapped", "sealed", "escape", "hostile system", "hostile environment"] }
 ] as const satisfies readonly StoryTypeChip[];
 
 export type StoryTypeChipId = (typeof STORY_TYPE_CHIPS)[number]["id"];
 
 export function getStoryTypeChipById(id: string): StoryTypeChip | null {
-  return STORY_TYPE_CHIPS.find((chip) => chip.id === id) ?? null;
+  const normalized = normalizeStoryTypeLookup(id);
+  const directMatch = STORY_TYPE_CHIPS.find((chip) => normalizeStoryTypeLookup(chip.id) === normalized);
+  if (directMatch) return directMatch;
+
+  const label = getStoryTypeChipLabel(id);
+  return label ? STORY_TYPE_CHIPS.find((chip) => chip.label === label) ?? null : null;
 }
 
 const GENERIC_STORY_TYPE_MATCH_TERMS = new Set(["dark", "dread", "eerie", "horror", "unsettling", "creepy"]);
@@ -43,7 +48,7 @@ export function getStoryTypeSeedSource(chip: StoryTypeChip, candidateTexts: stri
 }
 
 export function getStoryTypePromptRequirements(chip: StoryTypeChip): string {
-  if (chip.id !== "dark-fairy-tale") return "";
+  if (chip.id !== "dark-fantasy") return "";
   return [
     "Private dark fairy-tale planning constraints (do not quote or label in prose):",
     "- Use folklore or fairy-tale logic.",
@@ -55,7 +60,9 @@ export function getStoryTypePromptRequirements(chip: StoryTypeChip): string {
 }
 
 export function getStoryTypePrimaryCategory(input: { selectedStoryTypeChipLabel?: string | null; storyTypeChipLabel?: string | null; genrePreset?: string | null }): string {
-  return input.selectedStoryTypeChipLabel?.trim() || input.storyTypeChipLabel?.trim() || input.genrePreset?.trim() || "Story";
+  const selected = input.selectedStoryTypeChipLabel?.trim() || input.storyTypeChipLabel?.trim();
+  if (selected) return getStoryTypeChipLabel(selected) ?? selected;
+  return input.genrePreset?.trim() || "Story";
 }
 
 
@@ -78,24 +85,48 @@ export function getStoryTypeStartCopy(storyTypeLabel?: string | null): { confirm
   };
 }
 
+const STORY_TYPE_LABEL_ALIASES: Record<string, ApprovedHomeFearLabel> = {
+  "small-town": "Small-Town",
+  "small town": "Small-Town",
+  "small-town dread": "Small-Town",
+  "small town dread": "Small-Town",
+  "smalltown dread": "Small-Town",
+  gothic: "Gothic",
+  "gothic shadows": "Gothic",
+  weird: "Weird",
+  uncanny: "Weird",
+  cosmic: "Cosmic",
+  "cosmic horror": "Cosmic",
+  folk: "Folk",
+  "weird nature": "Folk",
+  supernatural: "Supernatural",
+  "haunted past": "Supernatural",
+  monster: "Monster",
+  "creature unease": "Monster",
+  "dark fantasy": "Dark Fantasy",
+  "dark fairy tale": "Dark Fantasy",
+  psychological: "Psychological",
+  "psychological dread": "Psychological",
+  isolation: "Isolation",
+  "no-exit dread": "Isolation",
+  "no exit dread": "Isolation",
+};
 
 export function getStoryTypeChipLabel(value?: string | null): string | null {
   if (!value) return null;
 
-  const normalized = value.toLowerCase().trim();
-  const normalizedLoose = normalized.replace(/-/g, " ");
+  const normalized = normalizeStoryTypeLookup(value);
+  const aliasMatch = STORY_TYPE_LABEL_ALIASES[normalized];
+  if (aliasMatch) return aliasMatch;
 
   const match = STORY_TYPE_CHIPS.find((chip) => {
-    const chipId = chip.id.toLowerCase();
-    const chipLabel = chip.label.toLowerCase();
+    const chipId = normalizeStoryTypeLookup(chip.id);
+    const chipLabel = normalizeStoryTypeLookup(chip.label);
     return (
       chipId === normalized ||
       chipLabel === normalized ||
-      chipLabel.replace(/-/g, " ") === normalizedLoose ||
       normalized.includes(chipId) ||
-      normalized.includes(chipLabel) ||
-      normalizedLoose.includes(chipId.replace(/-/g, " ")) ||
-      normalizedLoose.includes(chipLabel.replace(/-/g, " "))
+      normalized.includes(chipLabel)
     );
   });
 
@@ -104,45 +135,31 @@ export function getStoryTypeChipLabel(value?: string | null): string | null {
 
 
 export const APPROVED_HOME_FEAR_LABELS = [
-  "Small-Town Dread",
-  "Uncanny",
-  "Weird Nature",
-  "Creature Unease",
-  "Psychological Dread",
-  "Gothic Shadows",
-  "Cosmic Horror",
-  "Haunted Past",
-  "Dark Fairy Tale",
-  "No-Exit Dread",
+  "Small-Town",
+  "Gothic",
+  "Weird",
+  "Cosmic",
+  "Folk",
+  "Supernatural",
+  "Monster",
+  "Dark Fantasy",
+  "Psychological",
+  "Isolation",
 ] as const;
 
 export type ApprovedHomeFearLabel = (typeof APPROVED_HOME_FEAR_LABELS)[number];
 
-const FALLBACK_HOME_FEAR_LABEL: ApprovedHomeFearLabel = "Small-Town Dread";
+const FALLBACK_HOME_FEAR_LABEL: ApprovedHomeFearLabel = "Small-Town";
 
 export function getHomeFearLabel(value?: string | null): ApprovedHomeFearLabel {
   if (!value) return FALLBACK_HOME_FEAR_LABEL;
 
-  const normalized = value.toLowerCase().trim();
-  const normalizedLoose = normalized.replace(/-/g, " ");
+  const normalized = normalizeStoryTypeLookup(value);
+  const directMatch = STORY_TYPE_LABEL_ALIASES[normalized];
+  if (directMatch) return directMatch;
 
-  const directMatch = STORY_TYPE_CHIPS.find((chip) => {
-    const chipId = chip.id.toLowerCase();
-    const chipLabel = chip.label.toLowerCase();
-    return (
-      chipId === normalized ||
-      chipLabel === normalized ||
-      chipLabel.replace(/-/g, " ") === normalizedLoose ||
-      normalized.includes(chipId) ||
-      normalized.includes(chipLabel) ||
-      normalizedLoose.includes(chipId.replace(/-/g, " ")) ||
-      normalizedLoose.includes(chipLabel.replace(/-/g, " "))
-    );
-  });
-
-  if (directMatch && isApprovedHomeFearLabel(directMatch.label)) {
-    return directMatch.label;
-  }
+  const chipMatch = getStoryTypeChipLabel(value);
+  if (chipMatch && isApprovedHomeFearLabel(chipMatch)) return chipMatch;
 
   if (
     normalized.includes("gothic") ||
@@ -150,7 +167,7 @@ export function getHomeFearLabel(value?: string | null): ApprovedHomeFearLabel {
     normalized.includes("portrait") ||
     normalized.includes("inheritance")
   ) {
-    return "Gothic Shadows";
+    return "Gothic";
   }
 
   if (
@@ -159,43 +176,50 @@ export function getHomeFearLabel(value?: string | null): ApprovedHomeFearLabel {
     normalized.includes("fur") ||
     normalized.includes("creature")
   ) {
-    return "Creature Unease";
+    return "Monster";
   }
 
   if (
     normalized.includes("woods") ||
     normalized.includes("trail") ||
     normalized.includes("forest") ||
-    normalized.includes("nature")
+    normalized.includes("nature") ||
+    normalized.includes("ritual") ||
+    normalized.includes("village")
   ) {
-    return "Weird Nature";
+    return "Folk";
   }
 
   if (
     normalized.includes("memory") ||
     normalized.includes("guilt") ||
     normalized.includes("past") ||
-    normalized.includes("left behind")
+    normalized.includes("haunt") ||
+    normalized.includes("ghost") ||
+    normalized.includes("curse") ||
+    normalized.includes("spirit")
   ) {
-    return "Haunted Past";
+    return "Supernatural";
   }
 
   if (
     normalized.includes("cosmic") ||
     normalized.includes("ancient") ||
     normalized.includes("impossible") ||
-    normalized.includes("vast")
+    normalized.includes("vast") ||
+    normalized.includes("unknowable")
   ) {
-    return "Cosmic Horror";
+    return "Cosmic";
   }
 
   if (
     normalized.includes("uncanny") ||
     normalized.includes("wrong") ||
     normalized.includes("imitating") ||
-    normalized.includes("familiar")
+    normalized.includes("familiar") ||
+    normalized.includes("reality")
   ) {
-    return "Uncanny";
+    return "Weird";
   }
 
   if (
@@ -204,29 +228,30 @@ export function getHomeFearLabel(value?: string | null): ApprovedHomeFearLabel {
     normalized.includes("identity") ||
     normalized.includes("obsession")
   ) {
-    return "Psychological Dread";
+    return "Psychological";
   }
 
   if (
-    normalized.includes("no-exit dread") ||
-    normalized.includes("no exit dread") ||
+    normalized.includes("no exit") ||
     normalized.includes("sealed") ||
     normalized.includes("trapped") ||
     normalized.includes("bunker") ||
     normalized.includes("submarine") ||
     normalized.includes("spaceship") ||
-    normalized.includes("research station")
+    normalized.includes("research station") ||
+    normalized.includes("isolation")
   ) {
-    return "No-Exit Dread";
+    return "Isolation";
   }
 
   if (
     normalized.includes("fairy") ||
+    normalized.includes("fantasy") ||
     normalized.includes("folklore") ||
     normalized.includes("bargain") ||
     normalized.includes("threshold")
   ) {
-    return "Dark Fairy Tale";
+    return "Dark Fantasy";
   }
 
   return FALLBACK_HOME_FEAR_LABEL;
@@ -234,4 +259,8 @@ export function getHomeFearLabel(value?: string | null): ApprovedHomeFearLabel {
 
 function isApprovedHomeFearLabel(value: string): value is ApprovedHomeFearLabel {
   return APPROVED_HOME_FEAR_LABELS.some((label) => label === value);
+}
+
+function normalizeStoryTypeLookup(value: string): string {
+  return value.trim().toLowerCase().replace(/-/g, " ").replace(/\s+/g, " ");
 }
