@@ -274,7 +274,7 @@
     position: relative !important;
     overflow: hidden !important;
     min-height: 100svh !important;
-    background: linear-gradient(180deg, #090204 0%, #120507 48%, #0b0305 100%) !important;
+    background: #090204 !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section {
@@ -500,7 +500,7 @@
     isolation: isolate !important;
     overflow: hidden !important;
     min-height: 100svh !important;
-    background: linear-gradient(180deg, #090204 0%, #120507 48%, #0b0305 100%) !important;
+    background: #090204 !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section,

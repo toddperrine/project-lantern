@@ -13,12 +13,17 @@
   .project-lantern-shell main {
     max-width: 100%;
     overflow-x: hidden;
-    background: #17070a !important;
+    background: #090204 !important;
     color: #f2f1ed !important;
   }
 
   body {
-    background: #17070a !important;
+    background: #090204 !important;
+  }
+
+  .project-lantern-shell [data-device-preview-stage],
+  .project-lantern-shell [data-device-preview-content] {
+    background: #090204 !important;
   }
 
   .project-lantern-shell [data-device-preview-content] {
