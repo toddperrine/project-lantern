@@ -11037,7 +11037,7 @@ function MobileTopHeader({
 
       <a
         aria-label="Go home"
-        className="absolute left-1/2 top-1/2 z-0 flex h-8 w-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center border-0 bg-transparent p-0 no-underline"
+        className="absolute left-1/2 top-1/2 z-0 flex h-11 w-[min(15rem,calc(100%-6rem))] -translate-x-1/2 -translate-y-1/2 items-center justify-center border-0 bg-transparent p-0 no-underline"
         href="/"
         onClick={(event) => {
           event.preventDefault();
@@ -11046,9 +11046,6 @@ function MobileTopHeader({
       >
         <span className="grid place-items-center">
           <BloodwickWordmark className="text-sm" />
-          <span className="mt-0.5 text-center text-[0.65rem] font-semibold leading-none text-paper/45">
-            v{APP_VERSION}
-          </span>
         </span>
       </a>
 

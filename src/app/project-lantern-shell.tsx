@@ -27,7 +27,7 @@ export function ProjectLanternShell({ children }: { children: ReactNode }) {
         <div data-device-preview-content className="mx-auto w-full max-w-7xl overflow-x-hidden transition-[max-width,padding] duration-200 md:px-8 md:py-8">
           {children}
           <footer className="border-t border-warm-paper/10 px-4 py-5 text-center text-xs font-semibold text-muted-light md:mt-8 md:px-0 md:text-muted-dark">
-            Version {buildInfo.appVersion}
+            Version v{buildInfo.appVersion}
           </footer>
         </div>
       </div>

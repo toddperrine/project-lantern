@@ -1,14 +1,21 @@
+import Image from "next/image";
 import type { HTMLAttributes } from "react";
 
 type BloodwickBrandProps = HTMLAttributes<HTMLDivElement> & {
   label?: string;
 };
 
-export function BloodwickWordmark({ className = "", label = "Bloodwick", ...props }: BloodwickBrandProps) {
+export function BloodwickWordmark({ className = "", label = "BloodWick", ...props }: BloodwickBrandProps) {
   return (
     <div className={`bloodwick-wordmark ${className}`.trim()} {...props}>
-      <BloodwickMark aria-hidden="true" />
-      <span>{label}</span>
+      <Image
+        className="bloodwick-logo-image"
+        src="/artwork/Bloodwick Logo.PNG"
+        alt={label}
+        width={748}
+        height={269}
+        priority
+      />
     </div>
   );
 }
