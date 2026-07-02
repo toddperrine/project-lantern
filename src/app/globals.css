@@ -791,10 +791,10 @@ textarea {
 
   .bloodwick-logo-image {
     display: block;
-    width: auto;
-    max-width: min(9.25rem, 42vw);
+    width: clamp(150px, 42vw, 240px);
+    max-width: 100%;
     height: auto;
-    max-height: 2rem;
+    max-height: 3rem;
     object-fit: contain;
   }
 
