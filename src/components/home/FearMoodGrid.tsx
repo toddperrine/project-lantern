@@ -12,7 +12,7 @@ export type FearMoodGridProps = {
 };
 
 export function FearMoodGrid({
-  heading = "What kind of fear are you in the mood for right now?",
+  heading,
   ...props
 }: FearMoodGridProps) {
   const { activeMood, isGenerating = false, onRead, onSelect } = props;
@@ -22,14 +22,16 @@ export function FearMoodGrid({
     : null;
 
   return (
-    <section className="bloodwick-home-card min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-4 shadow-bloodwick-soft sm:p-5">
+    <section className="bloodwick-home-card flex h-full min-w-0 flex-col rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-4 shadow-bloodwick-soft sm:p-5">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
           Start something new
         </p>
-        <h2 className="mt-2 text-2xl font-semibold leading-tight text-bloodwick-white">
-          {heading}
-        </h2>
+        {heading ? (
+          <h2 className="mt-2 text-2xl font-semibold leading-tight text-bloodwick-white">
+            {heading}
+          </h2>
+        ) : null}
       </div>
       <div className="bloodwick-home-fear-grid mt-4 sm:grid-cols-2">
         {STORY_TYPE_CHIPS.map((chip) => {

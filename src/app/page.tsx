@@ -5171,36 +5171,7 @@ function HomeView(props: {
   return (
     <div className="bloodwick-home grid min-w-0 max-w-full gap-6 overflow-x-hidden md:gap-8">
       <BloodwickHomeHero />
-      <div className="grid min-w-0 gap-4 md:grid-cols-2" data-home-dashboard="reader-actions">
-        <div className="min-w-0">
-          {latestStory && storyBrief ? (
-            <ContinueEpisodeCard
-              hook={storyBrief.hook}
-              isGenerating={isContinuationGenerating}
-              isRecapOpen={isRecapOpen}
-              onCloseRecap={() => setIsRecapOpen(false)}
-              onContinue={onContinue}
-              onExport={onExportStory}
-              onOpenRecap={() => setIsRecapOpen(true)}
-              recap={storyBrief.recap}
-              seriesTitle={latestSeriesTitle}
-              storyTypeLabel={latestStoryTypeLabel}
-              title={latestStory.title}
-            />
-          ) : (
-            <section className="bloodwick-home-card bloodwick-continue-card min-w-0 rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
-                Continue Your Series
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold text-bloodwick-white">
-                No series in progress yet.
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-bloodwick-white/68">
-                Start something new to begin your first Bloodwick series.
-              </p>
-            </section>
-          )}
-        </div>
+      <div className="grid min-w-0 items-stretch gap-4 md:grid-cols-2" data-home-dashboard="reader-actions">
         <div className="grid min-w-0 gap-4">
           <FearMoodGrid
             activeMood={selectedFearCategory}
@@ -5220,6 +5191,35 @@ function HomeView(props: {
               onStart={onStartRecommendation}
             />
           ) : null}
+        </div>
+        <div className="min-w-0">
+          {latestStory && storyBrief ? (
+            <ContinueEpisodeCard
+              hook={storyBrief.hook}
+              isGenerating={isContinuationGenerating}
+              isRecapOpen={isRecapOpen}
+              onCloseRecap={() => setIsRecapOpen(false)}
+              onContinue={onContinue}
+              onExport={onExportStory}
+              onOpenRecap={() => setIsRecapOpen(true)}
+              recap={storyBrief.recap}
+              seriesTitle={latestSeriesTitle}
+              storyTypeLabel={latestStoryTypeLabel}
+              title={latestStory.title}
+            />
+          ) : (
+            <section className="bloodwick-home-card bloodwick-continue-card flex h-full min-w-0 flex-col justify-between rounded-bloodwick-lg border border-bloodwick-white/10 bg-bloodwick-panel/70 p-5 shadow-bloodwick-soft">
+              <div>
+                <h2 className="text-2xl font-semibold leading-tight text-bloodwick-white">
+                  <span className="text-bloodwick-copper">Continue:</span>{" "}
+                  <span>No series in progress yet.</span>
+                </h2>
+                <p className="mt-3 text-sm leading-6 text-bloodwick-white/68">
+                  Start something new to begin your first Bloodwick series.
+                </p>
+              </div>
+            </section>
+          )}
         </div>
       </div>
       <ReadyStoryQueuePanel
@@ -5903,7 +5903,7 @@ function ReadyStoryQueuePanel({
     return (
       <section className="bloodwick-home-section bloodwick-story-queue-section min-w-0 rounded-md border border-paper/10 bg-paper/5 p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
-          Stories waiting for you
+          Community Favorites
         </p>
         <h2 className="mt-2 text-2xl font-semibold text-paper">
           No waiting stories right now.
@@ -5919,7 +5919,7 @@ function ReadyStoryQueuePanel({
   return (
     <section className="bloodwick-home-section bloodwick-story-queue-section min-w-0 rounded-md border border-lantern-gold/20 bg-paper/10 p-5">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lantern-gold">
-        Stories waiting for you
+        Community Favorites
       </p>
 
       <div className="mt-4 grid gap-3">
@@ -6082,7 +6082,7 @@ function MobileMoodPicker({
   return (
     <section className="min-w-0">
       <h2 className="text-xl font-semibold leading-tight text-paper">
-        What kind of fear are you in the mood for right now?
+        Start something new
       </h2>
       <div className="mt-3 flex min-w-0 flex-wrap gap-2">
         {AVAILABLE_MOOD_CHIPS.map((mood) => {
@@ -6380,7 +6380,7 @@ function MoodPicker({
     <section className={hasCurrentStory ? "min-w-0" : "min-w-0 pt-1"}>
       <div className="max-w-3xl">
         <h2 className="text-2xl font-semibold text-paper md:text-3xl">
-          What kind of fear are you in the mood for right now?
+          Start something new
         </h2>
         {!hasCurrentStory ? (
           <p className="mt-3 text-sm leading-6 text-paper/70">

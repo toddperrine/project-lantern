@@ -29,21 +29,19 @@ export function ContinueEpisodeCard(props: ContinueEpisodeCardProps) {
   const recapId = "last-time-recap-dialog";
 
   return (
-    <section className="bloodwick-home-card bloodwick-continue-card min-w-0 overflow-hidden rounded-bloodwick-lg border border-bloodwick-red/25 bg-bloodwick-obsidian/75 shadow-bloodwick-soft">
-      <div className="grid min-w-0 gap-5 p-4 sm:p-5">
+    <section className="bloodwick-home-card bloodwick-continue-card flex h-full min-w-0 flex-col overflow-hidden rounded-bloodwick-lg border border-bloodwick-red/25 bg-bloodwick-obsidian/75 shadow-bloodwick-soft">
+      <div className="flex h-full min-w-0 flex-col justify-between gap-5 p-4 sm:p-5">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bloodwick-copper">
-            Continue Your Series
-          </p>
-          <p className="mt-3 text-sm font-semibold text-bloodwick-white/62">
-            {seriesTitle}
-          </p>
+          <h2 className="text-2xl font-semibold leading-tight text-bloodwick-white">
+            <span className="text-bloodwick-copper">Continue:</span>{" "}
+            <span>{seriesTitle}</span>
+          </h2>
           <span className="mt-3 inline-flex rounded-full border border-bloodwick-red/30 bg-bloodwick-red/10 px-3 py-1 text-xs font-semibold text-bloodwick-white/78">
             {storyTypeLabel}
           </span>
-          <h2 className="mt-3 text-2xl font-semibold leading-tight text-bloodwick-white">
+          <p className="mt-3 text-sm font-semibold text-bloodwick-white/78">
             {title}
-          </h2>
+          </p>
           <p className="mt-3 text-sm leading-6 text-bloodwick-white/68">
             {hook}
           </p>
