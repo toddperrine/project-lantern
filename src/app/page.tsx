@@ -11037,7 +11037,7 @@ function MobileTopHeader({
 
       <a
         aria-label="Go home"
-        className="absolute left-1/2 top-1/2 z-0 flex h-8 w-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center border-0 bg-transparent p-0 no-underline"
+        className="absolute left-1/2 top-1/2 z-0 flex h-10 w-44 max-w-[calc(100%-6rem)] -translate-x-1/2 -translate-y-1/2 items-center justify-center border-0 bg-transparent p-0 no-underline"
         href="/"
         onClick={(event) => {
           event.preventDefault();

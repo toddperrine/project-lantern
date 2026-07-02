@@ -784,11 +784,18 @@ textarea {
   .bloodwick-wordmark {
     display: inline-flex;
     align-items: center;
-    gap: 0.65rem;
+    justify-content: center;
+    min-width: 0;
     color: var(--bloodwick-white);
-    font-weight: 900;
-    letter-spacing: -0.055em;
-    text-transform: uppercase;
+  }
+
+  .bloodwick-logo-image {
+    display: block;
+    width: auto;
+    max-width: min(9.25rem, 42vw);
+    height: auto;
+    max-height: 2rem;
+    object-fit: contain;
   }
 
   .bloodwick-mark {
