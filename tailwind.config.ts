@@ -24,13 +24,13 @@ const config: Config = {
         "primary-light": "#F6EFE2",
         "muted-dark": "#C9C0AE",
         bloodwick: {
-          obsidian: "#0B0B0D",
+          obsidian: "#120507",
           red: "#E50914",
           white: "#F2F1ED",
           steel: "#6B7078",
           copper: "#B87333",
-          panel: "#151216",
-          plum: "#24121F"
+          panel: "#17070A",
+          plum: "#1B080C"
         }
       },
       boxShadow: {

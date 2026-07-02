@@ -4,7 +4,7 @@
 
 @media (max-width: 767px) {
   :root {
-    color-scheme: light;
+    color-scheme: dark;
   }
 
   html,
@@ -13,12 +13,17 @@
   .project-lantern-shell main {
     max-width: 100%;
     overflow-x: hidden;
-    background: #fbf7ef !important;
-    color: #171510 !important;
+    background: #090204 !important;
+    color: #f2f1ed !important;
   }
 
   body {
-    background: #fbf7ef !important;
+    background: #090204 !important;
+  }
+
+  .project-lantern-shell [data-device-preview-stage],
+  .project-lantern-shell [data-device-preview-content] {
+    background: #090204 !important;
   }
 
   .project-lantern-shell [data-device-preview-content] {
@@ -42,21 +47,21 @@
     align-items: center !important;
     gap: 0.6rem !important;
     padding: 0.1rem 0 0.35rem !important;
-    color: #171510 !important;
+    color: #f2f1ed !important;
   }
 
   .project-lantern-shell main > section > header:first-child button {
     width: 2.5rem !important;
     height: 2.5rem !important;
-    border: 1px solid rgba(23, 21, 16, 0.08) !important;
+    border: 1px solid rgba(242, 241, 237, 0.12) !important;
     border-radius: 999px !important;
-    background: #fffdf8 !important;
-    color: #171510 !important;
+    background: #17070a !important;
+    color: #f2f1ed !important;
     box-shadow: 0 8px 22px rgba(40, 34, 24, 0.06) !important;
   }
 
   .project-lantern-shell main > section > header:first-child p {
-    color: #171510 !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: 1.05rem !important;
     font-weight: 500 !important;
@@ -86,7 +91,7 @@
   .project-lantern-shell h3,
   .project-lantern-shell label,
   .project-lantern-shell span {
-    color: #171510 !important;
+    color: #f2f1ed !important;
   }
 
   .project-lantern-shell .text-paper\/70,
@@ -96,7 +101,7 @@
   .project-lantern-shell .text-paper\/55,
   .project-lantern-shell .text-paper\/45,
   .project-lantern-shell p {
-    color: #686157 !important;
+    color: #f2f1ed !important;
   }
 
   .project-lantern-shell .bg-paper\/10,
@@ -105,7 +110,7 @@
   .project-lantern-shell article,
   .project-lantern-shell section[class*="bg-paper"],
   .project-lantern-shell div[class*="bg-paper"] {
-    background-color: #fffdf8 !important;
+    background-color: #17070a !important;
   }
 
   .project-lantern-shell .border-paper\/10,
@@ -114,18 +119,18 @@
   .project-lantern-shell .border-warm-paper\/10,
   .project-lantern-shell article,
   .project-lantern-shell section {
-    border-color: rgba(27, 23, 16, 0.08) !important;
+    border-color: rgba(242, 241, 237, 0.12) !important;
   }
 
   .project-lantern-shell input,
   .project-lantern-shell textarea,
   .project-lantern-shell select {
-    background-color: #fffaf2 !important;
-    color: #171510 !important;
+    background-color: #17070a !important;
+    color: #f2f1ed !important;
   }
 
   .project-lantern-shell button {
-    color: #171510;
+    color: #f2f1ed;
   }
 
   .project-lantern-shell nav[aria-label="Mobile primary"] {
@@ -134,8 +139,8 @@
     bottom: 0 !important;
     z-index: 60 !important;
     display: block !important;
-    border-top: 1px solid rgba(23, 21, 16, 0.1) !important;
-    background: rgba(255, 252, 246, 0.98) !important;
+    border-top: 1px solid rgba(242, 241, 237, 0.12) !important;
+    background: rgba(18, 5, 7, 0.98) !important;
     padding: 0.42rem max(0.55rem, env(safe-area-inset-left)) calc(0.65rem + env(safe-area-inset-bottom)) max(0.55rem, env(safe-area-inset-right)) !important;
     box-shadow: 0 -10px 28px rgba(27, 23, 16, 0.08) !important;
   }
@@ -154,7 +159,7 @@
     border-radius: 0.72rem !important;
     background: transparent !important;
     padding: 0.46rem 0.18rem !important;
-    color: #756d61 !important;
+    color: #f2f1ed !important;
     font-size: 0.58rem !important;
     font-weight: 650 !important;
     line-height: 1.05 !important;
@@ -162,8 +167,8 @@
   }
 
   .project-lantern-shell nav[aria-label="Mobile primary"] button[aria-current="page"] {
-    background: #f5ead2 !important;
-    color: #9c6e1d !important;
+    background: #17070a !important;
+    color: #f2f1ed !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-original-home-content="true"] {
@@ -183,25 +188,25 @@
   .project-lantern-shell main:not([data-mobile-active-view="home"]) article,
   .project-lantern-shell main:not([data-mobile-active-view="home"]) section > div > section {
     border-radius: 0.9rem !important;
-    background: #fffdf8 !important;
+    background: #17070a !important;
     box-shadow: 0 10px 24px rgba(40, 34, 24, 0.05) !important;
   }
 
   .project-lantern-shell [role="dialog"] {
     z-index: 80 !important;
-    background: rgba(18, 16, 12, 0.48) !important;
+    background: rgba(9, 2, 4, 0.72) !important;
     padding: 1rem !important;
   }
 
   .project-lantern-shell [role="dialog"] > div {
     border: 0 !important;
     border-radius: 1rem !important;
-    background: #fffaf2 !important;
-    color: #171510 !important;
+    background: #17070a !important;
+    color: #f2f1ed !important;
   }
 
   .project-lantern-shell footer {
-    background: #fbf7ef !important;
-    color: #8a8276 !important;
+    background: #17070a !important;
+    color: rgba(242, 241, 237, 0.68) !important;
   }
 }
