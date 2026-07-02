@@ -31,7 +31,7 @@ export function FearMoodGrid({
           {heading}
         </h2>
       </div>
-      <div className="bloodwick-home-fear-grid mt-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="bloodwick-home-fear-grid mt-4 sm:grid-cols-2">
         {STORY_TYPE_CHIPS.map((chip) => {
           const isSelected = chip.id === activeMood;
           const tooltipId = `fear-help-${chip.id}`;

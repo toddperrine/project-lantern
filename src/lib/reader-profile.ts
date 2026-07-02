@@ -1,3 +1,5 @@
+import { normalizeBloodwickFearCategory } from "@/lib/bloodwick-fear-art";
+
 export const CANONICAL_READER_PROFILE_STORAGE_KEY = "projectLantern.readerProfile.v1";
 export const READER_ID_STORAGE_KEY = "projectLantern.readerId.v1";
 export const READER_PROFILE_STORAGE_KEY = "projectLantern.readerInteractionProfile.v1";
@@ -127,15 +129,16 @@ export type StoryFitOption = {
 };
 
 export const STORY_FIT_STORY_TYPE_OPTIONS: StoryFitOption[] = [
-  { label: "Small-Town Dread", description: "Ordinary places hiding something rotten beneath the surface." },
-  { label: "Gothic Shadows", description: "Old guilt, inheritance, decay, obsession, locked rooms, portraits, letters, and old sins." },
-  { label: "Uncanny", description: "Familiar people, rooms, objects, routines, or animals made subtly wrong." },
-  { label: "Cosmic Horror", description: "Human life brushing against something vast, ancient, indifferent, or impossible to understand." },
-  { label: "Weird Nature", description: "Forests, trails, animals, weather, water, fungus, or landscapes behaving with alien intention." },
-  { label: "Haunted Past", description: "Memory, grief, guilt, family history, old violence, or buried truth returning." },
-  { label: "Creature Unease", description: "Something living is watching, changing, imitating, nesting, hunting, or learning." },
-  { label: "Dark Fairy Tale", description: "Folklore rules, bargains, woods, thresholds, transformations, beautiful cruelty, and storybook logic turned dangerous." },
-  { label: "Psychological Dread", description: "Paranoia, obsession, identity fracture, unreliable perception, guilt, or emotional collapse." },
+  { label: "Small-Town", description: "Ordinary towns, neighborhoods, schools, roads, and families hiding something rotten beneath the surface." },
+  { label: "Gothic", description: "Decaying houses, old bloodlines, secrets, romance, inheritance, and dread-soaked atmosphere." },
+  { label: "Weird", description: "Reality bends in ways that feel impossible, uncanny, or wrong, often without clear rules or explanation." },
+  { label: "Cosmic", description: "Vast unknowable forces make human lives, beliefs, and sanity feel small and fragile." },
+  { label: "Folk", description: "Old land, old rituals, rural isolation, village belief, and inherited customs turn threatening." },
+  { label: "Supernatural", description: "Ghosts, curses, spirits, hauntings, and impossible forces break into the ordinary world." },
+  { label: "Monster", description: "Something living, hungry, changed, or inhuman stalks the edge of the story." },
+  { label: "Dark Fantasy", description: "Fairy-tale, mythic, or magical elements turn dangerous, beautiful, and morally unsafe." },
+  { label: "Psychological", description: "Fear comes from obsession, guilt, paranoia, memory, identity, and the instability of the mind." },
+  { label: "Isolation", description: "Trapped people face sealed spaces, hostile systems, or environments where escape may be impossible." },
 ];
 export const STORY_FIT_EMOTIONAL_PROMISE_OPTIONS: StoryFitOption[] = [
   { label: "A world I can disappear into", description: "Immersive place, texture, atmosphere, and continuity." },
@@ -219,7 +222,7 @@ export const STORY_FIT_PRESSURE_TO_LEGACY: Record<string, ReaderProfileNarrative
 export const STORY_FIT_ENDING_TO_LEGACY: Record<string, ReaderProfileEpisodeEndingShape> = { "Resolved incident": "resolved-incident", "Open mystery": "open-mystery", "Next-episode pull": "next-episode-pull", "Quiet aftermath": "quiet-aftermath", "Emotional aftershock": "quiet-aftermath", "New clue revealed": "open-mystery", "Door opens into bigger world": "next-episode-pull", "Consequence lands": "resolved-incident" };
 export const STORY_FIT_CHARACTER_LENS_TO_LEGACY: Record<string, ReaderProfileProtagonistLens> = { "Ordinary person pulled in": "ordinary-person-pulled-in", "Investigator / seeker": "investigator-seeker", "Caretaker / protector": "caretaker-protector", "Reluctant keeper / heir": "reluctant-keeper-heir", "Outsider / newcomer": "outsider-newcomer", "Animal-bonded protagonist": "animal-bonded-protagonist", "Duo": "surprise-me", "Trio / ensemble": "surprise-me", "Surprise me": "surprise-me" };
 
-const APPROVED_STORY_FIT_TYPE_LABELS = new Set([...STORY_FIT_STORY_TYPE_OPTIONS.map((option) => option.label), "Small-town dread", "Speculative mystery", "Hidden-world adventure", "Folkloric quest", "Strange road / borderland", "Haunted object or house", "Near-future anomaly", "Animal companion mystery", "Family secret"]);
+const APPROVED_STORY_FIT_TYPE_LABELS = new Set([...STORY_FIT_STORY_TYPE_OPTIONS.map((option) => option.label), "Small-Town Dread", "Small Town Dread", "Small-town dread", "Gothic Shadows", "Uncanny", "Cosmic Horror", "Weird Nature", "Haunted Past", "Creature Unease", "Dark Fairy Tale", "Psychological Dread", "No-Exit Dread", "No Exit Dread", "Speculative mystery", "Hidden-world adventure", "Folkloric quest", "Strange road / borderland", "Haunted object or house", "Near-future anomaly", "Animal companion mystery", "Family secret"]);
 const APPROVED_STORY_FIT_INGREDIENT_LABELS = new Set([...STORY_FIT_INGREDIENT_OPTIONS.map((option) => option.label), "A hidden past resurfacing", "An impossible object, map, or key", "A moral bargain with a cost", "A secret society or institution", "A creature or presence not fully understood", "A disappearance or investigation", "A place that changes when entered", "A friendship or team tested by pressure", "Magic with rules", "Strange technology", "Ancient folklore", "Ordinary place made uncanny", "Found map / key / object", "Secret society or order", "Family legacy", "Lost town / lost road", "Moral bargain", "Unreliable memory", "Hidden room / hidden archive"]);
 const APPROVED_STORY_FIT_EMOTIONAL_PROMISE_LABELS = new Set(STORY_FIT_EMOTIONAL_PROMISE_OPTIONS.map((option) => option.label));
 const APPROVED_STORY_FIT_WORLD_LABELS = new Set(STORY_FIT_WORLD_OPTIONS.map((option) => option.label));
@@ -703,10 +706,10 @@ export function normalizeReaderProfile(value: unknown): ReaderProfile {
 export function normalizeReaderProfilePreferences(value: unknown): ReaderProfilePreferences {
   const candidate = isRecord(value) ? value : {};
   const legacyMoodValues = readStringArray(candidate.preferredMoods);
-  const explicitStoryTypes = filterApprovedPreferenceItems(readStringArray(candidate.preferredStoryTypes), APPROVED_STORY_FIT_TYPE_LABELS, STORY_FIT_SELECTION_LIMITS.preferredStoryTypes);
+  const explicitStoryTypes = normalizeStoryFitStoryTypePreferenceItems(readStringArray(candidate.preferredStoryTypes));
   const preferredStoryTypes = explicitStoryTypes.length
     ? explicitStoryTypes
-    : filterApprovedPreferenceItems(legacyMoodValues, APPROVED_STORY_FIT_TYPE_LABELS, STORY_FIT_SELECTION_LIMITS.preferredStoryTypes);
+    : normalizeStoryFitStoryTypePreferenceItems(legacyMoodValues);
   const explicitIngredients = filterApprovedPreferenceItems(readStringArray(candidate.storyIngredients), APPROVED_STORY_FIT_INGREDIENT_LABELS, STORY_FIT_SELECTION_LIMITS.storyIngredients);
   const legacyGenreValues = readStringArray(candidate.preferredGenres);
   const storyIngredients = explicitIngredients.length
@@ -745,6 +748,18 @@ export function normalizeReaderProfilePreferences(value: unknown): ReaderProfile
     storyFitProfileVersion: "v2",
     ...(typeof candidate.updatedAt === "string" && candidate.updatedAt.trim() ? { updatedAt: candidate.updatedAt } : {}),
   };
+}
+
+function normalizeStoryFitStoryTypePreferenceItems(values: string[]): string[] {
+  return values.reduce((items, value) => {
+    const normalizedCategory = normalizeBloodwickFearCategory(value);
+    if (normalizedCategory) {
+      return addUniquePreferenceItem(items, normalizedCategory, STORY_FIT_SELECTION_LIMITS.preferredStoryTypes);
+    }
+
+    const approved = Array.from(APPROVED_STORY_FIT_TYPE_LABELS).find((label) => label.toLowerCase() === value.trim().toLowerCase());
+    return approved ? addUniquePreferenceItem(items, approved, STORY_FIT_SELECTION_LIMITS.preferredStoryTypes) : items;
+  }, [] as string[]);
 }
 
 function filterApprovedPreferenceItems(values: string[], approvedLabels: Set<string>, maxItems: number): string[] {
