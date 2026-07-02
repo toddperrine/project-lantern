@@ -7,14 +7,15 @@ export type BloodwickFearCategory =
   | "Gothic Shadows"
   | "Cosmic Horror"
   | "Haunted Past"
-  | "Dark Fairy Tale";
+  | "Dark Fairy Tale"
+  | "No-Exit Dread";
 
 export type BloodwickFearArtResult = {
   src: string | null;
   mode: "image" | "fallback";
 };
 
-export const BLOODWICK_FEAR_ART: Record<BloodwickFearCategory, string> = {
+export const BLOODWICK_FEAR_ART: Record<BloodwickFearCategory, string | null> = {
   "Small-Town Dread": "/artwork/Bloodwick%20Image%20-%20Small%20Town%20Dread.png",
   "Uncanny": "/artwork/Bloodwick%20Image%20-%20Uncanny.png",
   "Weird Nature": "/artwork/Bloodwick%20Image%20-%20Weird%20Nature.png",
@@ -24,6 +25,7 @@ export const BLOODWICK_FEAR_ART: Record<BloodwickFearCategory, string> = {
   "Cosmic Horror": "/artwork/Bloodwick%20Image%20-%20Cosmic%20Horror.png",
   "Haunted Past": "/artwork/Bloodwick%20Image%20-%20Haunted%20Past.png",
   "Dark Fairy Tale": "/artwork/Bloodwick%20Image%20-%20Dark%20Fairy%20Tale.png",
+  "No-Exit Dread": null,
 };
 
 export function normalizeBloodwickFearCategory(
@@ -39,6 +41,10 @@ export function normalizeBloodwickFearCategory(
     normalized === "smalltown dread"
   ) {
     return "Small-Town Dread";
+  }
+
+  if (normalized === "no-exit dread" || normalized === "no exit dread") {
+    return "No-Exit Dread";
   }
 
   const match = (Object.keys(BLOODWICK_FEAR_ART) as BloodwickFearCategory[]).find(
@@ -57,8 +63,14 @@ export function getBloodwickFearArt(
     return { src: null, mode: "fallback" };
   }
 
+  const src = BLOODWICK_FEAR_ART[normalized];
+
+  if (!src) {
+    return { src: null, mode: "fallback" };
+  }
+
   return {
-    src: BLOODWICK_FEAR_ART[normalized],
+    src,
     mode: "image",
   };
 }

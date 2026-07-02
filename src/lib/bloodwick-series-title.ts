@@ -65,6 +65,7 @@ const FEAR_CATEGORY_TO_ANCHOR: Record<string, string> = {
   "Cosmic Horror": "signal",
   "Haunted Past": "photograph",
   "Dark Fairy Tale": "road",
+  "No-Exit Dread": "hatch",
 };
 
 const FEAR_CATEGORY_TO_PRESSURE: Record<string, string> = {
@@ -77,6 +78,7 @@ const FEAR_CATEGORY_TO_PRESSURE: Record<string, string> = {
   "Cosmic Horror": "midnight",
   "Haunted Past": "borrowed",
   "Dark Fairy Tale": "returning",
+  "No-Exit Dread": "sealed",
 };
 
 const DEFAULT_PROVISIONAL_ANCHOR = "town";
@@ -361,6 +363,7 @@ function normalizeFearCategory(value?: string | null): string {
   if (normalized.includes("weird nature") || normalized.includes("nature")) return "Weird Nature";
   if (normalized.includes("creature")) return "Creature Unease";
   if (normalized.includes("psychological")) return "Psychological Dread";
+  if (normalized.includes("no-exit") || normalized.includes("no exit")) return "No-Exit Dread";
   if (normalized.includes("gothic")) return "Gothic Shadows";
   if (normalized.includes("cosmic")) return "Cosmic Horror";
   if (normalized.includes("haunted") || normalized.includes("past")) return "Haunted Past";

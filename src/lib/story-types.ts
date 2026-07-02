@@ -14,7 +14,8 @@ export const STORY_TYPE_CHIPS = [
   { id: "haunted-past", label: "Haunted Past", guidance: "Memory, grief, guilt, family history, old violence, or buried truth returning.", keywords: ["haunted", "dark", "memory", "guilt", "eerie"] },
   { id: "creature-unease", label: "Creature Unease", guidance: "Something living is watching, changing, imitating, nesting, hunting, or learning.", keywords: ["creature", "creepy", "unsettling", "horror"] },
   { id: "dark-fairy-tale", label: "Dark Fairy Tale", guidance: "Folklore rules, bargains, woods, thresholds, transformations, beautiful cruelty, and storybook logic turned dangerous.", keywords: ["dark fairy tale", "folklore", "eerie", "unsettling"] },
-  { id: "psychological-dread", label: "Psychological Dread", guidance: "Paranoia, obsession, identity fracture, unreliable perception, guilt, or emotional collapse.", keywords: ["psychological dread", "paranoia", "unsettling", "dark"] }
+  { id: "psychological-dread", label: "Psychological Dread", guidance: "Paranoia, obsession, identity fracture, unreliable perception, guilt, or emotional collapse.", keywords: ["psychological dread", "paranoia", "unsettling", "dark"] },
+  { id: "no-exit-dread", label: "No-Exit Dread", guidance: "Trapped systems and sealed places where escape is impossible or the environment itself turns hostile: spaceships, submarines, underwater labs, bunkers, mines, research stations, sealed apartment towers, storm-locked hospitals.", keywords: ["no-exit dread", "no exit dread", "trapped", "sealed", "escape", "spaceship", "submarine", "bunker", "mine", "research station", "hostile environment", "survival confinement"] }
 ] as const satisfies readonly StoryTypeChip[];
 
 export type StoryTypeChipId = (typeof STORY_TYPE_CHIPS)[number]["id"];
@@ -82,13 +83,19 @@ export function getStoryTypeChipLabel(value?: string | null): string | null {
   if (!value) return null;
 
   const normalized = value.toLowerCase().trim();
+  const normalizedLoose = normalized.replace(/-/g, " ");
 
   const match = STORY_TYPE_CHIPS.find((chip) => {
+    const chipId = chip.id.toLowerCase();
+    const chipLabel = chip.label.toLowerCase();
     return (
-      chip.id.toLowerCase() === normalized ||
-      chip.label.toLowerCase() === normalized ||
-      normalized.includes(chip.id.toLowerCase()) ||
-      normalized.includes(chip.label.toLowerCase())
+      chipId === normalized ||
+      chipLabel === normalized ||
+      chipLabel.replace(/-/g, " ") === normalizedLoose ||
+      normalized.includes(chipId) ||
+      normalized.includes(chipLabel) ||
+      normalizedLoose.includes(chipId.replace(/-/g, " ")) ||
+      normalizedLoose.includes(chipLabel.replace(/-/g, " "))
     );
   });
 
@@ -106,6 +113,7 @@ export const APPROVED_HOME_FEAR_LABELS = [
   "Cosmic Horror",
   "Haunted Past",
   "Dark Fairy Tale",
+  "No-Exit Dread",
 ] as const;
 
 export type ApprovedHomeFearLabel = (typeof APPROVED_HOME_FEAR_LABELS)[number];
@@ -116,13 +124,19 @@ export function getHomeFearLabel(value?: string | null): ApprovedHomeFearLabel {
   if (!value) return FALLBACK_HOME_FEAR_LABEL;
 
   const normalized = value.toLowerCase().trim();
+  const normalizedLoose = normalized.replace(/-/g, " ");
 
   const directMatch = STORY_TYPE_CHIPS.find((chip) => {
+    const chipId = chip.id.toLowerCase();
+    const chipLabel = chip.label.toLowerCase();
     return (
-      chip.id.toLowerCase() === normalized ||
-      chip.label.toLowerCase() === normalized ||
-      normalized.includes(chip.id.toLowerCase()) ||
-      normalized.includes(chip.label.toLowerCase())
+      chipId === normalized ||
+      chipLabel === normalized ||
+      chipLabel.replace(/-/g, " ") === normalizedLoose ||
+      normalized.includes(chipId) ||
+      normalized.includes(chipLabel) ||
+      normalizedLoose.includes(chipId.replace(/-/g, " ")) ||
+      normalizedLoose.includes(chipLabel.replace(/-/g, " "))
     );
   });
 
@@ -191,6 +205,19 @@ export function getHomeFearLabel(value?: string | null): ApprovedHomeFearLabel {
     normalized.includes("obsession")
   ) {
     return "Psychological Dread";
+  }
+
+  if (
+    normalized.includes("no-exit dread") ||
+    normalized.includes("no exit dread") ||
+    normalized.includes("sealed") ||
+    normalized.includes("trapped") ||
+    normalized.includes("bunker") ||
+    normalized.includes("submarine") ||
+    normalized.includes("spaceship") ||
+    normalized.includes("research station")
+  ) {
+    return "No-Exit Dread";
   }
 
   if (

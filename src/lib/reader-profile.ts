@@ -136,6 +136,7 @@ export const STORY_FIT_STORY_TYPE_OPTIONS: StoryFitOption[] = [
   { label: "Creature Unease", description: "Something living is watching, changing, imitating, nesting, hunting, or learning." },
   { label: "Dark Fairy Tale", description: "Folklore rules, bargains, woods, thresholds, transformations, beautiful cruelty, and storybook logic turned dangerous." },
   { label: "Psychological Dread", description: "Paranoia, obsession, identity fracture, unreliable perception, guilt, or emotional collapse." },
+  { label: "No-Exit Dread", description: "Trapped systems and sealed places where escape is impossible or the environment itself turns hostile." },
 ];
 export const STORY_FIT_EMOTIONAL_PROMISE_OPTIONS: StoryFitOption[] = [
   { label: "A world I can disappear into", description: "Immersive place, texture, atmosphere, and continuity." },
