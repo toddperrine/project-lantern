@@ -862,6 +862,7 @@ export default function Home() {
     readAppView(searchParams.get("view")) ?? "home",
   );
   const [activeMood, setActiveMood] = useState<Mood>(AVAILABLE_MOOD_CHIPS[0]);
+  const [selectedHomeFearCategory, setSelectedHomeFearCategory] = useState<Mood | null>(null);
   const [worldBible, setWorldBible] = useState<UploadState>(EMPTY_UPLOAD);
   const [characterProfiles, setCharacterProfiles] =
     useState<UploadState>(EMPTY_UPLOAD);
@@ -2545,6 +2546,7 @@ export default function Home() {
   function handleMoodSelect(mood: Mood) {
     if (requireSignInForAppAction("personalizing recommendations")) return;
     setActiveMood(mood);
+    setSelectedHomeFearCategory(mood);
     recordReaderSignal({ eventType: "moodSelected", mood });
   }
 
@@ -4068,23 +4070,20 @@ export default function Home() {
           <HomeView
             activeMood={activeMood}
             canUseDemoStory={!hasRealLatestStory}
-            continueDirection={continueDirection}
             hasDemoStory={Boolean(demoStory)}
-            isDirectionOpen={isDirectionOpen}
             isGenerating={isGenerating}
             isContinuationGenerating={isContinuationGenerating}
             isNewStoryGenerating={isNewStoryGenerating}
             latestStory={latestStory}
             onClearDemoStory={handleClearDemoStory}
             onContinue={handleContinueLatest}
-            onDirectionChange={setContinueDirection}
             onExportStory={handleExportLatestStory}
             onLoadDemoStory={handleLoadDemoStory}
             onMoodSelect={handleMoodSelect}
             onOpenLibrary={() => navigateToView("library")}
             onStartNewStory={handleStartSomethingNew}
             onStartRecommendation={handleStartRecommendation}
-            onToggleDirection={() => setIsDirectionOpen((current) => !current)}
+            selectedFearCategory={selectedHomeFearCategory}
             showStoryStartOptions={isStoryStartSelectionOpen}
             readyStoryQueue={readyStoryQueue}
             savedForLaterStoryQueue={savedForLaterStoryQueue}
@@ -5100,16 +5099,13 @@ function HomeView(props: {
   onSkipStoryFitSetup?: () => void;
   activeMood: Mood;
   canUseDemoStory: boolean;
-  continueDirection: string;
   hasDemoStory: boolean;
-  isDirectionOpen: boolean;
   isGenerating: boolean;
   isContinuationGenerating: boolean;
   isNewStoryGenerating: boolean;
   latestStory: LibraryStory | null;
   onClearDemoStory: () => void;
   onContinue: (direction?: string) => void;
-  onDirectionChange: (value: string) => void;
   onExportStory: () => void;
   onLoadDemoStory: () => void;
   onMoodSelect: (mood: Mood) => void;
@@ -5119,25 +5115,22 @@ function HomeView(props: {
   onOpenLibrary: () => void;
   onStartNewStory: () => void;
   onStartRecommendation: (story: StoryStart) => void;
-  onToggleDirection: () => void;
   readyStoryQueue: ReadyStoryQueueItem[];
   savedForLaterStoryQueue: ReadyStoryQueueItem[];
+  selectedFearCategory: Mood | null;
   showStoryStartOptions: boolean;
   suggestedStarts: StoryStart[];
 }) {
   const {
     activeMood,
     canUseDemoStory,
-    continueDirection,
     hasDemoStory,
-    isDirectionOpen,
     isGenerating,
     isContinuationGenerating,
     isNewStoryGenerating,
     latestStory,
     onClearDemoStory,
     onContinue,
-    onDirectionChange,
     onExportStory,
     onLoadDemoStory,
     onMoodSelect,
@@ -5147,9 +5140,9 @@ function HomeView(props: {
     onSaveReadyStoryForLater,
     onStartNewStory,
     onStartRecommendation,
-    onToggleDirection,
     readyStoryQueue,
     savedForLaterStoryQueue,
+    selectedFearCategory,
     showStoryStartOptions,
     suggestedStarts,
   } = props;
@@ -5182,17 +5175,13 @@ function HomeView(props: {
         <div className="min-w-0">
           {latestStory && storyBrief ? (
             <ContinueEpisodeCard
-              direction={continueDirection}
               hook={storyBrief.hook}
-              isDirectionOpen={isDirectionOpen}
               isGenerating={isContinuationGenerating}
               isRecapOpen={isRecapOpen}
               onCloseRecap={() => setIsRecapOpen(false)}
               onContinue={onContinue}
-              onDirectionChange={onDirectionChange}
               onExport={onExportStory}
               onOpenRecap={() => setIsRecapOpen(true)}
-              onToggleDirection={onToggleDirection}
               recap={storyBrief.recap}
               seriesTitle={latestSeriesTitle}
               storyTypeLabel={latestStoryTypeLabel}
@@ -5213,19 +5202,14 @@ function HomeView(props: {
           )}
         </div>
         <div className="grid min-w-0 gap-4">
-          <FearMoodGrid activeMood={activeMood} onSelect={onMoodSelect} />
-          {!showStoryStartOptions ? (
-            <StartSomethingNewPanel
-              canUseDemoStory={false}
-              hasDemoStory={hasDemoStory}
-              isGenerating={isGenerating}
-              isNewStoryGenerating={isNewStoryGenerating}
-              onClearDemoStory={onClearDemoStory}
-              onLoadDemoStory={onLoadDemoStory}
-              onStartNewStory={onStartNewStory}
-              selectedStoryTypeLabel={getStoryTypeChip(activeMood).label}
-            />
-          ) : (
+          <FearMoodGrid
+            activeMood={selectedFearCategory}
+            isGenerating={isGenerating}
+            isNewStoryGenerating={isNewStoryGenerating}
+            onRead={onStartNewStory}
+            onSelect={onMoodSelect}
+          />
+          {showStoryStartOptions ? (
             <SuggestedStoryStarts
               activeMood={activeMood}
               canUseDemoStory={false}
@@ -5235,7 +5219,7 @@ function HomeView(props: {
               stories={suggestedStarts}
               onStart={onStartRecommendation}
             />
-          )}
+          ) : null}
         </div>
       </div>
       <ReadyStoryQueuePanel
@@ -6023,18 +6007,7 @@ function MobileHomeView({
           onStart={onStartRecommendation}
           stories={suggestedStarts}
         />
-      ) : (
-        <StartSomethingNewPanel
-          canUseDemoStory={canUseDemoStory}
-          hasDemoStory={hasDemoStory}
-          isGenerating={isGenerating}
-          isNewStoryGenerating={isNewStoryGenerating}
-          onClearDemoStory={onClearDemoStory}
-          onLoadDemoStory={onLoadDemoStory}
-          onStartNewStory={onStartNewStory}
-          selectedStoryTypeLabel={getStoryTypeChip(activeMood).label}
-        />
-      )}
+      ) : null}
     </div>
   );
 }
@@ -6126,65 +6099,6 @@ function MobileMoodPicker({
           );
         })}
       </div>
-    </section>
-  );
-}
-
-function StartSomethingNewPanel({
-  canUseDemoStory,
-  hasDemoStory,
-  isGenerating,
-  isNewStoryGenerating,
-  onClearDemoStory,
-  onLoadDemoStory,
-  onStartNewStory,
-  selectedStoryTypeLabel,
-}: {
-  canUseDemoStory: boolean;
-  hasDemoStory: boolean;
-  isGenerating: boolean;
-  isNewStoryGenerating: boolean;
-  onClearDemoStory: () => void;
-  onLoadDemoStory: () => void;
-  onStartNewStory: () => void;
-  selectedStoryTypeLabel?: string | null;
-}) {
-  const startCopy = getStoryTypeStartCopy(selectedStoryTypeLabel);
-  return (
-    <section className="bloodwick-home-card bloodwick-start-panel min-w-0 rounded-md border border-lantern-gold/25 bg-paper/10 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          className="bloodwick-start-button inline-flex min-w-0 items-center gap-2 whitespace-normal rounded-md bg-lantern-gold px-5 py-3 text-left text-sm font-semibold text-night-ink disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isGenerating}
-          onClick={onStartNewStory}
-          type="button"
-        >
-          {isNewStoryGenerating ? (
-            <span
-              className="size-4 shrink-0 animate-spin rounded-full border-2 border-night-ink/30 border-t-night-ink"
-              aria-hidden="true"
-            />
-          ) : null}
-          <span className="min-w-0 break-words">
-            {isNewStoryGenerating ? startCopy.loading : startCopy.button}
-          </span>
-        </button>
-        {canUseDemoStory ? (
-          hasDemoStory ? (
-            <SmallButton onClick={onClearDemoStory}>
-              Clear demo story
-            </SmallButton>
-          ) : (
-            <SmallButton onClick={onLoadDemoStory}>Load demo story</SmallButton>
-          )
-        ) : null}
-      </div>
-      {isNewStoryGenerating ? (
-        <p className="mt-3 flex min-w-0 items-center gap-2 text-sm font-semibold text-lantern-gold">
-          <span aria-hidden="true">⌛</span>
-          <span className="min-w-0 break-words">{startCopy.loading}</span>
-        </p>
-      ) : null}
     </section>
   );
 }
@@ -6371,14 +6285,6 @@ function CurrentStoryCard({
               {isGenerating ? "⌛ Writing the next chapter…" : "Next Chapter"}
             </button>
             <button
-              className="rounded-md border border-aged-brass/50 bg-white/80 px-5 py-3 text-sm font-semibold text-aged-brass transition hover:border-aged-brass hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-55"
-              disabled={isGenerating}
-              onClick={onToggleDirection}
-              type="button"
-            >
-              Next Chapter with Input
-            </button>
-            <button
               className="rounded-md border border-primary-dark/20 bg-primary-dark/5 px-5 py-3 text-sm font-semibold text-primary-dark transition hover:bg-primary-dark/10"
               onClick={onOpenRecap}
               type="button"
@@ -6393,39 +6299,6 @@ function CurrentStoryCard({
               Export
             </button>
           </div>
-          {isDirectionOpen ? (
-            <div className="min-w-0 rounded-md border border-aged-brass/25 bg-white/75 p-4">
-              <label className="flex min-w-0 flex-col gap-2">
-                <span className="text-sm font-semibold text-primary-dark">
-                  Optional direction
-                </span>
-                <textarea
-                  className="min-h-32 w-full rounded-md border border-primary-dark/15 bg-white px-3 py-2 text-sm leading-6 text-primary-dark outline-none focus:border-aged-brass focus:ring-2 focus:ring-aged-brass/20"
-                  onChange={(event) => onDirectionChange(event.target.value)}
-                  placeholder="A character to follow, a secret to press on, a feeling to deepen."
-                  value={direction}
-                />
-              </label>
-              <button
-                className="mt-3 inline-flex items-center gap-2 rounded-md bg-primary-dark px-4 py-2 text-sm font-semibold text-primary-light disabled:cursor-not-allowed disabled:opacity-55"
-                disabled={isGenerating}
-                onClick={() => onContinue(direction)}
-                type="button"
-              >
-                {isGenerating ? (
-                  <>
-                    <span
-                      className="size-4 animate-spin rounded-full border-2 border-primary-light/30 border-t-primary-light"
-                      aria-hidden="true"
-                    />
-                    Writing the next chapter…
-                  </>
-                ) : (
-                  "Next Chapter with Input"
-                )}
-              </button>
-            </div>
-          ) : null}
         </div>
       </div>
       {isRecapOpen ? (
