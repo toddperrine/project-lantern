@@ -1752,3 +1752,51 @@ textarea {
   color: var(--bloodwick-white);
   font-weight: 800;
 }
+
+@media (min-width: 768px) and (max-width: 1099px) {
+  .bloodwick-home-fear-button {
+    min-height: 3.75rem;
+    padding: 0.5rem;
+  }
+
+  .bloodwick-home-fear-button-label {
+    font-size: 0.82rem;
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+  }
+}
+
+@media (max-width: 767px) {
+  .bloodwick-home-fear-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625rem;
+  }
+
+  .bloodwick-home-fear-button {
+    min-height: 5.25rem;
+    padding: 0.625rem;
+  }
+
+  .bloodwick-home-fear-button-image {
+    opacity: 0.9;
+  }
+
+  .bloodwick-home-fear-button-overlay {
+    background:
+      linear-gradient(180deg, rgb(11 11 13 / 0.08), rgb(11 11 13 / 0.42)),
+      linear-gradient(90deg, rgb(11 11 13 / 0.28), rgb(11 11 13 / 0.18));
+  }
+
+  .bloodwick-home-fear-button[aria-pressed="true"] .bloodwick-home-fear-button-overlay {
+    background:
+      linear-gradient(180deg, rgb(229 9 20 / 0.22), rgb(11 11 13 / 0.38)),
+      linear-gradient(90deg, rgb(229 9 20 / 0.34), rgb(11 11 13 / 0.22));
+  }
+
+  .bloodwick-home-fear-button-label {
+    font-size: 0.95rem;
+    line-height: 1.08;
+    text-align: center;
+    text-shadow: 0 2px 12px rgb(11 11 13 / 0.96);
+  }
+}
