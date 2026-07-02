@@ -15,7 +15,7 @@ export function FearMoodGrid({
   heading = "What kind of fear are you in the mood for right now?",
   ...props
 }: FearMoodGridProps) {
-  const { activeMood, isGenerating = false, isNewStoryGenerating = false, onRead, onSelect } = props;
+  const { activeMood, isGenerating = false, onRead, onSelect } = props;
   const [focusedMood, setFocusedMood] = useState<StoryTypeChipId | null>(null);
   const selectedChip = activeMood
     ? STORY_TYPE_CHIPS.find((chip) => chip.id === activeMood) ?? null
@@ -76,12 +76,23 @@ export function FearMoodGrid({
       </div>
       {selectedChip ? (
         <div className="bloodwick-home-read-action">
-          <button
-            disabled={isGenerating}
-            onClick={onRead}
-            type="button"
-          >
-            {isNewStoryGenerating ? "Writing…" : "Read"}
+          <button disabled={isGenerating} onClick={onRead} type="button">
+            <svg
+              aria-hidden="true"
+              fill="none"
+              height="18"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              width="18"
+            >
+              <path d="M12 7v14" />
+              <path d="M3 5.5A2.5 2.5 0 0 1 5.5 3H12v18H5.5A2.5 2.5 0 0 1 3 18.5z" />
+              <path d="M21 5.5A2.5 2.5 0 0 0 18.5 3H12v18h6.5A2.5 2.5 0 0 0 21 18.5z" />
+            </svg>
+            <span>Read</span>
           </button>
         </div>
       ) : null}
