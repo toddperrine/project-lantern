@@ -5,15 +5,15 @@
 
   .project-lantern-shell [data-mobile-mood-subtext="true"] {
     margin: -0.35rem 0 0 !important;
-    color: #7a7166 !important;
+    color: #f2f1ed !important;
     font-size: 0.78rem !important;
     line-height: 1.25 !important;
   }
 
   .project-lantern-shell [data-mobile-fallback-mood][aria-pressed="true"] {
-    border-color: rgba(178, 135, 62, 0.42) !important;
-    background: #f5ead2 !important;
-    color: #8b621f !important;
+    border-color: rgba(229, 9, 20, 0.52) !important;
+    background: #17070a !important;
+    color: #f2f1ed !important;
     box-shadow: 0 9px 22px rgba(178, 135, 62, 0.14) !important;
   }
 
@@ -26,7 +26,7 @@
     display: flex !important;
     align-items: flex-end !important;
     justify-content: center !important;
-    background: rgba(20, 17, 12, 0.38) !important;
+    background: rgba(9, 2, 4, 0.72) !important;
     padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)) !important;
   }
 
@@ -36,10 +36,10 @@
     width: min(100%, 27rem) !important;
     max-height: min(82svh, 40rem) !important;
     overflow: auto !important;
-    border: 1px solid rgba(27, 23, 16, 0.08) !important;
+    border: 1px solid rgba(242, 241, 237, 0.12) !important;
     border-radius: 1.1rem !important;
-    background: #fffdf8 !important;
-    color: #171510 !important;
+    background: #17070a !important;
+    color: #f2f1ed !important;
     box-shadow: 0 24px 70px rgba(27, 23, 16, 0.24) !important;
   }
 
@@ -50,7 +50,7 @@
     align-items: center !important;
     justify-content: space-between !important;
     gap: 1rem !important;
-    border-bottom: 1px solid rgba(27, 23, 16, 0.08) !important;
+    border-bottom: 1px solid rgba(242, 241, 237, 0.12) !important;
     padding: 0.92rem 1rem !important;
   }
 
@@ -58,7 +58,7 @@
   [data-mobile-account-header="true"] p,
   [data-mobile-recap-header="true"] p {
     margin: 0 !important;
-    color: #171510 !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: 1.05rem !important;
     font-weight: 600 !important;
@@ -71,10 +71,10 @@
     width: 2.35rem !important;
     height: 2.35rem !important;
     place-items: center !important;
-    border: 1px solid rgba(27, 23, 16, 0.1) !important;
+    border: 1px solid rgba(242, 241, 237, 0.12) !important;
     border-radius: 999px !important;
-    background: #f8f1e5 !important;
-    color: #171510 !important;
+    background: #17070a !important;
+    color: #f2f1ed !important;
     font-size: 1.25rem !important;
     line-height: 1 !important;
   }
@@ -87,11 +87,11 @@
 
   [data-mobile-menu-list="true"] button {
     width: 100% !important;
-    border: 1px solid rgba(27, 23, 16, 0.08) !important;
+    border: 1px solid rgba(242, 241, 237, 0.12) !important;
     border-radius: 0.82rem !important;
-    background: #fbf7ef !important;
+    background: #17070a !important;
     padding: 0.86rem 0.9rem !important;
-    color: #171510 !important;
+    color: #f2f1ed !important;
     font-size: 0.92rem !important;
     font-weight: 700 !important;
     text-align: left !important;
@@ -100,14 +100,14 @@
   [data-mobile-menu-load-demo="true"],
   [data-mobile-menu-clear-demo="true"] {
     margin-top: 0.18rem !important;
-    background: #f5ead2 !important;
-    color: #805b1f !important;
+    background: #17070a !important;
+    color: #f2f1ed !important;
   }
 
   [data-mobile-account-sheet="true"] > p {
     margin: 0 !important;
     padding: 1.05rem 1rem 1.1rem !important;
-    color: #5f584f !important;
+    color: #f2f1ed !important;
     font-size: 0.92rem !important;
     line-height: 1.45 !important;
   }
@@ -118,7 +118,7 @@
 
   [data-mobile-recap-panel="true"] h2 {
     margin: 1rem 1rem 0 !important;
-    color: #171510 !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: 1.24rem !important;
     line-height: 1.15 !important;
@@ -126,7 +126,7 @@
 
   [data-mobile-recap-panel="true"] > p {
     margin: 0.65rem 1rem 0 !important;
-    color: #5f584f !important;
+    color: #f2f1ed !important;
     font-size: 0.9rem !important;
     line-height: 1.55 !important;
   }
@@ -136,9 +136,9 @@
     margin: 1rem 1rem 0 !important;
     border: 0 !important;
     border-radius: 999px !important;
-    background: #b2873e !important;
+    background: var(--bloodwick-red) !important;
     padding: 0.82rem 1rem !important;
-    color: #171510 !important;
+    color: #f2f1ed !important;
     font-size: 0.9rem !important;
     font-weight: 800 !important;
   }

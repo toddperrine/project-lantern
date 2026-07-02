@@ -35,7 +35,7 @@
   .project-lantern-shell [data-mobile-fallback-moods="true"] h2,
   .project-lantern-shell [data-mobile-fallback-start-heading="true"] h2 {
     margin: 0 !important;
-    color: #171510 !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: 1.14rem !important;
     font-weight: 500 !important;
@@ -61,11 +61,11 @@
     min-width: 4.9rem !important;
     min-height: 4.75rem !important;
     place-items: center !important;
-    border: 1px solid rgba(27, 23, 16, 0.09) !important;
+    border: 1px solid rgba(242, 241, 237, 0.12) !important;
     border-radius: 0.75rem !important;
-    background: #fffdf8 !important;
+    background: #17070a !important;
     padding: 0.58rem !important;
-    color: #28241d !important;
+    color: #f2f1ed !important;
     font-size: 0.68rem !important;
     font-weight: 700 !important;
     text-align: center !important;
@@ -90,9 +90,9 @@
     min-width: 0 !important;
     min-height: 0 !important;
     overflow: hidden !important;
-    border: 1px solid rgba(27, 23, 16, 0.08) !important;
+    border: 1px solid rgba(242, 241, 237, 0.12) !important;
     border-radius: 0.9rem !important;
-    background: #fffdf8 !important;
+    background: #17070a !important;
     padding: 0.52rem !important;
     box-shadow: 0 10px 24px rgba(40, 34, 24, 0.06) !important;
   }
@@ -125,7 +125,7 @@
     min-height: 0 !important;
     overflow: hidden !important;
     border-radius: 0.7rem !important;
-    background-color: #e7e1d6 !important;
+    background-color: #17070a !important;
     background-position: center !important;
     background-repeat: no-repeat !important;
     background-size: contain !important;
@@ -152,7 +152,7 @@
     display: block !important;
     max-width: 100% !important;
     overflow: hidden !important;
-    color: #171510 !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: 0.96rem !important;
     font-style: normal !important;
@@ -168,7 +168,7 @@
     max-width: 100% !important;
     margin: 0 !important;
     overflow: hidden !important;
-    color: #6d665d !important;
+    color: #f2f1ed !important;
     font-size: 0.72rem !important;
     font-style: normal !important;
     line-height: 1.18 !important;
@@ -189,7 +189,7 @@
     overflow: hidden !important;
     border: 1px solid rgba(178, 135, 62, 0.22) !important;
     border-radius: 999px !important;
-    background: #f7eedc !important;
+    background: #17070a !important;
     padding: 0.08rem 0.38rem !important;
     color: #7d5a21 !important;
     font-size: 0.58rem !important;
@@ -246,7 +246,7 @@
 
   .project-lantern-shell [data-mobile-destination="characters"][data-mobile-compact-card="true"] > p:first-of-type {
     margin-top: 0.25rem !important;
-    color: #5f584f !important;
+    color: #f2f1ed !important;
     font-size: 0.82rem !important;
     line-height: 1.45 !important;
   }
@@ -257,7 +257,7 @@
   }
 
   .project-lantern-shell [data-mobile-destination="worlds"][data-mobile-compact-card="true"] p {
-    color: #5f584f !important;
+    color: #f2f1ed !important;
     font-size: 0.82rem !important;
     line-height: 1.45 !important;
   }
@@ -274,7 +274,7 @@
     position: relative !important;
     overflow: hidden !important;
     min-height: 100svh !important;
-    background: linear-gradient(180deg, #070b12 0%, #0b1018 22%, #17140f 32%, #5f4a2f 42%, #dec28a 52%, #fff3d3 64%, #fff8e8 100%) !important;
+    background: linear-gradient(180deg, #090204 0%, #120507 48%, #0b0305 100%) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section {
@@ -284,7 +284,7 @@
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section > header:first-child {
-    color: #fff9ec !important;
+    color: #f2f1ed !important;
     text-shadow: 0 1px 16px rgba(0, 0, 0, 0.28) !important;
   }
 
@@ -319,7 +319,7 @@
     border-radius: 0 !important;
     background: transparent !important;
     padding: clamp(7.4rem, 30vw, 10.4rem) 1rem calc(2.6rem + env(safe-area-inset-bottom)) !important;
-    color: #18130c !important;
+    color: #f2f1ed !important;
     text-align: center !important;
     box-shadow: none !important;
     outline: none !important;
@@ -336,7 +336,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-welcome="true"] {
     max-width: 20rem !important;
     margin: 0 auto -0.2rem !important;
-    color: rgba(74, 53, 27, 0.88) !important;
+    color: rgba(242, 241, 237, 0.78) !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1rem, 4vw, 1.18rem) !important;
     font-weight: 500 !important;
@@ -358,7 +358,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-question="true"] h1 {
     max-width: 22rem !important;
     margin: 0 auto !important;
-    color: #1b1207 !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(2.25rem, 9.8vw, 2.8rem) !important;
     font-weight: 500 !important;
@@ -388,7 +388,7 @@
     border-radius: 999px !important;
     background: transparent !important;
     padding: 0.55rem 0.42rem !important;
-    color: #2a1d0e !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1.1rem, 4.9vw, 1.34rem) !important;
     font-weight: 500 !important;
@@ -414,7 +414,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-choice][aria-pressed="true"] {
     border: 0 !important;
     background: transparent !important;
-    color: #6f4812 !important;
+    color: #f2f1ed !important;
     text-decoration: underline !important;
     text-decoration-thickness: 0.055em !important;
     text-underline-offset: 0.34em !important;
@@ -422,14 +422,14 @@
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-choice][aria-pressed="true"]::before {
-    background: rgba(212, 154, 53, 0.86);
+    background: rgba(229, 9, 20, 0.86);
     box-shadow: 0 0 12px rgba(212, 154, 53, 0.46);
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-helper="true"] {
     max-width: 18rem !important;
     margin: 0 auto !important;
-    color: rgba(40, 33, 24, 0.62) !important;
+    color: rgba(242, 241, 237, 0.68) !important;
     font-size: 0.86rem !important;
     font-weight: 500 !important;
     line-height: 1.45 !important;
@@ -442,7 +442,7 @@
     border: 0 !important;
     background: transparent !important;
     padding: 0 0.3rem !important;
-    color: rgba(94, 70, 33, 0.72) !important;
+    color: rgba(242, 241, 237, 0.68) !important;
     font-size: 0.86rem !important;
     font-weight: 650 !important;
   }
@@ -465,7 +465,7 @@
     border-radius: 0 !important;
     background: transparent !important;
     padding: 0.74rem 0.1rem !important;
-    color: #1a140c !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1.25rem, 5vw, 1.5rem) !important;
     font-weight: 500 !important;
@@ -475,12 +475,12 @@
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-actions="true"] button + button {
-    border-top: 1px solid rgba(150, 106, 35, 0.24) !important;
+    border-top: 1px solid rgba(242, 241, 237, 0.12) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-check-in-actions="true"] button::after {
     content: "›";
-    color: #9a6b22;
+    color: #f2f1ed;
     font-size: 1.45rem;
     line-height: 1;
   }
@@ -500,7 +500,7 @@
     isolation: isolate !important;
     overflow: hidden !important;
     min-height: 100svh !important;
-    background: linear-gradient(180deg, #070b12 0%, #0b1018 22%, #17140f 32%, #5f4a2f 42%, #dec28a 52%, #fff3d3 64%, #fff8e8 100%) !important;
+    background: linear-gradient(180deg, #090204 0%, #120507 48%, #0b0305 100%) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] > section,
@@ -548,7 +548,7 @@
     width: 100% !important;
     min-height: min(33rem, calc(100svh - 14rem - env(safe-area-inset-bottom))) !important;
     padding: clamp(9rem, 34vw, 12rem) 1rem calc(1.8rem + env(safe-area-inset-bottom)) !important;
-    color: #1b1308 !important;
+    color: #f2f1ed !important;
     text-align: center !important;
   }
 
@@ -558,7 +558,7 @@
     display: grid !important;
     align-content: center !important;
     justify-items: center !important;
-    color: #1b1308 !important;
+    color: #f2f1ed !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-home-gate="true"] {
@@ -573,7 +573,7 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-welcome="true"] {
     margin: 0 !important;
-    color: rgba(74, 53, 27, 0.88) !important;
+    color: rgba(242, 241, 237, 0.78) !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1rem, 4vw, 1.18rem) !important;
     font-weight: 500 !important;
@@ -584,7 +584,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-question="true"] {
     max-width: 22rem !important;
     margin: 0 !important;
-    color: #1b1207 !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(2.25rem, 9.8vw, 2.8rem) !important;
     font-weight: 500 !important;
@@ -610,7 +610,7 @@
     border-radius: 0 !important;
     background: transparent !important;
     padding: 0.74rem 0.1rem !important;
-    color: #2a1d0e !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: clamp(1.25rem, 5vw, 1.5rem) !important;
     font-weight: 500 !important;
@@ -620,12 +620,12 @@
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button + button {
-    border-top: 1px solid rgba(150, 106, 35, 0.24) !important;
+    border-top: 1px solid rgba(242, 241, 237, 0.12) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-gate-actions="true"] button::after {
     content: "›";
-    color: #9a6b22;
+    color: #f2f1ed;
     font-size: 1.45rem;
     line-height: 1;
   }
@@ -707,7 +707,7 @@
   .project-lantern-shell main[data-mobile-active-view="library"] .bloodwick-shelf-saved-later,
   .project-lantern-shell main[data-mobile-active-view="library"] [data-mobile-library-series-group="true"],
   .project-lantern-shell main[data-mobile-active-view="library"] [data-mobile-library-episode-card="true"] {
-    background: rgb(11 11 13 / 0.94) !important;
+    background: #17070a !important;
     border-color: rgb(107 112 120 / 0.32) !important;
     color: #F2F1ED !important;
     box-shadow: 0 18px 42px rgb(11 11 13 / 0.28) !important;

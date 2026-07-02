@@ -44,7 +44,7 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-heading="true"] {
     margin: 0 !important;
-    color: #171510 !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: 1.18rem !important;
     font-weight: 500 !important;
@@ -59,7 +59,7 @@
     overflow: hidden !important;
     border: 0 !important;
     border-radius: 1.05rem !important;
-    background-color: #d8d0c2 !important;
+    background-color: #17070a !important;
     background-image: linear-gradient(180deg, rgba(8, 10, 12, 0.04), rgba(8, 10, 12, 0.86)), url("/artwork/half-life-of-magic.png") !important;
     background-position: center !important;
     background-repeat: no-repeat !important;
@@ -74,7 +74,7 @@
     inset: 0;
     z-index: 1;
     background:
-      radial-gradient(circle at 20% 18%, rgba(255, 250, 242, 0.2), transparent 27%),
+      radial-gradient(circle at 20% 18%, rgba(229, 9, 20, 0.1), transparent 27%),
       linear-gradient(180deg, rgba(8, 10, 12, 0), rgba(8, 10, 12, 0.24) 46%, rgba(8, 10, 12, 0.78));
     pointer-events: none;
   }
@@ -117,7 +117,7 @@
     order: 2;
     display: block;
     margin: 0 !important;
-    color: rgba(255, 250, 242, 0.82) !important;
+    color: rgba(242, 241, 237, 0.82) !important;
     font-size: 0.72rem !important;
     font-weight: 700 !important;
     letter-spacing: 0 !important;
@@ -128,7 +128,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-continue-copy="true"] h2 {
     order: 1;
     margin: 0 !important;
-    color: #fffaf2 !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: 1.42rem !important;
     font-weight: 600 !important;
@@ -145,9 +145,9 @@
     align-items: center !important;
     min-height: 2rem !important;
     border-radius: 999px !important;
-    background: rgba(255, 250, 242, 0.92) !important;
+    background: rgba(23, 7, 10, 0.92) !important;
     padding: 0.44rem 0.78rem !important;
-    color: #171510 !important;
+    color: #f2f1ed !important;
     font-size: 0.72rem !important;
     font-weight: 800 !important;
     line-height: 1 !important;
@@ -164,10 +164,10 @@
     width: 2.65rem !important;
     height: 2.65rem !important;
     place-items: center !important;
-    border: 1px solid rgba(255, 250, 242, 0.46) !important;
+    border: 1px solid rgba(242, 241, 237, 0.46) !important;
     border-radius: 999px !important;
     background: rgba(0, 0, 0, 0.28) !important;
-    color: #fffaf2 !important;
+    color: #f2f1ed !important;
     box-shadow: none !important;
     backdrop-filter: blur(8px);
   }
@@ -182,7 +182,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-fallback-moods="true"] h2,
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-fallback-starts="true"] h2 {
     margin: 0 !important;
-    color: #171510 !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: 1.12rem !important;
     font-weight: 500 !important;
@@ -218,11 +218,11 @@
     flex: 0 0 auto !important;
     place-items: center !important;
     gap: 0.28rem !important;
-    border: 1px solid rgba(27, 23, 16, 0.09) !important;
+    border: 1px solid rgba(242, 241, 237, 0.12) !important;
     border-radius: 0.78rem !important;
-    background: #fffdf8 !important;
+    background: #17070a !important;
     padding: 0.54rem 0.58rem !important;
-    color: #28241d !important;
+    color: #f2f1ed !important;
     text-align: center !important;
     box-shadow: 0 8px 18px rgba(41, 35, 24, 0.04) !important;
   }
@@ -233,8 +233,8 @@
     height: 1.75rem !important;
     place-items: center !important;
     border-radius: 999px !important;
-    background: #efe8d8 !important;
-    color: #9a7330 !important;
+    background: #17070a !important;
+    color: #f2f1ed !important;
     font-size: 0.95rem !important;
     font-weight: 850 !important;
     line-height: 1 !important;
@@ -259,15 +259,15 @@
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-fallback-mood][aria-pressed="true"] {
-    border-color: rgba(178, 135, 62, 0.42) !important;
-    background: #f4e7cb !important;
-    color: #171510 !important;
+    border-color: rgba(229, 9, 20, 0.52) !important;
+    background: #17070a !important;
+    color: #f2f1ed !important;
     box-shadow: 0 10px 22px rgba(178, 135, 62, 0.14) !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-fallback-mood][aria-pressed="true"] [data-mobile-mood-icon="true"] {
-    background: #b2873e !important;
-    color: #fffaf2 !important;
+    background: var(--bloodwick-red) !important;
+    color: #f2f1ed !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-fallback-start-list="true"] {
@@ -283,9 +283,9 @@
     width: 100% !important;
     min-height: 0 !important;
     overflow: hidden !important;
-    border: 1px solid rgba(27, 23, 16, 0.08) !important;
+    border: 1px solid rgba(242, 241, 237, 0.12) !important;
     border-radius: 0.9rem !important;
-    background: #fffdf8 !important;
+    background: #17070a !important;
     padding: 0.52rem !important;
     box-shadow: 0 10px 24px rgba(40, 34, 24, 0.06) !important;
     text-align: left !important;
@@ -299,8 +299,8 @@
     min-height: 0 !important;
     overflow: hidden !important;
     border-radius: 0.7rem !important;
-    background-color: #e7e1d6 !important;
-    background-image: linear-gradient(135deg, #eee7da, #d9d0c1) !important;
+    background-color: #17070a !important;
+    background-image: linear-gradient(135deg, #210a0f, #120507) !important;
     background-position: center !important;
     background-repeat: no-repeat !important;
     background-size: cover !important;
@@ -350,7 +350,7 @@
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-story-row="true"] h3,
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-story-row="true"] strong {
     overflow: hidden !important;
-    color: #171510 !important;
+    color: #f2f1ed !important;
     font-family: Georgia, "Times New Roman", serif !important;
     font-size: 0.98rem !important;
     font-weight: 500 !important;
@@ -364,7 +364,7 @@
     display: -webkit-box !important;
     margin: 0 !important;
     overflow: hidden !important;
-    color: #6d665d !important;
+    color: #f2f1ed !important;
     font-size: 0.72rem !important;
     font-style: normal !important;
     line-height: 1.2 !important;
@@ -381,14 +381,14 @@
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-story-row="true"] span,
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-row-tags="true"] span {
-    color: #6d665d !important;
+    color: #f2f1ed !important;
   }
 
   .project-lantern-shell main[data-mobile-active-view="home"] [data-mobile-row-tags="true"] span {
     max-width: 5.4rem !important;
     overflow: hidden !important;
     border-radius: 999px !important;
-    background: #ede9df !important;
+    background: #17070a !important;
     padding: 0.14rem 0.43rem !important;
     color: #5a554d !important;
     font-size: 0.6rem !important;
@@ -415,7 +415,7 @@
     content: "Manage Library";
     display: block;
     margin-bottom: 0.7rem;
-    color: #171510;
+    color: #f2f1ed;
     font-family: Georgia, "Times New Roman", serif;
     font-size: 1.05rem;
     font-weight: 500;
@@ -433,9 +433,9 @@
     gap: 0.72rem !important;
     align-items: start !important;
     overflow: hidden !important;
-    border: 1px solid rgba(27, 23, 16, 0.08) !important;
+    border: 1px solid rgba(242, 241, 237, 0.12) !important;
     border-radius: 0.9rem !important;
-    background: #fffdf8 !important;
+    background: #17070a !important;
     padding: 0.65rem !important;
     box-shadow: 0 10px 24px rgba(40, 34, 24, 0.05) !important;
   }
@@ -446,7 +446,7 @@
     aspect-ratio: 1 / 1;
     width: 4.6rem;
     border-radius: 0.72rem;
-    background-color: #e7e1d6;
+    background-color: #17070a;
     background-position: center;
     background-repeat: no-repeat;
     background-size: cover;

@@ -21,10 +21,10 @@ body {
   max-width: 100%;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at top left, rgba(217, 164, 65, 0.12), transparent 34rem),
-    radial-gradient(circle at 85% 10%, rgba(47, 143, 139, 0.12), transparent 28rem),
-    linear-gradient(135deg, #0B1020 0%, #111827 58%, #0B1020 100%);
-  color: #F6EFE2;
+    radial-gradient(circle at top left, rgba(229, 9, 20, 0.14), transparent 34rem),
+    radial-gradient(circle at 85% 10%, rgba(184, 115, 51, 0.08), transparent 28rem),
+    linear-gradient(135deg, #090204 0%, #120507 58%, #0b0305 100%);
+  color: #f2f1ed;
 }
 
 button,
@@ -324,7 +324,7 @@ textarea {
   border-color: rgba(217, 164, 65, 0.24);
   background:
     linear-gradient(180deg, rgba(11, 16, 32, 0.08), rgba(11, 16, 32, 0.78)),
-    linear-gradient(135deg, #f0dfbf 0%, #9b6f54 48%, #1b2636 100%);
+    linear-gradient(135deg, #210a0f 0%, #17070a 48%, #090204 100%);
   box-shadow: 0 22px 70px rgba(0, 0, 0, 0.22);
 }
 
@@ -390,7 +390,7 @@ textarea {
 .project-lantern-shell article:has(> div > [aria-label$="portrait artwork"]) h3 {
   font-size: clamp(1.55rem, 9vw, 2.15rem);
   line-height: 1;
-  color: #fff8ea;
+  color: #f2f1ed;
   text-shadow: 0 2px 18px rgba(0, 0, 0, 0.4);
 }
 
@@ -609,13 +609,13 @@ textarea {
 
 .project-lantern-workspace section[class*="bg-white"],
 .project-lantern-workspace article[class*="bg-white"] {
-  background-color: rgba(255, 248, 234, 0.84);
+  background-color: rgba(23, 7, 10, 0.84);
 }
 
 .project-lantern-workspace textarea,
 .project-lantern-workspace input,
 .project-lantern-workspace select {
-  background-color: #FFF8EA;
+  background-color: #17070a;
 }
 
 @media (min-width: 768px) {
@@ -640,7 +640,7 @@ textarea {
   background:
     radial-gradient(circle at 58% 26%, rgba(246, 239, 226, 0.2), transparent 4.6rem),
     linear-gradient(160deg, rgba(11, 16, 32, 0.18) 0 34%, transparent 34% 100%),
-    linear-gradient(145deg, #f2d7a4 0%, #c58b46 38%, #4f766f 68%, #172233 100%) !important;
+    linear-gradient(145deg, #210a0f 0%, #17070a 48%, #090204 100%) !important;
 }
 
 .project-lantern-shell main > section > div > div > div > section:has(> div > div [aria-label$="artwork"]) > div > div [aria-label$="artwork"] > .absolute:nth-child(4) {
